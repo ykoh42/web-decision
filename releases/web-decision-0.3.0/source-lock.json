@@ -19,8 +19,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 2403,
-      "sha256": "27729fe14d7719b7f83b58e339e2f7c3231ac2343f7bdbb68c1cd6b5c660a214"
+      "bytes": 2730,
+      "sha256": "db4104755fd746d646472ee8fcb0fdfbabc18b496b72da0e2195541d46db0177"
     },
     {
       "path": "packages/web-decision/vite.config.mjs",
@@ -39,8 +39,8 @@
     },
     {
       "path": "pnpm-lock.yaml",
-      "bytes": 35163,
-      "sha256": "553e8eb85cf252b8a11e9eb99dc2afefa5fb31026766c149e498f6312bf49bc1"
+      "bytes": 73771,
+      "sha256": "8f2aa8f95e6ef24589bbc05e029c5c9508a5bc73a6ffc48d05909278422c94f8"
     },
     {
       "path": "pnpm-workspace.yaml",

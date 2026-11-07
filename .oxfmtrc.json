@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "semi": true,
+  "singleQuote": true,
+  "bracketSpacing": false,
+  "trailingComma": "none",
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "releases/web-decision-0.1.0/**",
+    "releases/web-decision-0.2.0/**",
+    "releases/web-decision-0.3.0/**",
+    "node_modules/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**"
+  ]
+}

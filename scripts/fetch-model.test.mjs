@@ -366,7 +366,10 @@ test('preview setup retries an interrupted checkpoint download before creating b
     await mkdir(join(root, 'scripts'));
     await mkdir(join(root, 'bin'));
     await copyFile(resolve('scripts/setup_preview.sh'), join(root, 'scripts/setup_preview.sh'));
-    await copyFile(resolve('scripts/verify_preview_build_requirements.py'), join(root, 'scripts/verify_preview_build_requirements.py'));
+    await copyFile(
+      resolve('scripts/verify_preview_build_requirements.py'),
+      join(root, 'scripts/verify_preview_build_requirements.py')
+    );
     await copyFile(resolve('requirements-preview-build.txt'), join(root, 'requirements-preview-build.txt'));
     await copyFile(resolve('requirements-preview-build.lock'), join(root, 'requirements-preview-build.lock'));
     const sha = createHash('sha256').update('abc').digest('hex');
@@ -651,7 +654,12 @@ test('does not start curl when the hard file-size limit is below the pinned size
 
     const result = spawnSync(
       'bash',
-      ['-c', 'ulimit -S -f 1 && ulimit -H -f 1 && exec bash "$1"', 'hard-limit-test', join(f.root, 'scripts/fetch-model.sh')],
+      [
+        '-c',
+        'ulimit -S -f 1 && ulimit -H -f 1 && exec bash "$1"',
+        'hard-limit-test',
+        join(f.root, 'scripts/fetch-model.sh')
+      ],
       {
         encoding: 'utf8',
         env: {

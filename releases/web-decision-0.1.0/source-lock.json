@@ -9,8 +9,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 2403,
-      "sha256": "27729fe14d7719b7f83b58e339e2f7c3231ac2343f7bdbb68c1cd6b5c660a214"
+      "bytes": 2730,
+      "sha256": "db4104755fd746d646472ee8fcb0fdfbabc18b496b72da0e2195541d46db0177"
     },
     {
       "path": "packages/web-decision/package.json",
@@ -29,8 +29,8 @@
     },
     {
       "path": "pnpm-lock.yaml",
-      "bytes": 35163,
-      "sha256": "553e8eb85cf252b8a11e9eb99dc2afefa5fb31026766c149e498f6312bf49bc1"
+      "bytes": 73771,
+      "sha256": "8f2aa8f95e6ef24589bbc05e029c5c9508a5bc73a6ffc48d05909278422c94f8"
     },
     {
       "path": "pnpm-workspace.yaml",
@@ -429,8 +429,8 @@
     },
     {
       "path": "scripts/fetch-model.test.mjs",
-      "bytes": 33910,
-      "sha256": "61c1805e35695a18f6839574a68c6f303922bf232c6ca8f2147815cc254a3ab9"
+      "bytes": 33968,
+      "sha256": "4d155be506cf4ee41709c158828e54b8762cd2a0510f8813e19ccb29379c8d9f"
     },
     {
       "path": "scripts/prepare_web_decision_assets.py",

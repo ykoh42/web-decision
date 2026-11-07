@@ -8,6 +8,10 @@
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
   "scripts": {
+    "lint": "oxlint . --max-warnings=2",
+    "format": "oxfmt '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
+    "format:check": "oxfmt --check '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
+    "check:quality": "pnpm run format:check && pnpm run lint",
     "test:release": "node --test releases/web-decision-0.1.0/prepare-asset-pack.test.mjs && node --test releases/web-decision-0.1.0/release-integrity.test.mjs && node --test scripts/fetch-model.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.1.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.2.0": "node --test releases/web-decision-0.2.0/test/model-contract.test.mjs releases/web-decision-0.2.0/prepare-asset-pack.test.mjs releases/web-decision-0.2.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.2.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.3.0": "node --test releases/web-decision-0.3.0/test/model-contract.test.mjs releases/web-decision-0.3.0/prepare-asset-pack.test.mjs releases/web-decision-0.3.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.3.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
@@ -22,6 +26,9 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@playwright/test": "1.65.0",
+    "eslint-plugin-sonarjs": "4.2.2",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
     "publint": "0.3.25",
     "vite": "8.3.6"
   },
