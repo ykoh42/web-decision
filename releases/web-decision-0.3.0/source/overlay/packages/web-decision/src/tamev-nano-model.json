@@ -1,0 +1,78 @@
+{
+  "model": "experimental-tamev-nano-tinybert-int8",
+  "precision": "int8",
+  "checkpoint": {
+    "repository": "Tamkimd/tamev-nano-tinybert",
+    "revision": "ad15b45f35526070d48fb91f6597d2805a2d80af"
+  },
+  "assets": {
+    "integrity": "pinned-per-file-sha256",
+    "location": "separate",
+    "requiredFiles": [
+      "model_int8.onnx",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "config.json"
+    ],
+    "totalBytes": 15585045
+  },
+  "licenses": {
+    "project": "Apache-2.0",
+    "modelTerms": "Apache-2.0-declared-by-pinned-model-card",
+    "modelCard": "https://huggingface.co/Tamkimd/tamev-nano-tinybert/tree/ad15b45f35526070d48fb91f6597d2805a2d80af"
+  },
+  "backend": {
+    "name": "onnxruntime-web-wasm",
+    "executionProvider": "wasm",
+    "intraOpNumThreads": 1
+  },
+  "features": {
+    "textChoice": {
+      "status": "implemented",
+      "abstention": "not-implemented",
+      "limits": [
+        {
+          "resource": "tokens",
+          "scope": "state",
+          "max": 128,
+          "description": "Context row including tokenizer special tokens; excess input is right-truncated and reported."
+        },
+        {
+          "resource": "tokens",
+          "scope": "question",
+          "max": 48,
+          "description": "Each option row including tokenizer special tokens; excess input is right-truncated and reported."
+        },
+        {
+          "resource": "options",
+          "scope": "question",
+          "min": 2,
+          "description": "Dynamic option axis; device resources constrain practical request size."
+        },
+        {
+          "resource": "questions",
+          "scope": "request",
+          "min": 1,
+          "description": "Questions run sequentially; no adapter-only question-count ceiling."
+        }
+      ],
+      "handling": "sequential-questions",
+      "tokenCount": "sum-of-encoded-rows",
+      "score": {
+        "basis": "candidate-probabilities",
+        "temperature": 1.5,
+        "temperatureAppliedBy": "model-export",
+        "calibration": "per-option-count-on-generic-decision"
+      }
+    },
+    "typedTextQuestionTypes": ["choice", "noul", "score"],
+    "imageChoice": {"status": "not-implemented"},
+    "rating": {"status": "not-implemented"}
+  },
+  "verification": {
+    "currentBundleGpu": "not-applicable",
+    "currentBundleCpuWasm": "verified",
+    "currentBundleJavascript": "not-applicable",
+    "priorEvidence": "The exact 0.3.0 release archive passed real-model CPU/WASM browser checks in Chromium, Firefox, and WebKit on one Apple M4 Pro. This does not establish compatibility with other devices or decision quality."
+  }
+}

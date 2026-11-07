@@ -1,0 +1,19 @@
+{
+  "package": "web-decision@0.2.0",
+  "registry": "https://registry.npmjs.org/",
+  "distTag": "latest",
+  "publishedAt": "2026-11-07T15:57:10.509Z",
+  "registryTarball": "https://registry.npmjs.org/web-decision/-/web-decision-0.2.0.tgz",
+  "archive": {
+    "file": "web-decision-0.2.0.tgz",
+    "bytes": 102265,
+    "sha256": "bd29861052f7de6d8a39f60f78253cc36ca6980e7ae0a104f09009354ee798f4",
+    "sha1": "7047b33f30be9dedec1d8905d0618dfe2b483ee5"
+  },
+  "verification": {
+    "registryVersion": "web-decision@0.2.0",
+    "latestDistTag": "0.2.0",
+    "downloadedRegistryArchiveMatchesPublishedArchive": true,
+    "method": "npm pack web-decision@0.2.0 followed by SHA-256 and SHA-1 comparison with the exact GitHub Release archive"
+  }
+}

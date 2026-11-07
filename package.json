@@ -10,13 +10,18 @@
   "scripts": {
     "test:release": "node --test releases/web-decision-0.1.0/prepare-asset-pack.test.mjs && node --test releases/web-decision-0.1.0/release-integrity.test.mjs && node --test scripts/fetch-model.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.1.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.2.0": "node --test releases/web-decision-0.2.0/test/model-contract.test.mjs releases/web-decision-0.2.0/prepare-asset-pack.test.mjs releases/web-decision-0.2.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.2.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
+    "test:release:0.3.0": "node --test releases/web-decision-0.3.0/test/model-contract.test.mjs releases/web-decision-0.3.0/prepare-asset-pack.test.mjs releases/web-decision-0.3.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.3.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
+    "test:release:0.3.0:browser:micro": "pnpm exec playwright test --config releases/web-decision-0.3.0/test/playwright.config.mjs",
     "build:release": "node releases/web-decision-0.1.0/build.mjs",
     "pack:release": "node releases/web-decision-0.1.0/pack.mjs",
     "build:release:0.2.0": "node releases/web-decision-0.2.0/build.mjs",
-    "pack:release:0.2.0": "node releases/web-decision-0.2.0/pack.mjs"
+    "pack:release:0.2.0": "node releases/web-decision-0.2.0/pack.mjs",
+    "build:release:0.3.0": "node releases/web-decision-0.3.0/build.mjs",
+    "pack:release:0.3.0": "node releases/web-decision-0.3.0/pack.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
+    "@playwright/test": "1.65.0",
     "publint": "0.3.25",
     "vite": "8.3.6"
   },

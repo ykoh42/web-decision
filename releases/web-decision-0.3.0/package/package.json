@@ -1,0 +1,40 @@
+{
+  "name": "web-decision",
+  "version": "0.3.0",
+  "description": "Browser-local Kev 0.6B, TAMEV Nano and TAMEV Micro decision models",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./index.d.ts",
+  "files": [
+    "dist",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "KEV06-NOTICE",
+    "KEV-NOTICE",
+    "TAMEV-NANO-NOTICE",
+    "TAMEV-NANO-LICENSE",
+    "TAMEV-MICRO-NOTICE",
+    "TAMEV-MICRO-LICENSE",
+    "TVM-LICENSE",
+    "TVM-NOTICE",
+    "EMSCRIPTEN-LICENSE",
+    "ROLLDOWN-LICENSE",
+    "ROLLDOWN-THIRD-PARTY-LICENSE",
+    "VITE-LICENSE.md"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-web": "1.31.1"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
+  "license": "Apache-2.0"
+}

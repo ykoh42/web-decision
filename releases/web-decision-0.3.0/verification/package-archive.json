@@ -1,0 +1,66 @@
+{
+  "package": "web-decision@0.3.0",
+  "archive": {
+    "file": "web-decision-0.3.0.tgz",
+    "sha256": "ccfa582e2070939b3f03e8c4759eaababc6b1f0ed1d546596d079123c4b54a50",
+    "bytes": 103515,
+    "files": 17
+  },
+  "bundle": {
+    "sha256": "b4aee808c55dc592abe920ae4c45aae8e1bc2abc0ca3fca161a0a25a92d5c9a0",
+    "bytes": 347305
+  },
+  "models": [
+    "kev-0.6b-q4f16",
+    "experimental-tamev-nano-tinybert-int8",
+    "experimental-tamev-micro-minilm-int8"
+  ],
+  "modelWeightsIncluded": false,
+  "checks": {
+    "sourceLockAndRebuild": "passed",
+    "rebuiltBundlePin": "matched",
+    "archiveMemberIntegrity": "passed",
+    "nodeTests": "13 passed",
+    "pythonAttentionTests": "10 passed",
+    "safeOutputTests": "14 passed",
+    "publint": "passed",
+    "typescriptNodeNextAndBundler": "passed",
+    "areTheTypesWrong": "ESM NodeNext and Bundler passed; ESM-only package reports an ignored CommonJS require warning",
+    "npmAuditProductionDependencies": "0 vulnerabilities",
+    "packageConsumerTypeChecks": "strict NodeNext and Bundler passed"
+  },
+  "realModelBrowserEvidence": {
+    "kev": [
+      "verification/kev-chromium.json",
+      "verification/kev-firefox.json",
+      "verification/kev-webkit.json"
+    ],
+    "tamevNano": [
+      "verification/nano-chromium.json",
+      "verification/nano-firefox.json",
+      "verification/nano-webkit.json"
+    ],
+    "tamevMicro": [
+      "verification/micro-chromium.json",
+      "verification/micro-firefox.json",
+      "verification/micro-webkit.json"
+    ],
+    "device": "Apple M4 Pro",
+    "scope": "Nine exact-archive real-model cases across Chromium 158.0.8127.18, Firefox 159.0, and WebKit 27.2. Kev uses non-fallback WebGPU with shader-f16; TAMEV uses ONNX Runtime WebAssembly CPU. This does not establish decision quality or support on other devices."
+  },
+  "cleanReleaseWorktree": {
+    "frozenPnpmInstall": "passed",
+    "releaseTests": {
+      "node": "13 passed",
+      "pythonAttention": "10 passed",
+      "safeOutput": "14 passed"
+    },
+    "rebuiltBundleSha256": "b4aee808c55dc592abe920ae4c45aae8e1bc2abc0ca3fca161a0a25a92d5c9a0",
+    "rebuiltArchiveMembers": "All 17 extracted package files match the exact browser-tested archive byte-for-byte. The regenerated tarball has a different outer SHA-256; the exact tested archive is retained for release."
+  },
+  "securityReview": {
+    "scanId": "178eff7e-5bce-499c-82c2-729122c08c5b",
+    "status": "completed; no vulnerability candidates",
+    "supplementalOverlayReview": "12 TVM overlay files were compared with the 0.1.0 overlays and are byte-identical; no findings."
+  }
+}

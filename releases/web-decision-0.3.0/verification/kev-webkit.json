@@ -1,0 +1,601 @@
+{
+  "adapterInfo": {
+    "vendor": "apple",
+    "architecture": "apple",
+    "isFallbackAdapter": false,
+    "shaderF16": true
+  },
+  "typed": {
+    "model": "kev-0.6b-q4f16",
+    "tokenCount": 74,
+    "answers": {
+      "team": {
+        "type": "choice",
+        "choice": "other",
+        "confidence": 0.6541,
+        "probabilities": {
+          "billing": 0.2217,
+          "delivery": 0.0089,
+          "other": 0.7694
+        },
+        "probabilityEntries": [
+          [
+            "billing",
+            0.2217
+          ],
+          [
+            "delivery",
+            0.0089
+          ],
+          [
+            "other",
+            0.7694
+          ]
+        ]
+      },
+      "refund": {
+        "type": "noul",
+        "noul": 0.0266
+      },
+      "urgency": {
+        "type": "score",
+        "score": 1.4059,
+        "legend": {
+          "0": "can wait",
+          "1": "soon",
+          "2": "today"
+        },
+        "probabilities": {
+          "0": 0.1297,
+          "1": 0.3346,
+          "2": 0.5357
+        },
+        "probabilityEntries": [
+          [
+            "0",
+            0.1297
+          ],
+          [
+            "1",
+            0.3346
+          ],
+          [
+            "2",
+            0.5357
+          ]
+        ],
+        "confidence": 0.1089
+      }
+    },
+    "answerEntries": [
+      [
+        "team",
+        {
+          "type": "choice",
+          "choice": "other",
+          "confidence": 0.6541,
+          "probabilities": {
+            "billing": 0.2217,
+            "delivery": 0.0089,
+            "other": 0.7694
+          },
+          "probabilityEntries": [
+            [
+              "billing",
+              0.2217
+            ],
+            [
+              "delivery",
+              0.0089
+            ],
+            [
+              "other",
+              0.7694
+            ]
+          ]
+        }
+      ],
+      [
+        "refund",
+        {
+          "type": "noul",
+          "noul": 0.0266
+        }
+      ],
+      [
+        "urgency",
+        {
+          "type": "score",
+          "score": 1.4059,
+          "legend": {
+            "0": "can wait",
+            "1": "soon",
+            "2": "today"
+          },
+          "probabilities": {
+            "0": 0.1297,
+            "1": 0.3346,
+            "2": 0.5357
+          },
+          "probabilityEntries": [
+            [
+              "0",
+              0.1297
+            ],
+            [
+              "1",
+              0.3346
+            ],
+            [
+              "2",
+              0.5357
+            ]
+          ],
+          "confidence": 0.1089
+        }
+      ]
+    ]
+  },
+  "generic": {
+    "tokenCount": 74,
+    "answers": [
+      {
+        "selected": "other",
+        "selectedIndex": 2,
+        "probabilities": [
+          {
+            "option": "billing: charges and refunds",
+            "probability": 0.22172501219636456,
+            "logit": 3.130859375
+          },
+          {
+            "option": "delivery: shipping problems",
+            "probability": 0.008899942925594512,
+            "logit": -0.08453369140625
+          },
+          {
+            "option": "other",
+            "probability": 0.769375044878041,
+            "logit": 4.375
+          }
+        ]
+      },
+      {
+        "selected": "no: something else",
+        "selectedIndex": 0,
+        "probabilities": [
+          {
+            "option": "no: something else",
+            "probability": 0.9734181718997279,
+            "logit": 5.2890625
+          },
+          {
+            "option": "yes: asks for money back",
+            "probability": 0.02658182810027201,
+            "logit": 1.6884765625
+          }
+        ]
+      },
+      {
+        "selected": "today",
+        "selectedIndex": 2,
+        "probabilities": [
+          {
+            "option": "can wait",
+            "probability": 0.12974586937809124,
+            "logit": 2.044921875
+          },
+          {
+            "option": "soon",
+            "probability": 0.3345690585429399,
+            "logit": 2.9921875
+          },
+          {
+            "option": "today",
+            "probability": 0.5356850720789689,
+            "logit": 3.462890625
+          }
+        ]
+      }
+    ]
+  },
+  "exactTokenCapTokenCount": 74,
+  "progress": {
+    "loadedBytes": 349103828,
+    "totalBytes": 349103828,
+    "fraction": 1
+  },
+  "packedInputs": [
+    [
+      151659,
+      26534,
+      25,
+      11430,
+      10917,
+      198,
+      23582,
+      25,
+      33671,
+      151660,
+      23085,
+      2083,
+      1265,
+      3705,
+      419,
+      30,
+      151648,
+      38637,
+      25,
+      10195,
+      323,
+      72518,
+      151649,
+      151648,
+      32390,
+      25,
+      11601,
+      5322,
+      151649,
+      151648,
+      1575,
+      151649,
+      151661,
+      151660,
+      3872,
+      279,
+      6002,
+      10161,
+      369,
+      264,
+      20965,
+      30,
+      151648,
+      2152,
+      25,
+      2494,
+      770,
+      151649,
+      151648,
+      9693,
+      25,
+      17064,
+      369,
+      3220,
+      1182,
+      151649,
+      151661,
+      151660,
+      4340,
+      33671,
+      374,
+      419,
+      30,
+      151648,
+      4814,
+      3783,
+      151649,
+      151648,
+      66056,
+      151649,
+      151648,
+      30113,
+      151649,
+      151661
+    ],
+    [
+      151659,
+      26534,
+      25,
+      11430,
+      10917,
+      198,
+      23582,
+      25,
+      33671,
+      151660,
+      23085,
+      2083,
+      1265,
+      3705,
+      419,
+      30,
+      151648,
+      38637,
+      25,
+      10195,
+      323,
+      72518,
+      151649,
+      151648,
+      32390,
+      25,
+      11601,
+      5322,
+      151649,
+      151648,
+      1575,
+      151649,
+      151661,
+      151660,
+      3872,
+      279,
+      6002,
+      10161,
+      369,
+      264,
+      20965,
+      30,
+      151648,
+      2152,
+      25,
+      2494,
+      770,
+      151649,
+      151648,
+      9693,
+      25,
+      17064,
+      369,
+      3220,
+      1182,
+      151649,
+      151661,
+      151660,
+      4340,
+      33671,
+      374,
+      419,
+      30,
+      151648,
+      4814,
+      3783,
+      151649,
+      151648,
+      66056,
+      151649,
+      151648,
+      30113,
+      151649,
+      151661
+    ],
+    [
+      151659,
+      87,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      856,
+      151660,
+      24051,
+      151648,
+      64,
+      151649,
+      151648,
+      65,
+      151649,
+      151661
+    ]
+  ],
+  "invalidInputCodes": [
+    "INVALID_INPUT",
+    "INVALID_INPUT",
+    "INVALID_INPUT"
+  ],
+  "invalidRequestTokenized": [
+    true,
+    false,
+    false
+  ],
+  "invalidRequestTokenCounts": [
+    [
+      65,
+      1,
+      1,
+      1
+    ],
+    [],
+    []
+  ],
+  "invalidTokenCapPackedTokenCount": 75,
+  "deviceProof": {
+    "state": "destroyed",
+    "reason": "destroyed",
+    "disposalStarted": true,
+    "lostBeforeDisposal": false
+  },
+  "closedCode": "SESSION_CLOSED",
+  "runStages": [
+    {
+      "stage": "systemOne",
+      "tokenCount": 74,
+      "questionCount": 3
+    },
+    {
+      "stage": "decide",
+      "tokenCount": 74,
+      "questionCount": 3
+    },
+    {
+      "stage": "exact-token-cap",
+      "tokenCount": 74,
+      "questionCount": 1
+    }
+  ],
+  "runCounts": [
+    {
+      "after": "systemOne",
+      "count": 1
+    },
+    {
+      "after": "decide",
+      "count": 2
+    },
+    {
+      "after": "exact-token-cap",
+      "count": 3
+    },
+    {
+      "after": "invalid-token-cap",
+      "count": 3,
+      "added": 0
+    },
+    {
+      "after": "invalid-option-cap",
+      "count": 3,
+      "added": 0
+    },
+    {
+      "after": "invalid-typed-option-cap",
+      "count": 3,
+      "added": 0
+    },
+    {
+      "after": "releaseCachedMemory",
+      "count": 3
+    },
+    {
+      "after": "dispose",
+      "count": 3
+    },
+    {
+      "after": "post-disposal",
+      "count": 3
+    }
+  ],
+  "assetResponses": [
+    {
+      "path": "/kev-0.6b-q4f16/manifest.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/tokenizer.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/tokenizer_config.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/model_config.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/model.wasm",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/tensor-cache.json",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_0.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_1.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_2.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_3.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_4.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_5.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_6.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_7.bin",
+      "status": 200,
+      "contentRange": null
+    },
+    {
+      "path": "/kev-0.6b-q4f16/weights/params_shard_8.bin",
+      "status": 200,
+      "contentRange": null
+    }
+  ]
+}

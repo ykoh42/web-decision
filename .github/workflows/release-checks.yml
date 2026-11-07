@@ -3,8 +3,15 @@ name: Release checks
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version to verify
+        required: true
+        type: choice
+        options: ['0.1.0', '0.2.0', '0.3.0']
 
 permissions:
   contents: read
@@ -27,25 +34,73 @@ jobs:
           require-lockfile: true
           install: false
           cache: true
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97b # v7.0.0
         if: matrix.node == '24.0.0'
         with:
           python-version: '3.12'
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm test:release
+      - name: Select release version
+        id: release
+        shell: bash
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$REQUESTED_RELEASE_VERSION" ]]; then
+            version="$REQUESTED_RELEASE_VERSION"
+          else
+            version="0.3.0"
+          fi
+          case "$version" in
+            0.1.0|0.2.0|0.3.0) ;;
+            *) echo "Unsupported release version: $version" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Test release package
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+            script="test:release"
+          else
+            script="test:release:$RELEASE_VERSION"
+          fi
+          pnpm run "$script"
       - name: Verify release build requirements
-        if: matrix.node == '24.0.0'
+        if: matrix.node == '24.0.0' && steps.release.outputs.version == '0.1.0'
         run: python scripts/verify_preview_build_requirements.py
-      - run: pnpm build:release
-      - run: pnpm pack:release
+      - name: Build release package
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+            script="build:release"
+          else
+            script="build:release:$RELEASE_VERSION"
+          fi
+          pnpm run "$script"
+      - name: Pack release archive
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+            script="pack:release"
+          else
+            script="pack:release:$RELEASE_VERSION"
+          fi
+          pnpm run "$script"
       - name: Audit the packed runtime dependency
         if: matrix.node == '24.0.0'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           consumer="$RUNNER_TEMP/web-decision-consumer"
           mkdir -p "$consumer"
           (
             cd "$consumer"
             npm init -y
-            npm install "$GITHUB_WORKSPACE/releases/web-decision-0.1.0/build/release/web-decision-0.1.0.tgz" --ignore-scripts
+            npm install "$GITHUB_WORKSPACE/releases/web-decision-$RELEASE_VERSION/build/release/web-decision-$RELEASE_VERSION.tgz" --ignore-scripts
             npm audit --omit=dev
           )

@@ -1,0 +1,16 @@
+TAMEV Micro MiniLM model integration
+
+This release includes an adapter for the TAMEV Micro MiniLM model at revision
+c1b95679390911748aad57f634bed70e5f87a084:
+
+https://huggingface.co/Tamkimd/tamev-micro-minilm/tree/c1b95679390911748aad57f634bed70e5f87a084
+
+The pinned model card declares Apache-2.0. Its exact LICENSE file is included
+as TAMEV-MICRO-LICENSE. The base model identified by the card is
+sentence-transformers/all-MiniLM-L6-v2.
+
+The model weights, tokenizer, configuration, training data and exported ONNX
+assets are fetched separately by the application; none are included in this
+npm package. The project has checked asset revisions, file sizes, hashes and
+runtime behavior. This notice does not make an independent legal determination
+about training-data provenance or grant rights beyond the upstream license.

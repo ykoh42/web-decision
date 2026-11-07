@@ -1,25 +1,36 @@
 # web-decision
 
-`web-decision` is a browser JavaScript library for running local decision models. The stable `0.1.0` release supports one model: Kev 0.6B Q4F16 through TVM WebGPU.
+`web-decision` is a browser JavaScript library for running decision models locally. The latest published stable release is `0.2.0`, with Kev 0.6B and TAMEV Nano routes.
 
 ## Install
 
 ```sh
-npm install web-decision@0.1.0
+npm install web-decision@0.2.0
 ```
 
-The package is code-only. The 14 model runtime assets (about 349 MB) must be prepared separately and hosted by the application. See the [package guide](releases/web-decision-0.1.0/package/README.md) and [rebuild instructions](releases/web-decision-0.1.0/README.md).
+The npm package contains code and notices, not model weights or runtime assets. Applications host the separately prepared asset packs:
+
+| Model | Runtime | Inference asset bytes |
+| --- | --- | ---: |
+| Kev 0.6B Q4F16 | TVM WebGPU (`shader-f16`) | 349,103,828 |
+| TAMEV Nano TinyBERT INT8 | ONNX Runtime WebAssembly CPU | 15,585,045 |
+
+See the [package guide](releases/web-decision-0.2.0/package/README.md), [asset rebuild instructions](releases/web-decision-0.2.0/README.md), and [release evidence](RELEASE_SCOPE.md).
 
 ## Verified scope
 
-The exact release archive was tested with real WebGPU inference in Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2 on one Apple M4 Pro. Each browser passed 11/11 cases, including 8,192-token generic and typed inputs, token boundaries, ordered options, Choice/Noul/Score outputs, and aggregate requests. These runs do not establish support for other devices, browser versions, model quality, or general decision accuracy. See [release scope and evidence](RELEASE_SCOPE.md).
+The exact `0.2.0` archive was tested with real models on one Apple M4 Pro in Chromium, Firefox, and WebKit. Kev used a non-fallback WebGPU adapter with `shader-f16`; TAMEV Nano used ONNX Runtime WebAssembly on CPU. The tests establish runtime and API behavior on those browsers, not decision quality or compatibility across all devices. Archive SHA-256: `bd29861052f7de6d8a39f60f78253cc36ca6980e7ae0a104f09009354ee798f4`.
+
+## `0.3.0` candidate
+
+The next release adds exactly one route, TAMEV Micro MiniLM INT8, and retains the existing routes. Its exact archive passed nine real-model cases across Chromium 158.0.8127.18, Firefox 159.0, and WebKit 27.2 on one Apple M4 Pro. See the [candidate archive and browser evidence](releases/web-decision-0.3.0/verification/package-archive.json). The candidate is still pending publication.
 
 ## Runtime requirements and safety
 
-The Kev route requires browser WebGPU with `shader-f16`. The model accepts up to 8,192 tokens per state and state-plus-question row. The library does not impose a default aggregate token, character, or question-count cap, and does not silently truncate accepted input. Applications handling untrusted input should configure the optional `maxInputTokens` and `maxInputCharacters` limits and apply request-size and concurrency controls themselves. An abort signal can stop queued work but does not preempt GPU inference that has already started.
+Kev requires browser WebGPU with `shader-f16`. It preserves input accepted by the model protocol and supports optional token and character limits. TAMEV follows its pinned tokenizer and model-specific truncation behavior, which is reported in the result. Applications that pass untrusted input should set their own request-size and concurrency limits.
 
-Use an application-configured asset URL. Do not let untrusted input choose `assetsUrl`; loading begins with a browser request for the manifest. Decision inputs are not sent to the asset host, and pinned asset hashes are verified before use.
+Use an application-configured asset URL. Do not let untrusted input choose `assetsUrl`. Decision inputs stay in browser-side tokenization and inference and are not sent to the asset host. The package verifies pinned model asset bytes before use.
 
 ## License
 
-Project code is Apache-2.0. Model assets and training data have separate terms; this release does not redistribute them or determine their licensing. Review [third-party notes in the package](releases/web-decision-0.1.0/package/KEV06-NOTICE) before preparing or hosting model assets.
+Project code is Apache-2.0. Model assets and training data have separate terms; the npm package does not redistribute model weights or establish their broader licensing. See the route notices in the [0.2.0 package](releases/web-decision-0.2.0/package/).
