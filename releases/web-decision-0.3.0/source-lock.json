@@ -129,8 +129,8 @@
     },
     {
       "path": "releases/web-decision-0.3.0/pack.mjs",
-      "bytes": 6584,
-      "sha256": "db2d321b7832faa5785abc15a21242ab9bb4c2a643524fb95529ca71c3f1ec6d"
+      "bytes": 6710,
+      "sha256": "a373226cbbed96dab47e01bfbb33a7d23d2dd98aeeae3c4b3a2c18425fab2c05"
     },
     {
       "path": "releases/web-decision-0.3.0/package/EMSCRIPTEN-LICENSE",

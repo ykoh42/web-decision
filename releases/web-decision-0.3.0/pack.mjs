@@ -96,9 +96,13 @@ assert.equal(packageJson.dependencies['onnxruntime-web'], '1.31.1');
 
 const packageDist = join(PACKAGE_ROOT, 'dist');
 const outputInfo = await listFiles(PACKAGE_ROOT);
-assert.ok(!outputInfo.includes('dist/index.js'), 'Refusing to overwrite the package bundle.');
-await mkdir(packageDist, {recursive: false});
-await writeFile(join(packageDist, 'index.js'), bundleBytes, {flag: 'wx'});
+const packageBundle = join(packageDist, 'index.js');
+if (outputInfo.includes('dist/index.js')) {
+  assert.deepEqual(await readFile(packageBundle), bundleBytes, 'The package bundle does not match the locked build output.');
+} else {
+  await mkdir(packageDist, {recursive: true});
+  await writeFile(packageBundle, bundleBytes, {flag: 'wx'});
+}
 assert.deepEqual(await listFiles(PACKAGE_ROOT), EXPECTED_FILES);
 
 execFileSync('pnpm', ['exec', 'publint', 'run', PACKAGE_ROOT, '--strict'], {
