@@ -1,0 +1,92 @@
+{
+  "package": "web-decision@0.1.0",
+  "browser": "webkit",
+  "browserVersion": "27.2",
+  "device": "Apple M4 Pro",
+  "archiveSha256": "b98ee9006192257313ad736f8aec6a3e6e632d2a844ee5ca63bc9060a4cf6484",
+  "bundleSha256": "aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13",
+  "runId": "2cb074a4410d0b82eb70165f3f5af80814020668710b1f0eca02febdf83b4d5b",
+  "evidenceDigestSha256": "cdebe14f3c59383ec6af740cac5280d31230f0c9892782419f6fee116be3f7bd",
+  "files": [
+    {
+      "path": "webkit/coverage-playwright.log",
+      "bytes": 916,
+      "sha256": "7969c168f6461cc2289ee164f9a49e11cc9e209e7cfc66a55c9a733137dd4c98"
+    },
+    {
+      "path": "webkit/memory-pressure.csv",
+      "bytes": 4675,
+      "sha256": "2e519efa78bd846b68d695b9e094cc775cdafe4817ce389ac059f08b9820bb3b"
+    },
+    {
+      "path": "webkit/stages/aggregate-inference.jsonl",
+      "bytes": 7624,
+      "sha256": "a7005b8735368f74e1328fc617080292fdbecb2dd7d7c9b672d7c13b4a10b01b"
+    },
+    {
+      "path": "webkit/stages/aggregate-inference.playwright.log",
+      "bytes": 616,
+      "sha256": "70ec97907262e3a0fd358e3d4f460d2dc19a1020377ed6e72debf52ee7baba7a"
+    },
+    {
+      "path": "webkit/stages/boundary-4096.jsonl",
+      "bytes": 13409,
+      "sha256": "fa4b2d171ee6da5b71d99908dc2ee62dff42024ef64bb46fed3d1eb126d1223f"
+    },
+    {
+      "path": "webkit/stages/boundary-4096.playwright.log",
+      "bytes": 617,
+      "sha256": "d08a7807179d30e94ed3e151bec973495be5893be1b0863d1d31e1519dc6a67c"
+    },
+    {
+      "path": "webkit/stages/boundary-6144.jsonl",
+      "bytes": 18423,
+      "sha256": "cc0fc341c11527032e66146a9aeb9a58d996566fe8c0035132cba04490a5e8a7"
+    },
+    {
+      "path": "webkit/stages/boundary-6144.playwright.log",
+      "bytes": 615,
+      "sha256": "89e0d1aa9e44828e422fcc81b587fb663454344853d353c647506502fd24fb5a"
+    },
+    {
+      "path": "webkit/stages/boundary-7168.jsonl",
+      "bytes": 21770,
+      "sha256": "38f3b73c31474b8c7b1c8f2b1c4fd2073895cc329b51760df776f99581c8fd6a"
+    },
+    {
+      "path": "webkit/stages/boundary-7168.playwright.log",
+      "bytes": 615,
+      "sha256": "42aff2990a8b7aac0e156053b185f1afc12f57b014dc8bae2a7482ef9f3f641f"
+    },
+    {
+      "path": "webkit/stages/boundary-8191.jsonl",
+      "bytes": 26768,
+      "sha256": "e217fad58cc499b82f772cf55e275d0fa898ef97f54d106ad9edc8e9b5eb8e87"
+    },
+    {
+      "path": "webkit/stages/boundary-8191.playwright.log",
+      "bytes": 615,
+      "sha256": "ef2568948220ace883a83d6897f4b89b67980e8d1f9c04320b2d367c1729b453"
+    },
+    {
+      "path": "webkit/stages/exact-inference.jsonl",
+      "bytes": 25644,
+      "sha256": "e3e667390bb137b458c42b2db8467bb1e26ac2842bcb568321288f1e3d604a9f"
+    },
+    {
+      "path": "webkit/stages/exact-inference.playwright.log",
+      "bytes": 615,
+      "sha256": "e7d2c8b35e4e2c6bf0d29765eab67f9bb0bb149776cfde9a023f8fb4296c29ad"
+    },
+    {
+      "path": "webkit/stages/typed-exact-inference.jsonl",
+      "bytes": 24780,
+      "sha256": "180c7b81173a07dd9855ab75384ba88dbcd258f24856d3590b1f98b818c4b401"
+    },
+    {
+      "path": "webkit/stages/typed-exact-inference.playwright.log",
+      "bytes": 615,
+      "sha256": "f4fddd9f6b81c5be7972a97439bb63f21d7b148deaf6f56258ab05b56c8b2610"
+    }
+  ]
+}

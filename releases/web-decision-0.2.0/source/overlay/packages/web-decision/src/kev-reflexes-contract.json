@@ -1,0 +1,89 @@
+{
+  "formatVersion": 1,
+  "model": "kev-0.6b-reflexes-q4f16",
+  "backend": "tvm-webgpu",
+  "experimental": true,
+  "maxStateTokens": 8192,
+  "maxBranchTokens": 8192,
+  "parameterCount": 398,
+  "tvmVersion": "0.27.0.post1",
+  "checkpoint": {
+    "repository": "jean-is/kev-0.6b-reflexes-ONNX",
+    "revision": "243bcef054df85dc6ed4e4becb68590c65a9f36e",
+    "weightSha256": "e549714e2c7d79115f594c104b609592e78ed571be30676c1904756ff2fe9156"
+  },
+  "files": {
+    "heads/param_394.bin": {
+      "sha256": "e809e5f359e0617086241caa04b573399791f7686c5c4ebe21792cb3f14af863",
+      "bytes": 1048576
+    },
+    "heads/param_395.bin": {
+      "sha256": "ce9be016b650c767fcaf8578416e4de54ae203906af005a8c8a7cc8d6c0a19f5",
+      "bytes": 1048576
+    },
+    "heads/param_396.bin": {
+      "sha256": "fa57d4a94eb3ea441bf35575dda7dfe621a5c3d5c4674272dd11d0c229817062",
+      "bytes": 1024
+    },
+    "heads/param_397.bin": {
+      "sha256": "c1cfef2177d798282630d2507842c34bfc5f9be3d733b5e51145da4d78db6f58",
+      "bytes": 1024
+    },
+    "model.wasm": {
+      "sha256": "d1443f703bfa55b3d594b1676eca6c5c90233b813c3b2de7c3aa89916ab3d7c2",
+      "bytes": 4623408
+    },
+    "model_config.json": {
+      "sha256": "40ce1c875acf016ab7742ecdc45d3bad0fe8c51d3ead0ca2263ec5eb4e96f42d",
+      "bytes": 2267
+    },
+    "tokenizer.json": {
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+      "bytes": 7031645
+    },
+    "tokenizer_config.json": {
+      "sha256": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
+      "bytes": 9678
+    },
+    "weights/params_shard_0.bin": {
+      "sha256": "389b31f41b7941517e3d3ca068b3d057eec8642370c7bc637943fe12201b27a5",
+      "bytes": 77791232
+    },
+    "weights/params_shard_1.bin": {
+      "sha256": "132dc47db3c865c1384b4acc26923741bacc67f026e1f9098b04583965995ceb",
+      "bytes": 33030144
+    },
+    "weights/params_shard_2.bin": {
+      "sha256": "7ec5326b1c482ef558f42d880a4d1c9020d041a7ba3a14151536048ade41a8e8",
+      "bytes": 33030144
+    },
+    "weights/params_shard_3.bin": {
+      "sha256": "6bb2187f531e58320d452a48c6570a51867e522063b721b3ddf218054cc0da91",
+      "bytes": 33030144
+    },
+    "weights/params_shard_4.bin": {
+      "sha256": "63ff0da483d454c8d670f9095ada6e7799f685d6b037fce3ea20dc2b2122c72a",
+      "bytes": 33030144
+    },
+    "weights/params_shard_5.bin": {
+      "sha256": "21df4211a57b7df79ca6e43e7d30d21227a10c412eac14981d8cab2c2283c27a",
+      "bytes": 33030144
+    },
+    "weights/params_shard_6.bin": {
+      "sha256": "2dd3c9e5536a6e1badb2da14ff5f8952991146da0b13b126c503f39a1145cdf4",
+      "bytes": 33030144
+    },
+    "weights/params_shard_7.bin": {
+      "sha256": "62bccfd72449ff787b264892b4cdc7c966c9186d103882dd4e8ac0b0dae0026c",
+      "bytes": 33513472
+    },
+    "weights/params_shard_8.bin": {
+      "sha256": "71b0aac038a4a79a3886a498c5727ef41b5e569c392c02485165c4110d3ffb87",
+      "bytes": 25755648
+    },
+    "weights/tensor-cache.json": {
+      "sha256": "e36346bfb419b01fd55996e9d5ef2b5a8168856d4960eb0f2894426a158d1bd7",
+      "bytes": 95018
+    }
+  }
+}

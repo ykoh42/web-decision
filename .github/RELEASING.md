@@ -1,21 +1,25 @@
 # Releasing web-decision
 
-The current stable release is `web-decision@0.1.0` and supports exactly one route, `kev-0.6b-q4f16`. Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
+The initial stable release, `web-decision@0.1.0`, supports the `kev-0.6b-q4f16` route. Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
+
+## Release cadence
+
+After `0.1.0`, release each newly completed model in its own version. Carry forward the previous stable model routes and add exactly one new route per release; do not wait to bundle several completed candidates together. A route is eligible only after its exact package archive passes the required package, type, and real-model browser checks, and its model and asset rights have been reviewed. If a candidate is blocked, keep its route out of the release and continue with the next candidate only as a separate release once that candidate is complete.
 
 ## Before publishing
 
-From a clean checkout, run:
+From a clean checkout, run the scripts for the candidate version. For example, for `0.2.0`:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm test:release
-pnpm build:release
-pnpm pack:release
+pnpm test:release:0.2.0
+pnpm build:release:0.2.0
+pnpm pack:release:0.2.0
 ```
 
 Then verify the resulting package archive in a clean npm consumer and run `npm audit --omit=dev`. Use `npm publish --dry-run --ignore-scripts --access public` to inspect the registry payload before publishing the stable version.
 
-Run real-model WebGPU tests locally for the exact archive and every included model. Record browser versions, device, non-fallback adapter, input and output coverage, archive and bundle hashes, failures, and host resource limits in `releases/web-decision-0.1.0/verification/`. Standard GitHub-hosted runners do not provide the local GPU evidence required for this release. Stable receipts are summarized in `RELEASE_SCOPE.md` and `releases/web-decision-0.1.0/verification/real-model-gpu.json`.
+Run real-model browser tests locally against the exact archive for every included model, using each model's supported runtime. For WebGPU routes, record browser versions, device, non-fallback adapter and required features. For CPU/WASM routes, record browser versions and execution provider; GPU verification is not applicable. Record input and output coverage, archive and bundle hashes, failures, and host resource limits in that version's `releases/web-decision-<version>/verification/` directory. Standard GitHub-hosted runners do not provide the local GPU evidence required for WebGPU routes.
 
 Review the exact staged file list, dependencies, notices, asset pins, model-data terms, and security findings before tagging. Do not include model weights unless redistribution rights and required notices are established. The current package excludes all model weights.
 

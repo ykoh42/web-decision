@@ -1,0 +1,96 @@
+{
+  "model": "kev-0.6b-q4f16",
+  "precision": "q4f16",
+  "checkpoint": {
+    "repository": "onnx-community/kev-0.6b-ONNX",
+    "revision": "5a827091b3d58fe4fdfc02a5a5b2ce364047d678"
+  },
+  "assets": {
+    "integrity": "pinned-manifest",
+    "manifestSha256": "bc79c92a7011d2aa1aff4ede66c06cc365de81e744507256afb5c0449870716a",
+    "location": "separate",
+    "requiredFiles": [
+      "manifest.json",
+      "model.wasm",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "model_config.json",
+      "weights/tensor-cache.json"
+    ],
+    "additionalFiles": "Weight shards or ranges listed by the model manifest are also required."
+  },
+  "licenses": {
+    "project": "Apache-2.0",
+    "modelTerms": "separate-review-required",
+    "modelCard": "https://huggingface.co/onnx-community/kev-0.6b-ONNX/tree/5a827091b3d58fe4fdfc02a5a5b2ce364047d678"
+  },
+  "backend": {
+    "name": "tvm-webgpu",
+    "requiredFeatures": ["shader-f16"],
+    "requiredLimits": {
+      "maxBufferSize": 268435456,
+      "maxStorageBufferBindingSize": 134217728,
+      "maxComputeWorkgroupStorageSize": 16384,
+      "maxStorageBuffersPerShaderStage": 8,
+      "maxComputeInvocationsPerWorkgroup": 256,
+      "maxComputeWorkgroupSizeX": 256,
+      "maxComputeWorkgroupSizeY": 8,
+      "maxComputeWorkgroupSizeZ": 1,
+      "maxComputeWorkgroupsPerDimension": 65535
+    },
+    "requiresNonFallbackAdapter": false
+  },
+  "features": {
+    "textChoice": {
+      "status": "implemented",
+      "abstention": "not-implemented",
+      "limits": [
+        {
+          "resource": "tokens",
+          "scope": "state",
+          "max": 8191,
+          "description": "Native Kev state limit; the model counts its state marker within the 8,192-token budget."
+        },
+        {
+          "resource": "tokens",
+          "scope": "question",
+          "max": 8192,
+          "description": "Native Kev per-question row limit, including the shared state and question branch. There is no fixed aggregate request-token cap; available memory limits the packed request."
+        },
+        {
+          "resource": "options",
+          "scope": "question",
+          "min": 1,
+          "max": 255,
+          "description": "Upstream Kev config declares a maximum of 255 options per question."
+        },
+        {
+          "resource": "questions",
+          "scope": "request",
+          "min": 1
+        }
+      ],
+      "handling": "packed-request",
+      "tokenCount": "packed-request",
+      "score": {
+        "basis": "choices",
+        "temperature": 1,
+        "temperatureAppliedBy": "decoder",
+        "calibration": "not-guaranteed"
+      }
+    },
+    "typedTextQuestionTypes": ["choice", "noul", "score"],
+    "imageChoice": {
+      "status": "not-implemented"
+    },
+    "rating": {
+      "status": "not-implemented"
+    }
+  },
+  "verification": {
+    "currentBundleGpu": "verified",
+    "currentBundleCpuWasm": "not-applicable",
+    "currentBundleJavascript": "not-applicable",
+    "priorEvidence": "This exact preview archive passed its recorded real-WebGPU suite in Chromium, Firefox, and WebKit on one Apple M4 Pro. The result applies only to that archive and tested device; it does not establish compatibility on other devices."
+  }
+}

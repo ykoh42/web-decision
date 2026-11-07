@@ -50,6 +50,7 @@ playwright-report/
 # The release scaffold contains a pinned copy of TVM's WebGPU web sources.
 /releases/web-decision-0.1.0-preview.1/build/
 /releases/web-decision-0.1.0/build/
+/releases/web-decision-0.2.0/build/
 !releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/
 !releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/**
 !releases/web-decision-0.1.0/source/overlay/.toolchains/

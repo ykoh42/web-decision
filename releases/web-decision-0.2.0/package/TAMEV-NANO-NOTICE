@@ -1,0 +1,16 @@
+TAMEV Nano TinyBERT model integration
+
+This release includes an adapter for the TAMEV Nano TinyBERT model at revision
+ad15b45f35526070d48fb91f6597d2805a2d80af:
+
+https://huggingface.co/Tamkimd/tamev-nano-tinybert/tree/ad15b45f35526070d48fb91f6597d2805a2d80af
+
+The pinned model card declares Apache-2.0. Its exact LICENSE file is included
+as TAMEV-NANO-LICENSE. The base model identified by the card is
+huawei-noah/TinyBERT_General_4L_312D.
+
+The model weights, tokenizer, configuration, training data and exported ONNX
+assets are fetched separately by the application; none are included in this
+npm package. The project has checked asset revisions, file sizes, hashes and
+runtime behavior. This notice does not make an independent legal determination
+about training-data provenance or grant rights beyond the upstream license.

@@ -1,0 +1,46 @@
+{
+  "package": "web-decision@0.2.0",
+  "archive": {
+    "file": "web-decision-0.2.0.tgz",
+    "sha256": "bd29861052f7de6d8a39f60f78253cc36ca6980e7ae0a104f09009354ee798f4",
+    "bytes": 102265,
+    "files": 15
+  },
+  "bundle": {
+    "sha256": "edf6ab23d6f47c922934814511ff06e4a6b734337b44613f4fc911a0cec148e0",
+    "bytes": 342689
+  },
+  "models": [
+    "kev-0.6b-q4f16",
+    "experimental-tamev-nano-tinybert-int8"
+  ],
+  "modelWeightsIncluded": false,
+  "checks": {
+    "sourceLockAndRebuild": "passed in an isolated source workspace",
+    "rebuiltBundlePin": "matched",
+    "rebuiltArchiveMembers": "all 15 files matched the tested archive byte-for-byte; tar metadata gives the rebuilt archive a different hash",
+    "nodeTests": "12 passed",
+    "pythonAttentionTests": "10 passed",
+    "safeOutputTests": "14 passed",
+    "publint": "passed",
+    "areTheTypesWrong": "ESM NodeNext and Bundler passed; the ESM-only profile reports an ignored CommonJS require warning",
+    "consumerTypeChecks": "strict Bundler and NodeNext passed",
+    "npmAuditProductionDependencies": "0 vulnerabilities",
+    "npmPublishDryRun": "passed"
+  },
+  "realModelBrowserEvidence": {
+    "kev": [
+      "verification/kev-webgpu-chromium.json",
+      "verification/kev-webgpu-firefox.json",
+      "verification/kev-webgpu-webkit.json"
+    ],
+    "tamevNanoTinybert": [
+      "verification/tamev-nano-cpu-wasm-chromium.json",
+      "verification/tamev-nano-cpu-wasm-firefox.json",
+      "verification/tamev-nano-cpu-wasm-webkit.json"
+    ],
+    "device": "Apple M4 Pro",
+    "scope": "Real-model API and runtime behavior on the listed browsers; not a claim about every device or decision quality."
+  },
+  "securityReview": "See verification/security-review.md; no validated package vulnerability was found, and the formal scan receipt limitation is recorded there."
+}
