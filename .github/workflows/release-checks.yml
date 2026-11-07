@@ -1,0 +1,51 @@
+name: Release checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20.19.0, 22.13.0, 24.0.0, 26.0.0]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
+        with:
+          runtime: node@${{ matrix.node }}
+          version: 12.16.1
+          require-lockfile: true
+          install: false
+          cache: true
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: matrix.node == '24.0.0'
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm test:release
+      - name: Verify preview build requirements
+        if: matrix.node == '24.0.0'
+        run: python scripts/verify_preview_build_requirements.py
+      - run: pnpm build:release
+      - run: pnpm pack:release
+      - name: Audit the packed runtime dependency
+        if: matrix.node == '24.0.0'
+        run: |
+          consumer="$RUNNER_TEMP/web-decision-consumer"
+          mkdir -p "$consumer"
+          (
+            cd "$consumer"
+            npm init -y
+            npm install "$GITHUB_WORKSPACE/releases/web-decision-0.1.0-preview.1/build/release/web-decision-0.1.0-preview.1.tgz" --ignore-scripts
+            npm audit --omit=dev
+          )

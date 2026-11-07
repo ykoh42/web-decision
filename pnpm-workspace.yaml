@@ -1,0 +1,5 @@
+packages:
+  - "."
+verifyDepsBeforeRun: error
+minimumReleaseAge: 1440
+minimumReleaseAgeIgnoreMissingTime: false

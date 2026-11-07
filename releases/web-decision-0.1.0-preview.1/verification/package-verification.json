@@ -1,0 +1,120 @@
+{
+  "state": "code-only-package-verified",
+  "package": {
+    "name": "web-decision",
+    "version": "0.1.0-preview.1"
+  },
+  "archive": {
+    "file": "web-decision-0.1.0-preview.1.tgz",
+    "bytes": 93301,
+    "sha256": "d3e03d997d5fb2d714582df2db8f52f2ef2eb4e283ee217322c9422898db8266",
+    "fileCount": 13
+  },
+  "bundle": {
+    "bytes": 310092,
+    "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+  },
+  "files": {
+    "EMSCRIPTEN-LICENSE": {
+      "bytes": 5093,
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
+    },
+    "KEV-NOTICE": {
+      "bytes": 550,
+      "sha256": "1b2d1d995bb9db602602b45e8ea46d3e68145e4f1fd5f5259a49082ffa764cf8"
+    },
+    "KEV06-NOTICE": {
+      "bytes": 2239,
+      "sha256": "3cfb44b40e95e6ad07083b6ab89b19715394b23d328a14167ba905d2e2a9ab9f"
+    },
+    "LICENSE": {
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "README.md": {
+      "bytes": 4305,
+      "sha256": "f267eaca0d7734a47cfdbbef1b4ca19d3b5f21a38bd024a116f201dfe8c7c9ae"
+    },
+    "ROLLDOWN-LICENSE": {
+      "bytes": 1302,
+      "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734"
+    },
+    "ROLLDOWN-THIRD-PARTY-LICENSE": {
+      "bytes": 2209,
+      "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c"
+    },
+    "TVM-LICENSE": {
+      "bytes": 12079,
+      "sha256": "e62264b483aca7a9f8c1ac69388b476971b43975ced90ac11dbd9e9c530edb46"
+    },
+    "TVM-NOTICE": {
+      "bytes": 164,
+      "sha256": "967cd2fb97712c43271e2b1c4f636c4d8823898869f0f76f65bf8a3232584f0f"
+    },
+    "VITE-LICENSE.md": {
+      "bytes": 98196,
+      "sha256": "a22152baa1aef74402443008e767e7c689a524c0909d19b0431d97f5ab066a13"
+    },
+    "dist/index.js": {
+      "bytes": 310092,
+      "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+    },
+    "index.d.ts": {
+      "bytes": 6428,
+      "sha256": "46140f63f4f6bec0eff7da08dd85e2a9df6836cf0e688fa853d5eaeb896e137d"
+    },
+    "package.json": {
+      "bytes": 727,
+      "sha256": "38b2288e4910993a64e39904619786dcc1c44a6743535b7941b5469e2dd45f00"
+    }
+  },
+  "sourceFingerprint": "e043adc671b5b1371c1880ca26202edf420e4e696eaef48f06b1ba236868bcde",
+  "sourceInputCount": 63,
+  "checks": {
+    "sourceLockEntries": 101,
+    "sourceLockVerified": true,
+    "releaseUnitTests": {
+      "javascript": {
+        "passed": 40,
+        "failed": 0
+      },
+      "python": {
+        "passed": 24,
+        "failed": 0
+      }
+    },
+    "fetchModelSecurityRegressionTests": {
+      "passed": 33,
+      "failed": 0
+    },
+    "publintStrict": "passed",
+    "areTheTypesWrong": "passed; ESM-only package profile",
+    "npmProductionAudit": {
+      "passed": true,
+      "vulnerabilities": 0
+    },
+    "npmAndPnpmConsumerInstall": "passed for the same archive SHA-256",
+    "typescriptConsumerChecks": "passed for npm and pnpm consumers",
+    "symlinkOutputRegressionTests": {
+      "passed": 7,
+      "scope": "Python safe-output and Node preview setup/fetch tests"
+    },
+    "safeOutputTests": {
+      "passed": 14,
+      "failed": 0,
+      "scope": "Python output path, no-follow publication, symlink, rollback, and EXDEV cases"
+    },
+    "pnpmAudit": {
+      "passed": true,
+      "vulnerabilities": 0,
+      "threshold": "low"
+    },
+    "securityReview": {
+      "scanId": "e9a6617c-6767-46b3-8aa7-6ca9e9e15024",
+      "scanStatus": "completed",
+      "coverage": "partial; the scanner indexed 112 files, but surface receipt links were incomplete",
+      "reportableFindings": 1,
+      "finding": "Low-severity CWE-400 in original local model fetch helper; transfer is now bounded and regression-tested"
+    }
+  }
+}

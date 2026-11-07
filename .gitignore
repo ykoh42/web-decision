@@ -1,0 +1,53 @@
+node_modules/
+**/node_modules/
+.venv/
+.toolchains/
+models/
+dist/
+**/dist/
+coverage/
+**/coverage/
+__pycache__/
+*.py[cod]
+
+# This workspace also stores private benchmark runs and downloaded artifacts.
+# Public source releases must add reviewed evidence deliberately.
+/experiments/
+/reports/
+/packages/web-decision-*-candidate-v1/
+/*.html
+
+# Credentials and local machine files.
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+id_rsa*
+id_ed25519*
+
+# Generated benchmark output and browser binaries are reproducible locally.
+/public/**/*.wasm
+/public/**/*.bin
+**/*.onnx
+**/*.onnx_data
+**/*.bin
+**/*.safetensors
+**/*.gguf
+**/*.pth
+**/*.pt
+**/*.tar.gz
+**/*.tgz
+
+*.log
+.DS_Store
+
+.preview-venv/
+test-results/
+playwright-report/
+
+# The release scaffold contains a pinned copy of TVM's WebGPU web sources.
+/releases/web-decision-0.1.0-preview.1/build/
+!releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/
+!releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/**
