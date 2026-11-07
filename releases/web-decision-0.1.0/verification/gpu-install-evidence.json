@@ -7,25 +7,44 @@
   "archive": {
     "file": "web-decision-0.1.0.tgz",
     "path": "releases/web-decision-0.1.0/build/release/web-decision-0.1.0.tgz",
-    "bytes": 93568,
-    "sha256": "8d4eec6db8688c6b13d1386ec9222addaf82b8a8cd26de900e8096d39d9b65d0",
+    "bytes": 93570,
+    "sha256": "b98ee9006192257313ad736f8aec6a3e6e632d2a844ee5ca63bc9060a4cf6484",
     "fileCount": 13
   },
   "bundle": {
-    "bytes": 310092,
-    "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d",
-    "installedSha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+    "bytes": 311825,
+    "sha256": "aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13",
+    "installedSha256": "aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13"
   },
+  "consumerChecks": {
+    "npmImportSmoke": "passed",
+    "typescript": {
+      "version": "6.0.3",
+      "mode": "strict NodeNext",
+      "result": "passed"
+    },
+    "npmAuditOmitDev": {
+      "vulnerabilities": 0,
+      "result": "passed"
+    },
+    "npmPublishDryRun": {
+      "access": "public",
+      "tag": "latest",
+      "ignoreScripts": true,
+      "result": "passed"
+    }
+  },
+  "note": "All consumer checks used the exact archive and installed bundle identified above. The dry run did not publish the package.",
   "declaration": {
     "bytes": 6428,
     "sha256": "46140f63f4f6bec0eff7da08dd85e2a9df6836cf0e688fa853d5eaeb896e137d"
   },
   "sourceBuild": {
-    "sourceFingerprint": "63370fb2f35ad93a65a4e03118cbe03dd0a44e3cae1e32db85344274dcd6e259",
+    "sourceFingerprint": "6fddb440cfaa475853573231750f33383f57a3610779ee33a5977cf6bb994f92",
     "sourceInputCount": 63,
     "bundle": {
-      "bytes": 310092,
-      "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+      "bytes": 311825,
+      "sha256": "aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13"
     }
   }
 }

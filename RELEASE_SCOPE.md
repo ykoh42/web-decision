@@ -4,17 +4,19 @@
 
 This stable release supports exactly one browser-local model route: `kev-0.6b-q4f16`, using TVM WebGPU with the `shader-f16` feature. The npm archive contains 13 code and notice files; it excludes model weights, tokenizer files, and runtime assets. Applications must prepare and host the pinned 14-file asset pack separately; its inference files total 349,103,828 bytes.
 
-The exact npm archive SHA-256 is `8d4eec6db8688c6b13d1386ec9222addaf82b8a8cd26de900e8096d39d9b65d0`. The matching bundle and real-model GPU results are recorded in [`releases/web-decision-0.1.0/verification`](releases/web-decision-0.1.0/verification).
+The exact npm archive SHA-256 is `b98ee9006192257313ad736f8aec6a3e6e632d2a844ee5ca63bc9060a4cf6484`. The matching bundle and real-model GPU results are recorded in [`releases/web-decision-0.1.0/verification`](releases/web-decision-0.1.0/verification). Per-browser test logs and structured stage events are preserved in [`verification/gpu-runs`](releases/web-decision-0.1.0/verification/gpu-runs).
 
 GPU runs used one Apple M4 Pro and a non-fallback adapter with `shader-f16` in all browsers:
 
-| Browser | Version | GPU cases | Minimum available host memory sampled |
+| Browser | Version | Passing GPU cases | Lowest sampled macOS `memory_pressure` free % |
 | --- | --- | ---: | ---: |
-| Chromium | 156.0.8078.4 | 11/11 | Not sampled during this run |
-| Firefox | 157.0 | 11/11 | 18.48 GiB |
-| WebKit | 27.2 | 11/11 | 17.52 GiB |
+| Chromium | 156.0.8078.4 | 11/11 | Not sampled during the run |
+| Firefox | 157.0 | 11/11 | 78% (85 samples) |
+| WebKit | 27.2 | 11/11 | 75% (175 samples) |
 
-The suite covered generic and typed 8,192-token inputs, token lengths 4,096, 6,144, 7,168, 8,191, and 8,192, aggregate requests, Choice/Noul/Score semantics, and option order. All results apply to the exact archive and bundle above. They do not establish compatibility with other devices, operating systems, or browser versions, nor decision accuracy or general task quality.
+The suite covered generic and typed 8,192-token inputs; token lengths 4,096, 6,144, 7,168, 8,191, and 8,192; a 2,217-token aggregate request; Choice/Noul/Score semantics; option order; probability validity; and validation at and above the accepted token limit. Chromium's first combined long-input diagnostic exceeded its 360-second Playwright test timeout. The seven long-input stages passed when the harness ran them independently. The final recorded result is 11 passing cases per browser.
+
+The GPU results apply to the exact archive and bundle above. They do not establish compatibility with other devices, operating systems, or browser versions, nor decision accuracy or general task quality.
 
 ## Limits and security notes
 

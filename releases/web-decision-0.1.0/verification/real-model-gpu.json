@@ -1,8 +1,8 @@
 {
   "package": "web-decision@0.1.0",
   "route": "kev-0.6b-q4f16",
-  "archiveSha256": "8d4eec6db8688c6b13d1386ec9222addaf82b8a8cd26de900e8096d39d9b65d0",
-  "bundleSha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d",
+  "archiveSha256": "b98ee9006192257313ad736f8aec6a3e6e632d2a844ee5ca63bc9060a4cf6484",
+  "bundleSha256": "aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13",
   "assetManifestRawSha256": "43d8079ec95c71615a218f4c3be61d615c65b4a3e4d4ae66a09ae1e10d7bb338",
   "assetManifestCanonicalSha256": "bc79c92a7011d2aa1aff4ede66c06cc365de81e744507256afb5c0449870716a",
   "tokenizerSha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
@@ -12,19 +12,20 @@
     {
       "browser": "chromium",
       "version": "156.0.8078.4",
-      "runId": "0660cf4c4b09d2f30c7c93d54140c1b58b00854f90ad705101e41fc646868c13",
-      "finishedAt": "2026-11-07T03:49:23.694Z",
+      "runId": "4c5a58d721f169a150344fe1019e3b3445af61248765dcd37470be0b6ed87631",
+      "finishedAt": "2026-11-07T06:01:31Z",
       "state": "passed",
       "stageTests": 7,
       "coverageTests": 4,
       "failedOrTimedOutTests": 0,
       "adapter": {
         "fallback": false,
-        "shaderF16": true
+        "shaderF16": true,
+        "vendor": "apple",
+        "architecture": "metal-3"
       },
       "hostMemory": {
-        "state": "not-sampled-during-run",
-        "reason": "The host memory monitor started after this browser run."
+        "state": "not-sampled-during-run"
       },
       "testedTokenLengths": [
         4096,
@@ -35,13 +36,14 @@
       ],
       "includesTyped8192TokenInput": true,
       "includesAggregateRequest": true,
-      "includesChoiceNoulScoreAndOptionOrdering": true
+      "includesChoiceNoulScoreAndOptionOrdering": true,
+      "evidenceManifest": "verification/gpu-runs/chromium/manifest.json"
     },
     {
       "browser": "firefox",
       "version": "157.0",
-      "runId": "4b57ec01c20dc83bc203ceedbf1257f48d41021f7113bc2db70888ae3d365245",
-      "finishedAt": "2026-11-07T04:05:11.096Z",
+      "runId": "3ffeefeaad95aa4218f1cdb6ec339b0bc8d2d48b925326a601f68dd4e14733d0",
+      "finishedAt": "2026-11-07T05:45:41Z",
       "state": "passed",
       "stageTests": 7,
       "coverageTests": 4,
@@ -52,8 +54,10 @@
       },
       "hostMemory": {
         "state": "sampled",
-        "minimumAvailableHostMemoryGiB": 18.48,
-        "sampleCount": 175
+        "metric": "macOS memory_pressure free percentage",
+        "sampleCount": 85,
+        "minimumFreePercent": 78,
+        "maximumFreePercent": 85
       },
       "testedTokenLengths": [
         4096,
@@ -64,25 +68,30 @@
       ],
       "includesTyped8192TokenInput": true,
       "includesAggregateRequest": true,
-      "includesChoiceNoulScoreAndOptionOrdering": true
+      "includesChoiceNoulScoreAndOptionOrdering": true,
+      "evidenceManifest": "verification/gpu-runs/firefox/manifest.json"
     },
     {
       "browser": "webkit",
       "version": "27.2",
-      "runId": "1df4a5c9b173186da9c98903afd986a1b9e23796ac7d5d6139c262f468876719",
-      "finishedAt": "2026-11-07T04:18:00.761Z",
+      "runId": "2cb074a4410d0b82eb70165f3f5af80814020668710b1f0eca02febdf83b4d5b",
+      "finishedAt": "2026-11-07T06:04:59Z",
       "state": "passed",
       "stageTests": 7,
       "coverageTests": 4,
       "failedOrTimedOutTests": 0,
       "adapter": {
         "fallback": false,
-        "shaderF16": true
+        "shaderF16": true,
+        "vendor": "apple",
+        "architecture": "apple"
       },
       "hostMemory": {
         "state": "sampled",
-        "minimumAvailableHostMemoryGiB": 17.52,
-        "sampleCount": 154
+        "metric": "macOS memory_pressure free percentage",
+        "sampleCount": 175,
+        "minimumFreePercent": 75,
+        "maximumFreePercent": 85
       },
       "testedTokenLengths": [
         4096,
@@ -93,8 +102,31 @@
       ],
       "includesTyped8192TokenInput": true,
       "includesAggregateRequest": true,
-      "includesChoiceNoulScoreAndOptionOrdering": true
+      "includesChoiceNoulScoreAndOptionOrdering": true,
+      "evidenceManifest": "verification/gpu-runs/webkit/manifest.json"
     }
   ],
-  "coverageLimit": "One Apple M4 Pro only. Chromium host memory was not sampled during its run. These results do not establish compatibility with other devices, operating systems, or browser versions, nor decision accuracy or general task quality."
+  "coverage": {
+    "passingCasesPerBrowser": 11,
+    "caseBreakdown": {
+      "semanticCoverage": 4,
+      "splitLongInputStages": 7
+    },
+    "features": [
+      "Choice, Noul, and Score outputs",
+      "one-option and 255-option decision boundaries",
+      "option and Map order preservation",
+      "probability validity and aggregate stability",
+      "generic and typed 8192-token inputs",
+      "uncapped aggregate request with 2217 tokens",
+      "8192-token exact model boundary",
+      "4096, 6144, 7168, and 8191-token boundaries",
+      "over-limit rejection before runtime invocation"
+    ]
+  },
+  "notes": [
+    "Chromium first ran a combined nine-case diagnostic. Eight cases passed; the case that ran all seven long-input inference stages sequentially exceeded Playwright\u2019s 360-second test timeout. The final run split those stages into seven independent invocations, all of which passed. This was a diagnostic harness timeout, not a reported WebGPU inference failure.",
+    "The pinned model fixture reports abstention as not implemented; these GPU runs validate the package route and output shape, not an abstention capability for this model."
+  ],
+  "coverageLimit": "One Apple M4 Pro only. Firefox and WebKit host memory samples are macOS memory_pressure free percentages, not GPU memory measurements. Chromium host memory was not sampled during its run. These results do not establish compatibility with other devices, operating systems, or browser versions, nor decision accuracy or general task quality."
 }

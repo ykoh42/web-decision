@@ -1,0 +1,10 @@
+[WebServer] (node:28172) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:28199) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 experiments/kev-single-model-public-preview-20261107/v0.1.0-preview.1/browser-diagnostic/gpu.spec.mjs:1285:1 › real WebGPU verifies Kev native 8,192-token rows and an uncapped aggregate request (2.5m)
+
+  1 passed (2.5m)
