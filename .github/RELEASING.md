@@ -1,6 +1,6 @@
 # Releasing web-decision
 
-The current stable release is `web-decision@0.3.0`. Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
+Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
 
 ## Release cadence
 
