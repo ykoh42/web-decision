@@ -1,36 +1,51 @@
 # web-decision
 
-`web-decision` is a browser JavaScript library for running decision models locally. The latest published stable release is `0.2.0`, with Kev 0.6B and TAMEV Nano routes.
+Latest stable: `0.3.0`. Run decision models locally in the browser.
 
 ## Install
 
 ```sh
-npm install web-decision@0.2.0
+npm install web-decision
 ```
 
-The npm package contains code and notices, not model weights or runtime assets. Applications host the separately prepared asset packs:
+## Models
 
-| Model | Runtime | Inference asset bytes |
+| Model | Runtime | Model files |
 | --- | --- | ---: |
-| Kev 0.6B Q4F16 | TVM WebGPU (`shader-f16`) | 349,103,828 |
-| TAMEV Nano TinyBERT INT8 | ONNX Runtime WebAssembly CPU | 15,585,045 |
+| Kev 0.6B Q4F16 | TVM WebGPU (`shader-f16`) | 349.1 MB |
+| TAMEV Nano TinyBERT INT8 | ONNX Runtime WebAssembly CPU | 15.6 MB |
+| TAMEV Micro MiniLM INT8 | ONNX Runtime WebAssembly CPU | 24.2 MB |
 
-See the [package guide](releases/web-decision-0.2.0/package/README.md), [asset rebuild instructions](releases/web-decision-0.2.0/README.md), and [release evidence](RELEASE_SCOPE.md).
+The npm package includes library code and notices. Host the model files at an application-controlled URL. See the [model setup guide](releases/web-decision-0.3.0/package/README.md) for asset links and protocol details.
 
-## Verified scope
+## Quick start
 
-The exact `0.2.0` archive was tested with real models on one Apple M4 Pro in Chromium, Firefox, and WebKit. Kev used a non-fallback WebGPU adapter with `shader-f16`; TAMEV Nano used ONNX Runtime WebAssembly on CPU. The tests establish runtime and API behavior on those browsers, not decision quality or compatibility across all devices. Archive SHA-256: `bd29861052f7de6d8a39f60f78253cc36ca6980e7ae0a104f09009354ee798f4`.
+```ts
+import {loadDecisionModel} from 'web-decision';
 
-## `0.3.0` candidate
+const model = await loadDecisionModel({
+  model: 'experimental-tamev-micro-minilm-int8',
+  assetsUrl: 'https://your-origin.example/models/tamev-micro-minilm/'
+});
 
-The next release adds exactly one route, TAMEV Micro MiniLM INT8, and retains the existing routes. Its exact archive passed nine real-model cases across Chromium 158.0.8127.18, Firefox 159.0, and WebKit 27.2 on one Apple M4 Pro. See the [candidate archive and browser evidence](releases/web-decision-0.3.0/verification/package-archive.json). The candidate is still pending publication.
+try {
+  const result = await model.decide({
+    state: 'A customer reports a duplicate card charge.',
+    questions: [{
+      instructions: 'Which team should review this?',
+      options: ['Billing', 'Fraud']
+    }]
+  });
+  console.log(result.answers[0]?.selected);
+} finally {
+  await model.dispose();
+}
+```
 
-## Runtime requirements and safety
+Decision requests run in the browser. The configured asset URL is used to fetch model files.
 
-Kev requires browser WebGPU with `shader-f16`. It preserves input accepted by the model protocol and supports optional token and character limits. TAMEV follows its pinned tokenizer and model-specific truncation behavior, which is reported in the result. Applications that pass untrusted input should set their own request-size and concurrency limits.
+## Verification
 
-Use an application-configured asset URL. Do not let untrusted input choose `assetsUrl`. Decision inputs stay in browser-side tokenization and inference and are not sent to the asset host. The package verifies pinned model asset bytes before use.
+Release `0.3.0` was tested with real models in Chromium, Firefox, and WebKit on an Apple M4 Pro. See the [GitHub release](https://github.com/ykoh42/web-decision/releases/tag/v0.3.0) and [verification record](releases/web-decision-0.3.0/verification/package-archive.json).
 
-## License
-
-Project code is Apache-2.0. Model assets and training data have separate terms; the npm package does not redistribute model weights or establish their broader licensing. See the route notices in the [0.2.0 package](releases/web-decision-0.2.0/package/).
+Project code is Apache-2.0. Model and runtime terms are listed in the package notices.

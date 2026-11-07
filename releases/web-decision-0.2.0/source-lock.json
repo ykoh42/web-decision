@@ -4,13 +4,13 @@
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 1163,
-      "sha256": "5d6c00a666e528c339053aa5ca238ea5448f1677cb1d7a320a3c3a382f4cc7d3"
+      "bytes": 1245,
+      "sha256": "4f56815687f178c284cb92fc2394685d82a92c04429730a25efc55282ca8d7bb"
     },
     {
       "path": "package.json",
-      "bytes": 1827,
-      "sha256": "9e5209ef232e26cf4d0f3ff690e9a93e67402a26bc34a04e9bb059fa44458973"
+      "bytes": 2403,
+      "sha256": "27729fe14d7719b7f83b58e339e2f7c3231ac2343f7bdbb68c1cd6b5c660a214"
     },
     {
       "path": "packages/web-decision/package.json",
@@ -29,8 +29,8 @@
     },
     {
       "path": "pnpm-lock.yaml",
-      "bytes": 34325,
-      "sha256": "10d31285f09f7da58367a886414b03588af46862b3c93d954b6e06fba1073a60"
+      "bytes": 35163,
+      "sha256": "553e8eb85cf252b8a11e9eb99dc2afefa5fb31026766c149e498f6312bf49bc1"
     },
     {
       "path": "pnpm-workspace.yaml",

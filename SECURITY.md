@@ -4,13 +4,11 @@
 
 Please do not publish exploit details in an issue. Use GitHub's private vulnerability reporting for this repository when it is available; otherwise contact the maintainer through the GitHub profile.
 
-## Release-specific guidance
+## Browser runtime
 
-`web-decision@0.1.0` is a browser-only release for the Kev 0.6B Q4F16 route.
+- Keep `assetsUrl` in trusted application configuration. The loader fetches model files from that URL and verifies their pinned hashes.
+- Decision input stays in browser-side tokenization and inference. It is not sent to the model asset host.
+- Apply request-size and concurrency controls at the application boundary when accepting untrusted input.
+- An abort signal can stop queued work. It cannot preempt inference already dispatched to the runtime.
 
-- Supply an application-configured `assetsUrl`; do not let user input choose the URL.
-- For untrusted decision input, set `maxInputTokens` and `maxInputCharacters` and apply request-size and concurrency controls at the application boundary. The package has no default aggregate input cap so it can preserve the model's accepted input range.
-- An abort signal can stop queued work. It cannot interrupt GPU inference after dispatch.
-- The code package verifies pinned model asset bytes but does not include or host model weights.
-
-See the [package security notes](releases/web-decision-0.1.0/package/README.md#supported-scope) and [release scope](RELEASE_SCOPE.md) for the tested artifact and known limits.
+See the [model setup guide](releases/web-decision-0.3.0/package/README.md) and [0.3.0 verification record](releases/web-decision-0.3.0/verification/package-archive.json) for asset requirements and tested scope.

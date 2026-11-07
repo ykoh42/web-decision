@@ -56,7 +56,18 @@
       "safeOutput": "14 passed"
     },
     "rebuiltBundleSha256": "b4aee808c55dc592abe920ae4c45aae8e1bc2abc0ca3fca161a0a25a92d5c9a0",
-    "rebuiltArchiveMembers": "All 17 extracted package files match the exact browser-tested archive byte-for-byte. The regenerated tarball has a different outer SHA-256; the exact tested archive is retained for release."
+    "rebuiltArchiveMembers": "All 17 extracted package files match the exact browser-tested archive byte-for-byte. The exact tested archive is retained and used for both publications."
+  },
+  "releaseCi": {
+    "url": "https://github.com/ykoh42/web-decision/actions/runs/42391436708",
+    "status": "passed",
+    "nodeVersions": [
+      "20.19.0",
+      "22.13.0",
+      "24.0.0",
+      "26.0.0"
+    ],
+    "steps": "Release tests, build, and pack passed on every Node version; packed dependency audit passed on Node 24."
   },
   "securityReview": {
     "scanId": "178eff7e-5bce-499c-82c2-729122c08c5b",

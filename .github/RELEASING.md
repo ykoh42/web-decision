@@ -1,6 +1,6 @@
 # Releasing web-decision
 
-The initial stable release, `web-decision@0.1.0`, supports the `kev-0.6b-q4f16` route. Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
+The current stable release is `web-decision@0.3.0`. Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
 
 ## Release cadence
 
@@ -8,13 +8,13 @@ After `0.1.0`, release each newly completed model in its own version. Carry forw
 
 ## Before publishing
 
-From a clean checkout, run the scripts for the candidate version. For example, for `0.2.0`:
+From a clean checkout, run the scripts for the candidate version. For example, for `0.3.0`:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm test:release:0.2.0
-pnpm build:release:0.2.0
-pnpm pack:release:0.2.0
+pnpm test:release:0.3.0
+pnpm build:release:0.3.0
+pnpm pack:release:0.3.0
 ```
 
 Then verify the resulting package archive in a clean npm consumer and run `npm audit --omit=dev`. Use `npm publish --dry-run --ignore-scripts --access public` to inspect the registry payload before publishing the stable version.
@@ -23,4 +23,4 @@ Run real-model browser tests locally against the exact archive for every include
 
 Review the exact staged file list, dependencies, notices, asset pins, model-data terms, and security findings before tagging. Do not include model weights unless redistribution rights and required notices are established. The current package excludes all model weights.
 
-Create the `v0.1.0` tag only from the reviewed source commit and attach the exact tested archive. Publish the same archive to npm with the `latest` tag. A GitHub Release and an npm registry publication are separate operations; neither implies the other.
+Create a `vX.Y.Z` tag from the reviewed source commit and attach the exact tested archive. Publish the same archive to npm with the `latest` tag. Verify both publications and record their hashes in that version's verification directory.

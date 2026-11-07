@@ -25,7 +25,7 @@
     "publint": "0.3.25",
     "vite": "8.3.6"
   },
-  "description": "`web-decision` is a browser JavaScript library for running local decision models. The stable `0.1.0` release supports one model: Kev 0.6B Q4F16 through TVM WebGPU.",
+  "description": "`web-decision` is a browser JavaScript library for running decision models locally.",
   "directories": {
     "example": "examples",
     "test": "tests"

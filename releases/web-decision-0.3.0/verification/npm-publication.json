@@ -1,0 +1,20 @@
+{
+  "package": "web-decision@0.3.0",
+  "registry": "https://registry.npmjs.org",
+  "publishedAt": "2026-11-07T16:36:14.446Z",
+  "distTag": {
+    "name": "latest",
+    "version": "0.3.0"
+  },
+  "tarball": {
+    "url": "https://registry.npmjs.org/web-decision/-/web-decision-0.3.0.tgz",
+    "file": "web-decision-0.3.0.tgz",
+    "bytes": 103515,
+    "fileCount": 17,
+    "sha256": "ccfa582e2070939b3f03e8c4759eaababc6b1f0ed1d546596d079123c4b54a50",
+    "sha1": "264f602201c0a8dae92c24f3051999a08d6c5f18",
+    "integrity": "sha512-qMD9ULkCQfE3zVmjRuM61LO2WIR5fHIlci7G3srHCZ7TS1feRaHS1HjcAjXkjVqjqgFDBu0i5pMkSaEO1DKqtg=="
+  },
+  "comparison": "The downloaded npm tarball matches the browser-tested archive and GitHub Release asset byte-for-byte.",
+  "githubRelease": "https://github.com/ykoh42/web-decision/releases/tag/v0.3.0"
+}

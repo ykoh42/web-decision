@@ -4,8 +4,8 @@
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 1199,
-      "sha256": "08a1392995b9536b3b2bf86b1a9c667bea0333dc327da4321eb4c18fd9a28e71"
+      "bytes": 1245,
+      "sha256": "4f56815687f178c284cb92fc2394685d82a92c04429730a25efc55282ca8d7bb"
     },
     {
       "path": "examples/basic/limits-plugin.mjs",
@@ -19,8 +19,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 2483,
-      "sha256": "e141c5ec7907e640a1af632f91b4206aceed6ccdf50d95995ca91a6261aafeeb"
+      "bytes": 2403,
+      "sha256": "27729fe14d7719b7f83b58e339e2f7c3231ac2343f7bdbb68c1cd6b5c660a214"
     },
     {
       "path": "packages/web-decision/vite.config.mjs",

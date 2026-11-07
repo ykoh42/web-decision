@@ -47,12 +47,13 @@ id_ed25519*
 test-results/
 playwright-report/
 
-# The release scaffold contains a pinned copy of TVM's WebGPU web sources.
-/releases/web-decision-0.1.0-preview.1/build/
+# Release scaffolds contain pinned copies of TVM's WebGPU web sources.
 /releases/web-decision-0.1.0/build/
 /releases/web-decision-0.2.0/build/
 /releases/web-decision-0.3.0/build/
-!releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/
-!releases/web-decision-0.1.0-preview.1/source/overlay/.toolchains/**
 !releases/web-decision-0.1.0/source/overlay/.toolchains/
 !releases/web-decision-0.1.0/source/overlay/.toolchains/**
+!releases/web-decision-0.2.0/source/overlay/.toolchains/
+!releases/web-decision-0.2.0/source/overlay/.toolchains/**
+!releases/web-decision-0.3.0/source/overlay/.toolchains/
+!releases/web-decision-0.3.0/source/overlay/.toolchains/**

@@ -56,5 +56,5 @@ node releases/web-decision-0.1.0/pack.mjs
 
 Do not run `scripts/setup_preview.sh` after these commands in the same checkout. If you later need asset preparation, use a separate fresh checkout and run setup there first.
 
-The expected q2-k128 WASM hash and size are recorded pins from the candidate. This source scaffold does not claim that a fresh compiler rebuild produced those bytes. Compare the generated `build-report.json` with `pins.json` before making that claim. Browser GPU evidence applies to the exact recorded `0.1.0` archive and device; see [RELEASE_SCOPE.md](../../RELEASE_SCOPE.md).
+The expected q2-k128 WASM hash and size are recorded pins from the candidate. This source scaffold does not claim that a fresh compiler rebuild produced those bytes. Compare the generated `build-report.json` with `pins.json` before making that claim. Browser GPU evidence applies to the exact recorded `0.1.0` archive and device; see the [package verification](verification/package-verification.json) and [GPU run logs](verification/gpu-runs/README.md).
 

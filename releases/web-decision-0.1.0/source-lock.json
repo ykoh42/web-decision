@@ -4,13 +4,13 @@
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 1127,
-      "sha256": "235b766bb78f1b952923dd391a1726cb9b9cda4ab408427e23f6afcf20a4c698"
+      "bytes": 1245,
+      "sha256": "4f56815687f178c284cb92fc2394685d82a92c04429730a25efc55282ca8d7bb"
     },
     {
       "path": "package.json",
-      "bytes": 1338,
-      "sha256": "b595e09a38d9b670dfc8e797603ec8287a93c1896b98dca06fdaccb94fd08488"
+      "bytes": 2403,
+      "sha256": "27729fe14d7719b7f83b58e339e2f7c3231ac2343f7bdbb68c1cd6b5c660a214"
     },
     {
       "path": "packages/web-decision/package.json",
@@ -29,8 +29,8 @@
     },
     {
       "path": "pnpm-lock.yaml",
-      "bytes": 34325,
-      "sha256": "10d31285f09f7da58367a886414b03588af46862b3c93d954b6e06fba1073a60"
+      "bytes": 35163,
+      "sha256": "553e8eb85cf252b8a11e9eb99dc2afefa5fb31026766c149e498f6312bf49bc1"
     },
     {
       "path": "pnpm-workspace.yaml",
@@ -39,8 +39,8 @@
     },
     {
       "path": "releases/web-decision-0.1.0/README.md",
-      "bytes": 3449,
-      "sha256": "5dc5c78aaeca08aec629b83e9a70f366e1bc14d93882985a567741aa76230c21"
+      "bytes": 3525,
+      "sha256": "1d5fbae197a520c1f4a84f5cbc8eb8a9fb031a504e478a1a8e2f8cf808a9a4c1"
     },
     {
       "path": "releases/web-decision-0.1.0/attention-q2/build_inputs.py",
