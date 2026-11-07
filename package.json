@@ -16,6 +16,7 @@
     "test:release:0.2.0": "node --test releases/web-decision-0.2.0/test/model-contract.test.mjs releases/web-decision-0.2.0/prepare-asset-pack.test.mjs releases/web-decision-0.2.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.2.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.3.0": "node --test releases/web-decision-0.3.0/test/model-contract.test.mjs releases/web-decision-0.3.0/prepare-asset-pack.test.mjs releases/web-decision-0.3.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.3.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.3.0:browser:micro": "pnpm exec playwright test --config releases/web-decision-0.3.0/test/playwright.config.mjs",
+    "test:types:0.3.0": "node scripts/ci/check-release-types.mjs",
     "build:release": "node releases/web-decision-0.1.0/build.mjs",
     "pack:release": "node releases/web-decision-0.1.0/pack.mjs",
     "build:release:0.2.0": "node releases/web-decision-0.2.0/build.mjs",
@@ -30,6 +31,7 @@
     "oxfmt": "0.77.0",
     "oxlint": "1.92.0",
     "publint": "0.3.25",
+    "typescript": "7.0.2",
     "vite": "8.3.6"
   },
   "description": "`web-decision` is a browser JavaScript library for running decision models locally.",
