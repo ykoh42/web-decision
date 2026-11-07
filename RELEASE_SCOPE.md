@@ -30,4 +30,4 @@ The earlier `web-decision@0.1.0-preview.1` archive and evidence remain under [`r
 
 ## Build and release checks
 
-The stable source lock, build, package archive, browser evidence, and security review are tracked under [`releases/web-decision-0.1.0`](releases/web-decision-0.1.0). See the [release procedure](.github/RELEASING.md). Project code is Apache-2.0; model and dataset terms remain separate. No model assets are attached to the release.
+The stable source lock, build, package archive, and browser evidence are tracked under [`releases/web-decision-0.1.0`](releases/web-decision-0.1.0). The security review is recorded separately by Codex Security. See the [release procedure](.github/RELEASING.md). Project code is Apache-2.0; model and dataset terms remain separate. No model assets are attached to the release.
