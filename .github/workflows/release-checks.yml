@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm test:release
-      - name: Verify preview build requirements
+      - name: Verify release build requirements
         if: matrix.node == '24.0.0'
         run: python scripts/verify_preview_build_requirements.py
       - run: pnpm build:release
@@ -46,6 +46,6 @@ jobs:
           (
             cd "$consumer"
             npm init -y
-            npm install "$GITHUB_WORKSPACE/releases/web-decision-0.1.0-preview.1/build/release/web-decision-0.1.0-preview.1.tgz" --ignore-scripts
+            npm install "$GITHUB_WORKSPACE/releases/web-decision-0.1.0/build/release/web-decision-0.1.0.tgz" --ignore-scripts
             npm audit --omit=dev
           )

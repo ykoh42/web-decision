@@ -1,20 +1,34 @@
 {
   "name": "web-decision-release-workspace",
   "private": true,
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
   "scripts": {
-    "test:release": "node --test releases/web-decision-0.1.0-preview.1/prepare-asset-pack.test.mjs && node --test releases/web-decision-0.1.0-preview.1/release-integrity.test.mjs && node --test scripts/fetch-model.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.1.0-preview.1/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
-    "build:release": "node releases/web-decision-0.1.0-preview.1/build.mjs",
-    "pack:release": "node releases/web-decision-0.1.0-preview.1/pack.mjs"
+    "test:release": "node --test releases/web-decision-0.1.0/prepare-asset-pack.test.mjs && node --test releases/web-decision-0.1.0/release-integrity.test.mjs && node --test scripts/fetch-model.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.1.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
+    "build:release": "node releases/web-decision-0.1.0/build.mjs",
+    "pack:release": "node releases/web-decision-0.1.0/pack.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "publint": "0.3.25",
     "vite": "8.3.6"
-  }
+  },
+  "description": "`web-decision` is a browser JavaScript library for running local decision models. The stable `0.1.0` release supports one model: Kev 0.6B Q4F16 through TVM WebGPU.",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ykoh42/web-decision.git"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/ykoh42/web-decision/issues"
+  },
+  "homepage": "https://github.com/ykoh42/web-decision#readme"
 }

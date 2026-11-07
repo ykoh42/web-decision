@@ -1,0 +1,40 @@
+[WebServer] (node:19676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:19703) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/gpu.spec.mjs:33:1 › real WebGPU preserves Kev 0.6B systemOne Choice, Noul, and Score semantics (1.1s)
+  ✓  2 tests/browser/gpu.spec.mjs:324:1 › real WebGPU covers Kev option count and one-option probability (1.9s)
+  ✓  3 tests/browser/gpu.spec.mjs:483:1 › real WebGPU preserves Kev 0.6B systemOne Map order and Choice/Score boundaries (36.7s)
+  ✓  4 tests/browser/gpu.spec.mjs:907:3 › real WebGPU loads, runs, releases memory, and disposes kev (1.2s)
+[WebServer] 2:10:05 PM [vite] (client) [console.error] Device lost, calling Instance.dispose(). Please initialize again.  {}
+  ✓  5 tests/browser/gpu.spec.mjs:1015:3 › real WebGPU reports device loss during kev loading and recovers (1.0s)
+  ✓  6 tests/browser/gpu.spec.mjs:1081:3 › real WebGPU kev supports read-ahead and offline loading (2.1s)
+  ✓  7 tests/browser/gpu.spec.mjs:1128:1 › real WebGPU keeps Kev probabilities stable when questions are requested together (954ms)
+  ✓  8 tests/browser/gpu.spec.mjs:1205:1 › real WebGPU runs Kev at minimum, midpoint and exact token limits (2.7s)
+  ✘  9 tests/browser/gpu.spec.mjs:1268:1 › real WebGPU verifies Kev native 8,192-token rows and an uncapped aggregate request (6.0m)
+
+
+  1) tests/browser/gpu.spec.mjs:1268:1 › real WebGPU verifies Kev native 8,192-token rows and an uncapped aggregate request
+
+    Test timeout of 360000ms exceeded.
+
+    Error: page.evaluate: Test timeout of 360000ms exceeded.
+
+      1275 |
+      1276 |   await page.addScriptTag({type: 'module', url: '/kev-native-limits-diagnostic.mjs'});
+    > 1277 |   const result = await page.evaluate(() => window.__webDecisionRunKevNativeLimitsDiagnostic());
+           |                             ^
+      1278 |
+      1279 |   if (process.env.WEB_DECISION_GPU_REPORT_DIR)
+      1280 |     await writeFile(
+        at tests/browser/gpu.spec.mjs:1277:29
+    Error Context: removed local temporary path.
+
+  Slow test file: tests/browser/gpu.spec.mjs (6.8m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 failed
+    tests/browser/gpu.spec.mjs:1268:1 › real WebGPU verifies Kev native 8,192-token rows and an uncapped aggregate request
+  8 passed (7.3m)
