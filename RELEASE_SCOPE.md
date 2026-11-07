@@ -12,7 +12,7 @@ GPU runs used one Apple M4 Pro and a non-fallback adapter with `shader-f16` in a
 | --- | --- | ---: | ---: |
 | Chromium | 156.0.8078.4 | 11/11 | Not sampled during the run |
 | Firefox | 157.0 | 11/11 | 78% (85 samples) |
-| WebKit | 27.2 | 11/11 | 75% (175 samples) |
+| WebKit | 27.2 | 11/11 | 75% (187 samples) |
 
 The suite covered generic and typed 8,192-token inputs; token lengths 4,096, 6,144, 7,168, 8,191, and 8,192; a 2,217-token aggregate request; Choice/Noul/Score semantics; option order; probability validity; and validation at and above the accepted token limit. Chromium's first combined long-input diagnostic exceeded its 360-second Playwright test timeout. The seven long-input stages passed when the harness ran them independently. The final recorded result is 11 passing cases per browser.
 

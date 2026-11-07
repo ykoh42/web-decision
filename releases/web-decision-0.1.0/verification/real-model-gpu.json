@@ -89,7 +89,7 @@
       "hostMemory": {
         "state": "sampled",
         "metric": "macOS memory_pressure free percentage",
-        "sampleCount": 175,
+        "sampleCount": 187,
         "minimumFreePercent": 75,
         "maximumFreePercent": 85
       },
