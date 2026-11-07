@@ -22,7 +22,7 @@ const BUILD_PARENT = join(RELEASE_ROOT, 'build');
 const BUILD_ROOT = join(RELEASE_ROOT, 'build/dist');
 const VERSION = '0.1.0';
 const MANIFEST_SHA256 = 'bc79c92a7011d2aa1aff4ede66c06cc365de81e744507256afb5c0449870716a';
-const BUNDLE_SHA256 = 'd2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d';
+const BUNDLE_SHA256 = 'aaced33a0abcccb368bec9d1b85f5b126b6d7d3fdebcb4dcb3cd0cbd8f47ba13';
 const sourceLockPath = join(RELEASE_ROOT, 'source-lock.json');
 const pins = JSON.parse(await readFile(join(RELEASE_ROOT, 'pins.json'), 'utf8'));
 assert.equal(pins.package.version, VERSION);

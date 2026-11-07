@@ -9,8 +9,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 1393,
-      "sha256": "af31001304cd54ce4f8ff4d9b51b9c7aa836f57af7969b89dc49f866a766ab95"
+      "bytes": 1338,
+      "sha256": "b595e09a38d9b670dfc8e797603ec8287a93c1896b98dca06fdaccb94fd08488"
     },
     {
       "path": "packages/web-decision/package.json",
@@ -54,8 +54,8 @@
     },
     {
       "path": "releases/web-decision-0.1.0/attention-q2/build_rewritten_model.py",
-      "bytes": 16072,
-      "sha256": "a62b9038e5f615568438fe310c112165d6f081da0ff6be6fe0c3eea3a18e1f4b"
+      "bytes": 17465,
+      "sha256": "49c52dc4da416caab043673b5f49c39d4fe9f8a50cc32ada5a39e3288339d2e8"
     },
     {
       "path": "releases/web-decision-0.1.0/attention-q2/kev_online_attention_k128.wgsl",
@@ -110,7 +110,7 @@
     {
       "path": "releases/web-decision-0.1.0/build.mjs",
       "bytes": 7835,
-      "sha256": "b6a5d2e6a94f9fb40d797b5c5ae8e591aeba276ad6cc7d97db4a0688b5b35427"
+      "sha256": "dc925a5e7f248b600d675103ccd8889e75c730f7c4475677437157754922c871"
     },
     {
       "path": "releases/web-decision-0.1.0/model-assets/kev-0.6b-q4f16/manifest.json",
@@ -185,7 +185,7 @@
     {
       "path": "releases/web-decision-0.1.0/pins.json",
       "bytes": 3348,
-      "sha256": "ae8f348689889d984afd2ffb4fdbcfbc63add4038e6222c8fef737ff29dbf3b9"
+      "sha256": "0d4794d417b1df6c95ce4a3c2b28f1a57541100052190eaf6d7e9dd7df177e06"
     },
     {
       "path": "releases/web-decision-0.1.0/prepare-asset-pack.mjs",
@@ -309,8 +309,8 @@
     },
     {
       "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-loader.js",
-      "bytes": 9392,
-      "sha256": "f78c0fdef846c5470d6d3b1203161864df2f9f0903e3b432bae6a05ad7d7a2f8"
+      "bytes": 11032,
+      "sha256": "3086ca361461791f9b8c6f9b3d3a4463b575ecd56108ed579e186a2069be568e"
     },
     {
       "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-preview-entry.js",

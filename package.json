@@ -18,7 +18,6 @@
     "vite": "8.3.6"
   },
   "description": "`web-decision` is a browser JavaScript library for running local decision models. The stable `0.1.0` release supports one model: Kev 0.6B Q4F16 through TVM WebGPU.",
-  "main": "vite.config.js",
   "directories": {
     "example": "examples",
     "test": "tests"
@@ -27,9 +26,7 @@
     "type": "git",
     "url": "git+https://github.com/ykoh42/web-decision.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/ykoh42/web-decision/issues"
   },

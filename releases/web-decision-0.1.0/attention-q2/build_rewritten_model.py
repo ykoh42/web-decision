@@ -171,7 +171,7 @@ def run_boundary_cpu_differential() -> dict:
     }
 
 
-def main() -> None:
+def parse_output_path() -> Path:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output",
@@ -181,9 +181,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     try:
-        output = assert_fresh_output_path(args.output)
+        return assert_fresh_output_path(args.output)
     except (FileExistsError, NotADirectoryError, ValueError) as error:
         raise SystemExit(str(error)) from error
+
+
+def validate_build_inputs() -> tuple[str, str, str]:
     if KEY_TILE != 128:
         raise SystemExit("This release builder is pinned to KEY_TILE=128; set KEY_TILE=128.")
     if tvm.__version__ != EXPECTED_TVM_VERSION:
@@ -203,10 +206,13 @@ def main() -> None:
         )
     except ValueError as error:
         raise SystemExit(str(error)) from error
-    output.mkdir(parents=True, exist_ok=False)
+    return emscripten_version, graph_sha256, external_data_sha256
 
-    started = time.monotonic()
-    report = {
+
+def create_build_report(
+    emscripten_version: str, graph_sha256: str, external_data_sha256: str
+) -> dict:
+    return {
         "kind": "kev-attention-query-tile-relax-prototype",
         "status": "running",
         "sourceGraph": str(GRAPH.relative_to(ROOT)),
@@ -229,146 +235,184 @@ def main() -> None:
         ],
     }
 
-    def stage(name: str) -> None:
-        report["stages"].append(
-            {"name": name, "elapsedSeconds": time.monotonic() - started}
-        )
-        print(name, flush=True)
 
-    try:
-        stage("Importing the pinned dynamic ONNX graph")
-        model = onnx.load(GRAPH, load_external_data=True)
-        onnx.checker.check_model = lambda _: None
-        mod = from_onnx(
-            model,
-            shape_dict=None,
-            dtype_dict={"input_ids": "int32", "attention_mask": "int32"},
-            keep_params_in_input=True,
-        )
-        mod, params = relax.frontend.detach_params(mod)
-        report["parameterCount"] = len(params["main"])
+def record_stage(report: dict, started: float, name: str) -> None:
+    report["stages"].append(
+        {"name": name, "elapsedSeconds": time.monotonic() - started}
+    )
+    print(name, flush=True)
 
-        stage("Rewriting all exact QK-scale-bias-softmax-V chains before LegalizeOps")
-        mod, count = rewrite_attention(mod)
-        report["rewrittenAttentionCalls"] = count
-        report["preLegalizeFunctionCount"] = len(mod.functions)
 
-        stage("Applying the pinned WebGPU Relax lowering pipeline")
-        target = tvm.target.Target(
-            "webgpu", host={"kind": "llvm", "mtriple": "wasm32-unknown-unknown-wasm"}
-        )
-        from tvm.relax.backend.gpu_generic.pipeline import (
-            dataflow_lower_passes,
-            finalize_passes,
-            legalize_passes,
-            library_dispatch_passes,
-        )
+def load_and_rewrite_model(report: dict, started: float):
+    record_stage(report, started, "Importing the pinned dynamic ONNX graph")
+    model = onnx.load(GRAPH, load_external_data=True)
+    onnx.checker.check_model = lambda _: None
+    mod = from_onnx(
+        model,
+        shape_dict=None,
+        dtype_dict={"input_ids": "int32", "attention_mask": "int32"},
+        keep_params_in_input=True,
+    )
+    mod, params = relax.frontend.detach_params(mod)
+    report["parameterCount"] = len(params["main"])
 
-        passes = (
-            library_dispatch_passes(target)
-            + legalize_passes(target)
-            + dataflow_lower_passes(target)
-            + finalize_passes(target)
-        )
-        with target:
-            for pipeline_pass in passes:
-                mod = pipeline_pass(mod)
-        report["normalizedShapeWriteCount"] = normalize_shape_func(mod)
-        report["loweredFunctionCount"] = len(mod.functions)
-        report["loweringPipelinePasses"] = [
-            pipeline_pass.info.name for pipeline_pass in passes
-        ]
-        lowered_ir = output / "lowered-ir.py"
-        lowered_ir.write_text(mod.script())
-        report["loweredIrSha256"] = sha256(lowered_ir)
-        report["queryKernelPresentAfterLowering"] = (
-            mod.get_global_var("kev_attention_query_tile") is not None
-        )
-        report["cpuBoundaryDifferential"] = run_boundary_cpu_differential()
-        if not report["cpuBoundaryDifferential"]["withinTolerance"]:
-            raise ValueError("Synthetic CPU boundary differential exceeded tolerance")
+    record_stage(
+        report,
+        started,
+        "Rewriting all exact QK-scale-bias-softmax-V chains before LegalizeOps",
+    )
+    mod, count = rewrite_attention(mod)
+    report["rewrittenAttentionCalls"] = count
+    report["preLegalizeFunctionCount"] = len(mod.functions)
+    return model, params, mod
 
-        stage("Compiling the rewritten Relax module for WebGPU and wasm32")
-        executable = relax.build(mod, target=target, relax_pipeline=None)
-        report["compileStatus"] = "success"
-        report["status"] = "compiled"
-        del params, model
 
-        stage("Saving generated WGSL for the integrated attention PrimFunc")
-        kernel_module = tvm.compile(
-            tvm.IRModule({"kev_attention_query_tile": attention_primfunc()}),
-            target="webgpu",
-        )
-        kernel_sources = []
-        pending_modules = [kernel_module.mod]
-        while pending_modules:
-            runtime_module = pending_modules.pop()
-            pending_modules.extend(runtime_module.imports)
-            try:
-                source = runtime_module.inspect_source("wgsl")
-            except Exception:
-                continue
-            if "kev_attention_query_tile_kernel" in source:
-                kernel_sources.append(source)
-        if len(kernel_sources) != 1:
-            raise RuntimeError(
-                f"Expected one attention WGSL source, found {len(kernel_sources)}"
-            )
-        wgsl = output / "kev_attention_query_tile.wgsl"
-        wgsl.write_text(kernel_sources[0])
-        report["attentionWgslSha256"] = sha256(wgsl)
-        report["attentionWgslBytes"] = wgsl.stat().st_size
-        expected_partial = (
-            f"var<workgroup> partial : array<f32, "
-            f"{QUERY_TILE * KEY_TILE * REDUCE_LANES}>;"
-        )
-        expected_scores = (
-            f"var<workgroup> scores : array<f32, {QUERY_TILE * KEY_TILE}>;"
-        )
-        if (
-            expected_partial not in kernel_sources[0]
-            or expected_scores not in kernel_sources[0]
-        ):
-            raise RuntimeError("Generated WGSL does not match the selected attention scratch dimensions")
-        barrier_count = kernel_sources[0].count("workgroupBarrier();")
-        if barrier_count != 2:
-            raise RuntimeError(f"Expected two WGSL barriers per key tile, found {barrier_count}")
-        report["attentionQueryTile"] = QUERY_TILE
-        report["attentionKeyTile"] = KEY_TILE
-        report["attentionReductionLanes"] = REDUCE_LANES
-        report["attentionWorkgroupSize"] = [128, QUERY_TILE, 1]
-        report["attentionWorkgroupScratchBytes"] = (
-            QUERY_TILE * (KEY_TILE * REDUCE_LANES + KEY_TILE) * 4
-        )
-        report["attentionWorkgroupsAt8192"] = 65536
-        report["attentionKeyTilesPerQueryAt8192"] = 8192 // KEY_TILE
-        report["attentionWorkgroupBarriersPerKeyTile"] = barrier_count
-        report["estimatedBarrierInstancesAt8192Across28Layers"] = (
-            report["attentionWorkgroupsAt8192"]
-            * report["attentionKeyTilesPerQueryAt8192"]
-            * barrier_count
-            * 28
-        )
-        report["performanceValidation"] = "not run; compile evidence only"
+def lower_model(mod, output: Path, report: dict, started: float):
+    record_stage(report, started, "Applying the pinned WebGPU Relax lowering pipeline")
+    target = tvm.target.Target(
+        "webgpu", host={"kind": "llvm", "mtriple": "wasm32-unknown-unknown-wasm"}
+    )
+    from tvm.relax.backend.gpu_generic.pipeline import (
+        dataflow_lower_passes,
+        finalize_passes,
+        legalize_passes,
+        library_dispatch_passes,
+    )
 
+    passes = (
+        library_dispatch_passes(target)
+        + legalize_passes(target)
+        + dataflow_lower_passes(target)
+        + finalize_passes(target)
+    )
+    with target:
+        for pipeline_pass in passes:
+            mod = pipeline_pass(mod)
+    report["normalizedShapeWriteCount"] = normalize_shape_func(mod)
+    report["loweredFunctionCount"] = len(mod.functions)
+    report["loweringPipelinePasses"] = [
+        pipeline_pass.info.name for pipeline_pass in passes
+    ]
+    lowered_ir = output / "lowered-ir.py"
+    lowered_ir.write_text(mod.script())
+    report["loweredIrSha256"] = sha256(lowered_ir)
+    report["queryKernelPresentAfterLowering"] = (
+        mod.get_global_var("kev_attention_query_tile") is not None
+    )
+    report["cpuBoundaryDifferential"] = run_boundary_cpu_differential()
+    if not report["cpuBoundaryDifferential"]["withinTolerance"]:
+        raise ValueError("Synthetic CPU boundary differential exceeded tolerance")
+    return mod, target
+
+
+def compile_model(mod, target, report: dict, started: float):
+    record_stage(report, started, "Compiling the rewritten Relax module for WebGPU and wasm32")
+    executable = relax.build(mod, target=target, relax_pipeline=None)
+    report["compileStatus"] = "success"
+    report["status"] = "compiled"
+    return executable
+
+
+def find_attention_wgsl(kernel_module) -> str:
+    kernel_sources = []
+    pending_modules = [kernel_module.mod]
+    while pending_modules:
+        runtime_module = pending_modules.pop()
+        pending_modules.extend(runtime_module.imports)
         try:
-            wasm = output / "model.wasm"
-            executable.export_library(str(wasm), fcompile=tvmjs.create_tvmjs_wasm)
-            report["wasmSha256"] = sha256(wasm)
-            report["wasmBytes"] = wasm.stat().st_size
-            report["wasmExportStatus"] = "success"
-            report["status"] = "success"
-        except Exception as error:
-            record_wasm_export_failure(report, error)
-        if report.get("wasmExportStatus") == "success" and (
-            report["wasmSha256"] != EXPECTED_WASM_SHA256
-            or report["wasmBytes"] != EXPECTED_WASM_BYTES
-        ):
-            report.update(
-                status="failed",
-                errorType="ValueError",
-                error="The q2-k128 WASM does not match the release hash and size pins.",
-            )
+            source = runtime_module.inspect_source("wgsl")
+        except Exception:
+            continue
+        if "kev_attention_query_tile_kernel" in source:
+            kernel_sources.append(source)
+    if len(kernel_sources) != 1:
+        raise RuntimeError(
+            f"Expected one attention WGSL source, found {len(kernel_sources)}"
+        )
+    return kernel_sources[0]
+
+
+def verify_attention_wgsl(source: str) -> int:
+    expected_partial = (
+        f"var<workgroup> partial : array<f32, "
+        f"{QUERY_TILE * KEY_TILE * REDUCE_LANES}>;"
+    )
+    expected_scores = f"var<workgroup> scores : array<f32, {QUERY_TILE * KEY_TILE}>;"
+    if expected_partial not in source or expected_scores not in source:
+        raise RuntimeError(
+            "Generated WGSL does not match the selected attention scratch dimensions"
+        )
+    barrier_count = source.count("workgroupBarrier();")
+    if barrier_count != 2:
+        raise RuntimeError(
+            f"Expected two WGSL barriers per key tile, found {barrier_count}"
+        )
+    return barrier_count
+
+
+def record_attention_metrics(report: dict, barrier_count: int) -> None:
+    report["attentionQueryTile"] = QUERY_TILE
+    report["attentionKeyTile"] = KEY_TILE
+    report["attentionReductionLanes"] = REDUCE_LANES
+    report["attentionWorkgroupSize"] = [128, QUERY_TILE, 1]
+    report["attentionWorkgroupScratchBytes"] = (
+        QUERY_TILE * (KEY_TILE * REDUCE_LANES + KEY_TILE) * 4
+    )
+    report["attentionWorkgroupsAt8192"] = 65536
+    report["attentionKeyTilesPerQueryAt8192"] = 8192 // KEY_TILE
+    report["attentionWorkgroupBarriersPerKeyTile"] = barrier_count
+    report["estimatedBarrierInstancesAt8192Across28Layers"] = (
+        report["attentionWorkgroupsAt8192"]
+        * report["attentionKeyTilesPerQueryAt8192"]
+        * barrier_count
+        * 28
+    )
+    report["performanceValidation"] = "not run; compile evidence only"
+
+
+def save_attention_wgsl(output: Path, report: dict, started: float) -> None:
+    record_stage(report, started, "Saving generated WGSL for the integrated attention PrimFunc")
+    kernel_module = tvm.compile(
+        tvm.IRModule({"kev_attention_query_tile": attention_primfunc()}),
+        target="webgpu",
+    )
+    source = find_attention_wgsl(kernel_module)
+    wgsl = output / "kev_attention_query_tile.wgsl"
+    wgsl.write_text(source)
+    report["attentionWgslSha256"] = sha256(wgsl)
+    report["attentionWgslBytes"] = wgsl.stat().st_size
+    record_attention_metrics(report, verify_attention_wgsl(source))
+
+
+def export_model(executable, output: Path, report: dict) -> None:
+    try:
+        wasm = output / "model.wasm"
+        executable.export_library(str(wasm), fcompile=tvmjs.create_tvmjs_wasm)
+        report["wasmSha256"] = sha256(wasm)
+        report["wasmBytes"] = wasm.stat().st_size
+        report["wasmExportStatus"] = "success"
+        report["status"] = "success"
+    except Exception as error:
+        record_wasm_export_failure(report, error)
+    if report.get("wasmExportStatus") == "success" and (
+        report["wasmSha256"] != EXPECTED_WASM_SHA256
+        or report["wasmBytes"] != EXPECTED_WASM_BYTES
+    ):
+        report.update(
+            status="failed",
+            errorType="ValueError",
+            error="The q2-k128 WASM does not match the release hash and size pins.",
+        )
+
+
+def run_build(output: Path, report: dict, started: float) -> None:
+    try:
+        model, params, mod = load_and_rewrite_model(report, started)
+        mod, target = lower_model(mod, output, report, started)
+        executable = compile_model(mod, target, report, started)
+        del params, model
+        save_attention_wgsl(output, report, started)
+        export_model(executable, output, report)
     except Exception as error:
         report.update(
             status="failed",
@@ -377,10 +421,24 @@ def main() -> None:
             traceback=traceback.format_exc(),
         )
 
+
+def write_build_report(output: Path, report: dict, started: float) -> None:
     report["elapsedSeconds"] = time.monotonic() - started
     (output / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
     raise_for_failed_build(report)
+
+
+def main() -> None:
+    output = parse_output_path()
+    emscripten_version, graph_sha256, external_data_sha256 = validate_build_inputs()
+    output.mkdir(parents=True, exist_ok=False)
+    started = time.monotonic()
+    report = create_build_report(
+        emscripten_version, graph_sha256, external_data_sha256
+    )
+    run_build(output, report, started)
+    write_build_report(output, report, started)
 
 
 if __name__ == "__main__":
