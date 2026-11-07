@@ -1,14 +1,14 @@
 # web-decision
 
-`web-decision` is a browser JavaScript library for running local decision models. The first public preview, `0.1.0-preview.1`, supports one model: Kev 0.6B Q4F16 through TVM WebGPU.
+`web-decision` is a browser JavaScript library for running local decision models. The stable `0.1.0` release supports one model: Kev 0.6B Q4F16 through TVM WebGPU.
 
 ## Install
 
 ```sh
-npm install https://github.com/ykoh42/web-decision/releases/download/v0.1.0-preview.1/web-decision-0.1.0-preview.1.tgz
+npm install web-decision@0.1.0
 ```
 
-The package is code-only. The 14 model runtime assets (about 349 MB) must be prepared separately and hosted by the application. See the [package guide](releases/web-decision-0.1.0-preview.1/package/README.md) and [rebuild instructions](releases/web-decision-0.1.0-preview.1/README.md).
+The package is code-only. The 14 model runtime assets (about 349 MB) must be prepared separately and hosted by the application. See the [package guide](releases/web-decision-0.1.0/package/README.md) and [rebuild instructions](releases/web-decision-0.1.0/README.md).
 
 ## Verified scope
 
@@ -22,4 +22,4 @@ Use an application-configured asset URL. Do not let untrusted input choose `asse
 
 ## License
 
-Project code is Apache-2.0. Model assets and training data have separate terms; this release does not redistribute them or determine their licensing. Review [third-party notes in the package](releases/web-decision-0.1.0-preview.1/package/KEV06-NOTICE) before preparing or hosting model assets.
+Project code is Apache-2.0. Model assets and training data have separate terms; this release does not redistribute them or determine their licensing. Review [third-party notes in the package](releases/web-decision-0.1.0/package/KEV06-NOTICE) before preparing or hosting model assets.

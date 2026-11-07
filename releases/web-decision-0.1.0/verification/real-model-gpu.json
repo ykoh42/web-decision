@@ -1,0 +1,100 @@
+{
+  "package": "web-decision@0.1.0",
+  "route": "kev-0.6b-q4f16",
+  "archiveSha256": "8d4eec6db8688c6b13d1386ec9222addaf82b8a8cd26de900e8096d39d9b65d0",
+  "bundleSha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d",
+  "assetManifestRawSha256": "43d8079ec95c71615a218f4c3be61d615c65b4a3e4d4ae66a09ae1e10d7bb338",
+  "assetManifestCanonicalSha256": "bc79c92a7011d2aa1aff4ede66c06cc365de81e744507256afb5c0449870716a",
+  "tokenizerSha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+  "wasmSha256": "5e995762514782786cf0230f7f88bf3b0f1db3499f9c44cea9a691539adee4b0",
+  "device": "Apple M4 Pro",
+  "browserRuns": [
+    {
+      "browser": "chromium",
+      "version": "156.0.8078.4",
+      "runId": "0660cf4c4b09d2f30c7c93d54140c1b58b00854f90ad705101e41fc646868c13",
+      "finishedAt": "2026-11-07T03:49:23.694Z",
+      "state": "passed",
+      "stageTests": 7,
+      "coverageTests": 4,
+      "failedOrTimedOutTests": 0,
+      "adapter": {
+        "fallback": false,
+        "shaderF16": true
+      },
+      "hostMemory": {
+        "state": "not-sampled-during-run",
+        "reason": "The host memory monitor started after this browser run."
+      },
+      "testedTokenLengths": [
+        4096,
+        6144,
+        7168,
+        8191,
+        8192
+      ],
+      "includesTyped8192TokenInput": true,
+      "includesAggregateRequest": true,
+      "includesChoiceNoulScoreAndOptionOrdering": true
+    },
+    {
+      "browser": "firefox",
+      "version": "157.0",
+      "runId": "4b57ec01c20dc83bc203ceedbf1257f48d41021f7113bc2db70888ae3d365245",
+      "finishedAt": "2026-11-07T04:05:11.096Z",
+      "state": "passed",
+      "stageTests": 7,
+      "coverageTests": 4,
+      "failedOrTimedOutTests": 0,
+      "adapter": {
+        "fallback": false,
+        "shaderF16": true
+      },
+      "hostMemory": {
+        "state": "sampled",
+        "minimumAvailableHostMemoryGiB": 18.48,
+        "sampleCount": 175
+      },
+      "testedTokenLengths": [
+        4096,
+        6144,
+        7168,
+        8191,
+        8192
+      ],
+      "includesTyped8192TokenInput": true,
+      "includesAggregateRequest": true,
+      "includesChoiceNoulScoreAndOptionOrdering": true
+    },
+    {
+      "browser": "webkit",
+      "version": "27.2",
+      "runId": "1df4a5c9b173186da9c98903afd986a1b9e23796ac7d5d6139c262f468876719",
+      "finishedAt": "2026-11-07T04:18:00.761Z",
+      "state": "passed",
+      "stageTests": 7,
+      "coverageTests": 4,
+      "failedOrTimedOutTests": 0,
+      "adapter": {
+        "fallback": false,
+        "shaderF16": true
+      },
+      "hostMemory": {
+        "state": "sampled",
+        "minimumAvailableHostMemoryGiB": 17.52,
+        "sampleCount": 154
+      },
+      "testedTokenLengths": [
+        4096,
+        6144,
+        7168,
+        8191,
+        8192
+      ],
+      "includesTyped8192TokenInput": true,
+      "includesAggregateRequest": true,
+      "includesChoiceNoulScoreAndOptionOrdering": true
+    }
+  ],
+  "coverageLimit": "One Apple M4 Pro only. Chromium host memory was not sampled during its run. These results do not establish compatibility with other devices, operating systems, or browser versions, nor decision accuracy or general task quality."
+}

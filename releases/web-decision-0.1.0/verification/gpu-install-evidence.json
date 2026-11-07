@@ -1,0 +1,31 @@
+{
+  "state": "package-consumer-verified",
+  "package": {
+    "name": "web-decision",
+    "version": "0.1.0"
+  },
+  "archive": {
+    "file": "web-decision-0.1.0.tgz",
+    "path": "releases/web-decision-0.1.0/build/release/web-decision-0.1.0.tgz",
+    "bytes": 93568,
+    "sha256": "8d4eec6db8688c6b13d1386ec9222addaf82b8a8cd26de900e8096d39d9b65d0",
+    "fileCount": 13
+  },
+  "bundle": {
+    "bytes": 310092,
+    "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d",
+    "installedSha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+  },
+  "declaration": {
+    "bytes": 6428,
+    "sha256": "46140f63f4f6bec0eff7da08dd85e2a9df6836cf0e688fa853d5eaeb896e137d"
+  },
+  "sourceBuild": {
+    "sourceFingerprint": "63370fb2f35ad93a65a4e03118cbe03dd0a44e3cae1e32db85344274dcd6e259",
+    "sourceInputCount": 63,
+    "bundle": {
+      "bytes": 310092,
+      "sha256": "d2c6746796faf6ffb03ebbb8b0123d7f39f1e37f3fed1cbd285d956b3f26c56d"
+    }
+  }
+}
