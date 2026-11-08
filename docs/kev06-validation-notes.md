@@ -8,6 +8,12 @@ The previously packaged stable WASM was 6,807,315 bytes with SHA-256 `68fe033118
 
 The two WASMs differ in their code section. The build environment and execution record for the historical stable WASM were not found, so the cause of its byte difference is not established. The new pins identify the repeatable candidate build; they do not establish provenance for the historical binary or authenticity of the source data.
 
+## Candidate archive check
+
+At commit `ba6262c7908b3e8b40a75631a00d4fbe0474cfee`, the exact npm archive with SHA-256 `a0958e02f1df70f7058f83af84eb2686cbc7fed22f799854804612632f9d0d8a` passed the Windows release evidence verifier. The installed archive ran one baseline request on Chrome 156 with a non-fallback WebGPU adapter and `shader-f16`; Windows reported an Intel UHD Graphics display device. The test measured all 14 cached assets, confirmed online inference and an offline rerun without network attempts, and matched the pinned historical and one-input ONNX CPU references. The Playwright JSON report SHA-256 was `c1fbe57ac3a9b4a19ceda69a0d7880e35298a80edd7c0dd739f75caceacfd718`.
+
+The verifier also matched the package WASM to the separately built `ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0` artifact and its build report. This is evidence for that archive, one browser, one host, and one reference input; later package changes need a new check. It does not resolve the broader numerical and model-quality questions below.
+
 ## Exploratory output comparison
 
 The historical stable and reproduced-candidate WASMs returned identical logits, probabilities and selections on four hand-selected English inputs of 22, 64, 57 and 243 tokens. Both selected the same option as the pinned ONNX model run with ONNX Runtime 1.31.1 CPU execution, graph optimizations enabled and four threads. The earlier comparison bundle was assembled in an isolated scratch checkout with its own updated integrity metadata; a source-comment build guard was temporarily bypassed for that experiment. This comparison is not evidence for an exact released archive or proof that this candidate package build has passed the current release gate.
