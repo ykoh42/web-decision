@@ -327,6 +327,35 @@ test('validates the pinned map and serves real bundled-assets exports through in
   }
 });
 
+test('a failed shared bundle import rejects both readers and can be retried', async (t: TestContext) => {
+  installTestGpu(t);
+  let attempts = 0;
+  const source = createKevReconstructedSource({
+    preflight: async () => {},
+    openCache: async () => null,
+    loadBundledAssets: async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('bundle unavailable');
+      return {experimentalKevBundledUrls: inlineAssets};
+    }
+  });
+  try {
+    const prepared = await source.prepare({model: EXPERIMENTAL_KEV_MODEL, cache: false});
+    const url = new URL('model.wasm', prepared.base);
+    const first = await Promise.allSettled([source.fetch(url), source.fetch(url)]);
+    assert.equal(attempts, 1);
+    for (const result of first) {
+      assert.equal(result.status, 'rejected');
+      if (result.status === 'rejected') assert.match(String(result.reason), /bundle unavailable/);
+    }
+    const retry = await source.fetch(url);
+    assert.equal(attempts, 2);
+    assert.deepEqual(new Uint8Array(await retry.arrayBuffer()), bytes(1, 2, 3));
+  } finally {
+    await source.dispose();
+  }
+});
+
 test('stable Kev defaults to its pinned manifest and stable-only WASM bundle', async (t: TestContext) => {
   installTestGpu(t);
   const source = createKev06StableReconstructedSource({

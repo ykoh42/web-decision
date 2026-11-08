@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import candidateManifest from '../../assets/experimental-kev-upstream/manifest.json' with {type: 'json'};
 import stableManifest from '../../assets/kev06-stable/manifest.json' with {type: 'json'};
 import sourceShardMapText from '../../assets/experimental-kev-upstream/source-shard-map.json?raw';
@@ -662,7 +664,8 @@ function createKevReconstructedSourceFor(
         if (bundledUrlsPromise === pending) bundledUrlsPromise = undefined;
       });
     }
-    return waitForAbort(() => bundledUrlsPromise, requestSignal);
+    const pending = bundledUrlsPromise;
+    return waitForAbort(() => pending, requestSignal);
   }
 
   async function prepare(options: KevSourceOptions): Promise<PreparedSource> {
