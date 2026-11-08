@@ -4,7 +4,7 @@ const PERSIAN = new Map(Object.entries({ي: 'ی', ى: 'ی', ك: 'ک', ة: 'ه', 
 const ARABIC = new Map(Object.entries({ی: 'ي', ک: 'ك'}));
 
 /** Match Decima's NFC and Arabic-script normalization before tokenization. */
-export function normalizeDecimaText(text, language = 'en') {
+export function normalizeDecimaText(text: string, language = 'en'): string {
   let value = text.normalize('NFC');
   if (language !== 'fa' && language !== 'ar') return value.trim();
   value = [...value]
