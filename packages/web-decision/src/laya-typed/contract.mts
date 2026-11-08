@@ -1,3 +1,26 @@
+import type {AssetSourceFile, ManifestSourceSpec} from '../asset-source-types.js';
+
+interface LayaTypedModelConfig {
+  readonly modelType: 'modernbert';
+  readonly vocabSize: 50368;
+  readonly specialTokenIds: Readonly<{clsId: 50281; sepId: 50282; padId: 50283; maskId: 50284}>;
+}
+
+interface LayaTypedSpec extends ManifestSourceSpec {
+  readonly model: typeof LAYA_TYPED_MODEL;
+  readonly repository: string;
+  readonly revision: string;
+  readonly sourceRepository: string;
+  readonly sourceRevision: string;
+  readonly modelConfig: LayaTypedModelConfig;
+  readonly files: Readonly<Record<string, AssetSourceFile>>;
+  readonly maxSequenceTokens: number;
+  readonly maxHeadTokens: number;
+  readonly maxOptionTokens: number;
+  readonly maxOptions: number;
+  readonly typedQuestionTypes: readonly ('choice' | 'score' | 'noul')[];
+}
+
 export const LAYA_TYPED_MODEL = 'experimental-laya-typed-decisions-fp16';
 export const LAYA_TYPED_REPOSITORY = 'onnx-community/laya-typed-decisions-ONNX';
 export const LAYA_TYPED_REVISION = '79c441b22da79eb3727bb01e8452e29a32cfa548';
@@ -7,7 +30,7 @@ const LAYA_TYPED_MODEL_CONFIG = Object.freeze({
   modelType: 'modernbert',
   vocabSize: 50368,
   specialTokenIds: Object.freeze({clsId: 50281, sepId: 50282, padId: 50283, maskId: 50284})
-});
+}) satisfies LayaTypedModelConfig;
 export const LAYA_TYPED_MAX_SEQUENCE_TOKENS = 1024;
 const LAYA_TYPED_MAX_HEAD_TOKENS = 256;
 const LAYA_TYPED_MAX_OPTION_TOKENS = 48;
@@ -34,7 +57,7 @@ export const LAYA_TYPED_FILES = Object.freeze({
     bytes: 842587136,
     sha256: '2565dd3a00465c5c615502894176cdb96a528ad66256dd8d08eb0af3a0f73582'
   })
-});
+}) satisfies Readonly<Record<string, AssetSourceFile>>;
 
 const LAYA_TYPED_TOTAL_BYTES = Object.values(LAYA_TYPED_FILES).reduce((sum, file) => sum + file.bytes, 0);
 export const LAYA_TYPED_SPEC = Object.freeze({
@@ -52,5 +75,5 @@ export const LAYA_TYPED_SPEC = Object.freeze({
   maxHeadTokens: LAYA_TYPED_MAX_HEAD_TOKENS,
   maxOptionTokens: LAYA_TYPED_MAX_OPTION_TOKENS,
   maxOptions: LAYA_TYPED_MAX_OPTIONS,
-  typedQuestionTypes: Object.freeze(['choice', 'score', 'noul'])
-});
+  typedQuestionTypes: Object.freeze(['choice', 'score', 'noul'] as const)
+}) satisfies LayaTypedSpec;
