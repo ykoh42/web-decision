@@ -204,7 +204,6 @@
     "packages/web-decision/src/verdict/runner.mjs",
     "packages/web-decision/src/verdict/session.mjs",
     "packages/web-decision/src/verdict/source.mjs",
-    "packages/web-decision/src/verdict/tokenizer.mjs",
     "packages/web-decision/src/xdecision/contract.mjs",
     "packages/web-decision/src/xdecision/loader.mjs",
     "packages/web-decision/test/asset-batch.test.mjs",
