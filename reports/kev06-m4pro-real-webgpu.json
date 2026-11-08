@@ -1,0 +1,194 @@
+{
+  "date": "2026-11-08T10:21:00.203Z",
+  "host": {
+    "platform": "darwin",
+    "release": "27.2.0",
+    "arch": "arm64",
+    "totalMemoryBytes": 25769803776,
+    "freeMemoryBytes": 9435906048
+  },
+  "browser": {
+    "name": "chromium",
+    "version": "158.0.8127.18",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
+    "webGpuFeatureStatus": "Hardware accelerated",
+    "gpuDeviceDescription": "Metal backend - Apple M4 Pro"
+  },
+  "package": {
+    "version": "0.0.0-preview.34",
+    "bundleSha256": "6359f73a940a269b10d93fd201ac902c286d7b6c18434c4980fda205fb97bc2b"
+  },
+  "assets": {
+    "manifestSha256": "8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767",
+    "files": [
+      "model.wasm",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "model_config.json",
+      "weights/tensor-cache.json",
+      "weights/params_shard_0.bin",
+      "weights/params_shard_1.bin",
+      "weights/params_shard_2.bin",
+      "weights/params_shard_3.bin",
+      "weights/params_shard_4.bin",
+      "weights/params_shard_5.bin",
+      "weights/params_shard_6.bin",
+      "weights/params_shard_7.bin",
+      "weights/params_shard_8.bin"
+    ]
+  },
+  "inference": {
+    "model": "kev-0.6b-q4f16",
+    "backend": "tvm-webgpu",
+    "currentBundleGpu": "verified",
+    "adapterInfo": {},
+    "adapterIsFallback": null,
+    "adapterFeatures": [
+      "depth32float-stencil8",
+      "chromium-experimental-subgroup-matrix",
+      "rg11b10ufloat-renderable",
+      "texture-formats-tier1",
+      "bgra8unorm-storage",
+      "texture-compression-bc",
+      "dual-source-blending",
+      "core-features-and-limits",
+      "chromium-experimental-sampling-resource-table",
+      "float32-filterable",
+      "indirect-first-instance",
+      "texture-compression-astc-sliced-3d",
+      "float32-blendable",
+      "atomic-vec2u-min-max",
+      "subgroup-size-control",
+      "texture-compression-unaligned",
+      "texture-compression-astc",
+      "texture-compression-etc2",
+      "depth-clip-control",
+      "texture-compression-bc-sliced-3d",
+      "clip-distances",
+      "texture-formats-tier2",
+      "shader-f16",
+      "timestamp-query",
+      "primitive-index",
+      "texture-component-swizzle",
+      "subgroups"
+    ],
+    "limits": {
+      "maxBufferSize": 4294967292,
+      "maxStorageBufferBindingSize": 4294967292,
+      "maxComputeWorkgroupStorageSize": 32768
+    },
+    "attentionTokenLimit": 11585,
+    "sequenceTokenLimit": 8192,
+    "minimum": {
+      "elapsedMs": 240.80000001192093,
+      "tokenCount": 8,
+      "selected": "only",
+      "optionOrder": [
+        "only"
+      ],
+      "probabilityTotal": 1
+    },
+    "base": {
+      "elapsedMs": 27.599999994039536,
+      "tokenCount": 11,
+      "selected": "yes",
+      "optionOrder": [
+        "no",
+        "yes"
+      ],
+      "probabilityTotal": 1
+    },
+    "lengths": [
+      {
+        "targetTokens": 32,
+        "elapsedMs": 27.900000005960464,
+        "tokenCount": 32,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 0.9999999999999999
+      },
+      {
+        "targetTokens": 69,
+        "elapsedMs": 37.900000005960464,
+        "tokenCount": 69,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      },
+      {
+        "targetTokens": 256,
+        "elapsedMs": 80.40000000596046,
+        "tokenCount": 256,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      },
+      {
+        "targetTokens": 1024,
+        "elapsedMs": 342.69999998807907,
+        "tokenCount": 1024,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      },
+      {
+        "targetTokens": 2048,
+        "elapsedMs": 801.9000000059605,
+        "tokenCount": 2048,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      },
+      {
+        "targetTokens": 2049,
+        "elapsedMs": 816.4000000059605,
+        "tokenCount": 2049,
+        "selected": "yes",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      },
+      {
+        "targetTokens": 8192,
+        "elapsedMs": 7001.5999999940395,
+        "tokenCount": 8192,
+        "selected": "no",
+        "optionOrder": [
+          "no",
+          "yes"
+        ],
+        "probabilityTotal": 1
+      }
+    ],
+    "overBoundary": {
+      "code": "INVALID_INPUT",
+      "message": "Question 0 state and branch exceed 8192 tokens; no truncation was applied."
+    },
+    "typed": {
+      "elapsedMs": 657.6999999880791,
+      "tokenCount": 1721,
+      "choice": "option-4",
+      "choiceOptionCount": 255,
+      "choiceProbabilityTotal": 0.9997999999999978,
+      "noul": 0.9977,
+      "score": 0.7094
+    }
+  }
+}

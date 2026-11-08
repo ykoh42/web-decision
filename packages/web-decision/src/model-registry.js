@@ -669,7 +669,7 @@ const models = [
     temperature: 1,
     typedTextQuestionTypes: ['choice', 'noul', 'score'],
     requiredLimits: KEV_REQUIRED_LIMITS,
-    gpuVerification: 'not-revalidated'
+    gpuVerification: 'verified'
   }),
   registration({
     family: 'kev',

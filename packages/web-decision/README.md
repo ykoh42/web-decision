@@ -55,4 +55,6 @@ pnpm verify:package
 
 The package build uses the pinned Apache TVM Web sources and Emscripten setup documented in the repository's package checks. Unit tests use synthetic runtime inputs unless a test explicitly requires local model assets. Local real-model browser results are reported separately from these tests.
 
+To run the real Kev 0.6B WebGPU boundary test, provide the verified asset-pack parent directory and run `WEB_DECISION_REAL_GPU=1 WEB_DECISION_KEV06_REAL_GPU=1 WEB_DECISION_PUBLIC_ASSET_ROOT=/path/to/model-assets pnpm test:browser:kev06`.
+
 The project code is Apache-2.0. See the package notices for bundled runtime and source attributions; model asset terms remain separate.

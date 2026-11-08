@@ -52,7 +52,7 @@ const currentGpuVerification = new Map([
   ['experimental-gliner2.5-decide-mobile-q4f16', 'verified'],
   ['experimental-d1-omni-600m-q8', 'not-revalidated'],
   ['experimental-openjev-verdict-151m-fp16', 'not-revalidated'],
-  ['kev-0.6b-q4f16', 'not-revalidated']
+  ['kev-0.6b-q4f16', 'verified']
 ]);
 
 const backendByFamily = {

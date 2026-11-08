@@ -34,10 +34,11 @@ export default defineConfig({
   use: {
     baseURL,
     browserName,
-    ...(realGPU && browserName === 'firefox' ? {headless: false} : {}),
+    ...(realGPU ? {headless: false} : {}),
     ...(channel ? {channel} : {}),
     launchOptions: {
       args: realGPU && browserName === 'chromium' ? chromiumArgs : [],
+      ...(realGPU && browserName === 'chromium' ? {ignoreDefaultArgs: ['--enable-unsafe-swiftshader']} : {}),
       ...(firefoxAppDataHome ? {env: {...process.env, CFFIXED_USER_HOME: firefoxAppDataHome}} : {})
     }
   },
