@@ -444,7 +444,8 @@ test(
   async (t) => {
     for (const [modelId, routeModel, assetsUrl] of [
       ['tamev-micro-minilm-int8', 'experimental-tamev-micro-minilm-int8', undefined],
-      ['tamev-nano-tinybert-int8', 'experimental-tamev-nano-tinybert-int8', 'https://mirror.example.test/nano/']
+      ['tamev-nano-tinybert-int8', 'experimental-tamev-nano-tinybert-int8', 'https://mirror.example.test/nano/'],
+      ['tamev-nano-flash-tinybert-int8', 'experimental-tamev-nano-flash-tinybert-int8', undefined]
     ]) {
       await t.test(modelId, async (t) => {
         const f = setup(t);

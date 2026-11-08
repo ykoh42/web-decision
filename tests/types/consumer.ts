@@ -45,6 +45,7 @@ import {
   type LoadedStableDecisionModel,
   type LoadedStableTamevMicroModel,
   type LoadedStableTamevNanoModel,
+  type LoadedStableTamevNanoFlashModel,
   type StableModelDescription,
   type StableModelId,
   type StableTamevSystemOneResult,
@@ -788,6 +789,16 @@ async function useInstalledPackage(): Promise<void> {
   const all: readonly ModelName[] = listDecisionModels();
   const stableIds: readonly StableModelId[] = listStableModelIds();
   const stableDescription = describeStableModel('tamev-micro-minilm-int8');
+  const nanoFlash: LoadedStableTamevNanoFlashModel = await loadDecisionModel({
+    modelId: 'tamev-nano-flash-tinybert-int8'
+  });
+  const nanoFlashResult = await nanoFlash.systemOne('state', {
+    route: {type: 'choice', criteria: {billing: 'billing', fraud: 'fraud'}}
+  });
+  const nanoFlashModelId: 'tamev-nano-flash-tinybert-int8' = nanoFlashResult.model;
+  const nanoFlashResultType: Promise<StableTamevSystemOneResult<'tamev-nano-flash-tinybert-int8'>> =
+    nanoFlash.systemOne('state', {});
+  await nanoFlash.dispose();
   if (isStableModelId('tamev-nano-tinybert-int8')) {
     const stableId: StableModelId = 'tamev-nano-tinybert-int8';
     describeStableModel(stableId);
@@ -828,7 +839,19 @@ async function useInstalledPackage(): Promise<void> {
   const cleared: boolean = await clearModelCache();
   await model.releaseCachedMemory();
   await model.dispose();
-  void [selected, selectedIndex, probability, cleared, loaded, modelId, all];
+  void [
+    selected,
+    selectedIndex,
+    probability,
+    cleared,
+    loaded,
+    modelId,
+    all,
+    stableIds,
+    stableDescription,
+    nanoFlashModelId,
+    nanoFlashResultType
+  ];
 }
 
 async function useImajev(): Promise<void> {

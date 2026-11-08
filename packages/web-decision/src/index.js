@@ -38,7 +38,7 @@ export {WebDecisionError};
 export {describeModel, isDecisionModel, listDecisionModels} from './model-registry.js';
 export {describeStableModel, isStableModelId, listStableModelIds} from './stable-models.js';
 
-function loadRegisteredModel(family, options, description) {
+function loadRegisteredModel(family, options, description, modelId) {
   const runtimeBindings = {Tokenizer, instantiate, createPolyfillWASI};
   const loaders = {
     kev: () => loadKevDecisionModel(options, description),
@@ -56,7 +56,7 @@ function loadRegisteredModel(family, options, description) {
     'opendecider-nano': () => loadOpenDeciderNano(options, runtimeBindings),
     decima: () => loadDecimaModel(options),
     tinydecide: () => loadTinyDecide(options),
-    tamev: () => loadTamev(options),
+    tamev: () => loadTamev(options, {publicModelId: modelId}),
     skejja: () => loadSkejja(options),
     ettin: () => loadEttin(options),
     laya: () => loadLayaModel(options),
@@ -112,7 +112,7 @@ export async function loadDecisionModel(options) {
     (!Object.hasOwn(debertaReadback, 'value') || debertaReadback.value !== undefined)
   )
     throw new WebDecisionError('INVALID_INPUT', 'debertaReadback is only supported by the DeBERTa model.');
-  const model = await loadRegisteredModel(family, loadOptions, description);
+  const model = await loadRegisteredModel(family, loadOptions, description, stableRequest?.modelId);
   try {
     if (stableRequest?.modelId.startsWith('tamev-')) {
       const descriptor = Object.getOwnPropertyDescriptor(model, 'systemOne');

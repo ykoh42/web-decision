@@ -1,11 +1,11 @@
 import {expect, test} from '@playwright/test';
 
 const enabled = process.env.WEB_DECISION_STABLE_MODEL_ID_REAL === '1';
-const tamevModelIds = ['tamev-micro-minilm-int8', 'tamev-nano-tinybert-int8'];
+const tamevModelIds = ['tamev-micro-minilm-int8', 'tamev-nano-tinybert-int8', 'tamev-nano-flash-tinybert-int8'];
 
 for (const modelId of tamevModelIds) {
   test(`stable model ID ${modelId} loads pinned assets without an assetsUrl`, async ({page}) => {
-    test.skip(!enabled, 'Set WEB_DECISION_STABLE_MODEL_ID_REAL=1 to load a pinned stable TAMEV model.');
+    test.skip(!enabled, 'Set WEB_DECISION_STABLE_MODEL_ID_REAL=1 to load a pinned TAMEV model by stable ID.');
     test.setTimeout(180_000);
     await page.goto('/');
     const report = await page.evaluate(async (modelId) => {
@@ -58,7 +58,12 @@ for (const modelId of tamevModelIds) {
       }
     }, modelId);
 
-    expect(report.catalog).toEqual(['tamev-micro-minilm-int8', 'tamev-nano-tinybert-int8', 'kev-0.6b-q4f16']);
+    expect(report.catalog).toEqual([
+      'tamev-micro-minilm-int8',
+      'tamev-nano-tinybert-int8',
+      'tamev-nano-flash-tinybert-int8',
+      'kev-0.6b-q4f16'
+    ]);
     expect(report.descriptionId).toBe(modelId);
     expect(report.describedId).toBe(modelId);
     expect(report.backend).toBe('onnxruntime-web-wasm');

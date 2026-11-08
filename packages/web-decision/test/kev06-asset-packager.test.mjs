@@ -57,13 +57,18 @@ test('Kev asset packager uses the current provenance and unchanged pinned model 
   assert.ok(provenance.includes(modelMetadata.checkpoint.revision));
   assert.ok(provenance.includes(modelMetadata.assets.manifestSha256));
   assert.doesNotMatch(provenance, /q2-k128|experimental-kev-0\.6b-q4f16-upstream|78026118/);
-  assert.ok(packagerSource.includes("'PROVENANCE.md': ROOT / 'scripts/asset-notices/PROVENANCE.md'"));
-  assert.ok(packagerSource.includes(`'PROVENANCE.md': '${provenanceSha256}'`));
-  assert.ok(
-    packagerSource.includes(
-      "'MODEL-APACHE-2.0.txt': ROOT / 'packages/web-decision/assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt'"
-    )
+  assert.match(
+    packagerSource,
+    /["']PROVENANCE\.md["']\s*:\s*ROOT\s*\/\s*["']scripts\/asset-notices\/PROVENANCE\.md["']/u
+  );
+  assert.match(packagerSource, new RegExp(`["']PROVENANCE\\.md["']\\s*:\\s*["']${provenanceSha256}["']`, 'u'));
+  assert.match(
+    packagerSource,
+    /["']MODEL-APACHE-2\.0\.txt["']\s*:\s*ROOT\s*\/\s*["']packages\/web-decision\/assets\/experimental-kev-upstream\/notices\/MODEL-APACHE-2\.0\.txt["']/u
   );
   assert.equal(modelLicenseSha256, '832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e');
-  assert.ok(packagerSource.includes(`'MODEL-APACHE-2.0.txt': '${modelLicenseSha256}'`));
+  assert.match(
+    packagerSource,
+    new RegExp(`["']MODEL-APACHE-2\\.0\\.txt["']\\s*:\\s*["']${modelLicenseSha256}["']`, 'u')
+  );
 });

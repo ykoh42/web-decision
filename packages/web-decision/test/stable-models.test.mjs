@@ -7,11 +7,18 @@ import {
   normalizeStableModelOptions
 } from '../src/stable-models.js';
 
-test('stable IDs use the published benchmark order and omit preview route names', () => {
-  assert.deepEqual(listStableModelIds(), ['tamev-micro-minilm-int8', 'tamev-nano-tinybert-int8', 'kev-0.6b-q4f16']);
+test('stable IDs use benchmark order within evaluation sets and omit internal route names', () => {
+  assert.deepEqual(listStableModelIds(), [
+    'tamev-micro-minilm-int8',
+    'tamev-nano-tinybert-int8',
+    'tamev-nano-flash-tinybert-int8',
+    'kev-0.6b-q4f16'
+  ]);
   assert.equal(Object.isFrozen(listStableModelIds()), true);
   assert.equal(isStableModelId('tamev-micro-minilm-int8'), true);
+  assert.equal(isStableModelId('tamev-nano-flash-tinybert-int8'), true);
   assert.equal(isStableModelId('experimental-tamev-micro-minilm-int8'), false);
+  assert.equal(isStableModelId('experimental-tamev-nano-flash-tinybert-int8'), false);
   assert.equal(isStableModelId('unknown-model'), false);
 });
 
@@ -38,6 +45,9 @@ test('stable options replace an undefined legacy selector with the pinned route'
   assert.equal(request.options.model, 'experimental-tamev-micro-minilm-int8');
   assert.equal(request.options.assetsUrl, '/mirror/');
   assert.equal(Object.hasOwn(request.options, 'modelId'), false);
+  const nanoFlashRequest = normalizeStableModelOptions({modelId: 'tamev-nano-flash-tinybert-int8'});
+  assert.equal(nanoFlashRequest.options.model, 'experimental-tamev-nano-flash-tinybert-int8');
+  assert.equal(nanoFlashRequest.options.assetsUrl, undefined);
   assert.throws(
     () =>
       normalizeStableModelOptions({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'}),

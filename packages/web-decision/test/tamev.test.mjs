@@ -760,6 +760,26 @@ test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a
   }
 });
 
+test('TAMEV stable load failures report the public ID', async () => {
+  await assert.rejects(
+    loadTamev(
+      {model: TAMEV_NANO_FLASH_MODEL},
+      {
+        publicModelId: 'tamev-nano-flash-tinybert-int8',
+        openSource: async () => {
+          throw new Error('asset request failed');
+        }
+      }
+    ),
+    (error) => {
+      assert.equal(error.code, 'MODEL_LOAD_FAILED');
+      assert.equal(error.message, 'Could not load tamev-nano-flash-tinybert-int8.');
+      assert.equal(error.message.includes('experimental-'), false);
+      return true;
+    }
+  );
+});
+
 test('TAMEV Nano Flash verifies default and mirror bytes and stays offline on cache misses', async (t) => {
   const requests = [];
   t.mock.method(globalThis, 'fetch', async (url) => {

@@ -27,7 +27,7 @@ try {
 }
 ```
 
-Use `listStableModelIds()` for the clean-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. These aliases map to the model set in the latest stable release and follow its published benchmark order; the alias names are new in the current workspace preview. TAMEV Micro and Nano use their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so its ID still requires an `assetsUrl`.
+Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so its ID still requires an `assetsUrl`.
 
 `listDecisionModels()` and `describeModel(id)` remain available for the full development route registry, including preview adapters. Those route names are not part of the stable-ID interface.
 

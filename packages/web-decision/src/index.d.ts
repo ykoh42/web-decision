@@ -703,8 +703,12 @@ export type ModelName =
   | 'experimental-d1-omni-600m-q8'
   | 'experimental-openjev-verdict-151m-fp16';
 
-/** Public aliases for the latest stable model set, ordered by benchmark; introduced by the current workspace preview. */
-export type StableModelId = 'tamev-micro-minilm-int8' | 'tamev-nano-tinybert-int8' | 'kev-0.6b-q4f16';
+/** Public IDs for pinned model routes, ordered by benchmark within comparable evaluation sets. */
+export type StableModelId =
+  | 'tamev-micro-minilm-int8'
+  | 'tamev-nano-tinybert-int8'
+  | 'tamev-nano-flash-tinybert-int8'
+  | 'kev-0.6b-q4f16';
 
 type PrefetchModelName = Exclude<
   ModelName,
@@ -1033,7 +1037,16 @@ export type StableTamevNanoLoadOptions = Omit<TamevNanoLoadOptions, 'model'> & {
   model?: undefined;
 };
 
-export type StableModelLoadOptions = StableKev06LoadOptions | StableTamevMicroLoadOptions | StableTamevNanoLoadOptions;
+export type StableTamevNanoFlashLoadOptions = Omit<TamevNanoFlashLoadOptions, 'model'> & {
+  modelId: 'tamev-nano-flash-tinybert-int8';
+  model?: undefined;
+};
+
+export type StableModelLoadOptions =
+  | StableKev06LoadOptions
+  | StableTamevMicroLoadOptions
+  | StableTamevNanoLoadOptions
+  | StableTamevNanoFlashLoadOptions;
 
 export type StableModelLoadOptionsWithAssetsUrl = Readonly<{
   modelId: StableModelId;
@@ -1710,12 +1723,17 @@ export type LoadedTamevMicroModel = LoadedTamevModel<'experimental-tamev-micro-m
 export type LoadedTamevNanoModel = LoadedTamevModel<'experimental-tamev-nano-tinybert-int8'>;
 export type LoadedTamevNanoFlashModel = LoadedTamevModel<'experimental-tamev-nano-flash-tinybert-int8'>;
 
-export type StableTamevModelId = 'tamev-micro-minilm-int8' | 'tamev-nano-tinybert-int8';
+export type StableTamevModelId =
+  | 'tamev-micro-minilm-int8'
+  | 'tamev-nano-tinybert-int8'
+  | 'tamev-nano-flash-tinybert-int8';
 export type StableTamevSystemOneResult<Model extends StableTamevModelId> = Omit<
   TamevSystemOneResult<
     Model extends 'tamev-micro-minilm-int8'
       ? 'experimental-tamev-micro-minilm-int8'
-      : 'experimental-tamev-nano-tinybert-int8'
+      : Model extends 'tamev-nano-tinybert-int8'
+        ? 'experimental-tamev-nano-tinybert-int8'
+        : 'experimental-tamev-nano-flash-tinybert-int8'
   >,
   'model'
 > & {readonly model: Model};
@@ -1740,6 +1758,10 @@ export type LoadedStableTamevNanoModel = LoadedStableTamevModel<
   'tamev-nano-tinybert-int8',
   'experimental-tamev-nano-tinybert-int8'
 >;
+export type LoadedStableTamevNanoFlashModel = LoadedStableTamevModel<
+  'tamev-nano-flash-tinybert-int8',
+  'experimental-tamev-nano-flash-tinybert-int8'
+>;
 
 export interface LoadedStableKev06DecisionModel extends Omit<LoadedKev06DecisionModel, 'description'> {
   readonly description: StableModelDescription;
@@ -1748,7 +1770,8 @@ export interface LoadedStableKev06DecisionModel extends Omit<LoadedKev06Decision
 export type LoadedStableDecisionModel =
   | LoadedStableKev06DecisionModel
   | LoadedStableTamevMicroModel
-  | LoadedStableTamevNanoModel;
+  | LoadedStableTamevNanoModel
+  | LoadedStableTamevNanoFlashModel;
 
 export type SkejjaModelName = 'experimental-skejja-edge32k-ft6-int8' | 'experimental-skejja-edge32k-ft6-int8dyn';
 export interface SkejjaChoiceQuestion {
@@ -1970,7 +1993,7 @@ export function listDecisionModels(): readonly ModelName[];
 export function isDecisionModel(value: unknown): value is ModelName;
 /** Describe a route without loading assets or checking the current GPU. */
 export function describeModel(model: ModelName): ModelDescription;
-/** List stable public aliases in descending order from the published benchmark table. */
+/** List stable public IDs, ordered by benchmark within comparable evaluation sets. */
 export function listStableModelIds(): readonly StableModelId[];
 /** Narrow a dynamic value to a stable public model ID. */
 export function isStableModelId(value: unknown): value is StableModelId;
@@ -1979,6 +2002,7 @@ export function describeStableModel(model: StableModelId): StableModelDescriptio
 /** Load a stable public ID. Pinned-source models may omit assetsUrl; Kev requires its hosted asset pack. */
 export function loadDecisionModel(options: StableTamevMicroLoadOptions): Promise<LoadedStableTamevMicroModel>;
 export function loadDecisionModel(options: StableTamevNanoLoadOptions): Promise<LoadedStableTamevNanoModel>;
+export function loadDecisionModel(options: StableTamevNanoFlashLoadOptions): Promise<LoadedStableTamevNanoFlashModel>;
 export function loadDecisionModel(options: StableKev06LoadOptions): Promise<LoadedStableKev06DecisionModel>;
 export function loadDecisionModel(options: StableModelLoadOptionsWithAssetsUrl): Promise<LoadedStableDecisionModel>;
 export function loadDecisionModel(options: StableModelLoadOptions): Promise<LoadedStableDecisionModel>;

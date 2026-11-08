@@ -23,9 +23,11 @@ withTemporaryDirectories((makeTempDirectory) => {
   assert.deepEqual(library.listStableModelIds(), [
     'tamev-micro-minilm-int8',
     'tamev-nano-tinybert-int8',
+    'tamev-nano-flash-tinybert-int8',
     'kev-0.6b-q4f16'
   ]);
   assert.equal(library.isStableModelId('tamev-micro-minilm-int8'), true);
+  assert.equal(library.isStableModelId('tamev-nano-flash-tinybert-int8'), true);
   assert.equal(library.isStableModelId('experimental-tamev-micro-minilm-int8'), false);
   assert.equal(library.describeStableModel('tamev-micro-minilm-int8').model, 'tamev-micro-minilm-int8');
   assert.throws(() => library.describeStableModel('experimental-tamev-micro-minilm-int8'), {code: 'INVALID_INPUT'});

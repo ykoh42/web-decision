@@ -113,7 +113,12 @@ function validateSession(session, profile) {
 async function loadTamevProfile(
   options,
   profile,
-  {ort = defaultOrt, Tokenizer: TokenizerClass = Tokenizer, openSource = openTamevSource} = {}
+  {
+    publicModelId = profile.model,
+    ort = defaultOrt,
+    Tokenizer: TokenizerClass = Tokenizer,
+    openSource = openTamevSource
+  } = {}
 ) {
   const checked = validateTamevLoadOptions(options, profile);
   const {signal} = checked;
@@ -145,7 +150,7 @@ async function loadTamevProfile(
     await Promise.allSettled([session?.release()].filter(Boolean));
     signal?.throwIfAborted();
     if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
-    throw fail('MODEL_LOAD_FAILED', `Could not load ${profile.model}.`, cause);
+    throw fail('MODEL_LOAD_FAILED', `Could not load ${publicModelId}.`, cause);
   }
 }
 
