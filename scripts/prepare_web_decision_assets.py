@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from kev06_asset_manifest import KEV06_MANIFEST_SHA256, canonical_manifest_sha256
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -18,6 +17,14 @@ if args.output.is_symlink():
 output = args.output.resolve()
 if output.exists():
     raise SystemExit(f'Refusing to overwrite existing path: {output}')
+try:
+    model_metadata = json.loads((ROOT / 'packages/web-decision/src/kev-preview-model.json').read_text())
+    expected_manifest_sha256 = model_metadata['assets']['manifestSha256']
+except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+    raise SystemExit(f'Could not read the current Kev manifest pin: {error}') from error
+if (not isinstance(expected_manifest_sha256, str) or len(expected_manifest_sha256) != 64
+        or any(character not in '0123456789abcdef' for character in expected_manifest_sha256)):
+    raise SystemExit('The current Kev model metadata contains an invalid manifest SHA-256')
 source = ROOT / 'models/kev-0.6b-onnx'
 cache = ROOT / 'models/tvm-kev-q4-dynamic'
 wasm = ROOT / 'public/tvm-kev-q4-dynamic.wasm'
@@ -44,6 +51,11 @@ def digest(path):
         for chunk in iter(lambda: f.read(1024 * 1024), b''):
             result.update(chunk)
     return result.hexdigest()
+
+
+def canonical_manifest_sha256(value):
+    canonical = json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False) + '\n'
+    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
 
 checkpoint_file = source / 'onnx/model_q4f16.onnx_data'
@@ -123,7 +135,7 @@ manifest = {
                    'weightSha256': '777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b'},
     'files': files,
 }
-if canonical_manifest_sha256(manifest) != KEV06_MANIFEST_SHA256:
+if canonical_manifest_sha256(manifest) != expected_manifest_sha256:
     raise SystemExit('Prepared Kev 0.6B manifest does not match the reviewed package pin.')
 (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
 # Keep distribution notices beside the assets. They are deliberately outside
