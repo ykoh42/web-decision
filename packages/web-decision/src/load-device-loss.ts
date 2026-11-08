@@ -1,11 +1,20 @@
 import {WebDecisionError} from './kev.js';
 
+interface DeviceLossSource {
+  readonly lost: PromiseLike<unknown>;
+}
+
+interface LoadDeviceLossWatch {
+  readonly signal: AbortSignal;
+  close(): void;
+}
+
 /** Forward caller cancellation and GPU loss while model assets are loading. */
-export function watchLoadDeviceLoss(device, callerSignal) {
+export function watchLoadDeviceLoss(device: DeviceLossSource, callerSignal?: AbortSignal | null): LoadDeviceLossWatch {
   const controller = new AbortController();
   let closed = false;
-  const forwardAbort = () => controller.abort(callerSignal.reason);
-  const onLoss = (cause) => {
+  const forwardAbort = () => controller.abort(callerSignal?.reason);
+  const onLoss = (cause: unknown) => {
     if (!closed)
       controller.abort(
         new WebDecisionError('MODEL_LOAD_FAILED', 'The GPU device was lost while loading the model.', {cause})
