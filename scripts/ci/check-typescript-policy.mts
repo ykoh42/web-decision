@@ -304,21 +304,35 @@ function isInlineScript(node: DefaultTreeAdapterTypes.Node): boolean {
   return node.childNodes.some((child) => defaultTreeAdapter.isTextNode(child) && child.value.trim().length > 0);
 }
 
-function containsInlineScript(node: DefaultTreeAdapterTypes.Node): boolean {
-  if (isInlineScript(node)) return true;
-  if (defaultTreeAdapter.isElementNode(node) && node.tagName === 'template' && 'content' in node) {
-    if (containsInlineScript(defaultTreeAdapter.getTemplateContent(node))) return true;
-  }
-  return 'childNodes' in node && node.childNodes.some(containsInlineScript);
+function hasInlineHandler(node: DefaultTreeAdapterTypes.Node): boolean {
+  if (!defaultTreeAdapter.isElementNode(node)) return false;
+  return node.attrs.some(({name, value}) => {
+    if (/^on[a-z]+$/u.test(name) && value.trim()) return true;
+    if (!['href', 'src', 'action', 'formaction'].includes(name)) return false;
+    return value
+      .split('')
+      .filter((character) => character.charCodeAt(0) > 32)
+      .join('')
+      .toLowerCase()
+      .startsWith('javascript:');
+  });
 }
 
-/** Find executable inline scripts in tracked or nonignored HTML. */
+function containsInlineJavaScript(node: DefaultTreeAdapterTypes.Node): boolean {
+  if (isInlineScript(node) || hasInlineHandler(node)) return true;
+  if (defaultTreeAdapter.isElementNode(node) && node.tagName === 'template' && 'content' in node) {
+    if (containsInlineJavaScript(defaultTreeAdapter.getTemplateContent(node))) return true;
+  }
+  return 'childNodes' in node && node.childNodes.some(containsInlineJavaScript);
+}
+
+/** Find inline JavaScript in tracked or nonignored HTML. */
 export function discoverInlineJavaScriptPaths(root: string): string[] {
   const output = runGit(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']);
   const paths = [...new Set(parseGitPathList(output))].filter(
     (path) => /\.html?$/iu.test(path) && existsSync(join(root, path))
   );
-  return paths.filter((path) => containsInlineScript(parse(readFileSync(join(root, path), 'utf8')))).sort();
+  return paths.filter((path) => containsInlineJavaScript(parse(readFileSync(join(root, path), 'utf8')))).sort();
 }
 
 function discoverSeedJavaScriptPaths(root: string, baselineCommit: string): Set<string> {
