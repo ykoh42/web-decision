@@ -12,5 +12,5 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "files": ["src/kev.ts", "src/kev-loader.ts"]
+  "files": ["src/kev.ts", "src/kev-loader.ts", "src/runtime/tvm-source.d.ts"]
 }

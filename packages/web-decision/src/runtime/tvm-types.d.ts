@@ -22,6 +22,3 @@ export interface Instance {
   createVirtualMachine(device: DLDevice): VirtualMachine;
   empty(shape: number[] | number, dtype: string, device: DLDevice): Tensor;
 }
-
-export function instantiate(bufferSource: ArrayBuffer, importObject: object): Promise<Instance>;
-export function createPolyfillWASI(): object;

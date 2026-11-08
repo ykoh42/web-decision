@@ -25,6 +25,7 @@
     "test/kev06-contract.test.mts",
     "test/model-assets.test.mts",
     "test/runtime-lifecycle.test.mts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "src/runtime/tvm-source.d.ts"
   ]
 }

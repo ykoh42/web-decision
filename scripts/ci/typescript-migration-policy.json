@@ -114,7 +114,6 @@
     "packages/web-decision/src/kev-deberta-reflexes-preview-entry.js",
     "packages/web-decision/src/kev-deberta-reflexes-preview-registry.js",
     "packages/web-decision/src/kev-gpu.js",
-    "packages/web-decision/src/kev-loader.js",
     "packages/web-decision/src/kev-preview-entry.js",
     "packages/web-decision/src/kev-preview-registry.js",
     "packages/web-decision/src/kev-reflexes.js",

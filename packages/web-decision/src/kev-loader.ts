@@ -1,6 +1,6 @@
 import {Tokenizer} from '@huggingface/tokenizers';
-import {createPolyfillWASI, instantiate} from './.toolchains/runtime.js';
-import type {DLDevice, Instance, PackedFunc, Tensor} from './.toolchains/runtime.js';
+import {createPolyfillWASI, instantiate} from './runtime/tvm.js';
+import type {DLDevice, Instance, PackedFunc, Tensor} from './runtime/tvm.js';
 import {detectKevGPUDevice} from './kev-gpu.js';
 import {
   commitCachedManifest as commitManifest,

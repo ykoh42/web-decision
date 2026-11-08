@@ -12,6 +12,24 @@ export function assertPreviewWebgpuHash(actual: string): void {
   }
 }
 
+export function tvmRuntimeImportWithoutTypeMarker(source: string): string | null {
+  const marker = '?web-decision-runtime';
+  const prefix = '../../../../.toolchains/apache-tvm-src/web/src/';
+  if (source !== `${prefix}runtime.ts${marker}` && source !== `${prefix}compact.ts${marker}`) return null;
+  return source.slice(0, -marker.length);
+}
+
+export function resolveTvmTypeBoundary(): Plugin {
+  return {
+    name: 'resolve-tvm-type-boundary',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      const target = tvmRuntimeImportWithoutTypeMarker(source);
+      return target ? this.resolve(target, importer, {skipSelf: true}) : null;
+    }
+  };
+}
+
 // The generated TVM WASI glue is imported by this browser-only bundle. Its
 // CommonJS export is in the Node branch and has no browser consumer. Change
 // only the exact pinned glue sequence; if that sequence changes, the build
@@ -50,6 +68,7 @@ export default defineConfig({
   // replace `typeof __filename` with "string" and make the branch unconditional.
   define: {__filename: 'undefined', __dirname: 'undefined'},
   plugins: [
+    resolveTvmTypeBoundary(),
     browserOnlyTvmWasiExport(),
     {
       name: 'verify-preview-webgpu-source',

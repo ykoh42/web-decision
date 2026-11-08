@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import config, {assertPreviewWebgpuHash, browserOnlyTvmWasiExport, stripNodeOnlyWasiExport} from '../vite.config.ts';
+import config, {
+  assertPreviewWebgpuHash,
+  browserOnlyTvmWasiExport,
+  stripNodeOnlyWasiExport,
+  tvmRuntimeImportWithoutTypeMarker
+} from '../vite.config.ts';
 // These hooks are exercised with the minimal bundle and context the test needs.
 type Chunk = {type: 'chunk'; code: string};
 type NormalizeHook = {generateBundle: (options: object, bundle: Record<string, Chunk>) => void};
@@ -15,6 +20,16 @@ const plugin = plugins.find(
     candidate && !Array.isArray(candidate) && 'name' in candidate && candidate.name === 'normalize-tvm-source-markers'
 ) as unknown as NormalizeHook;
 assert.ok(plugin);
+
+test('TVM type boundary only rewrites the two pinned runtime imports', () => {
+  const prefix = '../../../../.toolchains/apache-tvm-src/web/src/';
+  for (const file of ['runtime.ts', 'compact.ts']) {
+    assert.equal(tvmRuntimeImportWithoutTypeMarker(`${prefix}${file}?web-decision-runtime`), `${prefix}${file}`);
+  }
+  assert.equal(tvmRuntimeImportWithoutTypeMarker(`${prefix}other.ts?web-decision-runtime`), null);
+  assert.equal(tvmRuntimeImportWithoutTypeMarker(`${prefix}runtime.ts`), null);
+  assert.equal(tvmRuntimeImportWithoutTypeMarker('/other/runtime.ts?web-decision-runtime'), null);
+});
 
 test('TVM source marker normalization removes checkout-depth differences', () => {
   const build = (path: string): string => {
