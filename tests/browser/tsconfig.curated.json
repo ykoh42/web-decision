@@ -7,6 +7,7 @@
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
+    "allowImportingTsExtensions": true,
     "types": [
       "node"
     ],
@@ -23,6 +24,8 @@
   "files": [
     "harness.ts",
     "curated-harness.spec.ts",
-    "kev06-default-source-real-webgpu.spec.ts"
+    "kev06-default-source-real-webgpu.spec.ts",
+    "kev06-release-evidence.ts",
+    "kev06-release-evidence.test.ts"
   ]
 }
