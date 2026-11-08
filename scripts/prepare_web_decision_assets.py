@@ -10,11 +10,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument('--output', type=Path, required=True, help='New output directory; must not already exist')
+parser.add_argument('--output', type=Path, required=True,
+                    help='New output directory; must not already exist or traverse symlinks')
 args = parser.parse_args()
-if args.output.is_symlink():
-    raise SystemExit(f'Refusing to overwrite existing path: {args.output}')
-output = args.output.resolve()
+requested_output = args.output.expanduser()
+if not requested_output.is_absolute():
+    requested_output = Path.cwd() / requested_output
+for path_component in (requested_output, *requested_output.parents):
+    if path_component.is_symlink():
+        raise SystemExit(f'Refusing output path with symlink component: {path_component}')
+output = requested_output.resolve()
 if output.exists():
     raise SystemExit(f'Refusing to overwrite existing path: {output}')
 try:
@@ -112,16 +117,11 @@ header = (tvm / '3rdparty/compiler-rt/builtin_fp16.h').read_bytes()
 if not header.startswith(b'/*') or b'*/' not in header:
     raise SystemExit('Unexpected compiler-rt header notice')
 
-output.mkdir(parents=True)
 files = {}
 for name, path in sources.items():
-    dest = output / name
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(path, dest)
-    source_hash = digest(path)
-    if digest(dest) != source_hash:
-        raise SystemExit(f'Copy failed integrity check: {name}')
-    files[name] = {'sha256': source_hash, 'bytes': dest.stat().st_size}
+    if not path.is_file():
+        raise SystemExit(f'Missing required asset source: {name}')
+    files[name] = {'sha256': digest(path), 'bytes': path.stat().st_size}
 manifest = {
     'formatVersion': 1,
     'model': 'kev-0.6b-q4f16',
@@ -137,6 +137,14 @@ manifest = {
 }
 if canonical_manifest_sha256(manifest) != expected_manifest_sha256:
     raise SystemExit('Prepared Kev 0.6B manifest does not match the reviewed package pin.')
+
+output.mkdir(parents=True)
+for name, path in sources.items():
+    dest = output / name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, dest)
+    if digest(dest) != files[name]['sha256']:
+        raise SystemExit(f'Copy failed integrity check: {name}')
 (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
 # Keep distribution notices beside the assets. They are deliberately outside
 # `manifest.files`: the inference loader totals that list as bytes it fetches.
