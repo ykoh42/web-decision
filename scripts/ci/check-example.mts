@@ -10,7 +10,14 @@ assert.equal(
   false,
   'The example should install a package copy, not link to the source checkout'
 );
-const metadata = (path) => readFile(resolve(path, 'package.json'), 'utf8').then(JSON.parse);
+interface PackageMetadata {
+  name: string;
+  version: string;
+  license: string;
+}
+
+const metadata = async (path: string): Promise<PackageMetadata> =>
+  JSON.parse(await readFile(resolve(path, 'package.json'), 'utf8'));
 const [original, copy] = await Promise.all([metadata(source), metadata(installed)]);
 assert.equal(copy.version, original.version);
 assert.equal(copy.license, original.license);
@@ -19,11 +26,11 @@ const [installedEntry, sourceEntry] = await Promise.all([
   readFile(resolve(source, 'dist/index.js'))
 ]);
 assert.ok(installedEntry.equals(sourceEntry), 'Installed package entry must match the source package entry');
-const library = await import(pathToFileURL(resolve(installed, 'dist/index.js')));
+const library = await import(pathToFileURL(resolve(installed, 'dist/index.js')).href);
 assert.equal(typeof library.loadDecisionModel, 'function');
 const build = resolve('examples/basic/dist');
-async function files(directory, prefix = '') {
-  const result = [];
+async function files(directory: string, prefix = ''): Promise<string[]> {
+  const result: string[] = [];
   for (const entry of await readdir(directory, {withFileTypes: true})) {
     const name = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) result.push(...(await files(join(directory, entry.name), name)));

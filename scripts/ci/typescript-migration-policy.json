@@ -421,7 +421,6 @@
     "packages/web-decision/test/tinydecide.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",
     "packages/web-decision/test/xdecision-contract.test.mjs",
-    "scripts/ci/check-example.mjs",
     "scripts/ci/check-release-types.mjs",
     "scripts/ci/check_cognitive_complexity.mjs",
     "scripts/ci/test_cognitive_complexity.mjs",
