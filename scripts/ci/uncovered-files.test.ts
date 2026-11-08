@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {test} from 'node:test';
@@ -12,6 +12,11 @@ import {
 } from './uncovered-files.ts';
 
 const sourceRoot = '/workspace/src';
+
+function isWindowsSymlinkPermissionError(error: unknown): boolean {
+  if (process.platform !== 'win32' || typeof error !== 'object' || error === null || !('code' in error)) return false;
+  return typeof error.code === 'string' && ['EACCES', 'EPERM', 'ENOTSUP', 'UNKNOWN'].includes(error.code);
+}
 
 test('finds uncovered source files in stable path order and ignores empty totals', () => {
   const summary = {
@@ -55,6 +60,37 @@ test('discovers each executable source extension and skips declarations and the 
     );
   } finally {
     rmSync(temporaryRoot, {recursive: true, force: true});
+  }
+});
+
+test('rejects symbolic links in the runtime source directory', (context) => {
+  const sourceDirectory = mkdtempSync(join(tmpdir(), 'coverage-symlink-'));
+
+  try {
+    writeFileSync(join(sourceDirectory, 'target.mts'), '');
+    try {
+      symlinkSync('target.mts', join(sourceDirectory, 'linked.mts'), 'file');
+    } catch (error) {
+      if (isWindowsSymlinkPermissionError(error)) {
+        context.skip('Windows did not grant permission to create a file symlink.');
+        return;
+      }
+      throw error;
+    }
+
+    assert.throws(() => listRuntimeSourceFiles(sourceDirectory), /symbolic link: linked\.mts/);
+  } finally {
+    rmSync(sourceDirectory, {recursive: true, force: true});
+  }
+});
+
+test('rejects a source directory with no executable JavaScript or TypeScript files', () => {
+  const sourceDirectory = mkdtempSync(join(tmpdir(), 'coverage-empty-'));
+
+  try {
+    assert.throws(() => listRuntimeSourceFiles(sourceDirectory), /no executable JavaScript or TypeScript files/);
+  } finally {
+    rmSync(sourceDirectory, {recursive: true, force: true});
   }
 });
 

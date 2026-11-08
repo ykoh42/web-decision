@@ -44,6 +44,10 @@ function validateLineCoverage(name: string, coverage: unknown): asserts coverage
 function sourceFileNames(directory: string, sourceRoot: string, result: string[]): void {
   for (const entry of readdirSync(directory, {withFileTypes: true})) {
     const absolutePath = `${directory}/${entry.name}`;
+    if (entry.isSymbolicLink()) {
+      const name = relative(sourceRoot, absolutePath).split(sep).join('/');
+      throw new Error(`Source directory contains a symbolic link: ${name}.`);
+    }
     if (entry.isDirectory()) {
       sourceFileNames(absolutePath, sourceRoot, result);
       continue;
@@ -65,7 +69,11 @@ function sourceFileNames(directory: string, sourceRoot: string, result: string[]
 export function listRuntimeSourceFiles(sourceRoot: string): string[] {
   const files: string[] = [];
   sourceFileNames(sourceRoot, sourceRoot, files);
-  return files.sort();
+  const sortedFiles = files.sort();
+  if (sortedFiles.length === 0) {
+    throw new Error(`Source directory contains no executable JavaScript or TypeScript files: ${sourceRoot}.`);
+  }
+  return sortedFiles;
 }
 
 function relativeReportPath(sourceRoot: string, path: string): string {
