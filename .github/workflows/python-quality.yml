@@ -69,6 +69,7 @@ jobs:
             scripts/ci/test_python_quality.py \
             scripts/ci/test_workflow_syntax.py \
             scripts/test_safe_output.py \
+            scripts/test_verify_q4_cache.py \
             scripts/test_specialize_q4_direct_serialization.py \
             scripts/test_tvm_kev_shape_order.py
       - name: Enforce Python complexity completion

@@ -124,15 +124,5 @@
         "complexity": 20
       }
     ]
-  },
-  {
-    "path": "scripts/verify_q4_cache.py",
-    "file_name": "verify_q4_cache.py",
-    "functions": [
-      {
-        "name": "<module>",
-        "complexity": 19
-      }
-    ]
   }
 ]
