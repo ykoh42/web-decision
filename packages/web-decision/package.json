@@ -35,6 +35,7 @@
     "build": "vite build --config vite.config.ts",
     "check:catalog": "node --import tsx scripts/build-model-catalog.mts --check",
     "typecheck:curated": "tsc --project tsconfig.curated.json",
+    "typecheck:kev": "tsc --project tsconfig.kev.json",
     "test": "node --import tsx ../../scripts/kanana/run-node-tests.mts",
     "test:kanana-core": "node --import tsx ../../scripts/kanana/run-node-tests.mts --core",
     "test:kanana-runtime": "pnpm run typecheck:kanana-runtime && node --test test/kanana-tvm-runtime.test.mjs",

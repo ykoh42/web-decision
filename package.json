@@ -11,7 +11,7 @@
     "lint": "oxlint . --max-warnings=2",
     "format": "oxfmt '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
     "format:check": "oxfmt --check '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
-    "check:quality": "pnpm run format:check && pnpm run lint && pnpm run test:quality:complexity && pnpm run test:quality:package && node scripts/ci/check_cognitive_complexity.mjs && pnpm --filter web-decision check:catalog && pnpm --filter web-decision typecheck:curated && tsc --project tests/browser/tsconfig.curated.json && tsc --project tsconfig.tools.json",
+    "check:quality": "pnpm run format:check && pnpm run lint && pnpm run test:quality:complexity && pnpm run test:quality:package && node scripts/ci/check_cognitive_complexity.mjs && pnpm --filter web-decision check:catalog && pnpm --filter web-decision typecheck:curated && pnpm --filter web-decision typecheck:kev && tsc --project tests/browser/tsconfig.curated.json && tsc --project tsconfig.tools.json",
     "test:quality:complexity": "node --test scripts/ci/test_cognitive_complexity.mjs",
     "test:quality:package": "node --import tsx --test scripts/ci/asset-key.test.ts",
     "test:release": "node --test releases/web-decision-0.1.0/prepare-asset-pack.test.mjs && node --test releases/web-decision-0.1.0/release-integrity.test.mjs && node --test scripts/fetch-model.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.1.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
