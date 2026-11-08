@@ -1,0 +1,138 @@
+[
+  {
+    "path": "releases/web-decision-0.1.0/attention-q2/online_kernel.py",
+    "file_name": "online_kernel.py",
+    "functions": [
+      {
+        "name": "run_webgpu_codegen",
+        "complexity": 17
+      },
+      {
+        "name": "OnlineAttention::main",
+        "complexity": 87
+      }
+    ]
+  },
+  {
+    "path": "releases/web-decision-0.1.0/attention-q2/relax_rewrite.py",
+    "file_name": "relax_rewrite.py",
+    "functions": [
+      {
+        "name": "_attention_inputs",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "releases/web-decision-0.2.0/attention-q2/online_kernel.py",
+    "file_name": "online_kernel.py",
+    "functions": [
+      {
+        "name": "run_webgpu_codegen",
+        "complexity": 17
+      },
+      {
+        "name": "OnlineAttention::main",
+        "complexity": 87
+      }
+    ]
+  },
+  {
+    "path": "releases/web-decision-0.2.0/attention-q2/relax_rewrite.py",
+    "file_name": "relax_rewrite.py",
+    "functions": [
+      {
+        "name": "_attention_inputs",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "releases/web-decision-0.3.0/attention-q2/online_kernel.py",
+    "file_name": "online_kernel.py",
+    "functions": [
+      {
+        "name": "run_webgpu_codegen",
+        "complexity": 17
+      },
+      {
+        "name": "OnlineAttention::main",
+        "complexity": 87
+      }
+    ]
+  },
+  {
+    "path": "releases/web-decision-0.3.0/attention-q2/relax_rewrite.py",
+    "file_name": "relax_rewrite.py",
+    "functions": [
+      {
+        "name": "_attention_inputs",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "scripts/build_tvm_q4.py",
+    "file_name": "build_tvm_q4.py",
+    "functions": [
+      {
+        "name": "<module>",
+        "complexity": 34
+      }
+    ]
+  },
+  {
+    "path": "scripts/prepare_web_decision_assets.py",
+    "file_name": "prepare_web_decision_assets.py",
+    "functions": [
+      {
+        "name": "<module>",
+        "complexity": 42
+      }
+    ]
+  },
+  {
+    "path": "scripts/specialize_q4_direct.py",
+    "file_name": "specialize_q4_direct.py",
+    "functions": [
+      {
+        "name": "restore",
+        "complexity": 34
+      },
+      {
+        "name": "<module>",
+        "complexity": 46
+      }
+    ]
+  },
+  {
+    "path": "scripts/tvm_kev_shape_order.py",
+    "file_name": "tvm_kev_shape_order.py",
+    "functions": [
+      {
+        "name": "normalize",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "scripts/verify_preview_build_requirements.py",
+    "file_name": "verify_preview_build_requirements.py",
+    "functions": [
+      {
+        "name": "read_locked_requirements",
+        "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "scripts/verify_q4_cache.py",
+    "file_name": "verify_q4_cache.py",
+    "functions": [
+      {
+        "name": "<module>",
+        "complexity": 19
+      }
+    ]
+  }
+]

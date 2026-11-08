@@ -1,0 +1,18 @@
+[project]
+name = "web-decision-dev-tools"
+version = "0.0.0"
+requires-python = ">=3.12,<3.16"
+
+[dependency-groups]
+quality = [
+  "complexipy==8.3.0",
+  "pytest==9.2.0",
+  "ruff==0.17.4",
+]
+
+[tool.uv]
+package = false
+
+[tool.complexipy]
+max-complexity-allowed = 15
+check-script = true

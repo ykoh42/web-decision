@@ -64,4 +64,6 @@ This describes ongoing development, not the current `0.3.0` release behavior.
 
 Release `0.3.0` was tested with real models in Chromium, Firefox, and WebKit on an Apple M4 Pro. See the [GitHub release](https://github.com/ykoh42/web-decision/releases/tag/v0.3.0) and [verification record](releases/web-decision-0.3.0/verification/package-archive.json).
 
+For Python development checks, see [Python development tools](docs/python-quality.md).
+
 See [LICENSE](LICENSE) and the package notices for project, model, and runtime terms.
