@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "threshold": 15,
+  "versions": {
+    "oxlint": "1.92.0",
+    "sonarjs": "4.2.2",
+    "typescriptParser": "6.0.3"
+  },
+  "generatedExclusions": [
+    {
+      "path": "releases/web-decision-0.3.0/package/dist/index.js",
+      "reason": "Published distribution bundle generated from the audited release source; minified/compiled output is not a maintainable source file."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Four-line Emscripten/TVM-generated glue; the pinned upstream TypeScript/C++ source remains in scope and CI regenerates this artifact."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Four-line Emscripten/TVM-generated glue; the pinned upstream TypeScript/C++ source remains in scope and CI regenerates this artifact."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Four-line Emscripten/TVM-generated glue; the pinned upstream TypeScript/C++ source remains in scope and CI regenerates this artifact."
+    }
+  ],
+  "findings": [
+    {
+      "file": "packages/web-decision/src/deberta/contract.mjs",
+      "identity": "module/function:validateDebertaTensorCache",
+      "score": 29
+    },
+    {
+      "file": "packages/web-decision/src/deberta/model.mjs",
+      "identity": "module/class:ExperimentalDebertaSession/member:MethodDeclaration:releaseCachedMemory",
+      "score": 16
+    },
+    {
+      "file": "packages/web-decision/src/deberta/model.mjs",
+      "identity": "module/class:ExperimentalDebertaSession/member:MethodDeclaration:run",
+      "score": 17
+    },
+    {
+      "file": "packages/web-decision/src/deberta/packed-readback.mjs",
+      "identity": "module/function:runWithPackedReadback",
+      "score": 32
+    },
+    {
+      "file": "packages/web-decision/src/deberta/validate.mjs",
+      "identity": "module/function:validateDebertaTensors",
+      "score": 24
+    },
+    {
+      "file": "packages/web-decision/src/kanana/protocol.ts",
+      "identity": "module/function:querySchemaRecord",
+      "score": 19
+    },
+    {
+      "file": "packages/web-decision/src/kev06/upstream-source.mjs",
+      "identity": "module/function:readSourceBytes",
+      "score": 16
+    },
+    {
+      "file": "packages/web-decision/src/kev06/upstream-source.mjs",
+      "identity": "module/function:validatedMapping",
+      "score": 16
+    },
+    {
+      "file": "packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:releaseCachedMemory",
+      "score": 19
+    },
+    {
+      "file": "packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:run",
+      "score": 20
+    },
+    {
+      "file": "packages/web-decision/src/tamev/loader.mjs",
+      "identity": "module/function:validateTamevLoadOptions",
+      "score": 17
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:TinyDecide/member:MethodDeclaration:answer",
+      "score": 41
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:TinyDecide/member:MethodDeclaration:attend",
+      "score": 26
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:TinyDecide/member:MethodDeclaration:hidden",
+      "score": 37
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:Weights/member:constructor",
+      "score": 24
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:WordPiece/member:MethodDeclaration:encodeUntil",
+      "score": 30
+    },
+    {
+      "file": "packages/web-decision/src/tinydecide/engine.js",
+      "identity": "module/class:WordPiece/member:MethodDeclaration:word",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.1.0/prepare-asset-pack.mjs",
+      "identity": "module/function:prepareAssetPack",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:fetchTensorCacheInternal",
+      "score": 32
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:setPackedArguments",
+      "score": 31
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:wrapJSFuncAsSafeCallType",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal",
+      "score": 18
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal/binding:createShaderFunc",
+      "score": 20
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/function:detectGPUDevice",
+      "score": 26
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:releaseCachedMemory",
+      "score": 19
+    },
+    {
+      "file": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:run",
+      "score": 20
+    },
+    {
+      "file": "releases/web-decision-0.2.0/prepare-asset-pack.mjs",
+      "identity": "module/function:prepareAssetPack",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:fetchTensorCacheInternal",
+      "score": 32
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:setPackedArguments",
+      "score": 31
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:wrapJSFuncAsSafeCallType",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal",
+      "score": 18
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal/binding:createShaderFunc",
+      "score": 20
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/function:detectGPUDevice",
+      "score": 26
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:releaseCachedMemory",
+      "score": 19
+    },
+    {
+      "file": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:run",
+      "score": 20
+    },
+    {
+      "file": "releases/web-decision-0.3.0/prepare-asset-pack.mjs",
+      "identity": "module/function:prepareAssetPack",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:fetchTensorCacheInternal",
+      "score": 32
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:setPackedArguments",
+      "score": 31
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/runtime.ts",
+      "identity": "module/class:Instance/member:MethodDeclaration:wrapJSFuncAsSafeCallType",
+      "score": 16
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal",
+      "score": 18
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/class:WebGPUContext/member:MethodDeclaration:createShadeInternal/binding:createShaderFunc",
+      "score": 20
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/webgpu.ts",
+      "identity": "module/function:detectGPUDevice",
+      "score": 26
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:releaseCachedMemory",
+      "score": 19
+    },
+    {
+      "file": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/model.js",
+      "identity": "module/class:DecisionModel/member:MethodDeclaration:run",
+      "score": 20
+    }
+  ]
+}

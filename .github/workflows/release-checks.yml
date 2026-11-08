@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
         with:
           runtime: node@${{ matrix.node }}
@@ -63,7 +64,14 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Check formatting and lint
         if: matrix.node == '24.0.0'
-        run: pnpm run check:quality
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' || "$GITHUB_REF_TYPE" == 'tag' ]]; then
+            export BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          pnpm run check:quality
       - name: Type-check the stable package consumer
         if: matrix.node == '24.0.0'
         run: pnpm run test:types:0.3.0

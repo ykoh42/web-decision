@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: apache/tvm
@@ -51,7 +52,14 @@ jobs:
       - name: Install workspace
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Check formatting and lint
-        run: pnpm check:quality
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
+            export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          fi
+          pnpm check:quality
       - name: Run package tests
         run: pnpm test
       - name: Check released package types
