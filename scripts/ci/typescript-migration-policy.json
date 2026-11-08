@@ -203,7 +203,6 @@
     "packages/web-decision/test/asset-batch.test.mjs",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",
-    "packages/web-decision/test/bundler-notices.test.mjs",
     "packages/web-decision/test/cache-cancellation.test.mjs",
     "packages/web-decision/test/clef-loader.test.mjs",
     "packages/web-decision/test/clef-protocol.test.mjs",

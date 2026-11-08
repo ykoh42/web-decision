@@ -22,6 +22,7 @@
     "test/catalog.test.mts",
     "test/curated-*.test.mts",
     "test/build-normalization.test.mts",
+    "test/bundler-notices.test.mts",
     "test/kev06-contract.test.mts",
     "test/model-assets.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
