@@ -51,11 +51,6 @@
       "score": 24
     },
     {
-      "file": "packages/web-decision/src/kanana/protocol.ts",
-      "identity": "module/function:querySchemaRecord",
-      "score": 19
-    },
-    {
       "file": "packages/web-decision/src/kev06/upstream-source.mjs",
       "identity": "module/function:readSourceBytes",
       "score": 16

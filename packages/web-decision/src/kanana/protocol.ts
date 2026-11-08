@@ -374,6 +374,20 @@ function candidateTexts(question: Question): CandidateText {
   return {keys, values};
 }
 
+function scoreQuerySchema(normalized: Question, question: ScoreQuestion): ScoreSchema {
+  if (normalized.type !== 'score') fail('schema_mismatch', 'query_schema type differs from question');
+  if (compact(normalized.criteria) !== compact(question.criteria))
+    fail('schema_mismatch', 'Score schema must contain all original levels in their original order');
+  return {type: 'score', criteria: normalized.criteria};
+}
+
+function requireNoulCriterion(normalized: Question): void {
+  const criteria =
+    normalized.type === 'noul' ? (normalized.criteria ?? new Map<string, JsonValue>()) : new Map<string, JsonValue>();
+  if (![...criteria.values()].some((value) => value !== null && value !== ''))
+    fail('empty_schema', 'omit query_schema when no Noul criterion is supplied');
+}
+
 function querySchemaRecord(schema: unknown, question: Question): QuerySchema | null {
   if (schema == null) {
     return question.type === 'score' ? {type: 'score', criteria: [...question.criteria]} : null;
@@ -388,22 +402,8 @@ function querySchemaRecord(schema: unknown, question: Question): QuerySchema | n
     fail('invalid_schema', 'query_schema requires exactly type and criteria');
   if (schema.type !== question.type) fail('schema_mismatch', 'query_schema type differs from question');
   const normalized = questionRecord(schema);
-  if (question.type === 'score') {
-    if (normalized.type !== 'score') fail('schema_mismatch', 'query_schema type differs from question');
-    if (compact(normalized.criteria) !== compact(question.criteria))
-      fail('schema_mismatch', 'Score schema must contain all original levels in their original order');
-    return {type: 'score', criteria: normalized.criteria};
-  }
-  if (
-    question.type === 'noul' &&
-    ![
-      ...(normalized.type === 'noul'
-        ? (normalized.criteria ?? new Map<string, JsonValue>())
-        : new Map<string, JsonValue>()
-      ).values()
-    ].some((value) => value !== null && value !== '')
-  )
-    fail('empty_schema', 'omit query_schema when no Noul criterion is supplied');
+  if (question.type === 'score') return scoreQuerySchema(normalized, question);
+  if (question.type === 'noul') requireNoulCriterion(normalized);
   const baseChoiceCount = question.type === 'choice' ? question.criteria.size : 0;
   const schemaChoiceCount = normalized.type === 'choice' ? normalized.criteria.size : 0;
   if (question.type === 'choice' && (baseChoiceCount > MAX_SHOWN_CHOICES || schemaChoiceCount > MAX_SHOWN_CHOICES))
