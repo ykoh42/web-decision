@@ -463,28 +463,20 @@ function reportSourceProgress(
   }
 }
 
-async function readSourceStream(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
+function appendSourceChunk(
+  chunk: Uint8Array,
   buffer: Uint8Array,
   state: SourceStreamState,
-  signal: AbortSignal | undefined,
   onProgress: ((loadedBytes: number) => void) | undefined,
   profile: SourceProfile
-): Promise<void> {
-  for (;;) {
-    const part = await waitForAbort(() => reader.read(), signal);
-    if (part.done) {
-      state.done = true;
-      return;
-    }
-    if (!ArrayBuffer.isView(part.value) || part.value.BYTES_PER_ELEMENT !== 1)
-      throw invalidAsset('The pinned ONNX external-data stream did not return bytes.');
-    if (part.value.byteLength > profile.sourceBytes - state.length)
-      throw new ResponseSizeError('ONNX external-data body exceeds its pinned size.');
-    buffer.set(part.value, state.length);
-    state.length += part.value.byteLength;
-    reportSourceProgress(state, profile, onProgress);
-  }
+): void {
+  if (!ArrayBuffer.isView(chunk) || chunk.BYTES_PER_ELEMENT !== 1)
+    throw invalidAsset('The pinned ONNX external-data stream did not return bytes.');
+  if (chunk.byteLength > profile.sourceBytes - state.length)
+    throw new ResponseSizeError('ONNX external-data body exceeds its pinned size.');
+  buffer.set(chunk, state.length);
+  state.length += chunk.byteLength;
+  reportSourceProgress(state, profile, onProgress);
 }
 
 async function readSourceBytes(
@@ -501,7 +493,14 @@ async function readSourceBytes(
   const buffer = new Uint8Array(bytes);
   const state: SourceStreamState = {length: 0, lastReported: 0, done: false};
   try {
-    await readSourceStream(reader, buffer, state, signal, onProgress, profile);
+    for (;;) {
+      const part = await waitForAbort(() => reader.read(), signal);
+      if (part.done) {
+        state.done = true;
+        break;
+      }
+      appendSourceChunk(part.value, buffer, state, onProgress, profile);
+    }
     signal?.throwIfAborted();
     if (state.length !== profile.sourceBytes)
       throw new ResponseSizeError('ONNX external-data body is shorter than its pinned size.');
