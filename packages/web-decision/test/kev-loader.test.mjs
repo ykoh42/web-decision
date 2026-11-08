@@ -12,158 +12,18 @@ let installFakeBundledAssetsHook = () => null;
 if (supportsHooks) {
   const loaderUrls = new Set([
     new URL('../src/index.js', import.meta.url).href,
-    new URL('../src/kev-loader.js', import.meta.url).href
+    new URL('../src/index.ts', import.meta.url).href,
+    new URL('../src/kev-loader.js', import.meta.url).href,
+    new URL('../src/kev-loader.ts', import.meta.url).href
   ]);
-  const abortUrl = new URL('../src/abort.js', import.meta.url).href;
-  const fakeSource = `
-    export {waitForAbort} from ${JSON.stringify(abortUrl)};
-    const fixture = () => globalThis.__fakeKevLoader;
-    export class Tokenizer {}
-    export function createPolyfillWASI() { return {}; }
-    export function instantiate() { fixture().instantiations++; fixture().started(); return fixture().pending; }
-    export async function detectKevGPUDevice() { return {device: fixture().gpu, adapter: {features: new Set(['shader-f16'])}}; }
-    export const CACHE_NAME = 'fake';
-    export function parseJson(value) { return value; }
-    export async function readManifestResponse() { return fixture().manifest; }
-    export async function readKev06ManifestResponse() { return fixture().manifest; }
-    export const EXPERIMENTAL_KEV_MODEL = 'experimental-kev-0.6b-q4f16-upstream';
-    export const KEV06_STABLE_MODEL = 'kev-0.6b-q4f16';
-    export function createKevReconstructedSource(overrides = {}) {
-      fixture().candidateSourceCreates++;
-      fixture().bundledUrls = overrides.bundledUrls;
-      return {
-        async prepare(options) {
-          fixture().events.push('prepare');
-          options.signal?.throwIfAborted();
-          if (!fixture().gpuAvailable) throw Object.assign(new Error('WebGPU unavailable'), {code: 'UNSUPPORTED_ENVIRONMENT'});
-          return {base: 'https://kev-assets.web-decision.invalid/experimental-kev-upstream/', signal: options.signal, cache: null, response: {}, maxPrefetchBytes: 0};
-        },
-        async fetch(url, {signal} = {}) {
-          if (!fixture().bundledUrls) {
-            const module = await import('./kev06/bundled-assets.js');
-            fixture().bundledUrls = module.experimentalKevBundledUrls;
-          }
-          signal?.throwIfAborted();
-          return new Response(new Uint8Array([1]));
-        },
-        setProgress() {},
-        dispose() {}
-      };
+  const fakeModule = new URL('./fixtures/kev-loader/loader.ts', import.meta.url).href;
+  const fakeBundledModule = new URL('./fixtures/kev-loader/kev06/bundled-assets.ts', import.meta.url).href;
+  const fakeStableBundledModule = new URL('./fixtures/kev-loader/kev06/stable-bundled-assets.ts', import.meta.url).href;
+  test('uses file URLs for Kev loader mocks so coverage can normalize source maps', () => {
+    for (const moduleUrl of [fakeModule, fakeBundledModule, fakeStableBundledModule]) {
+      assert.equal(new URL(moduleUrl).protocol, 'file:');
     }
-    export function createKev06StableReconstructedSource() {
-      fixture().stableSourceCreates++;
-      return {
-        async prepare(options) {
-          fixture().events.push('stable-prepare');
-          fixture().stablePrepareOptions = options;
-          options.signal?.throwIfAborted();
-          if (!fixture().gpuAvailable) throw Object.assign(new Error('WebGPU unavailable'), {code: 'UNSUPPORTED_ENVIRONMENT'});
-          if (options.offline && !fixture().warmCache)
-            throw Object.assign(new Error('The stable model is not cached.'), {code: 'ASSET_LOAD_FAILED'});
-          return {base: 'https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/', signal: options.signal, cache: null, response: {}, maxPrefetchBytes: options.maxPrefetchBytes ?? 0};
-        },
-        async fetch(url, {signal} = {}) {
-          fixture().stableFetchUrls.push(url);
-          if (!fixture().stableBundledUrls) {
-            const module = await import('./kev06/stable-bundled-assets.js');
-            fixture().stableBundledUrls = module.stableKevBundledUrls;
-          }
-          signal?.throwIfAborted();
-          return new Response(new Uint8Array([4]));
-        },
-        setProgress() {},
-        dispose() { fixture().stableSourceDisposals++; }
-      };
-    }
-    export async function readExperimentalKevManifest() { return fixture().manifest; }
-    export async function commitCachedManifest() {}
-    export async function prepareModelSource(options) {
-      fixture().externalPrepares++;
-      fixture().externalOptions = options;
-      return {base: options.assetsUrl ?? 'https://legacy-assets.example.test/', signal: options.signal, response: {}, cache: null};
-    }
-    export function createModelAssetReader({base, fetchImpl, signal}) {
-      return {
-        async read(name, readSignal = signal) {
-          if (fetchImpl && !fixture().warmCache) {
-            const url = new URL(name, base).href;
-            fixture().assetFetches.push(url);
-            await fetchImpl(url, {signal: readSignal});
-          }
-          return new ArrayBuffer(1);
-        },
-        isCacheComplete() { return fixture().warmCache; },
-        setProgressPhase() {}
-      };
-    }
-    export async function readAssetBatch(names, read, signal) {
-      await Promise.all(names.map((name) => read(name, signal)));
-      return [{}, {}, fixture().modelConfig, {}, fixture().cacheManifest];
-    }
-    export async function uploadModelShards() { fixture().uploads++; }
-    export class DecisionModel {
-      constructor(runtime, device, gpu, fn, weights, tokenizer, limits) { this.runtime = runtime; this.gpu = gpu; this.limits = limits; }
-      dispose() { this.runtime.dispose(); this.gpu.destroy(); }
-    }
-    const loadFake = (family, options) => {
-      fixture().selectedFamily = family;
-      fixture().selectedOptions = options;
-      return {family};
-    };
-    export async function loadExperimentalDeberta(options) { return loadFake('deberta', options); }
-    export async function loadExperimentalMapika(options) { return loadFake('mapika', options); }
-    export async function loadExperimentalMapikaQ4(options) { return loadFake('mapika-q4', options); }
-    export async function loadExperimentalKev08(options) { return loadFake('kev08', options); }
-    export async function loadExperimentalStrandsFromSource(options) { return loadFake('strands', options); }
-    export async function loadTamev(options) {
-      const model = loadFake('tamev', options);
-      model.dispose = async () => {
-        fixture().tamevDisposals++;
-        if (fixture().tamevDisposeFails) throw new Error('fake TAMEV disposal failed');
-      };
-      const mode = fixture().tamevSystemOneMode;
-      if (mode === 'accessor') {
-        Object.defineProperty(model, 'systemOne', {get: () => () => ({model: options.model, answers: {}})});
-      } else if (mode === 'nonconfigurable') {
-        Object.defineProperty(model, 'systemOne', {
-          configurable: false,
-          enumerable: true,
-          value: async () => ({model: options.model, answers: {}}),
-          writable: false
-        });
-      } else if (mode === 'nonfunction') {
-        model.systemOne = 'not a function';
-      } else if (mode !== 'missing') {
-        model.systemOne = async () => ({model: options.model, answers: {}});
-      }
-      return model;
-    }
-  `;
-  const fakeModule = `data:text/javascript;base64,${Buffer.from(fakeSource).toString('base64')}`;
-  const fakeBundledAssets = `
-    globalThis.__fakeKevLoader.helperLoads++;
-    globalThis.__fakeKevLoader.events.push('helper');
-    export const experimentalKevBundledUrls = Object.freeze({
-      'model.wasm': 'data:application/wasm;base64,AA==',
-      'tokenizer.json': 'data:application/json;base64,e30=',
-      'tokenizer_config.json': 'data:application/json;base64,e30=',
-      'model_config.json': 'data:application/json;base64,e30=',
-      'weights/tensor-cache.json': 'data:application/json;base64,e30='
-    });
-  `;
-  const fakeBundledModule = `data:text/javascript;base64,${Buffer.from(fakeBundledAssets).toString('base64')}`;
-  const fakeStableBundledAssets = `
-    globalThis.__fakeKevLoader.stableHelperLoads++;
-    globalThis.__fakeKevLoader.events.push('stable-helper');
-    export const stableKevBundledUrls = Object.freeze({
-      'model.wasm': 'data:application/wasm;base64,BAUG',
-      'tokenizer.json': 'data:application/json;base64,e30=',
-      'tokenizer_config.json': 'data:application/json;base64,e30=',
-      'model_config.json': 'data:application/json;base64,e30=',
-      'weights/tensor-cache.json': 'data:application/json;base64,e30='
-    });
-  `;
-  const fakeStableBundledModule = `data:text/javascript;base64,${Buffer.from(fakeStableBundledAssets).toString('base64')}`;
+  });
   installFakeBundledAssetsHook = () =>
     nodeModule.registerHooks({
       resolve(specifier, context, nextResolve) {
@@ -178,6 +38,7 @@ if (supportsHooks) {
     '@huggingface/tokenizers',
     './kev-gpu.js',
     './assets.js',
+    './runtime/tvm.js',
     './kev06/contract.js',
     './kev06/upstream-source.mjs',
     './model.js',

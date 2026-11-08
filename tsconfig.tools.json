@@ -27,6 +27,10 @@
     "scripts/ci/packed-content.ts",
     "scripts/ci/uncovered-files.ts",
     "scripts/ci/uncovered-files.test.ts",
-    "scripts/ci/temporary-directories.ts"
+    "scripts/ci/temporary-directories.ts",
+    "packages/web-decision/test/fixtures/kev-loader/state.ts",
+    "packages/web-decision/test/fixtures/kev-loader/loader.ts",
+    "packages/web-decision/test/fixtures/kev-loader/kev06/bundled-assets.ts",
+    "packages/web-decision/test/fixtures/kev-loader/kev06/stable-bundled-assets.ts"
   ]
 }

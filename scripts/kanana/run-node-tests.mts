@@ -27,6 +27,9 @@ const coreTests = [
   'test/kanana-tiff16-image.test.mjs'
 ];
 const tests = process.argv.includes('--core') ? coreTests : allTests;
+// These tests import emitted JS with external TypeScript source maps. Keep tsx
+// off these files so its JS transform does not replace two maps with identity maps.
+const compiledSourceMapTests = new Set(coreTests);
 const coverageDirectory = join(packageRoot, 'coverage');
 await mkdir(coverageDirectory, {recursive: true});
 const outputDirectory = await mkdtemp(join(coverageDirectory, 'kanana-tests-'));
@@ -47,13 +50,19 @@ try {
     ],
     {cwd: packageRoot, stdio: 'inherit'}
   );
-  const testArguments = ['--import', 'tsx', '--test', ...tests];
-  if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');
-  execFileSync(process.execPath, testArguments, {
-    cwd: packageRoot,
-    env: {...process.env, KANANA_CORE_DIST: outputDirectory},
-    stdio: 'inherit'
-  });
+  const runTests = (files: string[], useTsx: boolean) => {
+    const testArguments = [...(useTsx ? ['--import', 'tsx'] : []), '--test', ...files];
+    if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');
+    execFileSync(process.execPath, testArguments, {
+      cwd: packageRoot,
+      env: {...process.env, KANANA_CORE_DIST: outputDirectory},
+      stdio: 'inherit'
+    });
+  };
+  const compiledTests = tests.filter((file) => compiledSourceMapTests.has(file));
+  const tsxTests = tests.filter((file) => !compiledSourceMapTests.has(file));
+  if (compiledTests.length > 0) runTests(compiledTests, false);
+  if (tsxTests.length > 0) runTests(tsxTests, true);
 } finally {
   await rm(outputDirectory, {recursive: true, force: true});
 }
