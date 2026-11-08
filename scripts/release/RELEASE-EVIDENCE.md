@@ -1,0 +1,168 @@
+# Release browser evidence gate
+
+The gate connects a candidate npm archive, the package installed by the browser test, curated catalog inputs, static asset manifests, and one real Chromium WebGPU test per curated model. It accepts only the dedicated test file pinned by [release-evidence-policy.json](./release-evidence-policy.json). The policy bytes are pinned in the verifier and must also match the committed `HEAD` copy.
+
+The expected model IDs and artifact digests come from the committed `packages/web-decision/src/catalog/model-spec.json` and `artifacts.lock.json`. The gate checks that the model spec and artifact lock have the same non-empty ID set, that each manifest digest and static manifest path match the lock, and that the built and installed public APIs (`listModels()` and `describeModel(id)`) match those committed inputs. It does not read the legacy model registry. The source API is built from `src/curated/index.ts`; the verifier imports its built `dist/index.js` so the CLI also runs on Node 20, which cannot execute TypeScript source directly.
+
+The archive must be an npm tarball with only regular files. The verifier compares every archive member byte-for-byte with the installed package directory, computes the archive SHA-256, package tree digest, and public bundle digest, then checks the static manifest at the path pinned in `artifacts.lock.json`. The manifest's complete `files` map is checked against the committed artifact lock. The public `assets.requiredFiles` list is derived as `['manifest.json', ...Object.keys(manifest.files)]`; the verifier derives the same full set from the committed lock and rejects a separately maintained source list. The bundled runtime files are a subset of this complete list and live in the lazy browser chunk. The record carries SHA-256 digests of the canonical installed package and entrypoint paths, not personal absolute paths; the gate recomputes both from its CLI input.
+
+Nine shard files are reconstructed by the browser loader from the pinned upstream source and are not separate tarball members. For that reason, the browser record must include a `verifiedFiles` item for every manifest entry. The browser spec independently reads the complete CacheStorage entries after a successful load, measures their byte lengths, and computes SHA-256 values. The gate compares that measured list against all 14 entries in the archive-pinned manifest. It also requires online inference, an offline repeat with identical results and zero network attempts, and matches against both the pinned Windows baseline fixture and the one-input upstream CPU reference fixture.
+
+The release matrix contains only Chromium on physical Windows hardware. It makes no Firefox or WebKit verification claim. The gate requires the actual WebGPU adapter to be non-fallback and to report the catalog's required features and limits. Adapter Info can be empty; the gate requires the value and source to be recorded but does not invent adapter fields. GPU manufacturer, device name, driver, and PNP ID must match separately sourced Windows WMI values. Host and OS metadata must likewise match their declared source data.
+
+## Run
+
+Pack and install the exact candidate archive first. Set the paths to that archive and the package directory that the test will load, then run the TypeScript Playwright spec and retain its JSON report:
+
+```powershell
+$env:WEB_DECISION_RELEASE_ARCHIVE = 'C:\release\web-decision-x.y.z.tgz'
+$env:WEB_DECISION_RELEASE_PACKAGE_DIR = 'C:\release\consumer\node_modules\web-decision'
+$env:WEB_DECISION_INSTALLED_BUNDLE = 'C:\release\consumer\node_modules\web-decision\dist\index.js'
+$env:PLAYWRIGHT_JSON_OUTPUT_NAME = 'C:\release\playwright-report.json'
+pnpm exec playwright test tests/browser/kev06-default-source-real-webgpu.spec.ts --reporter=json
+```
+
+The Playwright project must be `chromium`. Its report must contain exactly one passing execution per curated model, with no skip, retry, flaky result, global error, or unrelated test. The browser spec must load the package at `WEB_DECISION_RELEASE_PACKAGE_DIR`.
+
+Run the gate using the same archive and installation paths:
+
+```powershell
+./scripts/release/run-release-evidence.ps1 -Mode verify `
+  -Archive $env:WEB_DECISION_RELEASE_ARCHIVE `
+  -InstalledPackage $env:WEB_DECISION_RELEASE_PACKAGE_DIR `
+  -PlaywrightReport $env:PLAYWRIGHT_JSON_OUTPUT_NAME
+```
+
+The PowerShell runner compiles the TypeScript verifier to a temporary directory before launching it, so Node 20 can run the CLI. Run the verifier's strict typecheck with:
+
+```powershell
+node node_modules/typescript/bin/tsc --project scripts/release/tsconfig.json
+```
+
+Run its tests with the same Node 20-compatible runner:
+
+```powershell
+./scripts/release/run-release-evidence.ps1 -Mode test
+```
+
+On Node 22.13 or newer, the test file can also be run directly with Node's TypeScript support:
+
+```sh
+node --test scripts/release/verify-release-evidence.test.ts
+```
+
+## Evidence record
+
+Import the helper from the dedicated Playwright spec using `../../scripts/release/verify-release-evidence.ts`. Call it after the test has installed and exercised the candidate package. The helper returns the archive, sorted curated model requirements, catalog digest, and each exact static manifest. The `verifiedFiles` values below must come from the test's independent CacheStorage reads and SHA-256 calculations, not from copying the expected manifest values.
+
+The `*ComparisonPassed` and `observedOfflineNetworkAttempts` names in the example stand for values produced by the browser test's real comparisons and request monitor; they are not constants to set to passing values. The observed model ID, descriptor digest, inference arrays, adapter values, host metadata, and cache measurements must come from the running test.
+
+```ts
+import assert from 'node:assert/strict';
+import {realpathSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {collectReleaseEvidenceInputs} from '../../scripts/release/verify-release-evidence.ts';
+
+function observedInference(result) {
+  const actualProbabilities = result.probabilities;
+  return {
+    completed: true,
+    modelId: result.modelId,
+    backend: result.backend,
+    assetManifestSha256: result.assetManifestSha256,
+    selected: result.selected,
+    optionOrder: actualProbabilities.map(({option}) => option),
+    logits: actualProbabilities.map(({logit}) => logit),
+    probabilities: actualProbabilities.map(({probability}) => probability)
+  };
+}
+
+const inputs = await collectReleaseEvidenceInputs({
+  archivePath: process.env.WEB_DECISION_RELEASE_ARCHIVE!,
+  installedPackagePath: process.env.WEB_DECISION_RELEASE_PACKAGE_DIR!,
+  sourcePackageRoot: resolve(workspaceRoot, 'packages/web-decision')
+});
+assert.equal(realpathSync(resolve(process.env.WEB_DECISION_RELEASE_PACKAGE_DIR!)), inputs.archive.installedRoot);
+assert.equal(realpathSync(resolve(process.env.WEB_DECISION_INSTALLED_BUNDLE!)), inputs.archive.bundlePath);
+const model = inputs.models.find(({modelId}) => modelId === testedModelId)!;
+const manifest = inputs.manifests.get(testedModelId)!;
+assert.equal(online.modelId, testedModelId);
+assert.equal(online.describedId, testedModelId);
+assert.equal(online.assetManifestSha256, model.manifestSha256);
+const baselineReferenceMatched = baselineFixtureComparisonPassed;
+const upstreamReferenceMatched = upstreamFixtureComparisonPassed;
+const offlineMatchesOnline = offlineOutputComparisonPassed;
+const offlineNetworkAttempts = observedOfflineNetworkAttempts;
+const record = {
+  schemaVersion: 1,
+  testKind: 'real-model-webgpu',
+  catalogSha256: inputs.catalogSha256,
+  model: {
+    requestedId,
+    loadedId: online.modelId,
+    describedId: online.describedId,
+    assetManifestSha256: online.assetManifestSha256
+  },
+  artifact: {
+    modelId: testedModelId,
+    manifestPath: manifest.path,
+    manifestSha256: manifest.manifestSha256,
+    filesSha256: manifest.filesSha256,
+    manifest: manifest.manifest,
+    verifiedFiles: cacheMeasurements.map(({path, bytes, sha256}) => ({path, bytes, sha256}))
+  },
+  archive: {
+    sha256: inputs.archive.archiveSha256,
+    packageTreeSha256: inputs.archive.packageTreeSha256,
+    bundleSha256: inputs.archive.bundleSha256,
+    installedPackagePathSha256: inputs.archive.installedPackagePathSha256,
+    entryPathSha256: inputs.archive.entryPathSha256,
+    packageName: inputs.archive.packageName,
+    packageVersion: inputs.archive.packageVersion
+  },
+  browser: {name, version, userAgent},
+  device: {
+    manufacturer: hostManufacturer, model: hostModel, os, osVersion, architecture, isVirtual: false,
+    evidence: {
+      host: {source: 'windows-wmi/Win32_ComputerSystem', raw: {Manufacturer: hostManufacturer, Model: hostModel}},
+      os: {source: 'node:os', raw: {version: os, release: osVersion, architecture}}
+    }
+  },
+  gpu: {
+    api: 'webgpu', isFallbackAdapter, adapterInfo,
+    hardware: {manufacturer: gpuManufacturer, model: gpuModel, driverVersion, pnpDeviceId},
+    hardwareEvidence: {
+      source: 'windows-wmi/Win32_VideoController',
+      raw: {
+        AdapterCompatibility: gpuManufacturer,
+        Name: gpuModel,
+        DriverVersion: driverVersion,
+        PNPDeviceID: pnpDeviceId
+      }
+    },
+    features, limits
+  },
+  inference: {
+    online: {...observedInference(online), referenceMatched: baselineReferenceMatched},
+    offline: {...observedInference(offline), matchesOnline: offlineMatchesOnline, networkAttempts: offlineNetworkAttempts},
+    reference: {
+      packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
+      fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',
+      scope: 'baseline-preservation-only'
+    },
+    upstreamReference: {
+      matched: upstreamReferenceMatched,
+      fixtureSha256: '656e8403984e57f24dd38f08d461188bde7802288c369a88dac0b29319bada10',
+      modelId: 'kev-0.6b-q4f16',
+      graphSha256: '26e059ddd954efd9897772b098db10b9eeda9b873984dc1c73b32a9ce177c7c8',
+      weightsSha256: '777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b',
+      scope: 'single-input-upstream-onnx-cpu-reference'
+    }
+  }
+};
+console.log(`WEB_DECISION_RELEASE_EVIDENCE_V1:${JSON.stringify(record)}`);
+```
+
+The measured `verifiedFiles` list must contain exactly one `{path, bytes, sha256}` item for each path in `manifest.files`, including all reconstructed shards. `online` and `offline` each need `{completed: true, modelId, backend: 'tvm-webgpu', assetManifestSha256, selected, optionOrder, logits, probabilities}`. Derive `logits` and `probabilities` from the actual browser result's ordered probability entries. Do not include `optionIndices`: the public browser API does not expose the original token indices. The verifier compares the option order and each output value against both pinned references using their declared tolerances, then requires offline output to equal online output. Online must set `referenceMatched: true`; offline must set `matchesOnline: true` and `networkAttempts: []`.
+
+The gate reads both fixture files from the committed tree, checks their exact SHA-256 values, and checks the baseline package and upstream ONNX/weight digests inside those files. The old-main hashes establish preservation against the old Windows archive and baseline fixture. A separate upstream block pins the one-input CPU reference produced from the independently hash-verified ONNX and weight source. This compares one input only and is not a general model quality claim. The verifier checks that the report text is internally consistent with the exact archive, installed files, catalog, manifest, browser, and hardware fields. It does not cryptographically authenticate the browser run, the machine, or the text report.

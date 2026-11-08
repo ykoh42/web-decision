@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "evidencePrefix": "WEB_DECISION_RELEASE_EVIDENCE_V1:",
+  "testFile": "tests/browser/kev06-default-source-real-webgpu.spec.ts",
+  "browsers": [{"name": "chromium", "project": "chromium"}],
+  "requireNonFallbackAdapter": true,
+  "requirePhysicalDevice": true,
+  "requiredApi": "webgpu"
+}
