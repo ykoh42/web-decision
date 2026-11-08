@@ -1,0 +1,16 @@
+Elephant experimental text-choice integration
+
+The text prompt and answer-label order are adapted from OneJev's qev/prompt.py
+at revision 81ce62f1597c91e46767d4d02d6ac2e18534fe94. The integration changes
+the implementation and supports a limited text-choice path. OneJev is licensed
+under Apache License 2.0; the license text is included as LICENSE.
+
+https://github.com/OmniJev/OneJev/tree/81ce62f1597c91e46767d4d02d6ac2e18534fe94
+
+The separately obtained Elephant checkpoint, tokenizer and generated model
+assets are not included in this package. The pinned model card declares MIT
+and identifies Qwen/Qwen3.5-9B as its base model:
+https://huggingface.co/baselabs/elephant-1/tree/b3f8a93462fb1051a9de031e94a7ff380e254072
+
+Review the exact model, base model and generated asset terms and notices before
+distributing those assets separately.

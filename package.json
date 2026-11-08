@@ -22,7 +22,14 @@
     "build:release:0.2.0": "node releases/web-decision-0.2.0/build.mjs",
     "pack:release:0.2.0": "node releases/web-decision-0.2.0/pack.mjs",
     "build:release:0.3.0": "node releases/web-decision-0.3.0/build.mjs",
-    "pack:release:0.3.0": "node releases/web-decision-0.3.0/pack.mjs"
+    "pack:release:0.3.0": "node releases/web-decision-0.3.0/pack.mjs",
+    "test": "pnpm --filter web-decision test",
+    "test:package": "pnpm --filter web-decision test",
+    "build:package": "pnpm --filter web-decision build",
+    "test:coverage": "pnpm --filter web-decision test:coverage",
+    "check:package": "node scripts/ci/check-package.mjs",
+    "verify:package": "pnpm build:package && pnpm check:package",
+    "test:example": "node scripts/ci/check-example.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

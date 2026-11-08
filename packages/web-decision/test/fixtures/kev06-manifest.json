@@ -1,0 +1,73 @@
+{
+  "formatVersion": 1,
+  "model": "kev-0.6b-q4f16",
+  "backend": "tvm-webgpu",
+  "experimental": true,
+  "maxStateTokens": 8192,
+  "maxBranchTokens": 8192,
+  "parameterCount": 394,
+  "tvmVersion": "0.27.0.post1",
+  "checkpoint": {
+    "repository": "onnx-community/kev-0.6b-ONNX",
+    "revision": "5a827091b3d58fe4fdfc02a5a5b2ce364047d678",
+    "weightSha256": "777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b"
+  },
+  "files": {
+    "model.wasm": {
+      "sha256": "68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb",
+      "bytes": 6807315
+    },
+    "tokenizer.json": {
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+      "bytes": 7031645
+    },
+    "tokenizer_config.json": {
+      "sha256": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
+      "bytes": 9678
+    },
+    "model_config.json": {
+      "sha256": "40ce1c875acf016ab7742ecdc45d3bad0fe8c51d3ead0ca2263ec5eb4e96f42d",
+      "bytes": 2267
+    },
+    "weights/tensor-cache.json": {
+      "sha256": "d81bd1a6151d47d99292b59bb7fb3f974f779e2c9c26269238c85d954c665691",
+      "bytes": 138762
+    },
+    "weights/params_shard_0.bin": {
+      "sha256": "389b31f41b7941517e3d3ca068b3d057eec8642370c7bc637943fe12201b27a5",
+      "bytes": 77791232
+    },
+    "weights/params_shard_1.bin": {
+      "sha256": "ee5ffc708c5059886585f69b9e0be67597f1893365fa4c93d2e860beb24e7455",
+      "bytes": 33030144
+    },
+    "weights/params_shard_2.bin": {
+      "sha256": "a15723feb9034bd9abc071c35db1c9cf7ca85f507fd99afe66d4d1fc4eacc223",
+      "bytes": 33030144
+    },
+    "weights/params_shard_3.bin": {
+      "sha256": "ede08c41d34db032e1bd5e9416c29291f50ddf7925af230f8aab2b8bfa32fd64",
+      "bytes": 33030144
+    },
+    "weights/params_shard_4.bin": {
+      "sha256": "17920657d0a1bd3fe7a0129914ab53e16342967c3c023d7e6b593ce3e8561706",
+      "bytes": 33030144
+    },
+    "weights/params_shard_5.bin": {
+      "sha256": "f9fa6e62d60233b793660a79d461f02d3a115f94d7d551a821767cd63d1acbba",
+      "bytes": 33030144
+    },
+    "weights/params_shard_6.bin": {
+      "sha256": "9e8c7f110b6bad3659d2db93568b7508f5bdfb2df965b37791e840f7012dd94f",
+      "bytes": 33030144
+    },
+    "weights/params_shard_7.bin": {
+      "sha256": "54eba46256fd39aed80104759b7552a2f22ba67e9f2ec3afc64f9c6f0c1b6101",
+      "bytes": 33513472
+    },
+    "weights/params_shard_8.bin": {
+      "sha256": "98ef5f5b3e1b63ea5efb43441c7eca62a96e00735dad29b2c8d0f406128640ec",
+      "bytes": 25755648
+    }
+  }
+}

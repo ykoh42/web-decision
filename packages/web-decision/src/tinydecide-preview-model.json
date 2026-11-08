@@ -1,0 +1,60 @@
+{
+  "model": "experimental-tinydecide-10m-q4",
+  "precision": "q4",
+  "checkpoint": {
+    "repository": "TheREZOR/TinyDecide",
+    "revision": "aa745b73a2db9a43bce731f0e8e5c90a6899fe2c",
+    "weightSha256": "23fe9d93f2eafadbe4dc686a7dc5f309fbcba9ea1a4873d457e75d17c5bf3441"
+  },
+  "assets": {
+    "integrity": "pinned-files",
+    "location": "separate",
+    "requiredFiles": ["meta.json", "model.bin"],
+    "additionalFiles": "No additional files are required."
+  },
+  "licenses": {
+    "project": "Apache-2.0",
+    "modelTerms": "The pinned upstream card declares Apache-2.0; training provenance and transformed-asset terms are not independently reviewed.",
+    "modelCard": "https://huggingface.co/TheREZOR/TinyDecide/tree/aa745b73a2db9a43bce731f0e8e5c90a6899fe2c"
+  },
+  "backend": {"name": "javascript"},
+  "features": {
+    "textChoice": {
+      "status": "implemented",
+      "abstention": "not-implemented",
+      "limits": [
+        {
+          "resource": "tokens",
+          "scope": "state",
+          "max": 127,
+          "description": "Reads at most the first 127 state tokens and reports truncation."
+        },
+        {
+          "resource": "tokens",
+          "scope": "question",
+          "max": 192,
+          "description": "Includes the question, options and special tokens."
+        },
+        {"resource": "options", "scope": "question", "min": 2, "max": 32},
+        {"resource": "questions", "scope": "request", "min": 1}
+      ],
+      "handling": "packed-request",
+      "tokenCount": "packed-request",
+      "score": {
+        "basis": "choices",
+        "temperature": 1.149999976158142,
+        "temperatureAppliedBy": "model",
+        "calibration": "not-guaranteed"
+      }
+    },
+    "typedTextQuestionTypes": ["choice", "noul", "score", "span"],
+    "imageChoice": {"status": "not-implemented"},
+    "rating": {"status": "not-implemented"}
+  },
+  "verification": {
+    "currentBundleGpu": "not-applicable",
+    "currentBundleCpuWasm": "not-applicable",
+    "currentBundleJavascript": "verified",
+    "priorEvidence": "docs/model-support/TINYDECIDE_SUPPORT.md and experiments/tinydecide-single-model-preview-20261105/README.md"
+  }
+}

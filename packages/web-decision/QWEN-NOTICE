@@ -1,0 +1,6 @@
+The experimental model-building sources use the Qwen3.5 implementation from
+Hugging Face Transformers, licensed under the Apache License, Version 2.0.
+
+Copyright 2025 The Qwen Team and The HuggingFace Inc. team
+The Apache License text is included as LICENSE. Model weights and generated
+model assets are supplied separately and retain their own license terms.

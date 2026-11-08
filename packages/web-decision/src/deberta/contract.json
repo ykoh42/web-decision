@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "model": "open-jev-deberta-v3-large-q4f16",
+  "backend": "tvm-webgpu",
+  "experimental": true,
+  "maxInputTokens": 512,
+  "maxStateTokens": 256,
+  "parameterCount": 343,
+  "vocabSize": 128100,
+  "checkpoint": {
+    "repository": "onnx-community/open-jev-deberta-v3-large-ONNX",
+    "revision": "7c79f25b5ac496089f448a969c801872ad59d31c",
+    "graphSha256": "f9f014e96682fa0a9ac3c7b3b41786f58a2996dbff890b8ed18eed3869cc495d",
+    "weightSha256": "89bd9c644c621e3d79fbd1de6bb03e622c38e1dd42e11ab8acece8a236c3481f"
+  },
+  "files": {
+    "model.wasm": {"bytes": 5400210, "sha256": "fde5bce284f0c66e8bd76eadb1155721df93cb90df868a3646def2ee3a94403f"},
+    "mapping.json": {"bytes": 3184, "sha256": "2bd33cd30afb4c712122fb826067cb4d597225633d163ec2fb9010316a17faed"},
+    "split.json": {"bytes": 3357, "sha256": "dc4e8346ceee799c1a0793ede80544be66e9cac557ff5a13ab633166f185d7a8"},
+    "tokenizer.json": {"bytes": 8657170, "sha256": "cd119378b0160677b7a1e561ba29ada83918c1d420b326516a585382e83d9d39"},
+    "tokenizer_config.json": {"bytes": 1907, "sha256": "52e0421535dd20e51dd25f4ce965cf2689a7392956f84ca4867667efab600340"},
+    "model_config.json": {"bytes": 1563, "sha256": "2ec35432332ee6b5880509eefe44e6279fd9d3543f6ba96098119ffe0b0c2d5e"},
+    "weights/tensor-cache.json": {"bytes": 121378, "sha256": "eff101ce2b0ed4ba9c8d706bd52fe6a2afe0f4883bb1b0ae1b61700cec61fe58"},
+    "weights/params_shard_0.bin": {"bytes": 32505856, "sha256": "91f2e9cdd19510488416d477200901e00ee62cd83940176fe6aa3870e126c8bf"},
+    "weights/params_shard_1.bin": {"bytes": 31457280, "sha256": "5f14fd274a6c53875d15da28574a486d639d9d15e8e053f3a56ec0401222e471"},
+    "weights/params_shard_2.bin": {"bytes": 31457280, "sha256": "a2188fe2080bdc1a300ac31691aaee09f5b44d163527c844b6c09a956f5bf9ab"},
+    "weights/params_shard_3.bin": {"bytes": 65587200, "sha256": "2fc64c6cea39bf7f87be91781b8fe6cd27a11bf0d8269136d6b62b6cbc6a5635"},
+    "weights/params_shard_4.bin": {"bytes": 33030144, "sha256": "19c1d936f5688221f46b996bcaace5289683f50830d0d861a4dfc77180c65c58"},
+    "weights/params_shard_5.bin": {"bytes": 31981568, "sha256": "8d221615874b1227b5fd539c85724fe983431398dbb73a360814fbcd77dd2d0e"},
+    "weights/params_shard_6.bin": {"bytes": 31457280, "sha256": "9b97ff7983a9264f36ed85e0ac499a761d93f3d03647efd19a2253aebc956598"},
+    "weights/params_shard_7.bin": {"bytes": 31457280, "sha256": "5a65096f9aa0778beec259b3c1cf7a4a4584383d3aec3cf7e1bf093faf7573d8"},
+    "weights/params_shard_8.bin": {"bytes": 30933504, "sha256": "0ac009da600bbf6e38b1953cbe1b789cf787400e2ce0c7c66db579dfc287582b"},
+    "weights/params_shard_9.bin": {"bytes": 27269440, "sha256": "45c1e9f3a5fb94162eff5bb66c619c784b37494c0d786d7f88ccba390a4756ba"}
+  }
+}

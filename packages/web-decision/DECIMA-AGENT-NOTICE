@@ -1,0 +1,13 @@
+Decima-agent 2.3
+
+The Decima-agent model and released model files are identified as Apache-2.0
+by the upstream project:
+https://huggingface.co/amyrmahdy/decima-agent
+https://github.com/amyrmahdy/decima
+
+This notice applies to the model integration and its separately downloaded
+assets. It does not replace upstream terms or constitute an independent rights
+review. The upstream project describes training on synthetic decision data;
+review the dataset terms and model-card limitations before redistribution or
+commercial use. No model weights or training datasets are included in this
+package.

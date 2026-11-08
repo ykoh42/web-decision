@@ -1,0 +1,10 @@
+Portions of the Kev 0.8B text-choice input implementation are adapted from
+jaredpalmer/kev at commit 45923b7a3460b6d36358e2e143455902c1eb856b.
+The implementation was modified and translated to JavaScript.
+
+Copyright 2026 Jared Palmer
+Licensed under the Apache License, Version 2.0. The license text is included
+as LICENSE. Source: https://github.com/jaredpalmer/kev/tree/45923b7a3460b6d36358e2e143455902c1eb856b
+
+The separately obtained model checkpoint, adapter, and base weights are not
+included in this package and retain their own license terms.

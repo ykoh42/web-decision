@@ -1,0 +1,12 @@
+Nari Decision 4B experimental preview
+
+The choice prompt and protocol are adapted from blackmallangcow/nari-decision-4b,
+revision 029c4628a38859dce5b0db1742e9c97545aabe12. Its repository declares
+Apache-2.0; the license text is included as LICENSE. The adapter rejects input
+it cannot preserve within the compiled graph's limits and implements text
+choice questions only. Model weights and the compiled graph are not included.
+
+https://huggingface.co/blackmallangcow/nari-decision-4b/tree/029c4628a38859dce5b0db1742e9c97545aabe12
+
+Review model, base model and converted-asset terms and notices before
+distributing assets separately.

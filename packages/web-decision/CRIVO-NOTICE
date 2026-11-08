@@ -1,0 +1,9 @@
+Crivo-32M v2 model assets
+
+The Crivo model weights and the browser-converted ONNX graphs are not included in this npm package. They are separate assets and are licensed under Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0).
+
+Model source: tardellirs/crivo-32m, pinned revision 77d61fdb6421838320097d9bcb3e4e42a120323e.
+Browser conversion: dizyann/crivo-web, pinned revision fb3cf4bc66c06e51e08950399653e54a4ddeb154, models/32m/.
+License: https://creativecommons.org/licenses/by-nc/4.0/
+
+The license requires attribution and does not permit commercial use. Keep the upstream notices with any model assets you host or redistribute. This notice does not change the Apache-2.0 license of the web-decision package code.

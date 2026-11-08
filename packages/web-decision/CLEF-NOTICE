@@ -1,0 +1,12 @@
+Clef experimental text-choice integration
+
+The text-choice prompt and protocol are adapted from Cloudflare/clef-flash's
+joint_schema_model.py, revision fb4417d31c1d0f9e7e77f1141b40aaede7491e00.
+The source is Apache-2.0; the license text is included as LICENSE. This adapter
+implements a restricted text-choice path and changes the implementation.
+
+https://huggingface.co/Cloudflare/clef-flash/tree/fb4417d31c1d0f9e7e77f1141b40aaede7491e00
+
+Model weights, tokenizer and generated graph assets are separate and are not
+included in this package. Review the model, base model and converted-asset
+terms and notices before distributing those assets separately.

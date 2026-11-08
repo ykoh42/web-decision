@@ -1,0 +1,15 @@
+Laya Typed-Decisions model and ONNX conversion
+
+The experimental Laya Typed-Decisions route fetches its model files separately
+from onnx-community/laya-typed-decisions-ONNX at revision
+79c441b22da79eb3727bb01e8452e29a32cfa548. The conversion identifies
+convaiinnovations/laya-typed-decisions at revision
+e929ae5cf69bc34259cd2f95c9e91145b818b1f0 as its source. The pinned model
+cards declare Apache-2.0. Model assets are not bundled in this package.
+
+The adapter preserves the documented Choice, Score, and Noul tensor protocol,
+the checkpoint tokenizer IDs, question temperatures, option order, and
+diagnostic action logits. The action head is not used for abstention. See the
+upstream model card and
+https://github.com/ykoh42/web-decision/blob/main/docs/model-support/LAYA_TYPED_SUPPORT.md
+for measured behavior and limits.

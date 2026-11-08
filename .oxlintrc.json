@@ -24,6 +24,20 @@
   ],
   "overrides": [
     {
+      "files": ["packages/web-decision/src/**/*.{js,mjs}", "packages/web-decision/test/**/*.mjs"],
+      "rules": {
+        // `new Array(length)` is used for validated, intentional model-buffer preallocation.
+        "unicorn/no-new-array": "off"
+      }
+    },
+    {
+      "files": ["packages/web-decision/src/tinydecide/engine.js"],
+      "rules": {
+        // Preserve the upstream engine's pinned bytes, including unused reference helpers.
+        "no-unused-vars": "off"
+      }
+    },
+    {
       "files": ["releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/**/*.{js,mjs}"],
       "rules": {
         // The pinned release uses new Array(length) for validated, intentional preallocation.

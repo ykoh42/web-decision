@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>web-decision example</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 .25rem; }
+    textarea, input { box-sizing: border-box; width: 100%; font: inherit; padding: .5rem; }
+    textarea { min-height: 5rem; resize: vertical; }
+    button { font: inherit; padding: .5rem .9rem; margin: 1rem .5rem 0 0; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>Decision model example</h1>
+  <p id="intro">Run a decision model locally in your browser. Model files are separate from the package. Results can be incorrect, even at high probability.</p>
+  <label for="model">Model</label>
+  <select id="model"></select>
+  <label for="assets">Matching asset directory URL</label>
+  <input id="assets" placeholder="For example, /kev-0.6b-q4f16/">
+  <p id="asset-help">Some models require a separately configured asset server.</p>
+  <button id="load" type="button">Load model</button>
+  <button id="unload" type="button" disabled>Unload model</button>
+  <form id="form">
+    <label for="state">Context</label>
+    <textarea id="state">Routing rules: billing goes to the finance team; shipping goes to the delivery team; hardware goes to the technical team. The current ticket is classified as billing.</textarea>
+    <label for="question">Question</label>
+    <input id="question" value="Which team should receive the ticket?">
+    <label for="options">Options, one per line (no blank lines)</label>
+    <textarea id="options">finance team
+delivery team
+technical team</textarea>
+    <button id="decide" disabled>Decide</button>
+  </form>
+  <p id="status" role="status">Load the model to begin.</p>
+  <pre id="result"></pre>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

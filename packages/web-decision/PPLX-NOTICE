@@ -1,0 +1,12 @@
+pplx-decider-flash-v1.2
+
+Derived from Qwen/Qwen3.5-4B, revision
+851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a, under Apache License 2.0.
+
+The experimental adapter includes answer-code metadata from Perplexity's
+pplx-decider-flash-v1.2 checkpoint, revision
+9ff7cf9838e59df461c276b7699d56b244d2af58:
+https://huggingface.co/perplexity-ai/pplx-decider-flash-v1.2/tree/9ff7cf9838e59df461c276b7699d56b244d2af58
+
+Model weights and generated assets are not included in this package. Check
+the applicable model license and notices before distributing assets.

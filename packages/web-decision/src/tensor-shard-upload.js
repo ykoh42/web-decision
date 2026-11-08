@@ -1,0 +1,61 @@
+import {WebDecisionError} from './kev.js';
+import {assertLoadActive} from './runtime-lifecycle.js';
+import {processPrefetchedShards} from './shard-prefetch.js';
+
+/** Upload verified, contiguous tensor shards with bounded staging memory. */
+export async function uploadTensorShards({
+  index,
+  read,
+  runtime,
+  device,
+  weights,
+  signal,
+  maxPrefetchBytes,
+  lifecycle,
+  uncaptured,
+  inspectFragment
+}) {
+  // The pinned TVM internal supports offsets, so large tensors do not require
+  // an equally large JavaScript staging buffer.
+  const context = runtime.lib?.webGPUContext;
+  if (!context || typeof context.copyRawBytesToBuffer !== 'function')
+    throw new WebDecisionError('MODEL_LOAD_FAILED', 'The pinned TVM streaming upload API is unavailable.');
+  let recordIndex = 0,
+    offset = 0;
+  const consume = async (shard, buffer) => {
+    const data = new Uint8Array(buffer);
+    if (data.length !== shard.nbytes) throw new WebDecisionError('INVALID_ASSET', 'Invalid tensor shard length.');
+    let start = 0;
+    while (start < data.length) {
+      signal?.throwIfAborted();
+      assertLoadActive(lifecycle);
+      const record = index.records[recordIndex];
+      if (!record || offset < record.offset || offset >= record.offset + record.nbytes)
+        throw new WebDecisionError('INVALID_ASSET', 'Tensor parameter spans are inconsistent.');
+      const relative = offset - record.offset,
+        count = Math.min(data.length - start, record.nbytes - relative),
+        fragment = data.subarray(start, start + count);
+      inspectFragment?.(recordIndex, fragment, relative);
+      const tensor = (weights[recordIndex] ??= runtime.empty(record.shape, record.dtype, device));
+      if (typeof tensor.byteOffset !== 'number' || tensor.byteOffset % 4 || count % 4)
+        throw new WebDecisionError('MODEL_LOAD_FAILED', 'Tensor does not support aligned streaming upload.');
+      context.copyRawBytesToBuffer(fragment, tensor.getDataPtr(), tensor.byteOffset + relative, count);
+      start += count;
+      offset += count;
+      if (relative + count === record.nbytes) recordIndex++;
+    }
+    await device.sync();
+    signal?.throwIfAborted();
+    assertLoadActive(lifecycle);
+    if (uncaptured.length) throw new WebDecisionError('MODEL_LOAD_FAILED', uncaptured[0]);
+  };
+  await processPrefetchedShards(
+    index.shards,
+    (shard, readSignal) => read(shard.path, readSignal),
+    consume,
+    signal,
+    maxPrefetchBytes
+  );
+  if (recordIndex !== index.records.length || offset !== index.totalBytes)
+    throw new WebDecisionError('INVALID_ASSET', 'Incomplete tensor parameter data.');
+}

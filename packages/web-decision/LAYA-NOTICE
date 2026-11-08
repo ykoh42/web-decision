@@ -1,0 +1,13 @@
+Laya Multilingual model and ONNX conversion
+
+The experimental Laya route downloads its model files separately from the
+onnx-community/laya-multilingual-ONNX Hugging Face repository at revision
+46b77bbf5642fec5f14e540570228a8cbe8ab81f. The conversion is based on
+convaiinnovations/laya-multilingual at revision
+1720e3e3357cfe1e281542e223f8273b0890ca34. The pinned model cards identify
+Apache-2.0 terms. Model assets are not bundled in this package.
+
+The package adapts the model's documented Choice, Score, and Noul tensor
+protocol. Its action head is exposed only as diagnostic data and is not used
+for abstention. See the upstream model card and support record for model
+quality limitations and source attribution.

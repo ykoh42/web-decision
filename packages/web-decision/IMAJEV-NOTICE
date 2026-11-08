@@ -1,0 +1,13 @@
+Imajev experimental text-choice integration
+
+The text prompt and choice protocol are adapted from Imajev reference source,
+copyright 2026 Mohit Garg, Apache-2.0, at revision
+318e8dad55c12a1c6faddbec5f30489d2ee529ff:
+https://github.com/mohit67890/imajev/tree/318e8dad55c12a1c6faddbec5f30489d2ee529ff
+
+This integration supports text choices with one option-order rotation and
+rejects inputs outside the compiled candidate's limits. Model weights and the
+compiled graph are not included. Review the model, base model, training data
+and converted-asset terms before distributing assets separately.
+
+https://huggingface.co/mohit67890/imajev-4b/tree/27d4e54fc11efeea2ea4d10e910643440d2333b5

@@ -11,6 +11,8 @@
     "releases/web-decision-0.2.0/**",
     "releases/web-decision-0.3.0/**",
     "node_modules/**",
+    "packages/web-decision/src/tinydecide/engine.js",
+    "packages/web-decision/src/tinydecide/corrections.js",
     "coverage/**",
     "test-results/**",
     "playwright-report/**"

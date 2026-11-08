@@ -1,0 +1,16 @@
+TAMEV integration notice
+
+This package contains adapters for three TAMEV decision-model exports. The pinned model cards declare Apache-2.0:
+
+- TAMEV Micro MiniLM, revision c1b95679390911748aad57f634bed70e5f87a084:
+  https://huggingface.co/Tamkimd/tamev-micro-minilm/tree/c1b95679390911748aad57f634bed70e5f87a084
+- TAMEV Nano TinyBERT, revision ad15b45f35526070d48fb91f6597d2805a2d80af:
+  https://huggingface.co/Tamkimd/tamev-nano-tinybert/tree/ad15b45f35526070d48fb91f6597d2805a2d80af
+- TAMEV Nano Flash TinyBERT, revision 8049ddb646d4c4393df65cb08d0ad2380ef0934a:
+  https://huggingface.co/Tamkimd/tamev-nano-flash-tinybert/tree/8049ddb646d4c4393df65cb08d0ad2380ef0934a
+
+The models' weights, tokenizers, and configurations are fetched as separate assets and are not included in this package. The adapters preserve each pinned model's generic prediction behavior and Choice, Noul, and Score System One protocol where supported.
+
+The model cards, source project, and pinned model asset folders contain their own license and provenance information. Training-data terms, base-checkpoint lineage, exported ONNX files, and separately hosted model assets require independent review before redistribution. The model cards' license declarations do not resolve those questions.
+
+Source project: https://github.com/Tamkimd/tamev

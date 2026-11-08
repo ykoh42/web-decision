@@ -1,0 +1,13 @@
+Kev Reflexes Q4F16 model
+
+The separate model asset set is sourced from
+jean-is/kev-0.6b-reflexes-ONNX at revision
+243bcef054df85dc6ed4e4becb68590c65a9f36e. Its pinned model card declares
+Apache-2.0 and says its input/output protocol matches the Kev ONNX export.
+Model card: https://huggingface.co/jean-is/kev-0.6b-reflexes-ONNX/tree/243bcef054df85dc6ed4e4becb68590c65a9f36e
+
+Model files are hosted separately by the consuming application and are not
+included in this package. The model-card declaration does not resolve the
+checkpoint's training-data terms, lineage, transformed-asset terms, or rights
+to redistribute the weights. Review those terms before hosting or sharing the
+model assets.

@@ -1,5 +1,6 @@
 packages:
   - "."
+  - "packages/web-decision"
 overrides:
   minimatch: 11.0.1
 verifyDepsBeforeRun: error

@@ -1,0 +1,17 @@
+Strands Gemma 4 E2B model attribution
+
+This npm package contains the experimental browser runtime and protocol adapter only. It does not contain the model weights. Applications provide the separately hosted model assets through `assetsUrl`.
+
+Pinned decision checkpoint: `StrandsAgents/strands-decider-E2B-gemma4-v1-2610`, revision `d383ecf8534b13d49b3b567a1b66f88fca6d50ba`. The pinned checkpoint declares Apache-2.0. Its provenance file reports `code_commit: unknown` and does not pin training dataset revisions.
+
+Pinned base model: `google/gemma-4-E2B-it`, revision `3e22461f65e89153144f8adb70e3b8c2cc9845a7`. The pinned model card declares Apache-2.0 and links the [Gemma 4 license](https://ai.google.dev/gemma/docs/gemma_4_license). The pinned base inventory has no standalone LICENSE or NOTICE file.
+
+The browser graph and prepared tensor cache use FP16. The original base weights are BF16; converting them to FP16 is lossy. The runtime asset manifest records the pinned source hashes, conversion, graph, and cache hashes. Do not describe the converted weights as bit-exact BF16 weights.
+
+Model cards and source references:
+
+- Checkpoint: https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v1-2610/tree/d383ecf8534b13d49b3b567a1b66f88fca6d50ba
+- Base: https://huggingface.co/google/gemma-4-E2B-it/tree/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+- License research and provenance limits: `docs/research/strands-e2b-licensing.md`
+
+These publisher declarations and metadata preserve attribution; they do not establish the lineage or redistribution status of every training input or resulting model artifact.

@@ -1,0 +1,11 @@
+Decima-base-clean
+
+The upstream model repository identifies Decima-base-clean and its released
+model files as Apache-2.0:
+https://huggingface.co/amyrmahdy/decima-base-clean
+https://github.com/amyrmahdy/decima
+
+The upstream model card describes the training data as licence-clean and says
+it excludes datasets with non-commercial terms. This notice records the
+upstream claim; it is not an independent legal review. The model files and
+tokenizer are downloaded separately and are not included in this package.

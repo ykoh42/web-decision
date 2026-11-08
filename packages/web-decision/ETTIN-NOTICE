@@ -1,0 +1,8 @@
+Decider Ettin 68M int8 ONNX model
+
+The model card at https://huggingface.co/aravind1706/decider-ettin/tree/df8600e1f6e220b302cdd49897c2b1ff76e021ae declares Apache-2.0 for the model. The ONNX graph and tokenizer are downloaded separately by consumers and are not included in this package archive.
+
+The checkpoint card identifies jhu-clsp/ettin-encoder-68m as its base model and avbiswas/bev-decision-150K as its training dataset. The dataset card currently reports an unknown license. This project does not redistribute that dataset; review the dataset sources and resulting checkpoint terms before redistributing model assets.
+
+Model card: https://huggingface.co/aravind1706/decider-ettin/tree/df8600e1f6e220b302cdd49897c2b1ff76e021ae
+Dataset card: https://huggingface.co/datasets/avbiswas/bev-decision

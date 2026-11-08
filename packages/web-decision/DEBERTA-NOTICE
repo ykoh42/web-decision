@@ -1,0 +1,12 @@
+Open JEV DeBERTa-v3-large model and ONNX conversion
+
+This route uses onnx-community/open-jev-deberta-v3-large-ONNX at revision
+7c79f25b5ac496089f448a969c801872ad59d31c. Its model card declares Apache-2.0
+and identifies com-kotobalabs/open-jev-deberta-v3-large as the source and
+Microsoft DeBERTa-v3-large as the base model.
+Model card: https://huggingface.co/onnx-community/open-jev-deberta-v3-large-ONNX/tree/7c79f25b5ac496089f448a969c801872ad59d31c
+
+The prepared model assets are hosted separately by the consuming application
+and are not included in this package. The model-card declaration does not
+resolve training-data lineage or transformed-asset terms. Review those terms
+before hosting or redistributing the model files.
