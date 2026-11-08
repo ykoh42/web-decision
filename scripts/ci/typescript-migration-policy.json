@@ -338,7 +338,6 @@
     "packages/web-decision/test/kev-deberta-preview-registry.test.mjs",
     "packages/web-decision/test/kev-deberta-reflexes-preview-registry.test.mjs",
     "packages/web-decision/test/kev-gpu.test.mjs",
-    "packages/web-decision/test/kev-loader.test.mjs",
     "packages/web-decision/test/kev-preview-entry.test.mjs",
     "packages/web-decision/test/kev-reflexes.test.mjs",
     "packages/web-decision/test/kev-systemone-render-depth.test.mjs",

@@ -6,11 +6,17 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
+    "types": ["node"],
     "noEmit": true,
     "allowJs": true,
     "checkJs": false,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "files": ["src/kev.ts", "src/kev-loader.ts", "src/runtime/tvm-source.d.ts"]
+  "files": [
+    "src/kev.ts",
+    "src/kev-loader.ts",
+    "src/runtime/tvm-source.d.ts",
+    "test/kev-loader.test.mts"
+  ]
 }
