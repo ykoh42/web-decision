@@ -7,8 +7,10 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "files": ["src/kev.ts"]
+  "files": ["src/kev.ts", "src/kev-loader.ts"]
 }
