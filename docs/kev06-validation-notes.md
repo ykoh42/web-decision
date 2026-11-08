@@ -27,4 +27,10 @@ In an isolated copy of the extended graph, replacing only the 28 down-projection
 
 An independent ONNX Runtime Web 1.31.1 session on the same Chrome machine selected the same option for all four inputs, but its largest absolute differences from ORT CPU were 0.3594 for logits and 0.0483 for probabilities. The session used both WebGPU and CPU partitions; the log recorded 1,493 nodes on WebGPU and 1,329 on CPU. This is a comparison result, not a GPU-only reference or an added product runtime.
 
+## Typed and packed question probe
+
+A separate exploratory Windows Chrome WebGPU run exercised one request containing a choice, a yes/no (`noul`) and a five-level score question, then each question separately. All three question types returned results, and the choice was `billing`. For the score question, packed probabilities were `[0.6869, 0.2977, 0.0152, 0.0001, 0]` and separate probabilities were `[0.6902, 0.2945, 0.0152, 0.0001, 0]`; these public values are rounded to four decimal places. This single request is not a general equivalence or quality claim.
+
+The same packed and separate token IDs were independently confirmed against the JavaScript tokenizer and packing implementation. On ONNX Runtime 1.31.1 CPU with all graph optimizations and four threads, the score probabilities were identical for this request, while the choice probabilities differed by up to 0.00638 between packed and separate execution. The GPU choice probabilities were identical to four decimals; the yes/no probability was identical between packed and separate runs on both runtimes. Different execution shapes can therefore affect outputs, and the effect differs between these two runtime configurations. This probe does not identify the cause or establish an acceptable tolerance.
+
 Before release, resolve the build provenance and reference behavior, define an evidence-based numerical acceptance policy, and validate the exact release archive against representative inputs. Keep the existing single-input reference check and its limits until a reviewed replacement is available. Revalidate after changing a model artifact, its pins, or its runtime bundle.
