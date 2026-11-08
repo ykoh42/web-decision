@@ -35,7 +35,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   projects: [{name: browserName}],
-  ...(firefoxAppDataHome ? {globalTeardown: './tests/browser/firefox-app-data-teardown.mjs'} : {}),
+  ...(firefoxAppDataHome ? {globalTeardown: './tests/browser/firefox-app-data-teardown.ts'} : {}),
   use: {
     baseURL,
     browserName,
