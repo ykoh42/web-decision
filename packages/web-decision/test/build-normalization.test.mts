@@ -1,13 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import config, {assertPreviewWebgpuHash, browserOnlyTvmWasiExport, stripNodeOnlyWasiExport} from '../vite.config.ts';
-const plugin = config.plugins.find((p) => p.name === 'normalize-tvm-source-markers');
+// These hooks are exercised with the minimal bundle and context the test needs.
+type Chunk = {type: 'chunk'; code: string};
+type NormalizeHook = {generateBundle: (options: object, bundle: Record<string, Chunk>) => void};
+type WasiHooks = {
+  buildStart: () => void;
+  transform: (source: string, id: string) => {code: string; map: null} | null;
+  generateBundle: () => void;
+};
+const plugins = config.plugins ?? [];
+const plugin = plugins.find(
+  (candidate) =>
+    candidate && !Array.isArray(candidate) && 'name' in candidate && candidate.name === 'normalize-tvm-source-markers'
+) as unknown as NormalizeHook;
+assert.ok(plugin);
 
 test('TVM source marker normalization removes checkout-depth differences', () => {
-  const build = (path) => {
+  const build = (path: string): string => {
     const bundle = {
       entry: {
-        type: 'chunk',
+        type: 'chunk' as const,
         code: `// ${path}.toolchains/apache-tvm-src/web/src/runtime.ts\nconst text = "../.toolchains/apache-tvm-src/web/src/runtime.ts";\n`
       }
     };
@@ -21,7 +34,7 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
 
 test('build fails when the expected TVM marker format is missing', () => {
   assert.throws(
-    () => plugin.generateBundle({}, {entry: {type: 'chunk', code: 'const value = 1;'}}),
+    () => plugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}),
     /Expected TVM source markers/
   );
 });
@@ -45,7 +58,7 @@ test('browser-only WASI transform removes only the exact Node export', () => {
 });
 
 test('browser-only WASI transform targets the TVM glue and fails if missing', () => {
-  const plugin = browserOnlyTvmWasiExport();
+  const plugin = browserOnlyTvmWasiExport() as unknown as WasiHooks;
   plugin.buildStart();
   assert.equal(plugin.transform('no edit', '/other/wasi.js'), null);
   assert.throws(() => plugin.generateBundle(), /Expected TVM WASI glue/);
