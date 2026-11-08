@@ -143,7 +143,6 @@
     "packages/web-decision/src/model-family.js",
     "packages/web-decision/src/model-registry.js",
     "packages/web-decision/src/model-source.js",
-    "packages/web-decision/src/model.js",
     "packages/web-decision/src/nari/adapter.mjs",
     "packages/web-decision/src/nari/checkpoints.mjs",
     "packages/web-decision/src/nari/loader.mjs",

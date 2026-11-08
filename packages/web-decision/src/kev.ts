@@ -6,10 +6,10 @@ export {WebDecisionError};
 export type KevTokenizer = Pick<Tokenizer, 'encode'>;
 
 export interface KevLimits {
-  readonly maxInputTokens?: number;
-  readonly maxStateTokens?: number;
-  readonly maxBranchTokens?: number;
-  readonly maxOptions?: number;
+  readonly maxInputTokens?: number | undefined;
+  readonly maxStateTokens?: number | undefined;
+  readonly maxBranchTokens?: number | undefined;
+  readonly maxOptions?: number | undefined;
 }
 
 export interface KevPackOptions {
