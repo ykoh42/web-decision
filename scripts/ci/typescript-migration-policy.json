@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "baselineCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
   "managedJavaScript": [
-    "packages/web-decision/src/abortable-gpu-device.js",
     "packages/web-decision/src/assets.js",
     "packages/web-decision/src/crivo/contract.mjs",
     "packages/web-decision/src/crivo/loader.mjs",
@@ -209,7 +208,6 @@
     "packages/web-decision/src/verdict/tokenizer.mjs",
     "packages/web-decision/src/xdecision/contract.mjs",
     "packages/web-decision/src/xdecision/loader.mjs",
-    "packages/web-decision/test/abortable-gpu-device.test.mjs",
     "packages/web-decision/test/asset-batch.test.mjs",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",

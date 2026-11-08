@@ -3,9 +3,21 @@ import * as nodeModule from 'node:module';
 import test from 'node:test';
 import {requestGpuAdapter, requestGpuDevice} from '../src/abortable-gpu-device.js';
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((yes, no) => {
+type ResolveContext = {parentURL?: string};
+type ResolveResult = {shortCircuit?: boolean; url: string};
+type RegisterHooks = (hooks: {
+  resolve(
+    specifier: string,
+    context: ResolveContext,
+    nextResolve: (specifier: string, context: ResolveContext) => ResolveResult
+  ): ResolveResult;
+}) => {deregister(): void};
+const registerHooks = (nodeModule as typeof nodeModule & {registerHooks?: RegisterHooks}).registerHooks;
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
   });
@@ -16,17 +28,17 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
 test('requests the adapter and device with unchanged descriptors', async () => {
   const adapter = {},
-    device = {},
+    device = {destroy() {}},
     descriptor = {requiredFeatures: ['shader-f16'], requiredLimits: {maxBufferSize: 123}};
-  let adapterOptions, deviceOptions;
+  let adapterOptions: unknown, deviceOptions: unknown;
   const gpu = {
-    requestAdapter(options) {
+    requestAdapter(options: {powerPreference: 'high-performance'}) {
       adapterOptions = options;
       return Promise.resolve(adapter);
     }
   };
   const supported = {
-    requestDevice(options) {
+    requestDevice(options: typeof descriptor) {
       deviceOptions = options;
       return Promise.resolve(device);
     }
@@ -40,7 +52,7 @@ test('requests the adapter and device with unchanged descriptors', async () => {
 test('abort during an adapter request returns the reason without requesting a device', async () => {
   const controller = new AbortController(),
     reason = Error('adapter stop'),
-    pending = deferred();
+    pending = deferred<unknown>();
   let calls = 0;
   const result = requestGpuAdapter(
     {
@@ -65,7 +77,7 @@ test('abort during an adapter request returns the reason without requesting a de
 test('a cancelled adapter request observes a late rejection', async () => {
   const controller = new AbortController(),
     reason = Error('adapter stop'),
-    pending = deferred();
+    pending = deferred<unknown>();
   const result = requestGpuAdapter({requestAdapter: () => pending.promise}, controller.signal);
   controller.abort(reason);
   await assert.rejects(result, (error) => error === reason);
@@ -76,7 +88,7 @@ test('a cancelled adapter request observes a late rejection', async () => {
 test('abort after adapter resolution but before helper return preserves the reason', async () => {
   const controller = new AbortController(),
     reason = Error('adapter stop'),
-    pending = deferred();
+    pending = deferred<unknown>();
   const result = requestGpuAdapter({requestAdapter: () => pending.promise}, controller.signal);
   pending.resolve({});
   queueMicrotask(() => controller.abort(reason));
@@ -86,7 +98,7 @@ test('abort after adapter resolution but before helper return preserves the reas
 test('abort during a device request destroys a late device once', async () => {
   const controller = new AbortController(),
     reason = Error('device stop'),
-    pending = deferred();
+    pending = deferred<{destroy(): void}>();
   let destroyed = 0;
   const result = requestGpuDevice({requestDevice: () => pending.promise}, {}, controller.signal);
   controller.abort(reason);
@@ -103,7 +115,7 @@ test('abort during a device request destroys a late device once', async () => {
 test('a cancelled device request observes a late rejection', async () => {
   const controller = new AbortController(),
     reason = Error('device stop'),
-    pending = deferred();
+    pending = deferred<{destroy(): void}>();
   const result = requestGpuDevice({requestDevice: () => pending.promise}, {}, controller.signal);
   controller.abort(reason);
   await assert.rejects(result, (error) => error === reason);
@@ -114,7 +126,7 @@ test('a cancelled device request observes a late rejection', async () => {
 test('abort after device resolution but before helper return destroys the device once', async () => {
   const controller = new AbortController(),
     reason = Error('device stop'),
-    pending = deferred();
+    pending = deferred<{destroy(): void}>();
   let destroyed = 0;
   const result = requestGpuDevice({requestDevice: () => pending.promise}, {}, controller.signal);
   pending.resolve({
@@ -145,18 +157,18 @@ test('pre-aborted requests do not start and ordinary errors are preserved', asyn
 
 test(
   'failed late destroy retains the exact device and preserves the abort reason',
-  {skip: typeof nodeModule.registerHooks !== 'function'},
+  {skip: typeof registerHooks !== 'function'},
   async () => {
-    const helper = new URL('../src/abortable-gpu-device.js?retention-test', import.meta.url).href;
+    const helper = new URL('../src/abortable-gpu-device.ts?retention-test', import.meta.url).href;
     const fakeGuard = `data:text/javascript,${encodeURIComponent('export function retainStrandsResources(runtime, gpu) { globalThis.__retainedGpu = {runtime, gpu}; }')}`;
-    const hooks = nodeModule.registerHooks({
+    const hooks = registerHooks!({
       resolve(specifier, context, nextResolve) {
         if (context.parentURL === helper && specifier === './strands/disposal-guard.mjs')
           return {url: fakeGuard, shortCircuit: true};
         return nextResolve(specifier, context);
       }
     });
-    let tested;
+    let tested: typeof import('../src/abortable-gpu-device.js');
     try {
       tested = await import(helper);
     } finally {
@@ -164,22 +176,23 @@ test(
     }
     const controller = new AbortController(),
       reason = Error('device stop'),
-      pending = deferred(),
+      pending = deferred<{destroy(): void}>(),
       device = {
         destroy() {
           throw Error('destroy failed');
         }
       };
+    const retained = globalThis as typeof globalThis & {__retainedGpu?: {runtime: unknown; gpu: unknown}};
     try {
       const result = tested.requestGpuDevice({requestDevice: () => pending.promise}, {}, controller.signal);
       controller.abort(reason);
       await assert.rejects(result, (error) => error === reason);
       pending.resolve(device);
       await nextTurn();
-      assert.equal(globalThis.__retainedGpu?.gpu, device);
-      assert.equal(globalThis.__retainedGpu?.runtime, undefined);
+      assert.equal(retained.__retainedGpu?.gpu, device);
+      assert.equal(retained.__retainedGpu?.runtime, undefined);
     } finally {
-      delete globalThis.__retainedGpu;
+      delete retained.__retainedGpu;
     }
   }
 );

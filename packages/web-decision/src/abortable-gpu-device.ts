@@ -1,7 +1,11 @@
 import {waitForAbort} from './abort.js';
 import {retainStrandsResources} from './strands/disposal-guard.mjs';
 
-export function destroyGpuDevice(device) {
+interface Destroyable {
+  destroy(): void;
+}
+
+export function destroyGpuDevice(device: Destroyable | null | undefined): void {
   if (!device) return;
   try {
     device.destroy();
@@ -11,7 +15,10 @@ export function destroyGpuDevice(device) {
 }
 
 /** Stop waiting for an adapter when the caller cancels. */
-export async function requestGpuAdapter(gpu, signal) {
+export async function requestGpuAdapter<T>(
+  gpu: {requestAdapter(options: {powerPreference: 'high-performance'}): T | PromiseLike<T>},
+  signal?: AbortSignal
+): Promise<Awaited<T>> {
   try {
     signal?.throwIfAborted();
     const adapter = await waitForAbort(() => gpu.requestAdapter({powerPreference: 'high-performance'}), signal);
@@ -24,8 +31,12 @@ export async function requestGpuAdapter(gpu, signal) {
 }
 
 /** Destroy a device that arrives after cancellation, retaining it if destroy fails. */
-export async function requestGpuDevice(adapter, descriptor, signal) {
-  let device;
+export async function requestGpuDevice<T extends Destroyable, D>(
+  adapter: {requestDevice(descriptor: D): T | PromiseLike<T>},
+  descriptor: D,
+  signal?: AbortSignal
+): Promise<Awaited<T>> {
+  let device: Awaited<T> | undefined;
   try {
     signal?.throwIfAborted();
     device = await waitForAbort(() => adapter.requestDevice(descriptor), signal, destroyGpuDevice);
