@@ -31,6 +31,8 @@ Build a final candidate archive once. Install that exact archive in a clean cons
 
 Existing release snapshots and their original pins remain historical records; they are not evidence that a new package has passed. The current source tree is responsible for future packages. Prior GPU measurements must name the exact tested package, browser and device rather than imply broad support.
 
+Reproduce a historical release from its own Git tag: its source lock covers the files in that checkout. The release scripts in a later checkout are not a substitute for the tagged source.
+
 ## Quality gates
 
 New JavaScript and TypeScript use the repository's SonarJS cognitive complexity check, and Python uses complexipy. The limit is 15. Existing baseline findings remain visible and cannot worsen; new findings are not added as an automatic escape hatch. Formatting, lint, type, unit, package, model and release checks apply alongside these limits.

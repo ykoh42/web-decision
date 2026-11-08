@@ -1,26 +1,18 @@
 # Releasing web-decision
 
-Keep each Git tag, npm archive, and verification record tied to the same package archive and runtime bundle hashes.
+Release only curated models whose TVM artifacts and behavior have been verified. A release must identify its exact source commit, npm archive, model artifacts, and verification evidence.
 
-## Release cadence
+## Candidate checks
 
-After `0.1.0`, release each newly completed model in its own version. Carry forward the previous stable model routes and add exactly one new route per release; do not wait to bundle several completed candidates together. A route is eligible only after its exact package archive passes the required package, type, and real-model browser checks, and its model and asset rights have been reviewed. If a candidate is blocked, keep its route out of the release and continue with the next candidate only as a separate release once that candidate is complete.
+- Build one candidate archive from a clean checkout and install that archive in a clean consumer.
+- Check the public catalog, TypeScript API, package contents, dependency audit, pinned assets, notices, and model-data rights.
+- Run the repository's formatting, lint, cognitive complexity, type, unit, and package checks.
+- For every included model and claimed environment, run real inference against the installed archive. Record the browser, hardware, WebGPU adapter, required features, input and output coverage, and reference comparison.
+- Verify online loading, artifact hashes, cached offline loading and inference without network access, cleanup, and failure paths. Missing or skipped required evidence fails the release.
+- Tie the evidence to the archive and artifact hashes. A change after verification requires a new candidate and new checks.
 
-## Before publishing
+Review the candidate and evidence before creating a tag or publishing. Publish the exact archive that passed verification.
 
-From a clean checkout, run the scripts for the candidate version. For example, for `0.3.0`:
+## Historical releases
 
-```sh
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm test:release:0.3.0
-pnpm build:release:0.3.0
-pnpm pack:release:0.3.0
-```
-
-Then verify the resulting package archive in a clean npm consumer and run `npm audit --omit=dev`. Use `npm publish --dry-run --ignore-scripts --access public` to inspect the registry payload before publishing the stable version.
-
-Run real-model browser tests locally against the exact archive for every included model, using each model's supported runtime. For WebGPU routes, record browser versions, device, non-fallback adapter and required features. For CPU/WASM routes, record browser versions and execution provider; GPU verification is not applicable. Record input and output coverage, archive and bundle hashes, failures, and host resource limits in that version's `releases/web-decision-<version>/verification/` directory. Standard GitHub-hosted runners do not provide the local GPU evidence required for WebGPU routes.
-
-Review the exact staged file list, dependencies, notices, asset pins, model-data terms, and security findings before tagging. Do not include model weights unless redistribution rights and required notices are established. The current package excludes all model weights.
-
-Create a `vX.Y.Z` tag from the reviewed source commit and attach the exact tested archive. Publish the same archive to npm with the `latest` tag. Verify both publications and record their hashes in that version's verification directory.
+To reproduce a previous release, check out its own Git tag and use the instructions and source lock in that checkout. Historical verification is not evidence for a new archive.
