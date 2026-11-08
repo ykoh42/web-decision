@@ -20,6 +20,15 @@ withTemporaryDirectories((makeTempDirectory) => {
   assert.equal(typeof library.loadDecisionModel, 'function');
   assert.equal(typeof library.clearModelCache, 'function');
   assert.equal(typeof library.WebDecisionError, 'function');
+  assert.deepEqual(library.listStableModelIds(), [
+    'tamev-micro-minilm-int8',
+    'tamev-nano-tinybert-int8',
+    'kev-0.6b-q4f16'
+  ]);
+  assert.equal(library.isStableModelId('tamev-micro-minilm-int8'), true);
+  assert.equal(library.isStableModelId('experimental-tamev-micro-minilm-int8'), false);
+  assert.equal(library.describeStableModel('tamev-micro-minilm-int8').model, 'tamev-micro-minilm-int8');
+  assert.throws(() => library.describeStableModel('experimental-tamev-micro-minilm-int8'), {code: 'INVALID_INPUT'});
   assert.equal(library.describeModel('mapika-0.8b-q4f16').features.textChoice.limits[0].max, 128);
   assert.equal(library.isDecisionModel('imajev-4b'), false);
   assert.ok(library.listDecisionModels().includes('experimental-elephant-9b-q4f16-dlight'));

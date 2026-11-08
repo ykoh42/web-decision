@@ -2,8 +2,11 @@ import {
   WebDecisionError,
   clearModelCache,
   describeModel,
+  describeStableModel,
   isDecisionModel,
+  isStableModelId,
   listDecisionModels,
+  listStableModelIds,
   loadDecisionModel,
   type DecisionModel,
   type DecisionRequest,
@@ -38,6 +41,13 @@ import {
   type LoadedTamevMicroModel,
   type LoadedTamevNanoModel,
   type LoadedTamevNanoFlashModel,
+  type LoadedStableKev06DecisionModel,
+  type LoadedStableDecisionModel,
+  type LoadedStableTamevMicroModel,
+  type LoadedStableTamevNanoModel,
+  type StableModelDescription,
+  type StableModelId,
+  type StableTamevSystemOneResult,
   type LoadedSkejjaInt8Model,
   type LoadedSkejjaInt8DynModel,
   type SkejjaInt8LoadOptions,
@@ -313,6 +323,23 @@ const tamevNanoDefaultOptions: TamevNanoLoadOptions = {
 };
 const tamevMicroDefault = loadDecisionModel(tamevMicroDefaultOptions);
 const tamevNanoDefault = loadDecisionModel(tamevNanoDefaultOptions);
+const stableTamevMicro: Promise<LoadedStableTamevMicroModel> = loadDecisionModel({
+  modelId: 'tamev-micro-minilm-int8'
+});
+const stableTamevNano: Promise<LoadedStableTamevNanoModel> = loadDecisionModel({
+  modelId: 'tamev-nano-tinybert-int8',
+  assetsUrl: 'https://mirror.example.test/tamev-nano/'
+});
+const stableKev: Promise<LoadedStableKev06DecisionModel> = loadDecisionModel({
+  modelId: 'kev-0.6b-q4f16',
+  assetsUrl: '/models/kev-0.6b-q4f16/'
+});
+void stableTamevMicro.then((model) => {
+  const description: StableModelDescription = model.description;
+  const result: Promise<StableTamevSystemOneResult<'tamev-micro-minilm-int8'>> = model.systemOne('', {});
+  void [description, result];
+});
+void [stableTamevNano, stableKev];
 loadDecisionModel({model: 'experimental-tamev-nano-flash-tinybert-int8'});
 void [tamevMicroDefault, tamevNanoDefault];
 const tamevTypedOptions = loadDecisionModel(tamevOptions);
@@ -759,6 +786,22 @@ async function useInstalledPackage(): Promise<void> {
   const loaded: LoadedDecisionModel = await loadDecisionModel(options);
   const modelId: ModelName = loaded.description.model;
   const all: readonly ModelName[] = listDecisionModels();
+  const stableIds: readonly StableModelId[] = listStableModelIds();
+  const stableDescription = describeStableModel('tamev-micro-minilm-int8');
+  if (isStableModelId('tamev-nano-tinybert-int8')) {
+    const stableId: StableModelId = 'tamev-nano-tinybert-int8';
+    describeStableModel(stableId);
+  }
+  const stableIdInput: unknown = stableIds[0];
+  if (isStableModelId(stableIdInput)) {
+    const dynamicStableModel: Promise<LoadedStableDecisionModel> = loadDecisionModel({
+      modelId: stableIdInput,
+      assetsUrl: '/stable-model-assets/'
+    });
+    void dynamicStableModel;
+    // @ts-expect-error A dynamic stable ID may select Kev, whose asset pack requires a URL.
+    loadDecisionModel({modelId: stableIdInput});
+  }
   const description = describeModel('mapika-0.8b-q4f16');
   const temperature = describeModel('experimental-nari-decision-4b-q4f16').features.textChoice.score.temperature;
   if (typeof temperature === 'object' && 'byOptionCount' in temperature) {
@@ -766,6 +809,7 @@ async function useInstalledPackage(): Promise<void> {
     void minimum;
   }
   declareDynamicModel(description.model);
+  void [stableIds, stableDescription];
   // @ts-expect-error Descriptors are deeply readonly.
   description.features.textChoice.limits.push({resource: 'options', scope: 'question', min: 2, max: 3});
   // @ts-expect-error Image metadata is not an implemented operation.
@@ -1109,6 +1153,14 @@ loadDecisionModel({});
 loadDecisionModel({assetsUrl: '/', model: 'unknown-model'});
 // @ts-expect-error An unregistered model cannot be described as available.
 describeModel('imajev-4b');
+// @ts-expect-error Preview route names are not stable public IDs.
+loadDecisionModel({modelId: 'experimental-tamev-micro-minilm-int8'});
+// @ts-expect-error Unknown IDs are not part of the stable catalog.
+loadDecisionModel({modelId: 'unknown-model'});
+// @ts-expect-error The stable Kev ID still needs its separately hosted asset pack.
+loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
+// @ts-expect-error Stable and legacy selectors cannot be mixed.
+loadDecisionModel({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'});
 // @ts-expect-error The default model does not support DeBERTa readback.
 loadDecisionModel({assetsUrl: '/', debertaReadback: 'packed'});
 // @ts-expect-error Kev does not support DeBERTa readback.

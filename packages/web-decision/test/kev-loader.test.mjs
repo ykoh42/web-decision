@@ -3,6 +3,7 @@ import * as nodeModule from 'node:module';
 import test from 'node:test';
 import {KEV_DELIMITERS} from '../src/kev.js';
 import {describeModel} from '../src/model-registry.js';
+import {describeStableModel} from '../src/stable-models.js';
 
 // Exercise the actual Kev loader with small fake asset, GPU and runtime boundaries.
 const supportsHooks = typeof nodeModule.registerHooks === 'function';
@@ -19,7 +20,7 @@ if (supportsHooks) {
     const fixture = () => globalThis.__fakeKevLoader;
     export class Tokenizer {}
     export function createPolyfillWASI() { return {}; }
-    export function instantiate() { fixture().started(); return fixture().pending; }
+    export function instantiate() { fixture().instantiations++; fixture().started(); return fixture().pending; }
     export async function detectKevGPUDevice() { return {device: fixture().gpu, adapter: {features: new Set(['shader-f16'])}}; }
     export const CACHE_NAME = 'fake';
     export function parseJson(value) { return value; }
@@ -80,6 +81,29 @@ if (supportsHooks) {
     export async function loadExperimentalMapikaQ4(options) { return loadFake('mapika-q4', options); }
     export async function loadExperimentalKev08(options) { return loadFake('kev08', options); }
     export async function loadExperimentalStrandsFromSource(options) { return loadFake('strands', options); }
+    export async function loadTamev(options) {
+      const model = loadFake('tamev', options);
+      model.dispose = async () => {
+        fixture().tamevDisposals++;
+        if (fixture().tamevDisposeFails) throw new Error('fake TAMEV disposal failed');
+      };
+      const mode = fixture().tamevSystemOneMode;
+      if (mode === 'accessor') {
+        Object.defineProperty(model, 'systemOne', {get: () => () => ({model: options.model, answers: {}})});
+      } else if (mode === 'nonconfigurable') {
+        Object.defineProperty(model, 'systemOne', {
+          configurable: false,
+          enumerable: true,
+          value: async () => ({model: options.model, answers: {}}),
+          writable: false
+        });
+      } else if (mode === 'nonfunction') {
+        model.systemOne = 'not a function';
+      } else if (mode !== 'missing') {
+        model.systemOne = async () => ({model: options.model, answers: {}});
+      }
+      return model;
+    }
   `;
   const fakeModule = `data:text/javascript;base64,${Buffer.from(fakeSource).toString('base64')}`;
   const fakeBundledAssets = `
@@ -116,7 +140,8 @@ if (supportsHooks) {
     './mapika/loader.js',
     './mapika-q4/loader.js',
     './kev08/loader.js',
-    './strands/loader.mjs'
+    './strands/loader.mjs',
+    './tamev/loader.mjs'
   ]);
   const hooks = nodeModule.registerHooks({
     resolve(specifier, context, nextResolve) {
@@ -149,7 +174,7 @@ function setup(t) {
   const lost = new Promise((resolve) => {
     lose = resolve;
   });
-  const state = {disposed: 0, destroyed: 0, ended: 0, initialized: 0, uploads: 0};
+  const state = {disposed: 0, destroyed: 0, ended: 0, initialized: 0, instantiations: 0, uploads: 0};
   const gpu = {
     lost,
     addEventListener() {},
@@ -193,6 +218,9 @@ function setup(t) {
     events: [],
     gpuAvailable: true,
     warmCache: false,
+    tamevSystemOneMode: 'method',
+    tamevDisposeFails: false,
+    tamevDisposals: 0,
     gpu,
     pending,
     started: markStarted,
@@ -409,3 +437,93 @@ test('each non-Kev loader returns its own matching immutable description', {skip
     });
   }
 });
+
+test(
+  'stable model IDs route through pinned implementations and expose stable identity',
+  {skip: !supportsHooks},
+  async (t) => {
+    for (const [modelId, routeModel, assetsUrl] of [
+      ['tamev-micro-minilm-int8', 'experimental-tamev-micro-minilm-int8', undefined],
+      ['tamev-nano-tinybert-int8', 'experimental-tamev-nano-tinybert-int8', 'https://mirror.example.test/nano/']
+    ]) {
+      await t.test(modelId, async (t) => {
+        const f = setup(t);
+        const model = await loadDecisionModel({modelId, ...(assetsUrl ? {assetsUrl} : {})});
+
+        assert.equal(f.fake.selectedFamily, 'tamev');
+        assert.equal(f.fake.selectedOptions.model, routeModel);
+        assert.equal(f.fake.selectedOptions.assetsUrl, assetsUrl);
+        assert.equal(Object.hasOwn(f.fake.selectedOptions, 'modelId'), false);
+        assert.equal(model.description, describeStableModel(modelId));
+        assert.equal(model.description.model, modelId);
+        assert.deepEqual(await model.systemOne(), {model: modelId, answers: {}});
+        assert.equal(Object.getOwnPropertyDescriptor(model, 'systemOne').enumerable, true);
+        await model.dispose();
+        assert.equal(f.fake.tamevDisposals, 1);
+      });
+    }
+  }
+);
+
+test('unknown stable IDs and bare string IDs never fall through to default Kev', {skip: !supportsHooks}, async (t) => {
+  const f = setup(t);
+  f.resolveRuntime(f.runtime);
+  await assert.rejects(loadDecisionModel({modelId: 'experimental-strands-qwen-2b-fp16'}), {
+    code: 'INVALID_INPUT'
+  });
+  await assert.rejects(loadDecisionModel({modelId: 'not-a-model'}), {code: 'INVALID_INPUT'});
+  await assert.rejects(loadDecisionModel(Object.create({modelId: 'unknown-model'})), {code: 'INVALID_INPUT'});
+  await assert.rejects(
+    loadDecisionModel({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'}),
+    {code: 'INVALID_INPUT'}
+  );
+  let modelIdReads = 0;
+  const accessorOptions = Object.defineProperty({}, 'modelId', {
+    get() {
+      modelIdReads++;
+      return 'tamev-micro-minilm-int8';
+    }
+  });
+  await assert.rejects(loadDecisionModel(accessorOptions), {code: 'INVALID_INPUT'});
+  assert.equal(modelIdReads, 0);
+  await assert.rejects(loadDecisionModel('kev-0.6b-q4f16'), {code: 'INVALID_INPUT'});
+  assert.equal(f.state.initialized, 0);
+  assert.equal(f.state.instantiations, 0);
+  assert.equal(f.fake.selectedFamily, undefined);
+});
+
+test(
+  'stable TAMEV adaptation disposes sessions when the public method cannot be wrapped',
+  {skip: !supportsHooks},
+  async (t) => {
+    for (const mode of ['missing', 'accessor', 'nonfunction', 'nonconfigurable']) {
+      await t.test(mode, async (t) => {
+        const f = setup(t);
+        f.fake.tamevSystemOneMode = mode;
+        if (mode === 'nonconfigurable') {
+          await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), TypeError);
+        } else {
+          await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), {
+            code: 'MODEL_LOAD_FAILED'
+          });
+        }
+        assert.equal(f.fake.tamevDisposals, 1);
+      });
+    }
+  }
+);
+
+test(
+  'stable TAMEV cleanup preserves the original adaptation error when dispose fails',
+  {skip: !supportsHooks},
+  async (t) => {
+    const f = setup(t);
+    f.fake.tamevSystemOneMode = 'missing';
+    f.fake.tamevDisposeFails = true;
+    await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), {
+      code: 'MODEL_LOAD_FAILED',
+      message: 'Stable TAMEV model has no System One method.'
+    });
+    assert.equal(f.fake.tamevDisposals, 1);
+  }
+);

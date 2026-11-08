@@ -9,15 +9,17 @@ This workspace package is `0.0.0-preview.34` and is not the stable npm release. 
 ```js
 import {loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({model: 'experimental-tamev-micro-minilm-int8'});
+const model = await loadDecisionModel({modelId: 'tamev-micro-minilm-int8'});
 
 try {
   const result = await model.decide({
     state: 'A customer reports a duplicate charge.',
-    questions: [{
-      instructions: 'Which team should review this?',
-      options: ['Billing', 'Support']
-    }]
+    questions: [
+      {
+        instructions: 'Which team should review this?',
+        options: ['Billing', 'Support']
+      }
+    ]
   });
   console.log(result.answers[0]?.selected);
 } finally {
@@ -25,7 +27,9 @@ try {
 }
 ```
 
-Use `listDecisionModels()` to see registered routes and `describeModel(id)` to inspect each route's backend, input features, limits, and verification status. A registered `experimental-*` route is a preview adapter; it does not by itself mean that real-model inference has been verified on every browser or device.
+Use `listStableModelIds()` for the clean-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. These aliases map to the model set in the latest stable release and follow its published benchmark order; the alias names are new in the current workspace preview. TAMEV Micro and Nano use their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so its ID still requires an `assetsUrl`.
+
+`listDecisionModels()` and `describeModel(id)` remain available for the full development route registry, including preview adapters. Those route names are not part of the stable-ID interface.
 
 Some models also expose typed `systemOne` inputs. Check the route descriptor before using typed questions, abstention, scores, or multimodal fields. The library preserves each model's option order and output meaning. Any truncation follows the model protocol and is reported in the result.
 

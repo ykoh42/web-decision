@@ -7,6 +7,7 @@ import {loadExperimentalDeberta} from './deberta/loader.mjs';
 import {loadExperimentalStrandsFromSource} from './strands/loader.mjs';
 import {loadExperimentalStrandsGemma4FromSource} from './strands/gemma4-e2b-loader.mjs';
 import {selectModelRegistration} from './model-family.js';
+import {describeStableModel, normalizeStableModelOptions} from './stable-models.js';
 import {loadKevDecisionModel} from './kev-loader.js';
 import {loadExperimentalMapika} from './mapika/loader.js';
 import {loadExperimentalMapikaQ4} from './mapika-q4/loader.js';
@@ -35,6 +36,7 @@ import {loadCrivoModel} from './crivo/loader.mjs';
 
 export {WebDecisionError};
 export {describeModel, isDecisionModel, listDecisionModels} from './model-registry.js';
+export {describeStableModel, isStableModelId, listStableModelIds} from './stable-models.js';
 
 function loadRegisteredModel(family, options, description) {
   const runtimeBindings = {Tokenizer, instantiate, createPolyfillWASI};
@@ -95,16 +97,42 @@ function loadRegisteredModel(family, options, description) {
   return load();
 }
 
-/** Load a pinned experimental model from its matching model asset directory. */
+/** Load a registered decision model, or a stable public ID with model-specific options. */
 export async function loadDecisionModel(options) {
-  const {family, description} = selectModelRegistration(options);
-  if (family !== 'deberta' && options?.debertaReadback !== undefined)
+  if (typeof options === 'string')
+    throw new WebDecisionError('INVALID_INPUT', 'Pass a stable ID as the modelId property.');
+  const stableRequest =
+    options && typeof options === 'object' && 'modelId' in options ? normalizeStableModelOptions(options) : undefined;
+  const loadOptions = stableRequest?.options ?? options;
+  const {family, description} = selectModelRegistration(loadOptions);
+  const debertaReadback = loadOptions && Object.getOwnPropertyDescriptor(loadOptions, 'debertaReadback');
+  if (
+    family !== 'deberta' &&
+    debertaReadback &&
+    (!Object.hasOwn(debertaReadback, 'value') || debertaReadback.value !== undefined)
+  )
     throw new WebDecisionError('INVALID_INPUT', 'debertaReadback is only supported by the DeBERTa model.');
-  const model = await loadRegisteredModel(family, options, description);
-  // Expose the exact immutable registration used for routing without changing
-  // enumerable session internals or replacing any model-specific methods.
-  Object.defineProperty(model, 'description', {value: description});
-  return model;
+  const model = await loadRegisteredModel(family, loadOptions, description);
+  try {
+    if (stableRequest?.modelId.startsWith('tamev-')) {
+      const descriptor = Object.getOwnPropertyDescriptor(model, 'systemOne');
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function')
+        throw new WebDecisionError('MODEL_LOAD_FAILED', 'Stable TAMEV model has no System One method.');
+      const systemOne = descriptor.value.bind(model);
+      Object.defineProperty(model, 'systemOne', {
+        ...descriptor,
+        value: async (...args) => ({...(await systemOne(...args)), model: stableRequest.modelId})
+      });
+    }
+    // Keep route IDs internal to dispatch and expose the stable ID to callers.
+    Object.defineProperty(model, 'description', {
+      value: stableRequest ? describeStableModel(stableRequest.modelId) : description
+    });
+    return model;
+  } catch (error) {
+    await Promise.allSettled([Promise.resolve().then(() => model.dispose?.())]);
+    throw error;
+  }
 }
 
 /** Delete only model assets cached by this library for the current origin. */

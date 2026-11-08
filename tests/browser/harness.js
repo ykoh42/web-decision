@@ -1,8 +1,11 @@
 import {
   clearModelCache,
   describeModel,
+  describeStableModel,
   isDecisionModel,
+  isStableModelId,
   listDecisionModels,
+  listStableModelIds,
   loadDecisionModel,
   WebDecisionError
 } from 'web-decision';
@@ -10,8 +13,11 @@ import {
 window.webDecision = {
   clearModelCache,
   describeModel,
+  describeStableModel,
   isDecisionModel,
+  isStableModelId,
   listDecisionModels,
+  listStableModelIds,
   loadDecisionModel,
   WebDecisionError
 };
