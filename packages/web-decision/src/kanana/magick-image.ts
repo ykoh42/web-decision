@@ -12,27 +12,32 @@ const PILLOW_MAX_IMAGE_PIXELS = 89_478_485n;
 const PILLOW_ERROR_IMAGE_PIXELS = PILLOW_MAX_IMAGE_PIXELS * 2n;
 const RGB_CHANNELS = 3;
 const FORMAT_NAMES = 'BMP, GIF, WebP, TIFF, and CMYK JPEG';
+type ImageFormat = 'bmp' | 'gif' | 'jpeg' | 'pfm' | 'png' | 'pnm' | 'tiff' | 'webp' | null;
+type DecodedImageFormat = 'bmp' | 'gif' | 'jpeg' | 'tiff' | 'webp';
+type MagickModule = typeof import('@imagemagick/magick-wasm');
+type MagickWasm = URL | ByteArray | WebAssembly.Module;
+type DecodedImage = {rgb: Uint8Array; width: number; height: number};
 
-let runtimePromise;
+let runtimePromise: Promise<MagickModule> | undefined;
 
-function bytesOf(value) {
+function bytesOf(value: unknown): Uint8Array {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   throw new TypeError('Kanana Magick decoding requires encoded image bytes.');
 }
 
-function startsWith(bytes, signature) {
+function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
   return signature.every((value, index) => bytes[index] === value);
 }
 
-function hasAscii(bytes, offset, value) {
+function hasAscii(bytes: Uint8Array, offset: number, value: string): boolean {
   for (let index = 0; index < value.length; index++) {
     if (bytes[offset + index] !== value.charCodeAt(index)) return false;
   }
   return true;
 }
 
-function imageFormat(bytes) {
+function imageFormat(bytes: Uint8Array): ImageFormat {
   if (startsWith(bytes, PNG_SIGNATURE)) return 'png';
   if (startsWith(bytes, JPEG_SIGNATURE)) return 'jpeg';
   if (startsWith(bytes, BMP_SIGNATURE)) return 'bmp';
@@ -40,11 +45,11 @@ function imageFormat(bytes) {
   if (hasAscii(bytes, 0, 'RIFF') && hasAscii(bytes, 8, 'WEBP')) return 'webp';
   if (TIFF_SIGNATURES.some((signature) => startsWith(bytes, signature))) return 'tiff';
   if (hasAscii(bytes, 0, 'Pf') || hasAscii(bytes, 0, 'PF')) return 'pfm';
-  if (bytes[0] === 80 && bytes[1] >= 49 && bytes[1] <= 54) return 'pnm';
+  if (bytes[0] === 80 && bytes[1]! >= 49 && bytes[1]! <= 54) return 'pnm';
   return null;
 }
 
-function assertFormatSupported(format) {
+function assertFormatSupported(format: ImageFormat): asserts format is DecodedImageFormat {
   if (format === 'png') {
     throw new TypeError('Kanana PNG input must use the existing Pillow-compatible PNG decoder.');
   }
@@ -56,12 +61,12 @@ function assertFormatSupported(format) {
   }
 }
 
-async function defaultWasmUrl() {
+async function defaultWasmUrl(): Promise<URL> {
   const asset = await import('@imagemagick/magick-wasm/magick.wasm?url');
   return new URL(asset.default, import.meta.url);
 }
 
-async function magickRuntime(wasm) {
+async function magickRuntime(wasm: MagickWasm | undefined): Promise<MagickModule> {
   if (!runtimePromise) {
     runtimePromise = (async () => {
       const magick = await import('@imagemagick/magick-wasm');
@@ -75,7 +80,7 @@ async function magickRuntime(wasm) {
   return runtimePromise;
 }
 
-function checkPillowPixelLimit(width, height) {
+function checkPillowPixelLimit(width: number, height: number): void {
   const pixels = BigInt(width) * BigInt(height);
   if (pixels > PILLOW_ERROR_IMAGE_PIXELS) {
     throw new RangeError(
@@ -92,7 +97,7 @@ function checkPillowPixelLimit(width, height) {
   }
 }
 
-function assertSupportedMode(image, format, magick) {
+function assertSupportedMode(image: IMagickImage, format: DecodedImageFormat, magick: MagickModule): void {
   if (image.depth > 8) {
     throw new TypeError('Kanana Magick decoding only preserves tested 8-bit Pillow image modes.');
   }
@@ -108,7 +113,7 @@ function assertSupportedMode(image, format, magick) {
   }
 }
 
-function rgbPixels(image, format, magick) {
+function rgbPixels(image: IMagickImage, format: DecodedImageFormat, magick: MagickModule): DecodedImage {
   if (format === 'tiff') image.autoOrient();
 
   if (image.hasAlpha && image.colorType === magick.ColorType.TrueColorAlpha) {
@@ -126,7 +131,10 @@ function rgbPixels(image, format, magick) {
 }
 
 /** Decode supported encoded bytes while retaining tested Pillow 12.1.1 RGB semantics. */
-export async function decodeKananaMagickImage(source, options = {}) {
+export async function decodeKananaMagickImage(
+  source: unknown,
+  options: {signal?: AbortSignal | undefined; wasm?: MagickWasm | undefined} = {}
+): Promise<DecodedImage> {
   const signal = options.signal;
   signal?.throwIfAborted();
 
@@ -154,3 +162,4 @@ export async function decodeKananaMagickImage(source, options = {}) {
   signal?.throwIfAborted();
   return result;
 }
+import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';

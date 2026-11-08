@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
-import {decodeKananaImageSource} from '../src/kanana/browser-image.mjs';
-import {decodeKananaMagickImage} from '../src/kanana/magick-image.mjs';
+import {browserImage, magickImage} from './kanana-core-modules.mjs';
+
+const {decodeKananaImageSource} = browserImage;
+const {decodeKananaMagickImage} = magickImage;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 const wasmPath = fileURLToPath(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'));

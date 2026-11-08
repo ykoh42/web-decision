@@ -1,0 +1,10 @@
+{
+  "groups": [
+    {
+      "name": "all source files",
+      "prefixes": [""],
+      "lines": 85,
+      "branches": 80
+    }
+  ]
+}

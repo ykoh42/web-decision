@@ -10,7 +10,18 @@ const TEMPORAL_PATCH_SIZE = 2;
 const PILLOW_PRECISION = 1 << 22;
 const PATCH_VALUES = 3 * TEMPORAL_PATCH_SIZE * PATCH_SIZE ** 2;
 
-function assertImage(rgb, width, height) {
+type ResizeWeight = [index: number, weight: number];
+type ResizeWeights = ResizeWeight[][];
+type ImageGrid = [number, number, number];
+type PreprocessedKananaImage = {
+  imageTokenThw: ImageGrid;
+  pixelValues: Float32Array;
+  visionGridThw: ImageGrid;
+  width: number;
+  height: number;
+};
+
+function assertImage(rgb: Uint8Array, width: number, height: number): void {
   if (!(rgb instanceof Uint8Array)) throw new TypeError('RGB pixels must be a Uint8Array');
   if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1)
     throw new RangeError('image dimensions must be positive safe integers');
@@ -19,7 +30,7 @@ function assertImage(rgb, width, height) {
     throw new RangeError('RGB pixel length must match the image dimensions');
 }
 
-function roundToEvenMultiple(value, factor) {
+function roundToEvenMultiple(value: number, factor: number): number {
   const lower = Math.floor(value / factor);
   const remainder = value - lower * factor;
   const doubled = remainder * 2;
@@ -28,7 +39,13 @@ function roundToEvenMultiple(value, factor) {
   return (lower % 2 === 0 ? lower : lower + 1) * factor;
 }
 
-export function smartResize(height, width, minPixels, maxPixels, factor = PIXEL_FACTOR) {
+export function smartResize(
+  height: number,
+  width: number,
+  minPixels: number,
+  maxPixels: number,
+  factor = PIXEL_FACTOR
+): [number, number] {
   if (
     ![height, width, minPixels, maxPixels, factor].every(Number.isSafeInteger) ||
     height < 1 ||
@@ -55,24 +72,25 @@ export function smartResize(height, width, minPixels, maxPixels, factor = PIXEL_
   return [resizedHeight, resizedWidth];
 }
 
-function cubicPillow(value) {
+function cubicPillow(value: number): number {
   const distance = Math.abs(value);
   if (distance < 1) return (1.5 * distance - 2.5) * distance * distance + 1;
   if (distance < 2) return ((-0.5 * distance + 2.5) * distance - 4) * distance + 2;
   return 0;
 }
 
-function pillowWeights(inputSize, outputSize) {
+function pillowWeights(inputSize: number, outputSize: number): ResizeWeights {
   const scale = inputSize / outputSize;
   const filterScale = Math.max(scale, 1);
   const support = 2 * filterScale;
-  const rows = new Array(outputSize);
+  const rows: ResizeWeights = [];
+  rows.length = outputSize;
 
   for (let output = 0; output < outputSize; output++) {
     const center = (output + 0.5) * scale;
     const first = Math.max(0, Math.floor(center - support + 0.5));
     const end = Math.min(inputSize, Math.floor(center + support + 0.5));
-    const row = [];
+    const row: ResizeWeight[] = [];
     let total = 0;
 
     for (let input = first; input < end; input++) {
@@ -81,51 +99,92 @@ function pillowWeights(inputSize, outputSize) {
       total += weight;
     }
 
-    rows[output] = row.map(([input, weight]) => [input, Math.round((weight / total) * PILLOW_PRECISION)]);
+    rows[output] = row.map<ResizeWeight>(([input, weight]) => [input, Math.round((weight / total) * PILLOW_PRECISION)]);
   }
 
   return rows;
 }
 
-function clampByte(value) {
+function clampByte(value: number): number {
   return Math.max(0, Math.min(255, value));
 }
 
-function sumPillowHorizontal(input, inputWidth, line, channel, weights) {
+function sumPillowHorizontal(
+  input: Uint8Array,
+  inputWidth: number,
+  line: number,
+  channel: number,
+  weights: ResizeWeight[]
+): number {
   let sum = 0;
-  for (const [source, weight] of weights) sum += input[(line * inputWidth + source) * 3 + channel] * weight;
+  for (const [source, weight] of weights) sum += input[(line * inputWidth + source) * 3 + channel]! * weight;
   return sum;
 }
 
-function sumPillowVertical(input, inputWidth, line, channel, weights) {
+function sumPillowVertical(
+  input: Uint8Array,
+  inputWidth: number,
+  line: number,
+  channel: number,
+  weights: ResizeWeight[]
+): number {
   let sum = 0;
-  for (const [source, weight] of weights) sum += input[(source * inputWidth + line) * 3 + channel] * weight;
+  for (const [source, weight] of weights) sum += input[(source * inputWidth + line) * 3 + channel]! * weight;
   return sum;
 }
 
-function storePillowByte(output, outputWidth, x, y, channel, sum) {
+function storePillowByte(
+  output: Uint8Array,
+  outputWidth: number,
+  x: number,
+  y: number,
+  channel: number,
+  sum: number
+): void {
   output[(y * outputWidth + x) * 3 + channel] = clampByte(Math.floor((sum + PILLOW_PRECISION / 2) / PILLOW_PRECISION));
 }
 
-function resizePillowHorizontalLine(input, output, rows, width, outputWidth, line) {
+function resizePillowHorizontalLine(
+  input: Uint8Array,
+  output: Uint8Array,
+  rows: ResizeWeights,
+  width: number,
+  outputWidth: number,
+  line: number
+): void {
   for (let x = 0; x < outputWidth; x++) {
     for (let channel = 0; channel < 3; channel++) {
-      const sum = sumPillowHorizontal(input, width, line, channel, rows[x]);
+      const sum = sumPillowHorizontal(input, width, line, channel, rows[x]!);
       storePillowByte(output, outputWidth, x, line, channel, sum);
     }
   }
 }
 
-function resizePillowVerticalLine(input, output, rows, width, outputWidth, outputHeight, line) {
+function resizePillowVerticalLine(
+  input: Uint8Array,
+  output: Uint8Array,
+  rows: ResizeWeights,
+  width: number,
+  outputWidth: number,
+  outputHeight: number,
+  line: number
+): void {
   for (let y = 0; y < outputHeight; y++) {
     for (let channel = 0; channel < 3; channel++) {
-      const sum = sumPillowVertical(input, width, line, channel, rows[y]);
+      const sum = sumPillowVertical(input, width, line, channel, rows[y]!);
       storePillowByte(output, outputWidth, line, y, channel, sum);
     }
   }
 }
 
-function resizePillowAxis(input, inputWidth, inputHeight, outputWidth, outputHeight, horizontal) {
+function resizePillowAxis(
+  input: Uint8Array,
+  inputWidth: number,
+  inputHeight: number,
+  outputWidth: number,
+  outputHeight: number,
+  horizontal: boolean
+): Uint8Array {
   const inputSize = horizontal ? inputWidth : inputHeight;
   const outputSize = horizontal ? outputWidth : outputHeight;
   const rows = pillowWeights(inputSize, outputSize);
@@ -142,7 +201,13 @@ function resizePillowAxis(input, inputWidth, inputHeight, outputWidth, outputHei
   return output;
 }
 
-export function resizePillowBicubic(rgb, width, height, outputWidth, outputHeight) {
+export function resizePillowBicubic(
+  rgb: Uint8Array,
+  width: number,
+  height: number,
+  outputWidth: number,
+  outputHeight: number
+): Uint8Array {
   assertImage(rgb, width, height);
   if (!Number.isSafeInteger(outputWidth) || outputWidth < 1 || !Number.isSafeInteger(outputHeight) || outputHeight < 1)
     throw new RangeError('resize target dimensions must be positive safe integers');
@@ -152,7 +217,7 @@ export function resizePillowBicubic(rgb, width, height, outputWidth, outputHeigh
   return resizePillowAxis(horizontal, outputWidth, height, outputWidth, outputHeight, false);
 }
 
-function cubicTorchvision(value) {
+function cubicTorchvision(value: number): number {
   const distance = Math.abs(value);
   const coefficient = -0.5;
   if (distance < 1) return ((coefficient + 2) * distance - (coefficient + 3)) * distance * distance + 1;
@@ -161,15 +226,16 @@ function cubicTorchvision(value) {
   return 0;
 }
 
-function torchvisionUpscaleWeights(inputSize, outputSize) {
+function torchvisionUpscaleWeights(inputSize: number, outputSize: number): ResizeWeights {
   const scale = inputSize / outputSize;
-  const rows = new Array(outputSize);
+  const rows: ResizeWeights = [];
+  rows.length = outputSize;
 
   for (let output = 0; output < outputSize; output++) {
     const center = scale * (output + 0.5);
     const first = Math.max(Math.trunc(center - 2 + 0.5), 0);
     const end = Math.min(Math.trunc(center + 2 + 0.5), inputSize);
-    const row = [];
+    const row: ResizeWeight[] = [];
     let total = 0;
 
     for (let input = first; input < end; input++) {
@@ -178,13 +244,13 @@ function torchvisionUpscaleWeights(inputSize, outputSize) {
       total += weight;
     }
 
-    rows[output] = row.map(([input, weight]) => [input, weight / total]);
+    rows[output] = row.map<ResizeWeight>(([input, weight]) => [input, weight / total]);
   }
 
   return rows;
 }
 
-function quantizeWeights(rows) {
+function quantizeWeights(rows: ResizeWeights): {precision: number; rows: ResizeWeights} {
   let maximum = 0;
   for (const row of rows) {
     for (const [, weight] of row) maximum = Math.max(maximum, weight);
@@ -196,50 +262,94 @@ function quantizeWeights(rows) {
   return {
     precision,
     rows: rows.map((row) =>
-      row.map(([index, weight]) => [index, Math.trunc(weight * scale + Math.sign(weight * scale) * 0.5)])
+      row.map<ResizeWeight>(([index, weight]) => [index, Math.trunc(weight * scale + Math.sign(weight * scale) * 0.5)])
     )
   };
 }
 
-function roundedShift(value, precision) {
+function roundedShift(value: number, precision: number): number {
   return Math.floor((value + 2 ** (precision - 1)) / 2 ** precision);
 }
 
-function sumTorchvisionHorizontal(input, inputWidth, line, channel, weights) {
+function sumTorchvisionHorizontal(
+  input: Uint8Array,
+  inputWidth: number,
+  line: number,
+  channel: number,
+  weights: ResizeWeight[]
+): number {
   let sum = 0;
-  for (const [source, weight] of weights) sum += input[(line * inputWidth + source) * 3 + channel] * weight;
+  for (const [source, weight] of weights) sum += input[(line * inputWidth + source) * 3 + channel]! * weight;
   return sum;
 }
 
-function sumTorchvisionVertical(input, inputWidth, line, channel, weights) {
+function sumTorchvisionVertical(
+  input: Uint8Array,
+  inputWidth: number,
+  line: number,
+  channel: number,
+  weights: ResizeWeight[]
+): number {
   let sum = 0;
-  for (const [source, weight] of weights) sum += input[(source * inputWidth + line) * 3 + channel] * weight;
+  for (const [source, weight] of weights) sum += input[(source * inputWidth + line) * 3 + channel]! * weight;
   return sum;
 }
 
-function storeTorchvisionByte(output, outputWidth, x, y, channel, sum, precision) {
+function storeTorchvisionByte(
+  output: Uint8Array,
+  outputWidth: number,
+  x: number,
+  y: number,
+  channel: number,
+  sum: number,
+  precision: number
+): void {
   output[(y * outputWidth + x) * 3 + channel] = clampByte(roundedShift(sum, precision));
 }
 
-function resizeTorchvisionHorizontalLine(input, output, rows, precision, width, outputWidth, line) {
+function resizeTorchvisionHorizontalLine(
+  input: Uint8Array,
+  output: Uint8Array,
+  rows: ResizeWeights,
+  precision: number,
+  width: number,
+  outputWidth: number,
+  line: number
+): void {
   for (let x = 0; x < outputWidth; x++) {
     for (let channel = 0; channel < 3; channel++) {
-      const sum = sumTorchvisionHorizontal(input, width, line, channel, rows[x]);
+      const sum = sumTorchvisionHorizontal(input, width, line, channel, rows[x]!);
       storeTorchvisionByte(output, outputWidth, x, line, channel, sum, precision);
     }
   }
 }
 
-function resizeTorchvisionVerticalLine(input, output, rows, precision, width, outputWidth, outputHeight, line) {
+function resizeTorchvisionVerticalLine(
+  input: Uint8Array,
+  output: Uint8Array,
+  rows: ResizeWeights,
+  precision: number,
+  width: number,
+  outputWidth: number,
+  outputHeight: number,
+  line: number
+): void {
   for (let y = 0; y < outputHeight; y++) {
     for (let channel = 0; channel < 3; channel++) {
-      const sum = sumTorchvisionVertical(input, width, line, channel, rows[y]);
+      const sum = sumTorchvisionVertical(input, width, line, channel, rows[y]!);
       storeTorchvisionByte(output, outputWidth, line, y, channel, sum, precision);
     }
   }
 }
 
-function resizeTorchvisionAxis(input, inputWidth, inputHeight, outputWidth, outputHeight, horizontal) {
+function resizeTorchvisionAxis(
+  input: Uint8Array,
+  inputWidth: number,
+  inputHeight: number,
+  outputWidth: number,
+  outputHeight: number,
+  horizontal: boolean
+): Uint8Array {
   const inputSize = horizontal ? inputWidth : inputHeight;
   const outputSize = horizontal ? outputWidth : outputHeight;
   const weights = quantizeWeights(torchvisionUpscaleWeights(inputSize, outputSize));
@@ -265,7 +375,13 @@ function resizeTorchvisionAxis(input, inputWidth, inputHeight, outputWidth, outp
   return output;
 }
 
-export function resizeTorchvisionBicubicAntialias(rgb, width, height, outputWidth, outputHeight) {
+export function resizeTorchvisionBicubicAntialias(
+  rgb: Uint8Array,
+  width: number,
+  height: number,
+  outputWidth: number,
+  outputHeight: number
+): Uint8Array {
   assertImage(rgb, width, height);
   if (
     !Number.isSafeInteger(outputWidth) ||
@@ -280,7 +396,7 @@ export function resizeTorchvisionBicubicAntialias(rgb, width, height, outputWidt
   return resizeTorchvisionAxis(horizontal, outputWidth, height, outputWidth, outputHeight, false);
 }
 
-function normalizeByte(value) {
+function normalizeByte(value: number): number {
   const rescaled = Math.fround(value * (1 / 255));
   const centered = Math.fround(rescaled - 0.5);
   return Math.fround(centered / 0.5);
@@ -288,15 +404,30 @@ function normalizeByte(value) {
 
 const NORMALIZED_BYTE = Float32Array.from({length: 256}, (_, value) => normalizeByte(value));
 
-function copyPatchPlane(pixelValues, rgb, width, patchX, patchY, channel, offset) {
+function copyPatchPlane(
+  pixelValues: Float32Array,
+  rgb: Uint8Array,
+  width: number,
+  patchX: number,
+  patchY: number,
+  channel: number,
+  offset: number
+): number {
   for (let y = 0; y < PATCH_SIZE; y++) {
     const rowOffset = ((patchY + y) * width + patchX) * 3 + channel;
-    for (let x = 0; x < PATCH_SIZE; x++) pixelValues[offset++] = NORMALIZED_BYTE[rgb[rowOffset + x * 3]];
+    for (let x = 0; x < PATCH_SIZE; x++) pixelValues[offset++] = NORMALIZED_BYTE[rgb[rowOffset + x * 3]!]!;
   }
   return offset;
 }
 
-function writePatch(pixelValues, rgb, width, patchX, patchY, patch) {
+function writePatch(
+  pixelValues: Float32Array,
+  rgb: Uint8Array,
+  width: number,
+  patchX: number,
+  patchY: number,
+  patch: number
+): void {
   let offset = patch * PATCH_VALUES;
   for (let channel = 0; channel < 3; channel++) {
     for (let temporal = 0; temporal < TEMPORAL_PATCH_SIZE; temporal++)
@@ -304,7 +435,7 @@ function writePatch(pixelValues, rgb, width, patchX, patchY, patch) {
   }
 }
 
-export function packKananaImagePatches(rgb, width, height) {
+export function packKananaImagePatches(rgb: Uint8Array, width: number, height: number): Float32Array {
   assertImage(rgb, width, height);
   if (height % PIXEL_FACTOR !== 0 || width % PIXEL_FACTOR !== 0)
     throw new RangeError('Kanana image dimensions must be multiples of 32');
@@ -333,7 +464,7 @@ export function packKananaImagePatches(rgb, width, height) {
   return pixelValues;
 }
 
-export function preprocessKananaImage(rgb, width, height) {
+export function preprocessKananaImage(rgb: Uint8Array, width: number, height: number): PreprocessedKananaImage {
   assertImage(rgb, width, height);
 
   const [loadHeight, loadWidth] = smartResize(height, width, LOAD_MIN_PIXELS, LOAD_MAX_PIXELS);
@@ -345,8 +476,8 @@ export function preprocessKananaImage(rgb, width, height) {
 
   const gridHeight = imageHeight / PATCH_SIZE;
   const gridWidth = imageWidth / PATCH_SIZE;
-  const visionGridThw = [1, gridHeight, gridWidth];
-  const imageTokenThw = [1, gridHeight / MERGE_SIZE, gridWidth / MERGE_SIZE];
+  const visionGridThw: ImageGrid = [1, gridHeight, gridWidth];
+  const imageTokenThw: ImageGrid = [1, gridHeight / MERGE_SIZE, gridWidth / MERGE_SIZE];
 
   return {
     imageTokenThw,

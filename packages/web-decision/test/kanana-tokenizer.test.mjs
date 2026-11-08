@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {encodeKananaQuery} from '../src/kanana/tokenizer.mjs';
-import {preprocessKananaImage} from '../src/kanana/image-processing.mjs';
+import {imageProcessing, tokenizer} from './kanana-core-modules.mjs';
+
+const {encodeKananaQuery} = tokenizer;
+const {preprocessKananaImage} = imageProcessing;
 
 const imageMarker = '<|vision_start|><|image_pad|><|vision_end|>';
 const generationPrompt = '<|im_start|>assistant\n<think>\n\n</think>\n\n';

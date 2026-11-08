@@ -1,16 +1,22 @@
-import {decodeKananaEncodedImageSource} from './encoded-image.mjs';
+import {decodeKananaEncodedImageSource} from './encoded-image.js';
 
-const DECODED_IMAGE_GLOBALS = ['ImageBitmap', 'HTMLCanvasElement', 'OffscreenCanvas'];
+export type KananaImageDecodeOptions = {
+  signal?: AbortSignal;
+  fetch?: typeof fetch;
+  magickWasm?: URL | Int8Array | Uint8Array | Uint8ClampedArray | WebAssembly.Module;
+};
 
-function isDecodedImageSource(value) {
+const DECODED_IMAGE_GLOBALS = ['ImageBitmap', 'HTMLCanvasElement', 'OffscreenCanvas'] as const;
+
+function isDecodedImageSource(value: unknown): boolean {
   return DECODED_IMAGE_GLOBALS.some((name) => {
-    const ImageSource = globalThis[name];
+    const ImageSource = Reflect.get(globalThis, name) as (abstract new (...args: never[]) => object) | undefined;
     return typeof ImageSource === 'function' && value instanceof ImageSource;
   });
 }
 
 /** Decode original encoded bytes to row-major RGB while preserving Pillow source-mode semantics. */
-export async function decodeKananaImageSource(source, options = {}) {
+export async function decodeKananaImageSource(source: unknown, options: KananaImageDecodeOptions = {}) {
   const signal = options.signal;
   signal?.throwIfAborted();
 

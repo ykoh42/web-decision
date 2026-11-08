@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.kanana-runtime.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "checkJs": false,
+    "rootDir": "src/kanana",
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "src/kanana/tvm-runtime.ts",
+    "src/kanana/protocol.ts",
+    "src/kanana/scoring.ts",
+    "src/kanana/candidates.ts",
+    "src/kanana/chat-template.ts",
+    "src/kanana/tokenizer.ts",
+    "src/kanana/truncation.ts",
+    "src/kanana/browser-image.ts",
+    "src/kanana/encoded-image.ts",
+    "src/kanana/image-processing.ts",
+    "src/kanana/magick-image.ts",
+    "src/kanana/magick-wasm-url.d.ts",
+    "src/kanana/pnm-image.ts",
+    "src/kanana/tiff16-image.ts"
+  ]
+}

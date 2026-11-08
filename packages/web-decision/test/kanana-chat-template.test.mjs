@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {renderKananaChatTemplate} from '../src/kanana/chat-template.mjs';
-import {prepareKananaSystemOne, renderKananaQueryInput, renderKananaQueryMessages} from '../src/kanana/protocol.mjs';
+import {chatTemplate, protocol} from './kanana-core-modules.mjs';
+
+const {renderKananaChatTemplate} = chatTemplate;
+const {prepareKananaSystemOne, renderKananaQueryInput, renderKananaQueryMessages} = protocol;
 
 const queryMessages = (userParts = [{type: 'text', text: 'State:\nhello\n\nTask:\nchoice'}]) => [
   {role: 'system', content: [{type: 'text', text: 'Represent the state for the specified task.'}]},

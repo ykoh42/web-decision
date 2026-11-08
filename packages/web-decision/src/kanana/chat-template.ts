@@ -7,15 +7,15 @@ const stripEnd = new RegExp(`${PYTHON_WHITESPACE}+$`, 'u');
 export const KANANA_IMAGE_MARKER = '<|vision_start|><|image_pad|><|vision_end|>';
 const GENERATION_PROMPT = '<|im_start|>assistant\n<think>\n\n</think>\n\n';
 
-function isRecord(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function pythonStrip(value) {
+export function pythonStrip(value: string): string {
   return value.replace(stripStart, '').replace(stripEnd, '');
 }
 
-function renderPart(part, role) {
+function renderPart(part: unknown, role: 'system' | 'user'): string {
   if (!isRecord(part)) throw new TypeError('Kanana chat content parts must be objects.');
   if (part.type === 'text' && typeof part.text === 'string') return part.text;
   if (part.type === 'image') {
@@ -26,13 +26,13 @@ function renderPart(part, role) {
   throw new TypeError('Kanana query messages support text and image content parts.');
 }
 
-function renderParts(parts, role) {
+function renderParts(parts: unknown, role: 'system' | 'user'): string {
   if (!Array.isArray(parts)) throw new TypeError('Kanana query message content must be an array.');
   return pythonStrip(parts.map((part) => renderPart(part, role)).join(''));
 }
 
 /** Render one system and one user query with the pinned Kanana default generation prompt. */
-export function renderKananaChatTemplate(messages) {
+export function renderKananaChatTemplate(messages: unknown): string {
   if (
     !Array.isArray(messages) ||
     messages.length !== 2 ||
@@ -43,7 +43,11 @@ export function renderKananaChatTemplate(messages) {
   )
     throw new TypeError('Kanana query messages must contain one system message followed by one user message.');
 
-  const system = renderParts(messages[0].content, 'system');
-  const user = renderParts(messages[1].content, 'user');
+  const systemMessage = messages[0];
+  const userMessage = messages[1];
+  if (!isRecord(systemMessage) || !isRecord(userMessage))
+    throw new TypeError('Kanana query messages must contain one system message followed by one user message.');
+  const system = renderParts(systemMessage.content, 'system');
+  const user = renderParts(userMessage.content, 'user');
   return `<|im_start|>system\n${system}<|im_end|>\n<|im_start|>user\n${user}<|im_end|>\n${GENERATION_PROMPT}`;
 }

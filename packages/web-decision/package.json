@@ -114,8 +114,12 @@
   "sideEffects": false,
   "scripts": {
     "build": "vite build --config vite.config.mjs",
-    "test": "node --test test/*.test.mjs",
-    "test:coverage": "c8 --all --src src --include=src/** --exclude=src/*.d.ts --exclude=src/**/*.d.ts --exclude=src/tinydecide/engine.js --exclude=src/tinydecide/corrections.js --check-coverage --lines 85 --branches 80 --reporter=text --reporter=json-summary node --test test/*.test.mjs && node ../../scripts/ci/check-uncovered.mjs",
+    "test": "node ../../scripts/kanana/run-node-tests.mjs",
+    "test:kanana-core": "node ../../scripts/kanana/run-node-tests.mjs --core",
+    "test:kanana-runtime": "pnpm run typecheck:kanana-runtime && node --test test/kanana-tvm-runtime.test.mjs",
+    "typecheck:kanana-core": "tsc --project tsconfig.kanana-core.json",
+    "typecheck:kanana-runtime": "tsc --project tsconfig.kanana-runtime.json",
+    "test:coverage": "c8 --all --src src --include=src/** --exclude-after-remap --exclude=src/*.d.ts --exclude=src/**/*.d.ts --exclude=src/tinydecide/engine.js --exclude=src/tinydecide/corrections.js --check-coverage --lines 85 --branches 80 --reporter=text --reporter=json-summary node ../../scripts/kanana/run-node-tests.mjs && node ../../scripts/ci/check-uncovered.mjs",
     "build:kev-preview": "vite build --config vite.kev-preview.config.mjs",
     "build:tinydecide-preview": "vite build --config vite.tinydecide-preview.config.mjs",
     "build:kev-deberta-preview": "vite build --config vite.kev-deberta-preview.config.mjs",
@@ -130,6 +134,7 @@
     "@jsquash/jpeg": "1.6.0",
     "c8": "12.0.0",
     "fast-png": "8.0.0",
+    "typescript": "7.0.2",
     "vite": "8.3.6"
   },
   "license": "Apache-2.0"

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {decodeKananaPnmImage} from '../src/kanana/pnm-image.mjs';
+import {pnmImage} from './kanana-core-modules.mjs';
+
+const {decodeKananaPnmImage} = pnmImage;
 
 function image(header, rasterHex) {
   return Buffer.concat([Buffer.from(header, 'ascii'), Buffer.from(rasterHex, 'hex')]);

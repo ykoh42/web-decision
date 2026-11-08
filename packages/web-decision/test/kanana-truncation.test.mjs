@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {prepareKananaSystemOne, renderKananaQueryInput} from '../src/kanana/protocol.mjs';
-import {
+import {protocol, tokenizer, truncation} from './kanana-core-modules.mjs';
+
+const {prepareKananaSystemOne, renderKananaQueryInput} = protocol;
+const {
   KANANA_DOCUMENT_INSTRUCTION,
   KANANA_MAX_LENGTH,
   truncateKananaDocument,
   truncateKananaQuery,
   truncateKananaQuestionCandidate
-} from '../src/kanana/truncation.mjs';
-import {encodeKananaQuery} from '../src/kanana/tokenizer.mjs';
+} = truncation;
+const {encodeKananaQuery} = tokenizer;
 
 const IMAGE_TOKEN = '<|image_pad|>';
 const SPECIAL_TOKENS = ['<|im_start|>', '<|im_end|>', '<|vision_start|>', IMAGE_TOKEN, '<|vision_end|>'];
@@ -195,7 +197,14 @@ test('rejects an overlength prompt when pinned truncation is disabled', () => {
   const overhead = fit(empty, tokenizer).tokenCount;
   const input = queryInput({state: 'x'.repeat(KANANA_MAX_LENGTH - overhead + 1)});
 
-  assert.throws(() => fit(input, tokenizer, [], {truncateInputs: false}), {code: 'input_too_long'});
+  assert.throws(
+    () => fit(input, tokenizer, [], {truncateInputs: false}),
+    (error) => {
+      assert.deepEqual(Object.keys(error), ['name', 'code', 'maxLength', 'tokenCount']);
+      assert.equal(error.code, 'input_too_long');
+      return true;
+    }
+  );
 });
 
 test('preserves every expanded image token while trimming state text', () => {

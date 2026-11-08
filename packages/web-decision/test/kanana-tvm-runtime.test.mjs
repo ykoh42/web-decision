@@ -1,6 +1,42 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import {setupKananaTvmRuntime} from '../src/kanana/tvm-runtime.mjs';
+import {execFileSync} from 'node:child_process';
+import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import {dirname, join} from 'node:path';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import test, {after} from 'node:test';
+
+const require = createRequire(import.meta.url);
+const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc');
+const packageRoot = fileURLToPath(new URL('..', import.meta.url));
+const coverageDirectory = join(packageRoot, 'coverage');
+await mkdir(coverageDirectory, {recursive: true});
+const outputDirectory = await mkdtemp(join(coverageDirectory, 'kanana-tvm-'));
+await writeFile(join(outputDirectory, 'package.json'), '{"type":"module"}\n');
+
+try {
+  execFileSync(
+    process.execPath,
+    [
+      compiler,
+      '--project',
+      join(packageRoot, 'tsconfig.kanana-runtime.json'),
+      '--noEmit',
+      'false',
+      '--sourceMap',
+      '--outDir',
+      outputDirectory
+    ],
+    {cwd: packageRoot, stdio: 'inherit'}
+  );
+} catch (error) {
+  await rm(outputDirectory, {recursive: true, force: true});
+  throw error;
+}
+
+const runtimeModule = await import(pathToFileURL(join(outputDirectory, 'tvm-runtime.js')).href);
+const {setupKananaTvmRuntime} = runtimeModule;
+after(() => rm(outputDirectory, {recursive: true, force: true}));
 
 // These mocks test lifecycle ordering only. They do not emulate or validate WebGPU.
 function mockRuntime(events, overrides = {}) {

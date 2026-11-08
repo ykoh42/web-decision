@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {prepareKananaSystemOne} from '../src/kanana/protocol.mjs';
-import {KANANA_DOCUMENT_INSTRUCTION, KANANA_MAX_LENGTH} from '../src/kanana/truncation.mjs';
-import {prepareKananaCandidates, truncateKananaQueryWithCandidateFallback} from '../src/kanana/candidates.mjs';
-import {renderKananaChatTemplate} from '../src/kanana/chat-template.mjs';
+import {candidates, chatTemplate, protocol, truncation} from './kanana-core-modules.mjs';
+
+const {prepareKananaSystemOne} = protocol;
+const {KANANA_DOCUMENT_INSTRUCTION, KANANA_MAX_LENGTH} = truncation;
+const {prepareKananaCandidates, truncateKananaQueryWithCandidateFallback} = candidates;
+const {renderKananaChatTemplate} = chatTemplate;
 
 const SPECIAL_TOKENS = ['<|im_start|>', '<|im_end|>', '<|vision_start|>', '<|image_pad|>', '<|vision_end|>'];
 const CHAR_ID_OFFSET = 0x110000;

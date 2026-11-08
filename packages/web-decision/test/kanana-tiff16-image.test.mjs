@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
-import {decodeKananaTiff16Image} from '../src/kanana/tiff16-image.mjs';
+import {tiff16Image} from './kanana-core-modules.mjs';
+
+const {decodeKananaTiff16Image} = tiff16Image;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 
@@ -39,6 +41,16 @@ async function assertFixture(name, width = 4, height = 2) {
 test('16-bit grayscale conversion matches Pillow around byte boundaries', async () => {
   await assertFixture('gray-16bit-le');
   await assertFixture('gray-16bit-be-deflate');
+});
+
+test('preserves iterable byte inputs accepted by the Uint8Array constructor', async () => {
+  const encoded = await fixture('gray-16bit-le.tif');
+  const expected = await fixture('gray-16bit-le.rgb');
+  const image = await decodeKananaTiff16Image(encoded.values());
+
+  assert.equal(image.width, 4);
+  assert.equal(image.height, 2);
+  assert.deepEqual(Buffer.from(image.rgb), Buffer.from(expected));
 });
 
 test('16-bit grayscale LZW decodes across TIFF code-width changes', async () => {

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {KANANA_DECISION_TEMPERATURE, KANANA_DEFAULT_TEMPERATURE, scaleKananaLogits} from '../src/kanana/scoring.mjs';
+import {scoring} from './kanana-core-modules.mjs';
+
+const {KANANA_DECISION_TEMPERATURE, KANANA_DEFAULT_TEMPERATURE, scaleKananaLogits} = scoring;
 
 test('uses the pinned decision temperature and upstream request default', () => {
   const similarities = [0.123456789, -0.5, 0];

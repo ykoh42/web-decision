@@ -4,7 +4,9 @@ import {readFile} from 'node:fs/promises';
 import {test, before} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {init as initJpeg} from '@jsquash/jpeg/decode.js';
-import {decodeKananaEncodedImageSource, preflightKananaImageHeader} from '../src/kanana/encoded-image.mjs';
+import {encodedImage} from './kanana-core-modules.mjs';
+
+const {decodeKananaEncodedImageSource, preflightKananaImageHeader} = encodedImage;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 const require = createRequire(import.meta.url);

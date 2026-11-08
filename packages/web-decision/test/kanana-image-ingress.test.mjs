@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {File} from 'node:buffer';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
-import {decodeKananaImageSource} from '../src/kanana/browser-image.mjs';
+import {browserImage} from './kanana-core-modules.mjs';
+
+const {decodeKananaImageSource} = browserImage;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 

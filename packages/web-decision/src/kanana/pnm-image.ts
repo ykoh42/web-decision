@@ -3,15 +3,25 @@ const PILLOW_MAX_IMAGE_PIXELS = 89_478_485n;
 const PILLOW_ERROR_IMAGE_PIXELS = PILLOW_MAX_IMAGE_PIXELS * 2n;
 const WHITESPACE = new Set([0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20]);
 const ASCII_DECODER = new TextDecoder('utf-8', {fatal: true});
+const PNM_MAGICS = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'Pf'] as const;
 
-function asBytes(input) {
+type PnmMagic = (typeof PNM_MAGICS)[number];
+type PnmCursor = {offset: number};
+type PnmSize = {width: number; height: number; pixels: number; rgbLength: number};
+type DecodedPnmImage = {rgb: Uint8Array; width: number; height: number};
+
+function isPnmMagic(value: string): value is PnmMagic {
+  return PNM_MAGICS.includes(value as PnmMagic);
+}
+
+function asBytes(input: unknown): Uint8Array {
   if (input instanceof Uint8Array) return input;
   if (input instanceof ArrayBuffer) return new Uint8Array(input);
   if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   throw new TypeError('PNM input must be bytes.');
 }
 
-function skipComment(bytes, cursor) {
+function skipComment(bytes: Uint8Array, cursor: PnmCursor): void {
   while (cursor.offset < bytes.length && bytes[cursor.offset] !== 0x0a && bytes[cursor.offset] !== 0x0d)
     cursor.offset++;
   if (cursor.offset === bytes.length) throw new TypeError('PNM comment has no line ending.');
@@ -19,19 +29,19 @@ function skipComment(bytes, cursor) {
   else cursor.offset++;
 }
 
-function skipSeparators(bytes, cursor) {
+function skipSeparators(bytes: Uint8Array, cursor: PnmCursor): void {
   while (cursor.offset < bytes.length) {
-    if (WHITESPACE.has(bytes[cursor.offset])) cursor.offset++;
+    if (WHITESPACE.has(bytes[cursor.offset]!)) cursor.offset++;
     else if (bytes[cursor.offset] === 0x23) skipComment(bytes, cursor);
     else break;
   }
 }
 
-function readToken(bytes, cursor, label) {
+function readToken(bytes: Uint8Array, cursor: PnmCursor, label: string): string {
   skipSeparators(bytes, cursor);
   const start = cursor.offset;
-  while (cursor.offset < bytes.length && !WHITESPACE.has(bytes[cursor.offset]) && bytes[cursor.offset] !== 0x23) {
-    if (bytes[cursor.offset] > 0x7f) throw new TypeError(`PNM ${label} must be ASCII.`);
+  while (cursor.offset < bytes.length && !WHITESPACE.has(bytes[cursor.offset]!) && bytes[cursor.offset] !== 0x23) {
+    if (bytes[cursor.offset]! > 0x7f) throw new TypeError(`PNM ${label} must be ASCII.`);
     cursor.offset++;
   }
   const length = cursor.offset - start;
@@ -39,25 +49,25 @@ function readToken(bytes, cursor, label) {
   return ASCII_DECODER.decode(bytes.subarray(start, cursor.offset));
 }
 
-function consumeRasterDelimiter(bytes, cursor) {
+function consumeRasterDelimiter(bytes: Uint8Array, cursor: PnmCursor): void {
   if (cursor.offset >= bytes.length) throw new TypeError('PNM raster is missing.');
   if (bytes[cursor.offset] === 0x23) {
     skipComment(bytes, cursor);
     return;
   }
-  if (!WHITESPACE.has(bytes[cursor.offset])) throw new TypeError('PNM header has no raster delimiter.');
+  if (!WHITESPACE.has(bytes[cursor.offset]!)) throw new TypeError('PNM header has no raster delimiter.');
   const delimiter = bytes[cursor.offset++];
   if (delimiter === 0x0d && bytes[cursor.offset] === 0x0a) cursor.offset++;
 }
 
-function unsignedInteger(token, label) {
+function unsignedInteger(token: string, label: string): number {
   if (!/^\d+$/.test(token)) throw new TypeError(`PNM ${label} must be an unsigned integer.`);
   const value = Number(token);
   if (!Number.isSafeInteger(value)) throw new RangeError(`PNM ${label} exceeds the safe integer range.`);
   return value;
 }
 
-function checkPillowPixelLimit(pixels) {
+function checkPillowPixelLimit(pixels: bigint): void {
   if (pixels > PILLOW_ERROR_IMAGE_PIXELS) {
     throw new RangeError(
       `Kanana image size (${pixels} pixels) exceeds Pillow 12.1.1's decompression-bomb limit of ${PILLOW_ERROR_IMAGE_PIXELS} pixels.`
@@ -70,7 +80,7 @@ function checkPillowPixelLimit(pixels) {
   }
 }
 
-function imageSize(widthToken, heightToken) {
+function imageSize(widthToken: string, heightToken: string): PnmSize {
   const width = unsignedInteger(widthToken, 'width');
   const height = unsignedInteger(heightToken, 'height');
   if (width < 1 || height < 1) throw new RangeError('PNM dimensions must be positive.');
@@ -84,7 +94,7 @@ function imageSize(widthToken, heightToken) {
   return {width, height, pixels, rgbLength};
 }
 
-function roundToEven(value) {
+function roundToEven(value: number): number {
   const lower = Math.floor(value);
   const fraction = value - lower;
   if (fraction < 0.5) return lower;
@@ -92,11 +102,17 @@ function roundToEven(value) {
   return lower % 2 === 0 ? lower : lower + 1;
 }
 
-function clampByte(value) {
+function clampByte(value: number): number {
   return Math.max(0, Math.min(255, value));
 }
 
-function pnmByte(sample, maxval, grayscale, integerGray, direct16BitGray) {
+function pnmByte(
+  sample: number,
+  maxval: number,
+  grayscale: boolean,
+  integerGray: boolean,
+  direct16BitGray: boolean
+): number {
   if (grayscale && integerGray) {
     const integerValue = direct16BitGray ? sample : roundToEven((sample / maxval) * 65535);
     return clampByte(integerValue);
@@ -104,23 +120,31 @@ function pnmByte(sample, maxval, grayscale, integerGray, direct16BitGray) {
   return clampByte(roundToEven((sample / maxval) * 255));
 }
 
-function writeGray(rgb, pixel, value) {
+function writeGray(rgb: Uint8Array, pixel: number, value: number): void {
   const offset = pixel * RGB_CHANNELS;
   rgb[offset] = value;
   rgb[offset + 1] = value;
   rgb[offset + 2] = value;
 }
 
-function writePnmSample(rgb, sampleIndex, value, grayscale) {
+function writePnmSample(rgb: Uint8Array, sampleIndex: number, value: number, grayscale: boolean): void {
   if (grayscale) writeGray(rgb, sampleIndex, value);
   else rgb[sampleIndex] = value;
 }
 
-function decodedPnmImage(rgb, size) {
+function decodedPnmImage(rgb: Uint8Array, size: PnmSize): DecodedPnmImage {
   return {rgb, width: size.width, height: size.height};
 }
 
-function decodePlainPnm(bytes, cursor, size, maxval, grayscale, integerGray, sampleCount) {
+function decodePlainPnm(
+  bytes: Uint8Array,
+  cursor: PnmCursor,
+  size: PnmSize,
+  maxval: number,
+  grayscale: boolean,
+  integerGray: boolean,
+  sampleCount: number
+): DecodedPnmImage {
   if (sampleCount > bytes.length - cursor.offset) throw new TypeError('PNM raster is truncated.');
 
   const rgb = new Uint8Array(size.rgbLength);
@@ -133,12 +157,21 @@ function decodePlainPnm(bytes, cursor, size, maxval, grayscale, integerGray, sam
   return decodedPnmImage(rgb, size);
 }
 
-function rawPnmSample(bytes, offset, bytesPerSample) {
-  if (bytesPerSample === 1) return bytes[offset];
-  return (bytes[offset] << 8) | bytes[offset + 1];
+function rawPnmSample(bytes: Uint8Array, offset: number, bytesPerSample: number): number {
+  if (bytesPerSample === 1) return bytes[offset]!;
+  return (bytes[offset]! << 8) | bytes[offset + 1]!;
 }
 
-function decodeRawPnm(bytes, cursor, size, maxval, grayscale, integerGray, direct16BitGray, sampleCount) {
+function decodeRawPnm(
+  bytes: Uint8Array,
+  cursor: PnmCursor,
+  size: PnmSize,
+  maxval: number,
+  grayscale: boolean,
+  integerGray: boolean,
+  direct16BitGray: boolean,
+  sampleCount: number
+): DecodedPnmImage {
   consumeRasterDelimiter(bytes, cursor);
   const bytesPerSample = maxval < 256 ? 1 : 2;
   const rasterLength = sampleCount * bytesPerSample;
@@ -156,7 +189,12 @@ function decodeRawPnm(bytes, cursor, size, maxval, grayscale, integerGray, direc
   return decodedPnmImage(rgb, size);
 }
 
-function decodePnm(bytes, cursor, magic, size) {
+function decodePnm(
+  bytes: Uint8Array,
+  cursor: PnmCursor,
+  magic: Exclude<PnmMagic, 'P1' | 'P4' | 'Pf'>,
+  size: PnmSize
+): DecodedPnmImage {
   const grayscale = magic === 'P2' || magic === 'P5';
   const plain = magic === 'P2' || magic === 'P3';
   const channels = grayscale ? 1 : RGB_CHANNELS;
@@ -171,7 +209,7 @@ function decodePnm(bytes, cursor, magic, size) {
   return decodeRawPnm(bytes, cursor, size, maxval, grayscale, integerGray, direct16BitGray, sampleCount);
 }
 
-function decodePlainPbm(bytes, cursor, size) {
+function decodePlainPbm(bytes: Uint8Array, cursor: PnmCursor, size: PnmSize): DecodedPnmImage {
   if (size.pixels > bytes.length - cursor.offset) throw new TypeError('PBM raster is truncated.');
 
   const rgb = new Uint8Array(size.rgbLength);
@@ -182,7 +220,7 @@ function decodePlainPbm(bytes, cursor, size) {
   return decodedPnmImage(rgb, size);
 }
 
-function readPbmBit(bytes, cursor) {
+function readPbmBit(bytes: Uint8Array, cursor: PnmCursor): number {
   skipSeparators(bytes, cursor);
   const sample = bytes[cursor.offset++];
   if (sample === 0x30) return 0;
@@ -191,7 +229,7 @@ function readPbmBit(bytes, cursor) {
   throw new TypeError('PBM sample must be 0 or 1.');
 }
 
-function decodeRawPbm(bytes, cursor, size) {
+function decodeRawPbm(bytes: Uint8Array, cursor: PnmCursor, size: PnmSize): DecodedPnmImage {
   consumeRasterDelimiter(bytes, cursor);
   const bytesPerRow = Math.ceil(size.width / 8);
   const rasterLength = bytesPerRow * size.height;
@@ -201,7 +239,7 @@ function decodeRawPbm(bytes, cursor, size) {
   const rgb = new Uint8Array(size.rgbLength);
   for (let y = 0; y < size.height; y++) {
     for (let x = 0; x < size.width; x++) {
-      const value = bytes[cursor.offset + y * bytesPerRow + Math.floor(x / 8)];
+      const value = bytes[cursor.offset + y * bytesPerRow + Math.floor(x / 8)]!;
       const black = (value & (0x80 >> (x % 8))) !== 0;
       writeGray(rgb, y * size.width + x, black ? 0 : 255);
     }
@@ -209,12 +247,12 @@ function decodeRawPbm(bytes, cursor, size) {
   return decodedPnmImage(rgb, size);
 }
 
-function decodePbm(bytes, cursor, magic, size) {
+function decodePbm(bytes: Uint8Array, cursor: PnmCursor, magic: 'P1' | 'P4', size: PnmSize): DecodedPnmImage {
   if (magic === 'P1') return decodePlainPbm(bytes, cursor, size);
   return decodeRawPbm(bytes, cursor, size);
 }
 
-function pfmScale(token) {
+function pfmScale(token: string): number {
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(token))
     throw new TypeError('PFM scale must be a finite, non-zero number.');
   const scale = Number(token);
@@ -222,7 +260,7 @@ function pfmScale(token) {
   return scale;
 }
 
-function decodePfm(bytes, cursor, size) {
+function decodePfm(bytes: Uint8Array, cursor: PnmCursor, size: PnmSize): DecodedPnmImage {
   const scale = pfmScale(readToken(bytes, cursor, 'scale'));
   consumeRasterDelimiter(bytes, cursor);
   const sampleCount = size.pixels;
@@ -246,14 +284,13 @@ function decodePfm(bytes, cursor, size) {
 }
 
 /** Decode Pillow-compatible grayscale or RGB PNM/PFM samples into RGB bytes. */
-export function decodeKananaPnmImage(input) {
+export function decodeKananaPnmImage(input: unknown): DecodedPnmImage {
   const bytes = asBytes(input);
-  if (bytes.length < 3 || bytes[0] !== 0x50 || !WHITESPACE.has(bytes[2]))
+  if (bytes.length < 3 || bytes[0] !== 0x50 || !WHITESPACE.has(bytes[2]!))
     throw new TypeError('Input is not a supported PNM/PFM image.');
 
-  const magic = String.fromCharCode(bytes[0], bytes[1]);
-  if (!['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'Pf'].includes(magic))
-    throw new TypeError(`Unsupported PNM/PFM format ${magic}.`);
+  const magic = String.fromCharCode(bytes[0]!, bytes[1]!);
+  if (!isPnmMagic(magic)) throw new TypeError(`Unsupported PNM/PFM format ${magic}.`);
 
   const cursor = {offset: 2};
   const size = imageSize(readToken(bytes, cursor, 'width'), readToken(bytes, cursor, 'height'));

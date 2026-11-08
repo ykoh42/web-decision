@@ -1,15 +1,15 @@
 export const KANANA_DECISION_TEMPERATURE = 0.056139365295102696;
 export const KANANA_DEFAULT_TEMPERATURE = 1.0;
 
-function isNumberArray(values) {
+function isNumberArray(values: unknown): values is ArrayLike<unknown> & Iterable<unknown> {
   return Array.isArray(values) || (ArrayBuffer.isView(values) && !(values instanceof DataView));
 }
 
 export function scaleKananaLogits(
-  cosineSimilarities,
-  decisionTemperature = KANANA_DECISION_TEMPERATURE,
-  temperature = KANANA_DEFAULT_TEMPERATURE
-) {
+  cosineSimilarities: unknown,
+  decisionTemperature: number = KANANA_DECISION_TEMPERATURE,
+  temperature: number = KANANA_DEFAULT_TEMPERATURE
+): number[] {
   if (!isNumberArray(cosineSimilarities)) throw new TypeError('cosineSimilarities must be an array of numbers.');
   if (typeof decisionTemperature !== 'number' || !Number.isFinite(decisionTemperature) || decisionTemperature <= 0)
     throw new RangeError('decisionTemperature must be a finite number greater than 0.');

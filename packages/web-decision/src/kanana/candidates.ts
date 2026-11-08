@@ -4,25 +4,54 @@ import {
   truncateKananaDocument,
   truncateKananaQuery,
   truncateKananaQuestionCandidate
-} from './truncation.mjs';
-import {renderKananaQueryInput} from './protocol.mjs';
+} from './truncation.js';
+import {renderKananaQueryInput} from './protocol.js';
 
-function fail(code, message) {
+type CandidateTokenizer = {
+  encode(text: string, options?: {add_special_tokens?: boolean}): {ids: ArrayLike<number>};
+  decode?(ids: number[], options?: {skip_special_tokens?: boolean}): string;
+};
+type CandidateEntry = {
+  id: string;
+  candidateKeys: unknown[];
+  candidateTexts: unknown[];
+  [key: string]: unknown;
+};
+type CandidateDocument = {
+  key: string;
+  text: string;
+  messages: unknown;
+  inputIds: number[];
+  tokenCount: number;
+  truncated: boolean;
+  retainedTokens: unknown;
+};
+type PreparedCandidateEntry = Omit<CandidateEntry, 'candidateKeys' | 'candidateTexts'> & {
+  candidateKeys: string[];
+  candidateTexts: string[];
+  candidateDocuments: CandidateDocument[];
+};
+type CandidateOptions = {maxLength?: number; truncateInputs?: boolean; instruction?: string};
+type QueryFallbackOptions = {maxLength?: number; truncateInputs?: boolean; truncateQuestionCandidates?: boolean};
+
+function fail(code: string, message: string): never {
   const error = new TypeError(message);
-  error.code = code;
+  (error as TypeError & {code: string}).code = code;
   throw error;
 }
 
-function validateEntries(prepared) {
-  if (!Array.isArray(prepared?.questionEntries)) throw new TypeError('Expected a prepared Kanana request.');
-  for (let index = 0; index < prepared.questionEntries.length; index++) {
-    if (!Object.hasOwn(prepared.questionEntries, index))
+function validateEntries(prepared: unknown): CandidateEntry[] {
+  if (!Array.isArray((prepared as {questionEntries?: unknown} | null | undefined)?.questionEntries))
+    throw new TypeError('Expected a prepared Kanana request.');
+  const request = prepared as {questionEntries: CandidateEntry[]};
+  for (let index = 0; index < request.questionEntries.length; index++) {
+    if (!Object.hasOwn(request.questionEntries, index))
       fail('questions', 'prepared question entries must not contain empty entries.');
   }
-  return prepared.questionEntries;
+  return request.questionEntries;
 }
 
-function validateCandidateArray(value, label, questionId) {
+function validateCandidateArray(value: unknown, label: string, questionId: string): unknown[] {
   if (!Array.isArray(value)) fail('candidate_count', `${label} for question ${questionId} must be an array.`);
   for (let index = 0; index < value.length; index++) {
     if (!Object.hasOwn(value, index)) fail('candidate_count', `${label} must not contain empty entries.`);
@@ -30,18 +59,23 @@ function validateCandidateArray(value, label, questionId) {
   return value;
 }
 
-function candidateSequence(inputIds) {
+function candidateSequence(inputIds: number[]): string {
   return inputIds.join(',');
 }
 
-function prepareQuestionCandidates(tokenizer, entry, options, truncateInputs) {
+function prepareQuestionCandidates(
+  tokenizer: CandidateTokenizer,
+  entry: CandidateEntry,
+  options: {maxLength: number; truncateInputs: boolean; instruction: string},
+  truncateInputs: boolean
+): PreparedCandidateEntry {
   const candidateKeys = validateCandidateArray(entry?.candidateKeys, 'candidateKeys', entry?.id);
   const candidateTexts = validateCandidateArray(entry?.candidateTexts, 'candidateTexts', entry?.id);
   if (candidateKeys.length !== candidateTexts.length)
     fail('candidate_count', `candidateKeys and candidateTexts for question ${entry?.id} must have equal lengths.`);
 
   const seen = new Set();
-  const candidateDocuments = [];
+  const candidateDocuments: CandidateDocument[] = [];
   for (let index = 0; index < candidateTexts.length; index++) {
     const key = candidateKeys[index];
     const text = candidateTexts[index];
@@ -66,18 +100,22 @@ function prepareQuestionCandidates(tokenizer, entry, options, truncateInputs) {
 
   return {
     ...entry,
-    candidateKeys: [...candidateKeys],
-    candidateTexts: [...candidateTexts],
+    candidateKeys: [...candidateKeys] as string[],
+    candidateTexts: [...candidateTexts] as string[],
     candidateDocuments
   };
 }
 
 /** Prepare candidate documents in model order and detect untruncated token collisions. */
 export function prepareKananaCandidates(
-  tokenizer,
-  prepared,
-  {maxLength = KANANA_MAX_LENGTH, truncateInputs = true, instruction = KANANA_DOCUMENT_INSTRUCTION} = {}
-) {
+  tokenizer: CandidateTokenizer,
+  prepared: unknown,
+  {
+    maxLength = KANANA_MAX_LENGTH,
+    truncateInputs = true,
+    instruction = KANANA_DOCUMENT_INSTRUCTION
+  }: CandidateOptions = {}
+): PreparedCandidateEntry[] {
   const questionEntries = validateEntries(prepared);
   if (typeof truncateInputs !== 'boolean') throw new TypeError('truncateInputs must be a boolean.');
   const options = {maxLength, truncateInputs, instruction};
@@ -86,21 +124,26 @@ export function prepareKananaCandidates(
 
 /** Truncate query state first, then shorten a structured question candidate only if protected input cannot fit. */
 export function truncateKananaQueryWithCandidateFallback(
-  tokenizer,
-  prepared,
-  questionId,
-  imageTokenThw = [],
-  {maxLength = KANANA_MAX_LENGTH, truncateInputs = true, truncateQuestionCandidates = true} = {}
-) {
+  tokenizer: CandidateTokenizer,
+  prepared: unknown,
+  questionId: string,
+  imageTokenThw: number[][] = [],
+  {maxLength = KANANA_MAX_LENGTH, truncateInputs = true, truncateQuestionCandidates = true}: QueryFallbackOptions = {}
+): ReturnType<typeof truncateKananaQuery> | ReturnType<typeof truncateKananaQuestionCandidate> {
   const input = renderKananaQueryInput(prepared, questionId);
   try {
     return truncateKananaQuery(tokenizer, input.messages, imageTokenThw, {
       editableUserTextIndexes: input.editableUserTextIndexes,
       maxLength,
       truncateInputs
-    });
+    } as {editableUserTextIndexes: number[]; maxLength: number; truncateInputs: boolean});
   } catch (error) {
-    if (error?.code !== 'input_too_long' || !truncateInputs || !truncateQuestionCandidates) throw error;
+    if (
+      (error as {code?: unknown} | null | undefined)?.code !== 'input_too_long' ||
+      !truncateInputs ||
+      !truncateQuestionCandidates
+    )
+      throw error;
     return truncateKananaQuestionCandidate(tokenizer, prepared, questionId, imageTokenThw, {
       maxLength,
       truncateInputs,

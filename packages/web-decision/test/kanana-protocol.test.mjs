@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import {File} from 'node:buffer';
 import test from 'node:test';
-import {
+import {chatTemplate, protocol} from './kanana-core-modules.mjs';
+
+const {
   answerKananaQuestion,
   finishKananaSystemOne,
   prepareKananaSystemOne,
   prepareKananaTextSystemOne,
   renderKananaQueryInput,
   renderKananaQueryMessages
-} from '../src/kanana/protocol.mjs';
-import {renderKananaChatTemplate} from '../src/kanana/chat-template.mjs';
+} = protocol;
+const {renderKananaChatTemplate} = chatTemplate;
 
 function choice(
   criteria = new Map([
@@ -59,6 +61,13 @@ test('state format follows Kanana text, JSON and messages rules and preserves im
   assert.throws(() => prepareKananaSystemOne({state: [], stateFormat: 'messages', questions: {route: choice()}}), {
     code: 'state_format'
   });
+  assert.throws(
+    () => prepareKananaSystemOne(null),
+    (error) => {
+      assert.deepEqual(Object.keys(error), ['name', 'code']);
+      return true;
+    }
+  );
   assert.throws(() => prepareKananaSystemOne({state: null, stateFormat: '', questions: {route: choice()}}), {
     code: 'state_format'
   });

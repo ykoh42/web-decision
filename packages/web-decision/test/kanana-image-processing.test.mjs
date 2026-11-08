@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import test from 'node:test';
-import {
+import {imageProcessing} from './kanana-core-modules.mjs';
+
+const {
   packKananaImagePatches,
   preprocessKananaImage,
   resizePillowBicubic,
   resizeTorchvisionBicubicAntialias,
   smartResize
-} from '../src/kanana/image-processing.mjs';
+} = imageProcessing;
 
 function makeRgb(width, height, pattern, seed = 0x12345678) {
   const pixels = new Uint8Array(width * height * 3);

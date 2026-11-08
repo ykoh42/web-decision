@@ -1,6 +1,19 @@
 import {decode as decodePng} from 'fast-png';
+import type {DecodedPng, PngDataArray} from 'fast-png';
 import decodeJpeg from '@jsquash/jpeg/decode.js';
-import {decodeKananaPnmImage} from './pnm-image.mjs';
+import {decodeKananaPnmImage} from './pnm-image.js';
+
+export type KananaImageDecodeOptions = {
+  signal?: AbortSignal | undefined;
+  fetch?: typeof fetch | undefined;
+  magickWasm?: URL | Int8Array | Uint8Array | Uint8ClampedArray | WebAssembly.Module | undefined;
+};
+
+type DecodedImage = {rgb: Uint8Array; width: number; height: number};
+type ImageHeader =
+  | {format: 'png'; width: number; height: number}
+  | {format: 'jpeg'; width: number; height: number; components: number};
+type JpegFrame = {width: number; height: number; components: number};
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const TIFF_SIGNATURES = [new Uint8Array([73, 73, 42, 0]), new Uint8Array([77, 77, 0, 42])];
@@ -9,11 +22,11 @@ const RGB_CHANNELS = 3;
 const PILLOW_MAX_IMAGE_PIXELS = 89_478_485;
 const PILLOW_ERROR_IMAGE_PIXELS = PILLOW_MAX_IMAGE_PIXELS * 2;
 
-function isBlob(value) {
+function isBlob(value: unknown): value is Blob {
   return typeof globalThis.Blob === 'function' && value instanceof globalThis.Blob;
 }
 
-function imageUrl(value) {
+function imageUrl(value: unknown): string | null {
   if (typeof value === 'string') return value;
   if (typeof globalThis.URL === 'function' && value instanceof globalThis.URL) return value.href;
   if (typeof globalThis.HTMLImageElement === 'function' && value instanceof globalThis.HTMLImageElement)
@@ -21,7 +34,7 @@ function imageUrl(value) {
   return null;
 }
 
-function parseImageUrl(value) {
+function parseImageUrl(value: string): string {
   let url;
   try {
     url = new URL(value, globalThis.location?.href);
@@ -31,7 +44,7 @@ function parseImageUrl(value) {
 
   if (url.protocol === 'data:') {
     const comma = url.href.indexOf(',');
-    const mediaType = comma < 0 ? '' : url.href.slice(5, comma).split(';', 1)[0];
+    const mediaType = comma < 0 ? '' : (url.href.slice(5, comma).split(';', 1)[0] ?? '');
     if (!mediaType.toLowerCase().startsWith('image/'))
       throw new TypeError('Kanana data URLs must declare an image media type.');
     return url.href;
@@ -42,7 +55,11 @@ function parseImageUrl(value) {
   return url.href;
 }
 
-async function readImageBytes(source, options, signal) {
+async function readImageBytes(
+  source: unknown,
+  options: KananaImageDecodeOptions,
+  signal: AbortSignal | undefined
+): Promise<Uint8Array> {
   if (isBlob(source)) return new Uint8Array(await source.arrayBuffer());
 
   const address = imageUrl(source);
@@ -56,7 +73,7 @@ async function readImageBytes(source, options, signal) {
     response = await fetchImage(url, signal ? {signal} : undefined);
   } catch (cause) {
     if (signal?.aborted) throw signal.reason;
-    if (cause?.name === 'AbortError') throw cause;
+    if ((cause as {name?: unknown} | null)?.name === 'AbortError') throw cause;
     throw new TypeError('Kanana image URL must allow a readable CORS response.', {cause});
   }
   signal?.throwIfAborted();
@@ -69,23 +86,23 @@ async function readImageBytes(source, options, signal) {
   return bytes;
 }
 
-function isPng(bytes) {
+function isPng(bytes: Uint8Array): boolean {
   return PNG_SIGNATURE.every((byte, index) => bytes[index] === byte);
 }
 
-function isJpeg(bytes) {
+function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
 }
 
-function isPnm(bytes) {
-  return bytes.length >= 3 && bytes[0] === 0x50 && [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20].includes(bytes[2]);
+function isPnm(bytes: Uint8Array): boolean {
+  return bytes.length >= 3 && bytes[0] === 0x50 && [0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20].includes(bytes[2]!);
 }
 
-function isClassicTiff(bytes) {
+function isClassicTiff(bytes: Uint8Array): boolean {
   return TIFF_SIGNATURES.some((signature) => signature.every((byte, index) => bytes[index] === byte));
 }
 
-function assertDimensions(width, height) {
+function assertDimensions(width: number, height: number): number {
   const pixels = width * height;
   if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1)
     throw new RangeError('Kanana image dimensions must be positive safe integers.');
@@ -94,7 +111,7 @@ function assertDimensions(width, height) {
   return pixels;
 }
 
-function checkPillowPixelLimit(width, height) {
+function checkPillowPixelLimit(width: number, height: number): void {
   const pixels = BigInt(Math.max(1, width)) * BigInt(Math.max(1, height));
   const warningLimit = BigInt(PILLOW_MAX_IMAGE_PIXELS);
   const errorLimit = BigInt(PILLOW_ERROR_IMAGE_PIXELS);
@@ -111,11 +128,11 @@ function checkPillowPixelLimit(width, height) {
   }
 }
 
-function readUint32(bytes, offset) {
-  return bytes[offset] * 0x1000000 + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3];
+function readUint32(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! * 0x1000000 + (bytes[offset + 1]! << 16) + (bytes[offset + 2]! << 8) + bytes[offset + 3]!;
 }
 
-function pngDimensions(bytes) {
+function pngDimensions(bytes: Uint8Array): {width: number; height: number} {
   const isImageHeader =
     bytes.length >= 24 &&
     readUint32(bytes, 8) === 13 &&
@@ -128,35 +145,35 @@ function pngDimensions(bytes) {
   return {width: readUint32(bytes, 16), height: readUint32(bytes, 20)};
 }
 
-function skipJpegFillBytes(bytes, offset) {
+function skipJpegFillBytes(bytes: Uint8Array, offset: number): number {
   while (bytes[offset] === 0xff) offset++;
   return offset;
 }
 
-function isStandaloneJpegMarker(marker) {
+function isStandaloneJpegMarker(marker: number): boolean {
   return marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7);
 }
 
-function isJpegFrameMarker(marker) {
+function isJpegFrameMarker(marker: number): boolean {
   return [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker);
 }
 
-function jpegSegmentLength(bytes, offset) {
+function jpegSegmentLength(bytes: Uint8Array, offset: number): number | null {
   if (offset + 1 >= bytes.length) return null;
-  const length = (bytes[offset] << 8) | bytes[offset + 1];
+  const length = (bytes[offset]! << 8) | bytes[offset + 1]!;
   return length >= 2 && offset + length <= bytes.length ? length : null;
 }
 
-function jpegFrameHeader(bytes, offset, length) {
+function jpegFrameHeader(bytes: Uint8Array, offset: number, length: number): JpegFrame | null {
   if (length < 8) return null;
   return {
-    height: (bytes[offset + 3] << 8) | bytes[offset + 4],
-    width: (bytes[offset + 5] << 8) | bytes[offset + 6],
-    components: bytes[offset + 7]
+    height: (bytes[offset + 3]! << 8) | bytes[offset + 4]!,
+    width: (bytes[offset + 5]! << 8) | bytes[offset + 6]!,
+    components: bytes[offset + 7]!
   };
 }
 
-function jpegFrame(bytes) {
+function jpegFrame(bytes: Uint8Array): JpegFrame {
   let offset = 2;
 
   while (offset < bytes.length) {
@@ -179,7 +196,7 @@ function jpegFrame(bytes) {
 }
 
 /** Read Pillow-compatible dimensions before a full decoder allocates pixel buffers. */
-export function preflightKananaImageHeader(bytes) {
+export function preflightKananaImageHeader(bytes: Uint8Array): ImageHeader | null {
   if (isPng(bytes)) {
     const {width, height} = pngDimensions(bytes);
     checkPillowPixelLimit(width, height);
@@ -193,35 +210,43 @@ export function preflightKananaImageHeader(bytes) {
   return null;
 }
 
-function byteView(data) {
+function byteView(data: PngDataArray | Uint8ClampedArray): Uint8Array {
   return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
 }
 
-function compositeWhite(color, alpha) {
+function compositeWhite(color: number, alpha: number): number {
   return Math.floor((color * alpha + 255 * (255 - alpha) + 127) / 255);
 }
 
-function readPackedSample(data, width, x, y, depth) {
+function readPackedSample(data: PngDataArray, width: number, x: number, y: number, depth: number): number {
   const rowBytes = Math.ceil((width * depth) / 8);
   const bit = x * depth;
-  const byte = data[y * rowBytes + Math.floor(bit / 8)];
+  const byte = data[y * rowBytes + Math.floor(bit / 8)]!;
   const shift = 8 - depth - (bit % 8);
   return (byte >> shift) & ((1 << depth) - 1);
 }
 
-function pngSample(data, width, x, y, channel, channels, depth) {
+function pngSample(
+  data: PngDataArray,
+  width: number,
+  x: number,
+  y: number,
+  channel: number,
+  channels: number,
+  depth: number
+): number {
   if (depth < 8) return readPackedSample(data, width, x, y, depth);
   const index = (y * width + x) * channels + channel;
-  return data[index];
+  return data[index]!;
 }
 
-function sampleToByte(sample, depth, grayscale) {
+function sampleToByte(sample: number, depth: number, grayscale: boolean): number {
   if (depth === 16) return grayscale ? Math.min(sample, 255) : sample >>> 8;
   if (depth < 8) return (sample * 255) / ((1 << depth) - 1);
   return sample;
 }
 
-function assertPngData(image, pixels) {
+function assertPngData(image: DecodedPng, pixels: number): void {
   const {data, depth, channels, width, height, palette} = image;
   if (![1, 2, 3, 4].includes(channels)) throw new TypeError('Kanana PNG has an unsupported channel layout.');
   if (![1, 2, 4, 8, 16].includes(depth)) throw new TypeError('Kanana PNG has an unsupported bit depth.');
@@ -234,7 +259,7 @@ function assertPngData(image, pixels) {
   if (channels === 1 && palette && depth === 16) throw new TypeError('Kanana PNG palette depth is unsupported.');
 }
 
-function createRgbTarget(image, pixels) {
+function createRgbTarget(image: DecodedPng, pixels: number): Uint8Array {
   const {data, depth, channels} = image;
   const sourceBytesPerPixel = depth >= 8 ? channels * (depth / 8) : 0;
   if (sourceBytesPerPixel >= RGB_CHANNELS) {
@@ -244,7 +269,7 @@ function createRgbTarget(image, pixels) {
   return new Uint8Array(pixels * RGB_CHANNELS);
 }
 
-function writePngPixel(image, rgb, target, x, y) {
+function writePngPixel(image: DecodedPng, rgb: Uint8Array, target: number, x: number, y: number): void {
   const {channels} = image;
   if (channels === 4) return writeRgbaPixel(image, rgb, target, x, y);
   if (channels === 3) return writeRgbPixel(image, rgb, target, x, y);
@@ -252,7 +277,7 @@ function writePngPixel(image, rgb, target, x, y) {
   return writeGrayOrPalettePixel(image, rgb, target, x, y);
 }
 
-function writeRgbaPixel(image, rgb, target, x, y) {
+function writeRgbaPixel(image: DecodedPng, rgb: Uint8Array, target: number, x: number, y: number): void {
   const {data, width, depth, channels} = image;
   const red = sampleToByte(pngSample(data, width, x, y, 0, channels, depth), depth, false);
   const green = sampleToByte(pngSample(data, width, x, y, 1, channels, depth), depth, false);
@@ -263,7 +288,7 @@ function writeRgbaPixel(image, rgb, target, x, y) {
   rgb[target + 2] = compositeWhite(blue, alpha);
 }
 
-function writeRgbPixel(image, rgb, target, x, y) {
+function writeRgbPixel(image: DecodedPng, rgb: Uint8Array, target: number, x: number, y: number): void {
   const {data, width, depth, channels} = image;
   for (let channel = 0; channel < RGB_CHANNELS; channel++) {
     const sample = pngSample(data, width, x, y, channel, channels, depth);
@@ -271,7 +296,7 @@ function writeRgbPixel(image, rgb, target, x, y) {
   }
 }
 
-function writeGrayAlphaPixel(image, rgb, target, x, y) {
+function writeGrayAlphaPixel(image: DecodedPng, rgb: Uint8Array, target: number, x: number, y: number): void {
   const {data, width, depth, channels} = image;
   const sample = pngSample(data, width, x, y, 0, channels, depth);
   const gray = sampleToByte(sample, depth, false);
@@ -280,7 +305,7 @@ function writeGrayAlphaPixel(image, rgb, target, x, y) {
   rgb[target + 2] = gray;
 }
 
-function writeGrayOrPalettePixel(image, rgb, target, x, y) {
+function writeGrayOrPalettePixel(image: DecodedPng, rgb: Uint8Array, target: number, x: number, y: number): void {
   const {data, width, depth, channels, palette} = image;
   const sample = pngSample(data, width, x, y, 0, channels, depth);
   if (palette) return writePalettePixel(palette, sample, rgb, target);
@@ -291,15 +316,20 @@ function writeGrayOrPalettePixel(image, rgb, target, x, y) {
   rgb[target + 2] = gray;
 }
 
-function writePalettePixel(palette, index, rgb, target) {
+function writePalettePixel(
+  palette: NonNullable<DecodedPng['palette']>,
+  index: number,
+  rgb: Uint8Array,
+  target: number
+): void {
   const color = palette[index];
   if (!Array.isArray(color) || color.length < RGB_CHANNELS) throw new TypeError('Kanana PNG palette index is invalid.');
-  rgb[target] = color[0];
-  rgb[target + 1] = color[1];
-  rgb[target + 2] = color[2];
+  rgb[target] = color[0]!;
+  rgb[target + 1] = color[1]!;
+  rgb[target + 2] = color[2]!;
 }
 
-function normalizePng(image) {
+function normalizePng(image: DecodedPng): DecodedImage {
   const {width, height, channels, palette} = image;
   const pixels = assertDimensions(width, height);
   assertPngData(image, pixels);
@@ -312,7 +342,7 @@ function normalizePng(image) {
   return {rgb, width, height};
 }
 
-function normalizeJpeg(imageData) {
+function normalizeJpeg(imageData: ImageData): DecodedImage {
   const {width, height, data} = imageData;
   const pixels = assertDimensions(width, height);
   if (!(data instanceof Uint8Array) && !(data instanceof Uint8ClampedArray))
@@ -323,9 +353,9 @@ function normalizeJpeg(imageData) {
   const bytes = byteView(data);
   const rgb = bytes.subarray(0, pixels * RGB_CHANNELS);
   for (let pixel = 0, source = 0, target = 0; pixel < pixels; pixel++, source += 4, target += 3) {
-    const red = bytes[source];
-    const green = bytes[source + 1];
-    const blue = bytes[source + 2];
+    const red = bytes[source]!;
+    const green = bytes[source + 1]!;
+    const blue = bytes[source + 2]!;
     rgb[target] = red;
     rgb[target + 1] = green;
     rgb[target + 2] = blue;
@@ -334,7 +364,10 @@ function normalizeJpeg(imageData) {
 }
 
 /** Decode supported encoded image bytes to Pillow-compatible RGB pixels. */
-export async function decodeKananaEncodedImageSource(source, options = {}) {
+export async function decodeKananaEncodedImageSource(
+  source: unknown,
+  options: KananaImageDecodeOptions = {}
+): Promise<DecodedImage> {
   const signal = options.signal;
   signal?.throwIfAborted();
   const bytes = await readImageBytes(source, options, signal);
@@ -345,12 +378,12 @@ export async function decodeKananaEncodedImageSource(source, options = {}) {
   if (header?.format === 'jpeg') {
     const {components} = header;
     if (components === 4) {
-      const {decodeKananaMagickImage} = await import('./magick-image.mjs');
+      const {decodeKananaMagickImage} = await import('./magick-image.js');
       return decodeKananaMagickImage(bytes, {signal, wasm: options.magickWasm});
     }
     if (components !== 1 && components !== 3)
       throw new TypeError(`Kanana JPEG with ${components} color components cannot match the pinned Pillow conversion.`);
-    const imageData = await decodeJpeg(bytes.buffer, {preserveOrientation: false});
+    const imageData = await decodeJpeg(bytes.buffer as ArrayBuffer, {preserveOrientation: false});
     signal?.throwIfAborted();
     return normalizeJpeg(imageData);
   }
@@ -358,12 +391,12 @@ export async function decodeKananaEncodedImageSource(source, options = {}) {
   if (isPnm(bytes)) return decodeKananaPnmImage(bytes);
 
   if (isClassicTiff(bytes)) {
-    const {decodeKananaTiff16Image} = await import('./tiff16-image.mjs');
+    const {decodeKananaTiff16Image} = await import('./tiff16-image.js');
     const image = await decodeKananaTiff16Image(bytes, {signal});
     signal?.throwIfAborted();
     if (image) return image;
   }
 
-  const {decodeKananaMagickImage} = await import('./magick-image.mjs');
+  const {decodeKananaMagickImage} = await import('./magick-image.js');
   return decodeKananaMagickImage(bytes, {signal, wasm: options.magickWasm});
 }
