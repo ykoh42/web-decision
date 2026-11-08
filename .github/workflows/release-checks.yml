@@ -2,13 +2,11 @@ name: Release checks
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
   workflow_dispatch:
     inputs:
       release_version:
-        description: Release version to verify
+        description: Release version to verify when running this workflow from its matching release tag
         required: true
         type: choice
         options: ['0.1.0', '0.2.0', '0.3.0']
