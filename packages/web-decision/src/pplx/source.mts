@@ -5,7 +5,7 @@ import {parseStrictJson} from '../h2o/strict-json.mjs';
 import {WebDecisionError} from '../kev.js';
 import {readVerifiedRange} from '../strands/range-reader.mjs';
 import {FLASH_GRAPH_SHA256, FLASH_MANIFEST_SHA256} from './contract.mjs';
-import type {FlashManifest, FlashManifestEntry, FlashQ4CandidateEntry, FlashRange, FlashSource} from './types.mjs';
+import type {FlashManifest, FlashManifestEntry, FlashQ4CandidateEntry, FlashRange, FlashSource} from './types.js';
 
 const FILES = Object.freeze({
   'manifest.pending.json': {bytes: 527849, sha256: FLASH_MANIFEST_SHA256},

@@ -20,7 +20,7 @@ import type {
   FlashTensor,
   FlashTokenizer,
   FlashTvmRuntime
-} from './types.mjs';
+} from './types.js';
 
 export {FLASH_LIMITS, FLASH_MODEL};
 const KEYS = new Set([

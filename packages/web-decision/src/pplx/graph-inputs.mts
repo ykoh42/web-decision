@@ -1,6 +1,6 @@
 // Prepare a validated batch-one joint input for the pinned Q4 graph.
 import {WebDecisionError} from '../kev.js';
-import type {FlashGraphInput, PackedFlashRequest} from './types.mjs';
+import type {FlashGraphInput, PackedFlashRequest} from './types.js';
 const VOCABULARY = 248320;
 const MAX_TOKENS = 512;
 const MAX_MARKERS = 255;

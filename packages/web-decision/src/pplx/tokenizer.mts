@@ -1,6 +1,6 @@
 import {WebDecisionError} from '../kev.js';
 import decision from './decision-config.json' with {type: 'json'};
-import type {FlashDecisionConfig, FlashTokenizer} from './types.mjs';
+import type {FlashDecisionConfig, FlashTokenizer} from './types.js';
 
 const SPECIAL = Object.freeze([
   '<|im_end|>',

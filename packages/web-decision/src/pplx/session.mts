@@ -4,7 +4,7 @@ import {WebDecisionError} from '../kev.js';
 import {validateDecisionFields, validateRequestFields} from '../request-fields.mjs';
 import {FLASH_MAX_OPTIONS, packFlashRequest, unpackFlashScores} from './protocol.mjs';
 import decision from './decision-config.json' with {type: 'json'};
-import type {FlashDecisionConfig, FlashTokenizer, PackedFlashRequest} from './types.mjs';
+import type {FlashDecisionConfig, FlashTokenizer, PackedFlashRequest} from './types.js';
 
 const TEMPERATURE = decision.temperature;
 

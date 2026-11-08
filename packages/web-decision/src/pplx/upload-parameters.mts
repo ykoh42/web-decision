@@ -1,5 +1,5 @@
 import {uploadParameterEntries} from '../parameter-upload.mjs';
-import type {FlashManifest, FlashManifestEntry, FlashQ4CandidateEntry, FlashRange, FlashTensor} from './types.mjs';
+import type {FlashManifest, FlashManifestEntry, FlashQ4CandidateEntry, FlashRange, FlashTensor} from './types.js';
 
 interface FlashUploadCallbacks {
   signal?: AbortSignal | undefined;

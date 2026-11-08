@@ -1,7 +1,7 @@
 import {H2oTvmRunner} from '../h2o/runner.mjs';
 import {withStrandsScope} from '../strands/scope.mjs';
 import {createFlashGraphInputs} from './graph-inputs.mjs';
-import type {FlashGraphInput, FlashTensor, FlashTvmRuntime, PackedFlashRequest} from './types.mjs';
+import type {FlashGraphInput, FlashTensor, FlashTvmRuntime, PackedFlashRequest} from './types.js';
 
 interface FlashReadbackLease {
   prepareReadback(): void;
