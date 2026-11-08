@@ -1,17 +1,19 @@
 // Prepare a validated batch-one joint input for the pinned Q4 graph.
 import {WebDecisionError} from '../kev.js';
+import type {FlashGraphInput, PackedFlashRequest} from './types.mjs';
 const VOCABULARY = 248320;
 const MAX_TOKENS = 512;
 const MAX_MARKERS = 255;
 
-function invalid() {
+function invalid(): never {
   throw new WebDecisionError('INVALID_INPUT', 'Invalid Perplexity graph inputs.');
 }
 
-export function createFlashGraphInputs(packed, markerId) {
-  if (!packed || !Array.isArray(packed.ids) || !Array.isArray(packed.groups)) invalid();
-  const ids = Array.from(packed.ids);
-  const groups = Array.from(packed.groups);
+export function createFlashGraphInputs(packed: unknown, markerId: number): FlashGraphInput[] {
+  const candidate = packed as PackedFlashRequest | null | undefined;
+  if (!candidate || !Array.isArray(candidate.ids) || !Array.isArray(candidate.groups)) invalid();
+  const ids = Array.from(candidate.ids);
+  const groups = Array.from(candidate.groups);
   const n = ids.length;
   if (
     n < 2 ||
@@ -31,8 +33,8 @@ export function createFlashGraphInputs(packed, markerId) {
         !Number.isSafeInteger(index) ||
         index < 0 ||
         index >= n ||
-        ids[index] !== markerId ||
-        (i > 0 && markers[i - 1] >= index)
+        ids[index as number] !== markerId ||
+        (i > 0 && markers[i - 1]! >= index)
     )
   )
     invalid();
