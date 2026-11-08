@@ -56,6 +56,6 @@ test('Kev asset packager uses the current provenance and unchanged pinned model 
   assert.ok(provenance.includes(modelMetadata.checkpoint.revision));
   assert.ok(provenance.includes(modelMetadata.assets.manifestSha256));
   assert.doesNotMatch(provenance, /q2-k128|experimental-kev-0\.6b-q4f16-upstream|78026118/);
-  assert.equal(provenanceSha256, 'b649e445aba65d3aa12c855c4d2e5ecfbef608100bfdaead3b0e46cfee4dfc9a');
+  assert.equal(provenanceSha256, 'b63d3b71202bff7f75d2e4a28240728e8fbf0135e1fc2d9cd5bd601ba01782e7');
   assert.equal(modelLicenseSha256, '832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e');
 });

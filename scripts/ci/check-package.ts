@@ -10,7 +10,7 @@ import {findPackedContentIssues} from './packed-content.ts';
 import {withTemporaryDirectories} from './temporary-directories.ts';
 
 const stableKevModelId = 'kev-0.6b-q4f16';
-const stableKevManifestSha256 = '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767';
+const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2';
 type BundleChunk = Readonly<{name: string; text: string}>;
 type AssetInput = readonly [name: string, sourcePath: string];
 type ManifestFile = Readonly<{sha256: string; bytes: number}>;

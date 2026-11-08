@@ -13,7 +13,7 @@ This notice records the pinned inputs and build controls for the separately host
 
 - `scripts/setup_preview.sh` pins TVM source revision `7b5acb32bd271342a24130f4ef439ff6c2e52c6c`, Emscripten SDK revision `d7b4130688bfa348392b921ab04015aa15c4f154`, and Emscripten `4.0.23`.
 - The setup specializes the pinned Q4F16 ONNX graph for dynamic sequence length, builds the TVM WebGPU WASM and tensor cache, then invokes the asset packager. The packager requires a successful build report with input shape `[1, "sequence_length"]` and 394 parameters, verifies the pinned source and cache hashes, and checks each copied file against its SHA-256.
-- The canonical asset manifest SHA-256 is `8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767`, taken from `packages/web-decision/src/kev-preview-model.json`.
+- The canonical asset manifest SHA-256 is `57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2`, taken from `packages/web-decision/src/kev-preview-model.json`.
 - The asset manifest lists inference files only. Distribution notices are copied beside them and are not fetched by the browser inference loader.
 
 This record documents source and build pins. It does not determine redistribution rights, establish model quality, or guarantee results across hardware and browsers. Model terms and the intended hosting use require separate review.

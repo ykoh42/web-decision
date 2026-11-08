@@ -368,12 +368,12 @@ test('stable Kev defaults to its pinned manifest and stable-only WASM bundle', a
     const manifest = await readKev06ManifestResponse(prepared.response);
     assert.equal(prepared.base.href, 'https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/');
     assert.equal(prepared.manifestUrl, `${prepared.base.href}manifest.json`);
-    assert.equal(KEV06_MANIFEST_SHA256, '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767');
+    assert.equal(KEV06_MANIFEST_SHA256, '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2');
     assert.equal(manifest.model, KEV06_STABLE_MODEL);
     assert.equal(manifest.parameterCount, 394);
     assert.deepEqual(manifest.files['model.wasm'], {
-      sha256: '68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb',
-      bytes: 6807315
+      sha256: 'ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0',
+      bytes: 6807324
     });
     assert.deepEqual(stableBundledAssets.stableKevBundledUrls, stableInlineAssets);
     assert.notEqual(

@@ -14,8 +14,8 @@
   },
   "files": {
     "model.wasm": {
-      "sha256": "68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb",
-      "bytes": 6807315
+      "sha256": "ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0",
+      "bytes": 6807324
     },
     "tokenizer.json": {
       "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",

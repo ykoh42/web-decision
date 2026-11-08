@@ -36,7 +36,7 @@ EXPECTED_SOURCE_HASHES = {
     "tokenizer_config.json": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
 }
 EXPECTED_NOTICE_HASHES = {
-    "PROVENANCE.md": "b649e445aba65d3aa12c855c4d2e5ecfbef608100bfdaead3b0e46cfee4dfc9a",
+    "PROVENANCE.md": "b63d3b71202bff7f75d2e4a28240728e8fbf0135e1fc2d9cd5bd601ba01782e7",
     "MODEL-APACHE-2.0.txt": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
     "EMSCRIPTEN-LICENSE.txt": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
     "MUSL-COPYRIGHT.txt": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",

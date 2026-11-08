@@ -42,13 +42,13 @@ function responseFromBytes(bytes: Uint8Array): Response {
   return new Response(body);
 }
 
-test('stable bundled Kev WASM and manifest match the current-main pins', async () => {
+test('stable bundled Kev WASM and manifest match the current pins', async () => {
   const manifest = (await readKev06ManifestResponse(responseFromBytes(stableManifestBytes))) as KevManifest;
   const model = requiredFile(manifest, 'model.wasm');
   assert.equal(sha256(stableWasmBytes), model.sha256);
   assert.equal(stableWasmBytes.byteLength, model.bytes);
-  assert.equal(sha256(stableWasmBytes), '68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb');
-  assert.equal(KEV06_MANIFEST_SHA256, '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767');
+  assert.equal(sha256(stableWasmBytes), 'ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0');
+  assert.equal(KEV06_MANIFEST_SHA256, '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2');
   assert.equal(manifest.experimental, true);
 });
 

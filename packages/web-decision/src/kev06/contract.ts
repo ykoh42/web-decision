@@ -11,7 +11,7 @@ type Kev06Manifest = {
   readonly maxBranchTokens: number;
 };
 
-export const KEV06_MANIFEST_SHA256 = '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767';
+export const KEV06_MANIFEST_SHA256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2';
 
 /** Accept only the verified default Kev 0.6B asset manifest. */
 export async function readKev06ManifestResponse(response: Response, signal?: AbortSignal): Promise<Kev06Manifest> {
