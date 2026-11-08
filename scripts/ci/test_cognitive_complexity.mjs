@@ -42,6 +42,12 @@ function baseline(findings) {
   };
 }
 
+function makeCacheFixture(prefix) {
+  const cacheDirectory = path.join(ROOT, 'node_modules/.cache');
+  fs.mkdirSync(cacheDirectory, {recursive: true});
+  return fs.mkdtempSync(path.join(cacheDirectory, prefix));
+}
+
 test('fails closed when the tracked JavaScript/TypeScript list is empty', () => {
   assert.throws(() => selectTrackedSources([], []), /No tracked JavaScript or TypeScript sources/);
 });
@@ -131,7 +137,7 @@ test('rejects broad or complexity-specific suppressions but permits unrelated li
 });
 
 test('the configured Oxlint invocation detects complexity in real JavaScript and TypeScript files', () => {
-  const fixtureDirectory = fs.mkdtempSync(path.join(ROOT, 'node_modules/.cache/cognitive-fixture-'));
+  const fixtureDirectory = makeCacheFixture('cognitive-fixture-');
   const jsPath = path.relative(ROOT, path.join(fixtureDirectory, 'high-complexity.js')).replaceAll('\\', '/');
   const tsPath = path.relative(ROOT, path.join(fixtureDirectory, 'high-complexity.ts')).replaceAll('\\', '/');
   const statements = Array.from({length: 16}, (_, index) => `  if (value === ${index}) value += 1;`).join('\n');
@@ -176,7 +182,7 @@ test('a new untracked non-ignored high-complexity file is discovered and rejecte
 });
 
 test('ambiguous anonymous callbacks produce duplicate identities and fail closed', () => {
-  const fixtureDirectory = fs.mkdtempSync(path.join(ROOT, 'node_modules/.cache/cognitive-duplicate-'));
+  const fixtureDirectory = makeCacheFixture('cognitive-duplicate-');
   const filePath = path.join(fixtureDirectory, 'duplicate.js');
   const relativePath = path.relative(ROOT, filePath).replaceAll('\\', '/');
   const statements = Array.from({length: 16}, (_, index) => `    if (value === ${index}) value += 1;`).join('\n');
