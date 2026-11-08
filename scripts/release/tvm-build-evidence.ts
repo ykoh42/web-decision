@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {createReadStream} from 'node:fs';
-import {readFile, realpath, stat} from 'node:fs/promises';
-import {dirname, isAbsolute, relative, resolve, sep} from 'node:path';
+import {readFile, readdir, realpath, stat} from 'node:fs/promises';
+import {dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 interface AssetMetadata {
   readonly bytes: number;
@@ -57,6 +57,18 @@ async function hashFile(path: string): Promise<string> {
   const digest = createHash('sha256');
   for await (const chunk of createReadStream(path)) digest.update(chunk);
   return digest.digest('hex');
+}
+
+async function containsFileIdentity(root: string, file: {dev: number; ino: number}): Promise<boolean> {
+  if (file.ino === 0) return false;
+  for (const entry of await readdir(root, {withFileTypes: true})) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory() && (await containsFileIdentity(path, file))) return true;
+    if (!entry.isFile()) continue;
+    const candidate = await stat(path);
+    if (candidate.ino !== 0 && candidate.ino === file.ino && candidate.dev === file.dev) return true;
+  }
+  return false;
 }
 
 /** Compare supplied TVM build artifacts with the packaged model pins. */
@@ -141,6 +153,12 @@ export async function verifyTvmBuildEvidence(
       requireCondition(
         file.ino === 0 || source.ino === 0 || file.ino !== source.ino || file.dev !== source.dev,
         `TVM build WASM is the packaged source file for ${entry.modelId}/${entry.artifact}.`
+      );
+    }
+    for (const root of blockedRoots) {
+      requireCondition(
+        !(await containsFileIdentity(root, file)),
+        `TVM build WASM is the packaged source file or installed file for ${entry.modelId}/${entry.artifact}.`
       );
     }
     requireCondition(

@@ -126,6 +126,14 @@ test('rejects a package file or hardlink as the independent build', async (t) =>
   await writeFile(f.path, JSON.stringify({schemaVersion: 1, builds: [f.record]}));
   await writeFile(join(f.root, 'build.json'), JSON.stringify(f.report));
   await assert.rejects(verifyTvmBuildEvidence(f.path, models, [source]), /packaged source file/u);
+
+  const installed = join(f.root, 'installed');
+  await mkdir(installed);
+  const installedArtifact = join(installed, 'model.wasm');
+  await writeFile(installedArtifact, f.bytes);
+  await rm(join(f.root, 'rebuilt.wasm'));
+  await link(installedArtifact, join(f.root, 'rebuilt.wasm'));
+  await assert.rejects(verifyTvmBuildEvidence(f.path, f.models, [source, installed]), /packaged source file/u);
 });
 
 test('includes evidence and report digests for detecting changes between checks', async (t) => {
