@@ -7,6 +7,7 @@ Release only curated models whose TVM artifacts and behavior have been verified.
 - Build one candidate archive from a clean checkout and install that archive in a clean consumer.
 - Check the public catalog, TypeScript API, package contents, dependency audit, pinned assets, notices, and model-data rights.
 - Run the repository's formatting, lint, cognitive complexity, type, unit, and package checks.
+- Pass `pnpm run check:typescript:complete` and `pnpm run check:complexity:complete`, plus the Python complexity completion check in CI.
 - For every included model and claimed environment, run real inference against the installed archive. Record the browser, hardware, WebGPU adapter, required features, input and output coverage, and reference comparison.
 - Verify online loading, artifact hashes, cached offline loading and inference without network access, cleanup, and failure paths. Missing or skipped required evidence fails the release.
 - Tie the evidence to the archive and artifact hashes. A change after verification requires a new candidate and new checks.

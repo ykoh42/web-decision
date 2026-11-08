@@ -65,8 +65,11 @@ jobs:
         run: |
           uv run --locked --no-sync --only-group quality pytest -q \
             scripts/ci/test_python_complexity.py \
+            scripts/ci/test_python_complexity_completion.py \
             scripts/ci/test_python_quality.py \
             scripts/ci/test_workflow_syntax.py \
             scripts/test_safe_output.py \
             scripts/test_specialize_q4_direct_serialization.py \
             scripts/test_tvm_kev_shape_order.py
+      - name: Enforce Python complexity completion
+        run: uv run --locked --no-sync --only-group quality python scripts/ci/check_python_complexity_completion.py
