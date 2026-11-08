@@ -1,9 +1,19 @@
-TinyDecide JavaScript engine
+TinyDecide engine
 
-The engine and correction helper in src/tinydecide/ are copied unchanged from
-TheREZOR/TinyDecide at revision aa745b73a2db9a43bce731f0e8e5c90a6899fe2c.
-The engine SHA-256 is 577fb33b169b370711248b94bf4d9c6f61eda5f4f158710f177a96ffe74990d1.
-The corrections helper SHA-256 is ee0de6af2b114b2c665c07c1e7908646c7afb939f69839184f72bf0436f990b9.
+The runtime implementation at src/tinydecide/engine.ts is a maintained TypeScript
+port of TheREZOR/TinyDecide at revision aa745b73a2db9a43bce731f0e8e5c90a6899fe2c.
+It is not byte-exact upstream source. The byte-exact upstream JavaScript is retained
+only as the test fixture test/fixtures/vendor/tinydecide-engine.js.txt; its SHA-256 is
+577fb33b169b370711248b94bf4d9c6f61eda5f4f158710f177a96ffe74990d1. Tests verify
+that checksum and compare tokenizer and weight-reader outputs against the fixture.
+The fixture source is https://huggingface.co/TheREZOR/TinyDecide/resolve/aa745b73a2db9a43bce731f0e8e5c90a6899fe2c/tinydecide.js.
+The test/tinydecide-engine-parity.mts verifier also loads the pinned model files and
+compares all 219 decoded tensors and Choice, Score, Noul, and Span outputs between
+the TypeScript runtime and the upstream fixture. The fixture is copied to a temporary
+.mjs file for execution; the package runtime remains the TypeScript port.
+The correction helper in src/tinydecide/corrections.js remains copied unchanged from
+that revision; its SHA-256 is ee0de6af2b114b2c665c07c1e7908646c7afb939f69839184f72bf0436f990b9.
+Its upstream source is https://huggingface.co/TheREZOR/TinyDecide/resolve/aa745b73a2db9a43bce731f0e8e5c90a6899fe2c/corrections.js.
 The upstream model card declares Apache-2.0 for TinyDecide. See
 https://huggingface.co/TheREZOR/TinyDecide/tree/aa745b73a2db9a43bce731f0e8e5c90a6899fe2c
 for the source revision, model files, model card, and current license statement.

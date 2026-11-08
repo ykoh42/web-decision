@@ -31,36 +31,6 @@
       "score": 17
     },
     {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:TinyDecide/member:MethodDeclaration:answer",
-      "score": 41
-    },
-    {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:TinyDecide/member:MethodDeclaration:attend",
-      "score": 26
-    },
-    {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:TinyDecide/member:MethodDeclaration:hidden",
-      "score": 37
-    },
-    {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:Weights/member:constructor",
-      "score": 24
-    },
-    {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:WordPiece/member:MethodDeclaration:encodeUntil",
-      "score": 30
-    },
-    {
-      "file": "packages/web-decision/src/tinydecide/engine.js",
-      "identity": "module/class:WordPiece/member:MethodDeclaration:word",
-      "score": 16
-    },
-    {
       "file": "releases/web-decision-0.1.0/prepare-asset-pack.mjs",
       "identity": "module/function:prepareAssetPack",
       "score": 16
