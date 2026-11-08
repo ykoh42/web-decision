@@ -51,16 +51,6 @@
       "score": 24
     },
     {
-      "file": "packages/web-decision/src/kev06/upstream-source.mjs",
-      "identity": "module/function:readSourceBytes",
-      "score": 16
-    },
-    {
-      "file": "packages/web-decision/src/kev06/upstream-source.mjs",
-      "identity": "module/function:validatedMapping",
-      "score": 16
-    },
-    {
       "file": "packages/web-decision/src/model.js",
       "identity": "module/class:DecisionModel/member:MethodDeclaration:releaseCachedMemory",
       "score": 19
