@@ -161,7 +161,6 @@
     "packages/web-decision/src/skejja/tokenizer.mjs",
     "packages/web-decision/src/stable-models.js",
     "packages/web-decision/src/strands/choice.mjs",
-    "packages/web-decision/src/strands/disposal-guard.mjs",
     "packages/web-decision/src/strands/fused-upload.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-loader.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-runner.mjs",
