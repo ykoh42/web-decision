@@ -12,7 +12,7 @@ from pathlib import Path
 import os
 import numpy as np,onnx,onnxsim
 from onnx import TensorProto,external_data_helper,helper,numpy_helper
-from safe_output import atomic_write,open_directory
+from safe_output import atomic_write,atomic_write_serialized_message,open_directory
 ROOT=Path(__file__).resolve().parents[1];folder=ROOT/'models/kev-0.6b-onnx/onnx';source=folder/'model_q4f16.onnx';started=time.perf_counter()
 parser=argparse.ArgumentParser();parser.add_argument('--seq-len',type=int,default=69);parser.add_argument('--dynamic',action='store_true');args=parser.parse_args();seq=args.seq_len
 if not 1<=seq<=1024:raise SystemExit('seq-len must be in 1..1024 for this prototype')
@@ -85,7 +85,7 @@ def restore(as_u32):
  inps=[x for x in m.graph.input if x.name not in placeholder_names];del m.graph.input[:];m.graph.input.extend(inps)
  used={x for n in m.graph.node for x in n.input};assert not (used&placeholder_names)
  suffix='dynamic' if args.dynamic else f'seq{seq}'
- name=f'model_q4f16_direct_{suffix}_u32.onnx' if as_u32 else f'model_q4f16_direct_{suffix}.onnx';atomic_write(model_output_fd,name,lambda output:onnx.save(m,output));return name
+ name=f'model_q4f16_direct_{suffix}_u32.onnx' if as_u32 else f'model_q4f16_direct_{suffix}.onnx';atomic_write_serialized_message(model_output_fd,name,m);return name
 ort=restore(False);tvm=restore(True)
 report={'kind':'q4-direct-specialization','source':str(source.relative_to(ROOT)),'onnxGraph':ort,'tvmGraph':tvm,'inputShape':[1,'sequence_length' if args.dynamic else seq],'quantizedOperators':len(ops),'rmsnormOperatorsExpanded':counts['SimplifiedLayerNormalization'],'placeholderCount':len(placeholders),'simplifiedNodeCount':len(simplified.graph.node),'denseWeightFilesCreated':0,'checkpointWeightBytesReadByConverter':0,'elapsedSeconds':time.perf_counter()-started,'note':'Shape-only graph inputs carry no values. Both outputs reuse the original packed external weights and scales.'}
 report_name='q4-direct-dynamic.json' if args.dynamic else ('q4-direct-specialization.json' if seq==69 else f'q4-direct-specialization-seq{seq}.json')

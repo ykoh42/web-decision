@@ -41,6 +41,7 @@ python3.12 -m venv .preview-venv
 # Install only hashed wheels so isolated source builds cannot add unpinned dependencies.
 .preview-venv/bin/python -m pip install --require-hashes --only-binary=:all: -r requirements-preview-build.lock
 .preview-venv/bin/python scripts/test_tvm_kev_shape_order.py
+.preview-venv/bin/python scripts/test_specialize_q4_direct_serialization.py
 
 revision=7b5acb32bd271342a24130f4ef439ff6c2e52c6c
 tvm=.toolchains/apache-tvm-src

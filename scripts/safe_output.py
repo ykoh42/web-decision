@@ -50,6 +50,11 @@ def atomic_write(directory_fd, name, write):
         raise
 
 
+def atomic_write_serialized_message(directory_fd, name, message):
+    """Atomically write protobuf bytes without giving the serializer a path."""
+    atomic_write(directory_fd, name, lambda output: output.write(message.SerializeToString()))
+
+
 def require_absent(directory_fd, name):
     """Reject any existing entry without following a symlink."""
     if not name or name in (".", "..") or "/" in name or "\\" in name:
