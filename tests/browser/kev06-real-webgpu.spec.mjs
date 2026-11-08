@@ -67,7 +67,7 @@ test('Kev 0.6B Q4F16 runs exact-package WebGPU boundary cases', async ({page, br
       ])
     );
     const model = await window.webDecision.loadDecisionModel({
-      model: 'kev-0.6b-q4f16',
+      modelId: 'kev-0.6b-q4f16',
       assetsUrl: '/kev-0.6b-q4f16/'
     });
 
@@ -146,6 +146,7 @@ test('Kev 0.6B Q4F16 runs exact-package WebGPU boundary cases', async ({page, br
       );
 
       return {
+        modelId: 'kev-0.6b-q4f16',
         model: model.description.model,
         backend: model.description.backend.name,
         currentBundleGpu: model.description.verification.currentBundleGpu,
@@ -200,7 +201,11 @@ test('Kev 0.6B Q4F16 runs exact-package WebGPU boundary cases', async ({page, br
     });
     webGpuFeatureStatus =
       gpuReport.match(/WebGPU:\s*(Hardware accelerated|Software only|Disabled|Blocklisted)/i)?.[1] ?? null;
-    gpuDeviceDescription = gpuReport.match(/<Integrated GPU>\s*([^\n]+)/i)?.[1]?.trim() ?? null;
+    gpuDeviceDescription =
+      gpuReport.match(/<Integrated GPU>\s*([^\n]+)/i)?.[1]?.trim() ??
+      gpuReport.match(/GPU\d+\s+VENDOR=[^\n]*?\bDEVICE=[^\n]*?\[([^\]]+)\]/i)?.[1]?.trim() ??
+      gpuReport.match(/GL_RENDERER\s+([^\n]+)/i)?.[1]?.trim() ??
+      null;
     await gpuPage.close();
     expect(webGpuFeatureStatus).toMatch(/hardware accelerated/i);
     expect(gpuDeviceDescription).not.toBeNull();
@@ -233,6 +238,7 @@ test('Kev 0.6B Q4F16 runs exact-package WebGPU boundary cases', async ({page, br
     package: {version: '0.0.0-preview.34', bundleSha256},
     assets: {manifestSha256, files: Object.keys(manifest.files)},
     inference: {
+      modelId: inference.modelId,
       model: inference.model,
       backend: inference.backend,
       currentBundleGpu: inference.currentBundleGpu,

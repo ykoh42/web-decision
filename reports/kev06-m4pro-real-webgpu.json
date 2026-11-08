@@ -1,11 +1,11 @@
 {
-  "date": "2026-11-08T10:21:00.203Z",
+  "date": "2026-11-08T15:10:19.068Z",
   "host": {
     "platform": "darwin",
     "release": "27.2.0",
     "arch": "arm64",
     "totalMemoryBytes": 25769803776,
-    "freeMemoryBytes": 9435906048
+    "freeMemoryBytes": 8383315968
   },
   "browser": {
     "name": "chromium",
@@ -16,7 +16,7 @@
   },
   "package": {
     "version": "0.0.0-preview.34",
-    "bundleSha256": "6359f73a940a269b10d93fd201ac902c286d7b6c18434c4980fda205fb97bc2b"
+    "bundleSha256": "c9930c6caa9db1cceb9b50e213b8a6243d9a3fc8595ef213ca51d68f8beee32e"
   },
   "assets": {
     "manifestSha256": "8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767",
@@ -38,6 +38,7 @@
     ]
   },
   "inference": {
+    "modelId": "kev-0.6b-q4f16",
     "model": "kev-0.6b-q4f16",
     "backend": "tvm-webgpu",
     "currentBundleGpu": "verified",
@@ -80,7 +81,7 @@
     "attentionTokenLimit": 11585,
     "sequenceTokenLimit": 8192,
     "minimum": {
-      "elapsedMs": 240.80000001192093,
+      "elapsedMs": 234.30000001192093,
       "tokenCount": 8,
       "selected": "only",
       "optionOrder": [
@@ -89,7 +90,7 @@
       "probabilityTotal": 1
     },
     "base": {
-      "elapsedMs": 27.599999994039536,
+      "elapsedMs": 27.299999982118607,
       "tokenCount": 11,
       "selected": "yes",
       "optionOrder": [
@@ -112,7 +113,7 @@
       },
       {
         "targetTokens": 69,
-        "elapsedMs": 37.900000005960464,
+        "elapsedMs": 37.80000001192093,
         "tokenCount": 69,
         "selected": "yes",
         "optionOrder": [
@@ -123,7 +124,7 @@
       },
       {
         "targetTokens": 256,
-        "elapsedMs": 80.40000000596046,
+        "elapsedMs": 80.19999998807907,
         "tokenCount": 256,
         "selected": "yes",
         "optionOrder": [
@@ -134,7 +135,7 @@
       },
       {
         "targetTokens": 1024,
-        "elapsedMs": 342.69999998807907,
+        "elapsedMs": 342.10000002384186,
         "tokenCount": 1024,
         "selected": "yes",
         "optionOrder": [
@@ -145,7 +146,7 @@
       },
       {
         "targetTokens": 2048,
-        "elapsedMs": 801.9000000059605,
+        "elapsedMs": 800.2000000178814,
         "tokenCount": 2048,
         "selected": "yes",
         "optionOrder": [
@@ -156,7 +157,7 @@
       },
       {
         "targetTokens": 2049,
-        "elapsedMs": 816.4000000059605,
+        "elapsedMs": 816.9000000059605,
         "tokenCount": 2049,
         "selected": "yes",
         "optionOrder": [
@@ -167,7 +168,7 @@
       },
       {
         "targetTokens": 8192,
-        "elapsedMs": 7001.5999999940395,
+        "elapsedMs": 6976.9000000059605,
         "tokenCount": 8192,
         "selected": "no",
         "optionOrder": [
@@ -182,7 +183,7 @@
       "message": "Question 0 state and branch exceed 8192 tokens; no truncation was applied."
     },
     "typed": {
-      "elapsedMs": 657.6999999880791,
+      "elapsedMs": 653.7999999821186,
       "tokenCount": 1721,
       "choice": "option-4",
       "choiceOptionCount": 255,
