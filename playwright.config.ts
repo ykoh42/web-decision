@@ -34,6 +34,7 @@ export default defineConfig({
   timeout: 30000,
   workers: 1,
   reporter: 'list',
+  projects: [{name: browserName}],
   ...(firefoxAppDataHome ? {globalTeardown: './tests/browser/firefox-app-data-teardown.mjs'} : {}),
   use: {
     baseURL,

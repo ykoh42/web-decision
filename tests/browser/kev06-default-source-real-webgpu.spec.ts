@@ -20,6 +20,7 @@ type UpstreamReference = Readonly<{
 type OnlineResult = {
   model: string;
   backend: string;
+  assetManifestSha256: string;
   adapterInfo: GPUAdapterInfo;
   adapterIsFallback: false;
   adapterFeatures: string[];
@@ -134,13 +135,20 @@ test('stable Kev model ID loads pinned upstream weights and then reloads offline
         result = {
           model: model.description.modelId,
           backend: model.description.backend.name,
+          assetManifestSha256: model.description.assets.manifestSha256,
           adapterInfo: adapter.info ?? {},
           adapterIsFallback,
           adapterFeatures: [...adapter.features],
           adapterLimits: {
             maxBufferSize: adapter.limits.maxBufferSize,
             maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-            maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize
+            maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+            maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
+            maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+            maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+            maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+            maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
+            maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension
           },
           userAgent: navigator.userAgent,
           selected: answer.selected,
@@ -232,6 +240,7 @@ test('stable Kev model ID loads pinned upstream weights and then reloads offline
       return {
         model: model.description.modelId,
         backend: model.description.backend.name,
+        assetManifestSha256: model.description.assets.manifestSha256,
         answer
       };
     } finally {
@@ -245,6 +254,7 @@ test('stable Kev model ID loads pinned upstream weights and then reloads offline
   expect(offlineRequests).toEqual([]);
   expect(offline.model).toBe(modelId);
   expect(offline.backend).toBe('tvm-webgpu');
+  expect(offline.assetManifestSha256).toBe(online.assetManifestSha256);
   expect(offline.answer.selected).toBe(online.selected);
   expect(offline.answer.probabilities.map(({option}) => option)).toEqual(online.optionOrder);
   for (const [index, option] of offline.answer.probabilities.entries()) {

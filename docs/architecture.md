@@ -36,3 +36,5 @@ Reproduce a historical release from its own Git tag and verify its source lock. 
 ## Quality gates
 
 New JavaScript and TypeScript use the repository's SonarJS cognitive complexity check, and Python uses complexipy. The limit is 15. Existing baseline findings remain visible and cannot worsen; new findings are not added as an automatic escape hatch. Formatting, lint, type, unit, package, model and release checks apply alongside these limits.
+
+The TypeScript migration policy tracks remaining directly maintained JavaScript by exact path. CI requires the complete migration check; immutable historical releases and documented external or generated outputs have separate exact-path exceptions.
