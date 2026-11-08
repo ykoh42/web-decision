@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import prepare_web_decision_assets as packager
 
@@ -14,6 +15,69 @@ def sha256(data):
 
 
 class PrepareWebDecisionAssetsTests(unittest.TestCase):
+    def test_collects_and_verifies_pinned_notice_sources(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tvm = root / ".toolchains/apache-tvm-src"
+            emscripten = root / ".toolchains/emsdk/upstream/emscripten"
+            paths = {
+                "PROVENANCE.md": "scripts/asset-notices/PROVENANCE.md",
+                "MODEL-APACHE-2.0.txt": "packages/web-decision/assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt",
+                "EMSCRIPTEN-LICENSE.txt": emscripten / "LICENSE",
+                "MUSL-COPYRIGHT.txt": emscripten / "system/lib/libc/musl/COPYRIGHT",
+                "LIBCXX-LICENSE.txt": emscripten / "system/lib/libcxx/LICENSE.TXT",
+                "LIBCXXABI-LICENSE.txt": emscripten
+                / "system/lib/libcxxabi/LICENSE.TXT",
+                "EMSCRIPTEN-COMPILER-RT-LICENSE.txt": emscripten
+                / "system/lib/compiler-rt/LICENSE.TXT",
+                "TVM-LICENSE.txt": tvm / "LICENSE",
+                "TVM-NOTICE.txt": tvm / "NOTICE",
+                "TVM-FFI-LICENSE.txt": tvm / "3rdparty/tvm-ffi/LICENSE",
+                "TVM-FFI-NOTICE.txt": tvm / "3rdparty/tvm-ffi/NOTICE",
+                "DLPACK-LICENSE.txt": tvm / "3rdparty/tvm-ffi/3rdparty/dlpack/LICENSE",
+                "COMPILER-RT-LICENSE.txt": tvm / "licenses/LICENSE.builtin_fp16.txt",
+            }
+            expected = {}
+            for name, location in paths.items():
+                path = root / location
+                path.parent.mkdir(parents=True, exist_ok=True)
+                data = (
+                    (packager.ROOT / location).read_bytes()
+                    if isinstance(location, str)
+                    else name.encode()
+                )
+                path.write_bytes(data)
+                if name not in {"PROVENANCE.md", "MODEL-APACHE-2.0.txt"}:
+                    expected[name] = sha256(data)
+            header = tvm / "3rdparty/compiler-rt/builtin_fp16.h"
+            header.parent.mkdir(parents=True, exist_ok=True)
+            header.write_bytes(b"/* license */\nint x;\n")
+
+            with patch.dict(packager.EXPECTED_NOTICE_HASHES, expected):
+                sources, hashes, extracted = packager.collect_notice_sources(root)
+                self.assertEqual(
+                    sources, {name: root / location for name, location in paths.items()}
+                )
+                self.assertEqual(extracted, b"/* license */\n")
+                self.assertEqual(
+                    hashes["PROVENANCE.md"],
+                    packager.EXPECTED_NOTICE_HASHES["PROVENANCE.md"],
+                )
+                self.assertEqual(
+                    hashes["MODEL-APACHE-2.0.txt"],
+                    packager.EXPECTED_NOTICE_HASHES["MODEL-APACHE-2.0.txt"],
+                )
+                for name in ("PROVENANCE.md", "MODEL-APACHE-2.0.txt"):
+                    path = sources[name]
+                    original = path.read_bytes()
+                    path.write_bytes(original + b"tampered")
+                    with (
+                        self.subTest(name=name),
+                        self.assertRaisesRegex(SystemExit, "Unexpected notice source"),
+                    ):
+                        packager.collect_notice_sources(root)
+                    path.write_bytes(original)
+
     def test_manifest_pin_requires_the_canonical_manifest_digest(self):
         manifest = {"files": {"model.wasm": {"sha256": sha256(b"model")}}}
         pin = packager.canonical_manifest_sha256(manifest)
