@@ -424,11 +424,9 @@
     "scripts/fetch-model.test.mjs",
     "scripts/release/kev-current-source-preview-package-policy.mjs",
     "scripts/release/kev-current-source-preview-safety.mjs",
-    "tests/browser/kev-upstream-provider.vite.config.mjs",
     "tests/browser/kev06-real-webgpu.spec.mjs",
     "tests/browser/stable-model-id.spec.mjs",
-    "tests/browser/strands-qwen2-real-webgpu.spec.mjs",
-    "tests/run-kev-upstream-provider.mjs"
+    "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
   ],
   "exceptions": [
     {

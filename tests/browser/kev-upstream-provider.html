@@ -113,7 +113,7 @@
           try {
             Object.defineProperty(globalThis, 'navigator', {configurable: true, value: navigatorValue});
             try {
-              await loadDecisionModel({model: EXPERIMENTAL_KEV_MODEL, cache: true});
+              await loadDecisionModel({modelId: 'kev-0.6b-q4f16', cache: true});
               throw new Error(`${label}: prepare unexpectedly succeeded.`);
             } catch (cause) {
               result = cause;
