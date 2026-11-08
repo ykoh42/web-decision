@@ -42,6 +42,7 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
     plugin.generateBundle({}, bundle);
     return bundle.entry.code;
   };
+  assert.equal(build(''), build('../../'));
   assert.equal(build('../../'), build('../../../../'));
   assert.match(build('../../'), /^\/\/ \[TVM\]\/runtime\.ts/m);
   assert.match(build('../../'), /const text = "\.\.\/\.toolchains/);

@@ -85,10 +85,10 @@ export default defineConfig({
           if (item.type !== 'chunk') continue;
           // Rolldown emits source paths as comments. Their number of ../ segments
           // depends on the checkout location, even when the code is identical.
-          const marker = /^\/\/ (?:\.\.\/)+\.toolchains\/apache-tvm-src\/web\/src\//m;
+          const marker = /^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//m;
           if (!marker.test(item.code)) continue;
           sawMarker = true;
-          item.code = item.code.replace(/^\/\/ (?:\.\.\/)+\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
+          item.code = item.code.replace(/^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
         }
         if (!sawMarker) throw new Error('Expected TVM source markers in bundle');
       }
