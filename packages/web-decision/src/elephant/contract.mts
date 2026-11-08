@@ -12,8 +12,10 @@ const VARIANTS = Object.freeze({
   })
 });
 
-export function elephantVariant(model) {
-  return typeof model === 'string' && Object.hasOwn(VARIANTS, model) ? VARIANTS[model] : undefined;
+export function elephantVariant(model: unknown) {
+  return typeof model === 'string' && Object.hasOwn(VARIANTS, model)
+    ? VARIANTS[model as keyof typeof VARIANTS]
+    : undefined;
 }
 export const ELEPHANT_LIMITS = Object.freeze({
   maxBufferSize: 134217728,

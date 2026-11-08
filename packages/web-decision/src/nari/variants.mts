@@ -17,7 +17,7 @@ export const NARI_MIXED = Object.freeze({
   bindings: 606
 });
 
-export function nariVariant(model) {
+export function nariVariant(model: unknown) {
   if (model === NARI_FULL.model) return NARI_FULL;
   if (model === NARI_MIXED.model) return NARI_MIXED;
   return undefined;
