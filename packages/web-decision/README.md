@@ -2,7 +2,7 @@
 
 `web-decision` runs curated decision models locally in the browser using TVM. A model ID selects a package-pinned model and its verified assets. Applications cannot register an arbitrary model or asset URL.
 
-This workspace is a preview. The latest published stable package and its supported models are documented in the [main README](../../README.md).
+This workspace is a preview. The latest published stable package and its supported models are documented in the [repository README](https://github.com/ykoh42/web-decision#readme).
 
 ```js
 import {describeModel, listModels, loadDecisionModel} from 'web-decision';
