@@ -3,24 +3,37 @@ import {WebDecisionError} from './kev.js';
 import {processPrefetchedShards} from './shard-prefetch.js';
 
 /** Read verified assets while tracking progress and whether all files were cached. */
-export function createModelAssetReader({base, manifest, cache, signal, options}) {
+export function createModelAssetReader({base, manifest, cache, signal, options, fetchImpl, progressPhase}) {
   const totalBytes = Object.values(manifest.files).reduce((sum, entry) => sum + entry.bytes, 0);
   let loadedBytes = 0,
-    cacheComplete = true;
+    cacheComplete = true,
+    currentProgressPhase = progressPhase;
   const read = (name, readSignal = signal) =>
     readVerifiedAsset(base, manifest, name, {
       cache,
       signal: readSignal,
       offline: options.offline === true,
+      fetchImpl,
       onCacheStatus: (cached) => {
         if (!cached) cacheComplete = false;
       },
       onBytes: (count) => {
         loadedBytes += count;
-        options.onProgress?.({loadedBytes, totalBytes, fraction: totalBytes ? loadedBytes / totalBytes : 1});
+        options.onProgress?.({
+          loadedBytes,
+          totalBytes,
+          fraction: totalBytes ? loadedBytes / totalBytes : 1,
+          ...(currentProgressPhase ? {phase: currentProgressPhase} : {})
+        });
       }
     });
-  return {read, isCacheComplete: () => cacheComplete};
+  return {
+    read,
+    isCacheComplete: () => cacheComplete,
+    setProgressPhase(phase) {
+      currentProgressPhase = phase;
+    }
+  };
 }
 
 /** Upload each verified tensor shard in order, with optional bounded read-ahead. */

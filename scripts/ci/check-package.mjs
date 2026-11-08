@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {readFileSync, writeFileSync} from 'node:fs';
+import {readFileSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {checkConsumerTypes} from './check-types.mjs';
@@ -129,6 +129,8 @@ withTemporaryDirectories((makeTempDirectory) => {
   });
   const [archive] = JSON.parse(output);
   const files = archive.files.map((file) => file.path).sort();
+  const kevChunkFiles = readdirSync(join(pkg, 'dist')).filter((name) => /^bundled-assets-.+\.js$/u.test(name));
+  assert.equal(kevChunkFiles.length, 1, 'The build must emit exactly one lazy Kev asset chunk.');
   const expectedFiles = [
     'CLEF-NOTICE',
     'CRIVO-NOTICE',
@@ -173,7 +175,24 @@ withTemporaryDirectories((makeTempDirectory) => {
     'VERDICT-NOTICE',
     'VITE-LICENSE.md',
     'XDECISION-NOTICE',
+    'assets/experimental-kev-upstream/PROVENANCE.md',
+    'assets/experimental-kev-upstream/notices/COMPILER-RT-HEADER-NOTICE.txt',
+    'assets/experimental-kev-upstream/notices/COMPILER-RT-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/DLPACK-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/EMSCRIPTEN-COMPILER-RT-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/EMSCRIPTEN-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/LIBCXX-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/LIBCXXABI-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt',
+    'assets/experimental-kev-upstream/notices/MUSL-COPYRIGHT.txt',
+    'assets/experimental-kev-upstream/notices/NOTICE-SOURCES.md',
+    'assets/experimental-kev-upstream/notices/PROVENANCE.md',
+    'assets/experimental-kev-upstream/notices/TVM-FFI-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/TVM-FFI-NOTICE.txt',
+    'assets/experimental-kev-upstream/notices/TVM-LICENSE.txt',
+    'assets/experimental-kev-upstream/notices/TVM-NOTICE.txt',
     'dist/index.js',
+    `dist/${kevChunkFiles[0]}`,
     'package.json',
     'src/STRANDS-GEMMA4-NOTICE',
     'src/abort.js',
@@ -367,8 +386,47 @@ withTemporaryDirectories((makeTempDirectory) => {
   execFileSync(process.execPath, ['--input-type=module', '-e', smokeTest], {cwd: consumer, stdio: 'inherit'});
   checkConsumerTypes(consumer);
   const bundle = readFileSync(join(consumer, 'node_modules/web-decision/dist/index.js'));
+  const bundleText = bundle.toString('utf8');
+  const kevChunkName = kevChunkFiles[0];
+  assert.ok(
+    bundleText.includes(`import("./${kevChunkName}")`),
+    'The experimental Kev assets must load through a dynamic package chunk.'
+  );
+  const kevChunkPath = join(consumer, 'node_modules/web-decision/dist', kevChunkName);
+  const kevChunk = readFileSync(kevChunkPath);
+  const kevChunkText = kevChunk.toString('utf8');
+  assert.doesNotMatch(
+    kevChunkText,
+    /\?url(?:&|["'])/u,
+    'The published lazy chunk must not depend on consumer asset plugins.'
+  );
+  for (const [name, sourcePath] of [
+    ['model.wasm', 'assets/experimental-kev-upstream/model.wasm'],
+    ['tokenizer.json', 'assets/experimental-kev-upstream/tokenizer.json'],
+    ['tokenizer_config.json', 'assets/experimental-kev-upstream/tokenizer_config.json'],
+    ['model_config.json', 'assets/experimental-kev-upstream/model_config.json'],
+    ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
+  ]) {
+    const key = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const match = kevChunkText.match(new RegExp(`["']${key}["']\\s*:\\s*["'](data:[^"']+)["']`, 'u'));
+    assert.ok(match, `The lazy package chunk is missing the inline asset ${name}.`);
+    const dataUrl = match[1];
+    const comma = dataUrl.indexOf(',');
+    assert.ok(comma > 5, `The lazy package chunk has an invalid data URL for ${name}.`);
+    const metadata = dataUrl.slice(5, comma);
+    const payload = dataUrl.slice(comma + 1);
+    const bytes = metadata.includes(';base64')
+      ? Buffer.from(payload, 'base64')
+      : Buffer.from(decodeURIComponent(payload));
+    const source = readFileSync(join(pkg, sourcePath));
+    assert.equal(
+      createHash('sha256').update(bytes).digest('hex'),
+      createHash('sha256').update(source).digest('hex'),
+      `The lazy package chunk changed the pinned asset ${name}.`
+    );
+  }
   console.log(
-    `Installed ${metadata.name}@${metadata.version}; bundle SHA-256: ${createHash('sha256').update(bundle).digest('hex')}`
+    `Installed ${metadata.name}@${metadata.version}; bundle SHA-256: ${createHash('sha256').update(bundle).digest('hex')}; lazy Kev chunk: ${kevChunkName}`
   );
   const pnpmConsumer = makeTempDirectory('web-decision-ci-pnpm-consumer-');
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -382,6 +440,7 @@ withTemporaryDirectories((makeTempDirectory) => {
   assert.equal(pnpmInstalled.version, metadata.version);
   assert.equal(pnpmInstalled.license, metadata.license);
   assert.deepEqual(readFileSync(join(pnpmConsumer, 'node_modules/web-decision/dist/index.js')), bundle);
+  assert.deepEqual(readFileSync(join(pnpmConsumer, 'node_modules/web-decision/dist', kevChunkName)), kevChunk);
   execFileSync(process.execPath, ['--input-type=module', '-e', smokeTest], {cwd: pnpmConsumer, stdio: 'inherit'});
   checkConsumerTypes(pnpmConsumer);
   console.log('The archive installs, imports, and type-checks in clean npm and pnpm consumers.');

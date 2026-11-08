@@ -371,7 +371,11 @@ export type Kev08SystemOneAnswer =
     }>
   | Readonly<{type: 'noul'; noul: number}>;
 
-export type KevSystemOneModelName = 'kev-0.6b-q4f16' | 'kev-0.6b-reflexes-q4f16' | 'kev-0.8b-f16';
+export type KevSystemOneModelName =
+  | 'kev-0.6b-q4f16'
+  | 'experimental-kev-0.6b-q4f16-upstream'
+  | 'kev-0.6b-reflexes-q4f16'
+  | 'kev-0.8b-f16';
 
 export interface Kev08SystemOneResult {
   readonly model: 'kev-0.8b-f16';
@@ -652,6 +656,7 @@ export interface ModelProgress {
   loadedBytes: number;
   totalBytes: number;
   fraction: number;
+  phase?: 'bundled-assets' | 'upstream-source' | 'asset-verification';
 }
 
 export type ModelName =
@@ -670,6 +675,7 @@ export type ModelName =
   | 'experimental-skejja-edge32k-ft6-int8dyn'
   | 'experimental-ettin-68m-int8'
   | 'kev-0.6b-q4f16'
+  | 'experimental-kev-0.6b-q4f16-upstream'
   | 'kev-0.6b-reflexes-q4f16'
   | 'open-jev-deberta-v3-large-q4f16'
   | 'mapika-0.8b-f16'
@@ -730,6 +736,7 @@ type PrefetchModelName = Exclude<
   | 'experimental-crivo-32m-v2-int8'
   | 'experimental-d1-omni-600m-q8'
   | 'experimental-openjev-verdict-151m-fp16'
+  | 'experimental-kev-0.6b-q4f16-upstream'
   | 'experimental-laya-multilingual-fp16'
   | 'experimental-laya-typed-decisions-fp16'
   | 'experimental-xdecision-fp16'
@@ -777,7 +784,7 @@ export interface TextChoiceCapability {
 }
 
 export type AssetIntegrity = Readonly<{
-  location: 'separate';
+  location: 'separate' | 'package-and-pinned-upstream';
   requiredFiles: readonly string[];
   additionalFiles: string;
 }> &
@@ -785,6 +792,12 @@ export type AssetIntegrity = Readonly<{
     | Readonly<{integrity: 'manifest-declared'}>
     | Readonly<{integrity: 'pinned-files'}>
     | Readonly<{integrity: 'pinned-manifest'; manifestSha256: string}>
+    | Readonly<{
+        integrity: 'candidate-pinned-manifest-and-shards';
+        manifestSha256: string;
+        sourceDataSha256: string;
+        candidateWasmSha256: string;
+      }>
   );
 
 export interface SelectiveActionCapability {
@@ -1213,6 +1226,7 @@ export type LoadOptions =
   | ImajevLoadOptions
   | MapikaLoadOptions
   | Kev06LoadOptions
+  | KevUpstreamLoadOptions
   | KevReflexesLoadOptions
   | Kev08LoadOptions
   | DecimaLoadOptions
@@ -1231,6 +1245,18 @@ export type LoadOptions =
 export type Kev06LoadOptions = CommonLoadOptions & {
   model?: 'kev-0.6b-q4f16';
   maxPrefetchBytes?: number;
+  /** Optional cap on the complete packed token sequence; omitted means no aggregate token cap. */
+  maxInputTokens?: number;
+  /** Optional cap on rendered prompt text in UTF-16 code units; omitted means no character cap. */
+  maxInputCharacters?: number;
+  debertaReadback?: undefined;
+};
+
+export type KevUpstreamLoadOptions = Omit<CommonLoadOptions, 'assetsUrl'> & {
+  model: 'experimental-kev-0.6b-q4f16-upstream';
+  /** The upstream source is pinned in the package; this route does not accept an asset mirror. */
+  assetsUrl?: never;
+  maxPrefetchBytes?: 0;
   /** Optional cap on the complete packed token sequence; omitted means no aggregate token cap. */
   maxInputTokens?: number;
   /** Optional cap on rendered prompt text in UTF-16 code units; omitted means no character cap. */
@@ -1294,6 +1320,15 @@ export interface LoadedKev06DecisionModel extends LoadedDecisionModel {
     questions: KevSystemOneQuestions,
     options?: DecisionOptions
   ): Promise<KevSystemOneResult<'kev-0.6b-q4f16'>>;
+}
+
+export interface LoadedKevUpstreamDecisionModel extends LoadedDecisionModel {
+  /** Experimental q2-k128 Kev route; uses the same Choice, Noul, and ordered Score protocol. */
+  systemOne(
+    state: KevSystemOneJsonValue,
+    questions: KevSystemOneQuestions,
+    options?: DecisionOptions
+  ): Promise<KevSystemOneResult<'experimental-kev-0.6b-q4f16-upstream'>>;
 }
 
 export interface LoadedKevReflexesDecisionModel extends LoadedDecisionModel {
@@ -1865,8 +1900,14 @@ export function loadDecisionModel(
 export function loadDecisionModel(options: DebertaLoadOptions): Promise<LoadedDebertaDecisionModel>;
 export function loadDecisionModel(options: KevReflexesLoadOptions): Promise<LoadedKevReflexesDecisionModel>;
 export function loadDecisionModel(options: Kev06LoadOptions): Promise<LoadedKev06DecisionModel>;
+export function loadDecisionModel(options: KevUpstreamLoadOptions): Promise<LoadedKevUpstreamDecisionModel>;
 export function loadDecisionModel(options: Kev08LoadOptions): Promise<LoadedKev08DecisionModel>;
-export function loadDecisionModel<Options extends Readonly<{assetsUrl: string; model: ModelName}>>(
+export function loadDecisionModel<
+  Options extends Readonly<{
+    assetsUrl: string;
+    model: Exclude<ModelName, 'experimental-kev-0.6b-q4f16-upstream'>;
+  }>
+>(
   options: Options & Record<Exclude<keyof Options, 'assetsUrl' | 'model'>, never>
 ): Promise<LoadedDecisionModel | LoadedImajevDecisionModel>;
 export function loadDecisionModel(options: StandardLoadOptions): Promise<LoadedDecisionModel>;

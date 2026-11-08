@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from 'node:test';
+import {fileURLToPath} from 'node:url';
 import {Tokenizer} from './strands-fake-tokenizer.mjs';
 import {ExperimentalFusedRunner} from '../src/strands/runner.mjs';
 import {ExperimentalStrandsSession} from '../src/strands/session.mjs';
@@ -242,7 +243,7 @@ test('a prior pending readback poisons before a new graph call', async () => {
 
 test('an unexpected rejected readback is observed without treating it as safe', () => {
   for (const mode of ['preexisting', 'graph', 'replacement', 'nonwritable']) {
-    execFileSync(process.execPath, [new URL('./strands-unhandled-fixture.mjs', import.meta.url).pathname, mode], {
+    execFileSync(process.execPath, [fileURLToPath(new URL('./strands-unhandled-fixture.mjs', import.meta.url)), mode], {
       env: {PATH: '/usr/bin:/bin', LANG: 'C'},
       timeout: 2000,
       stdio: 'pipe'

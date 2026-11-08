@@ -7,6 +7,7 @@ import {describeModel} from '../src/model-registry.js';
 // Exercise the actual Kev loader with small fake asset, GPU and runtime boundaries.
 const supportsHooks = typeof nodeModule.registerHooks === 'function';
 let loadDecisionModel;
+let installFakeBundledAssetsHook = () => null;
 if (supportsHooks) {
   const loaderUrls = new Set([
     new URL('../src/index.js', import.meta.url).href,
@@ -24,10 +25,46 @@ if (supportsHooks) {
     export function parseJson(value) { return value; }
     export async function readManifestResponse() { return fixture().manifest; }
     export async function readKev06ManifestResponse() { return fixture().manifest; }
+    export const EXPERIMENTAL_KEV_MODEL = 'experimental-kev-0.6b-q4f16-upstream';
+    export function createKevReconstructedSource(overrides = {}) {
+      fixture().bundledUrls = overrides.bundledUrls;
+      return {
+        async prepare(options) {
+          fixture().events.push('prepare');
+          options.signal?.throwIfAborted();
+          if (!fixture().gpuAvailable) throw Object.assign(new Error('WebGPU unavailable'), {code: 'UNSUPPORTED_ENVIRONMENT'});
+          return {base: 'https://kev-assets.web-decision.invalid/experimental-kev-upstream/', signal: options.signal, cache: null, response: {}, maxPrefetchBytes: 0};
+        },
+        async fetch(url, {signal} = {}) {
+          if (!fixture().bundledUrls) {
+            const module = await import('./kev06/bundled-assets.js');
+            fixture().bundledUrls = module.experimentalKevBundledUrls;
+          }
+          signal?.throwIfAborted();
+          return new Response(new Uint8Array([1]));
+        },
+        setProgress() {},
+        dispose() {}
+      };
+    }
+    export async function readExperimentalKevManifest() { return fixture().manifest; }
     export async function commitCachedManifest() {}
     export async function prepareModelSource(options) { return {signal: options.signal, response: {}, cache: null}; }
-    export function createModelAssetReader() { return {read() {}, isCacheComplete() { return false; }}; }
-    export async function readAssetBatch() { return [{}, {}, fixture().modelConfig, {}, fixture().cacheManifest]; }
+    export function createModelAssetReader({base, fetchImpl, signal}) {
+      return {
+        async read(name, readSignal = signal) {
+          if (fetchImpl && !fixture().warmCache)
+            await fetchImpl(new URL(name, base).href, {signal: readSignal});
+          return new ArrayBuffer(1);
+        },
+        isCacheComplete() { return fixture().warmCache; },
+        setProgressPhase() {}
+      };
+    }
+    export async function readAssetBatch(names, read, signal) {
+      await Promise.all(names.map((name) => read(name, signal)));
+      return [{}, {}, fixture().modelConfig, {}, fixture().cacheManifest];
+    }
     export async function uploadModelShards() { fixture().uploads++; }
     export class DecisionModel {
       constructor(runtime, device, gpu, fn, weights, tokenizer, limits) { this.runtime = runtime; this.gpu = gpu; this.limits = limits; }
@@ -45,11 +82,32 @@ if (supportsHooks) {
     export async function loadExperimentalStrandsFromSource(options) { return loadFake('strands', options); }
   `;
   const fakeModule = `data:text/javascript;base64,${Buffer.from(fakeSource).toString('base64')}`;
+  const fakeBundledAssets = `
+    globalThis.__fakeKevLoader.helperLoads++;
+    globalThis.__fakeKevLoader.events.push('helper');
+    export const experimentalKevBundledUrls = Object.freeze({
+      'model.wasm': 'data:application/wasm;base64,AA==',
+      'tokenizer.json': 'data:application/json;base64,e30=',
+      'tokenizer_config.json': 'data:application/json;base64,e30=',
+      'model_config.json': 'data:application/json;base64,e30=',
+      'weights/tensor-cache.json': 'data:application/json;base64,e30='
+    });
+  `;
+  const fakeBundledModule = `data:text/javascript;base64,${Buffer.from(fakeBundledAssets).toString('base64')}`;
+  installFakeBundledAssetsHook = () =>
+    nodeModule.registerHooks({
+      resolve(specifier, context, nextResolve) {
+        if (context.parentURL === fakeModule && specifier === './kev06/bundled-assets.js')
+          return {url: fakeBundledModule, shortCircuit: true};
+        return nextResolve(specifier, context);
+      }
+    });
   const mocked = new Set([
     '@huggingface/tokenizers',
     './kev-gpu.js',
     './assets.js',
     './kev06/contract.js',
+    './kev06/upstream-source.mjs',
     './model.js',
     './asset-batch.js',
     './model-source.js',
@@ -131,6 +189,10 @@ function setup(t) {
   }));
   const fake = {
     ...state,
+    helperLoads: 0,
+    events: [],
+    gpuAvailable: true,
+    warmCache: false,
     gpu,
     pending,
     started: markStarted,
@@ -213,6 +275,68 @@ test('Kev loader transfers a successful runtime to the model', {skip: !supportsH
   assert.equal(f.state.disposed, 1);
   assert.equal(f.state.destroyed, 1);
 });
+
+test(
+  'experimental upstream Kev imports its immutable data URLs lazily after prepare on a cache miss',
+  {skip: !supportsHooks},
+  async (t) => {
+    const f = setup(t);
+    const helperHook = installFakeBundledAssetsHook();
+    t.after(() => helperHook?.deregister());
+    const loading = loadDecisionModel({model: 'experimental-kev-0.6b-q4f16-upstream'});
+    await f.started;
+    f.resolveRuntime(f.runtime);
+    const model = await loading;
+    assert.equal(f.fake.helperLoads, 1);
+    assert.deepEqual(f.fake.events, ['prepare', 'helper']);
+    assert.deepEqual(
+      Object.keys(f.fake.bundledUrls).sort(),
+      ['model.wasm', 'model_config.json', 'tokenizer.json', 'tokenizer_config.json', 'weights/tensor-cache.json'].sort()
+    );
+    assert.equal(f.fake.bundledUrls['model.wasm'], 'data:application/wasm;base64,AA==');
+    assert.equal(model.description.model, 'experimental-kev-0.6b-q4f16-upstream');
+    model.dispose();
+  }
+);
+
+test(
+  'experimental Kev skips its helper chunk for pre-abort, unavailable WebGPU, and warm offline cache',
+  {
+    skip: !supportsHooks
+  },
+  async (t) => {
+    for (const kind of ['pre-abort', 'no-gpu', 'warm-offline']) {
+      await t.test(kind, async (t) => {
+        const f = setup(t);
+        const helperHook = installFakeBundledAssetsHook();
+        t.after(() => helperHook?.deregister());
+        const options = {model: 'experimental-kev-0.6b-q4f16-upstream'};
+        if (kind === 'pre-abort') {
+          const controller = new AbortController();
+          const reason = new Error('cancelled before load');
+          controller.abort(reason);
+          options.signal = controller.signal;
+          await assert.rejects(loadDecisionModel(options), (error) => error === reason);
+          assert.deepEqual(f.fake.events, ['prepare']);
+        } else if (kind === 'no-gpu') {
+          f.fake.gpuAvailable = false;
+          await assert.rejects(loadDecisionModel(options), {code: 'UNSUPPORTED_ENVIRONMENT'});
+          assert.deepEqual(f.fake.events, ['prepare']);
+        } else {
+          f.fake.warmCache = true;
+          options.offline = true;
+          const loading = loadDecisionModel(options);
+          await f.started;
+          f.resolveRuntime(f.runtime);
+          const model = await loading;
+          assert.deepEqual(f.fake.events, ['prepare']);
+          model.dispose();
+        }
+        assert.equal(f.fake.helperLoads, 0);
+      });
+    }
+  }
+);
 
 test('Kev accepts an optional caller-selected aggregate token cap', {skip: !supportsHooks}, async (t) => {
   const f = setup(t);

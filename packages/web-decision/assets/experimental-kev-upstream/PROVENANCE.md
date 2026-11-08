@@ -1,0 +1,9 @@
+# Experimental Kev upstream reconstruction assets
+
+This unpublished npm package registers the explicit model ID `experimental-kev-0.6b-q4f16-upstream`. It is not the released Kev 0.3 model. The stable `kev-0.6b-q4f16` ID still requires its existing `assetsUrl` and keeps all released pins unchanged; the experimental ID has no automatic default or public model URL.
+
+The npm package bundles the q2-k128 candidate TVM WebGPU WASM and tokenizer/config/cache metadata. The source checkout also carries a 394-record source-to-shard map, SHA-256 `bbe4279b99d995770bd3ba681d17cec07e4f083aeaaddffb0a3ce26d07e81065`. The candidate WASM SHA-256 is `78026118d5c1f85941f75e0929d88d72edfc1a0418895d3f26bf6738a506882d`; released 0.3 instead pins `5e995762514782786cf0230f7f88bf3b0f1db3499f9c44cea9a691539adee4b0`. No equivalence is claimed.
+
+At runtime the provider fetches the external data from the immutable Hugging Face revision `5a827091b3d58fe4fdfc02a5a5b2ce364047d678`, enforces the exact 335,357,952-byte limit and source SHA-256 `777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b`, then exposes only mapped shard responses to the existing per-file verifier. The existing 128 MiB per-asset limit remains in force; each shard is cached only after its candidate manifest length and SHA-256 checks succeed. The raw source is not placed in CacheStorage.
+
+The runtime fetches one pinned 335,357,952-byte ONNX external-data file, then reconstructs and verifies the nine TVM shards from the map before each shard is cached. The raw ONNX file is not cached. Observed Windows Chrome testing measured about 1.8 GiB aggregate Chrome working set during online reconstruction and load. This is experimental, has no broad parity or quality acceptance, and requires further review of licensing, browser support, cache quota, and package URL behavior before any distribution decision.

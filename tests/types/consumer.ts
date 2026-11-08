@@ -13,6 +13,7 @@ import {
   type LoadedDecisionModel,
   type LoadedDebertaDecisionModel,
   type LoadedKev06DecisionModel,
+  type LoadedKevUpstreamDecisionModel,
   type LoadedKevReflexesDecisionModel,
   type LoadedKev08DecisionModel,
   type LoadedMapikaDecisionModel,
@@ -23,6 +24,7 @@ import {
   type KevSystemOneJsonValue,
   type StrandsGemma4SystemOneQuestion,
   type Kev08LoadOptions,
+  type KevUpstreamLoadOptions,
   type ModelName,
   type StandardLoadOptions,
   type OpenDeciderNanoLoadOptions,
@@ -105,7 +107,29 @@ const kevReflexesLoadOptionsWithCaps: LoadOptions = {
   maxInputTokens: 4096,
   maxInputCharacters: 65_536
 };
-void [kevLoadOptionsWithCaps, kevLoadOptionsWithoutCaps, kevReflexesLoadOptionsWithCaps];
+const kevUpstreamOptions: KevUpstreamLoadOptions = {
+  model: 'experimental-kev-0.6b-q4f16-upstream',
+  maxPrefetchBytes: 0,
+  onProgress(progress) {
+    const phase: 'bundled-assets' | 'upstream-source' | 'asset-verification' | undefined = progress.phase;
+    void phase;
+  }
+};
+const kevUpstream: Promise<LoadedKevUpstreamDecisionModel> = loadDecisionModel(kevUpstreamOptions);
+void kevUpstream.then((model) => {
+  const result: Promise<KevSystemOneResult<'experimental-kev-0.6b-q4f16-upstream'>> = model.systemOne(
+    'A billing ticket.',
+    {
+      route: {type: 'choice', instructions: 'Choose a team.', criteria: {billing: null, delivery: null}}
+    }
+  );
+  void result;
+});
+// @ts-expect-error The experimental source provider does not accept a separate asset directory.
+loadDecisionModel({model: 'experimental-kev-0.6b-q4f16-upstream', assetsUrl: '/models/kev-upstream/'});
+// @ts-expect-error The experimental source provider disables shard read-ahead to constrain extra memory.
+loadDecisionModel({model: 'experimental-kev-0.6b-q4f16-upstream', maxPrefetchBytes: 1});
+void [kevLoadOptionsWithCaps, kevLoadOptionsWithoutCaps, kevReflexesLoadOptionsWithCaps, kevUpstream];
 const crivoOptions: CrivoLoadOptions = {
   model: 'experimental-crivo-32m-v2-int8',
   assetsUrl: '/models/crivo-32m-v2/',
@@ -630,6 +654,7 @@ declare const dynamicModel: Exclude<
   | 'experimental-crivo-32m-v2-int8'
   | 'experimental-d1-omni-600m-q8'
   | 'experimental-openjev-verdict-151m-fp16'
+  | 'experimental-kev-0.6b-q4f16-upstream'
 >;
 declare const legacyModel: Exclude<
   NonNullable<LoadOptions['model']>,
@@ -668,6 +693,7 @@ declare const legacyModel: Exclude<
   | 'experimental-gliner2.5-decide-mobile-q4f16'
   | 'experimental-d1-omni-600m-q8'
   | 'experimental-openjev-verdict-151m-fp16'
+  | 'experimental-kev-0.6b-q4f16-upstream'
 >;
 declare const dynamicBudget: number;
 const dynamicOptions: LoadOptions = {assetsUrl: '/', model: dynamicModel};
@@ -1030,7 +1056,8 @@ function declareDynamicModel(value: unknown): void {
   if (isDecisionModel(value)) {
     const model: ModelName = value;
     describeModel(model);
-    loadDecisionModel({assetsUrl: '/', model});
+    if (model === 'experimental-kev-0.6b-q4f16-upstream') loadDecisionModel({model});
+    else loadDecisionModel({assetsUrl: '/', model});
   }
 }
 

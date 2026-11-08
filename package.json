@@ -17,6 +17,7 @@
     "test:release:0.3.0": "node --test releases/web-decision-0.3.0/test/model-contract.test.mjs releases/web-decision-0.3.0/prepare-asset-pack.test.mjs releases/web-decision-0.3.0/release-integrity.test.mjs && python3 -B -m unittest discover -s releases/web-decision-0.3.0/attention-q2 -p 'test_*.py' && python3 -B scripts/test_safe_output.py",
     "test:release:0.3.0:browser:micro": "pnpm exec playwright test --config releases/web-decision-0.3.0/test/playwright.config.mjs",
     "test:browser:kev06": "pnpm exec playwright test --config=playwright.config.mjs tests/browser/kev06-real-webgpu.spec.mjs",
+    "test:browser:kev-upstream-provider": "pnpm build:package && node tests/run-kev-upstream-provider.mjs",
     "test:types:0.3.0": "node scripts/ci/check-release-types.mjs",
     "build:release": "node releases/web-decision-0.1.0/build.mjs",
     "pack:release": "node releases/web-decision-0.1.0/pack.mjs",

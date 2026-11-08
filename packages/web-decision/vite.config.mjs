@@ -61,14 +61,17 @@ export default defineConfig({
     {
       name: 'normalize-tvm-source-markers',
       generateBundle(_options, bundle) {
+        let sawMarker = false;
         for (const item of Object.values(bundle)) {
           if (item.type !== 'chunk') continue;
           // Rolldown emits source paths as comments. Their number of ../ segments
           // depends on the checkout location, even when the code is identical.
-          const marker = /^\/\/ (?:\.\.\/)+\.toolchains\/apache-tvm-src\/web\/src\//gm;
-          if (!marker.test(item.code)) throw new Error('Expected TVM source markers in bundle');
-          item.code = item.code.replace(marker, '// [TVM]/');
+          const marker = /^\/\/ (?:\.\.\/)+\.toolchains\/apache-tvm-src\/web\/src\//m;
+          if (!marker.test(item.code)) continue;
+          sawMarker = true;
+          item.code = item.code.replace(/^\/\/ (?:\.\.\/)+\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
         }
+        if (!sawMarker) throw new Error('Expected TVM source markers in bundle');
       }
     }
   ],

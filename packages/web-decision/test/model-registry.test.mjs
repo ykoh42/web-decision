@@ -6,6 +6,11 @@ import {MAPIKA_MANIFEST_SHA256} from '../src/mapika/contract.js';
 import {MAPIKA_Q4_MANIFEST_SHA256} from '../src/mapika-q4/contract.js';
 import {KEV08_MANIFEST_SHA256} from '../src/kev08/contract.js';
 import {KEV06_MANIFEST_SHA256} from '../src/kev06/contract.js';
+import {
+  EXPERIMENTAL_KEV_UPSTREAM_MANIFEST_SHA256,
+  EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
+  EXPERIMENTAL_KEV_UPSTREAM_WASM_SHA256
+} from '../src/kev06/upstream-contract.js';
 import {MANIFEST_SHA256} from '../src/strands/manifest.mjs';
 import {MAX_TOKENS as STRANDS_MAX_TOKENS} from '../src/strands/choice.mjs';
 import {KEV_MAX_BRANCH_TOKENS, KEV_MAX_OPTIONS, KEV_MAX_STATE_TOKENS} from '../src/kev.js';
@@ -104,6 +109,7 @@ test('the catalog and router describe the same implemented routes', () => {
     ['experimental-gliner2.5-decide-mobile-q4f16', 'gliner-mobile'],
     ['experimental-tinydecide-10m-q4', 'tinydecide'],
     ['kev-0.6b-q4f16', 'kev'],
+    ['experimental-kev-0.6b-q4f16-upstream', 'kev'],
     ['kev-0.6b-reflexes-q4f16', 'kev'],
     ['open-jev-deberta-v3-large-q4f16', 'deberta'],
     ['mapika-0.8b-f16', 'mapika'],
@@ -156,7 +162,10 @@ test('the catalog and router describe the same implemented routes', () => {
     );
     assert.equal(description.licenses.project, 'Apache-2.0');
     assert.match(description.licenses.modelCard, /^https:\/\/huggingface\.co\//);
-    assert.equal(description.assets.location, 'separate');
+    assert.equal(
+      description.assets.location,
+      name === 'experimental-kev-0.6b-q4f16-upstream' ? 'package-and-pinned-upstream' : 'separate'
+    );
     assert.ok(description.assets.requiredFiles.length >= 2);
     assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').min, 1);
     const expectedBackend =
@@ -167,6 +176,25 @@ test('the catalog and router describe the same implemented routes', () => {
         : (backendByFamily[family] ?? backendByFamily.default);
     assert.equal(description.backend.name, expectedBackend);
   }
+});
+
+test('experimental upstream Kev has separate pins and leaves the stable Kev route unchanged', () => {
+  const stable = describeModel('kev-0.6b-q4f16');
+  const experimental = describeModel('experimental-kev-0.6b-q4f16-upstream');
+
+  assert.equal(stable.assets.integrity, 'pinned-manifest');
+  assert.equal(stable.assets.manifestSha256, KEV06_MANIFEST_SHA256);
+  assert.equal(experimental.assets.integrity, 'candidate-pinned-manifest-and-shards');
+  assert.equal(experimental.assets.manifestSha256, EXPERIMENTAL_KEV_UPSTREAM_MANIFEST_SHA256);
+  assert.equal(experimental.assets.sourceDataSha256, EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256);
+  assert.equal(experimental.assets.candidateWasmSha256, EXPERIMENTAL_KEV_UPSTREAM_WASM_SHA256);
+  assert.notEqual(experimental.assets.manifestSha256, stable.assets.manifestSha256);
+  assert.equal(experimental.assets.location, 'package-and-pinned-upstream');
+  assert.match(experimental.assets.additionalFiles, /lazily loaded packaged JavaScript chunk/u);
+  assert.equal(experimental.checkpoint.weightSha256, EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256);
+  assert.equal(experimental.backend.name, 'tvm-webgpu');
+  assert.equal(experimental.verification.currentBundleGpu, 'not-revalidated');
+  assert.equal(selectModelFamily({model: experimental.model}), 'kev');
 });
 
 test('Laya metadata identifies WebGPU execution and runtime-managed CPU fallback', () => {

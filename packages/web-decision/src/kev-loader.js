@@ -12,6 +12,11 @@ import {readAssetBatch} from './asset-batch.js';
 import {prepareModelSource} from './model-source.js';
 import {createModelAssetReader, uploadModelShards} from './model-assets.js';
 import {readKev06ManifestResponse} from './kev06/contract.js';
+import {
+  createKevReconstructedSource,
+  EXPERIMENTAL_KEV_MODEL,
+  readExperimentalKevManifest
+} from './kev06/upstream-source.mjs';
 
 function unsupported(message) {
   return new WebDecisionError('UNSUPPORTED_ENVIRONMENT', message);
@@ -87,9 +92,10 @@ function validateOptionalLimit(value, name) {
     throw new WebDecisionError('INVALID_INPUT', `${name} must be a non-negative safe integer.`);
 }
 
-async function loadKevModel(options, description, readManifest, uploadHeads) {
+async function loadKevModel(options, description, readManifest, uploadHeads, sourceProvider) {
   validateOptionalLimit(options?.maxInputCharacters, 'maxInputCharacters');
   validateOptionalLimit(options?.maxInputTokens, 'maxInputTokens');
+  const prepareSource = sourceProvider?.prepare ?? prepareModelSource;
   const {
     base,
     cache,
@@ -97,11 +103,20 @@ async function loadKevModel(options, description, readManifest, uploadHeads) {
     manifestUrl,
     response: manifestResponse,
     maxPrefetchBytes
-  } = await prepareModelSource(options, {
+  } = await prepareSource(options, {
     offlineMissingMessage: 'The model manifest is not available offline. Load the model online first.'
   });
   const manifest = await readManifest(manifestResponse, signal);
-  const assetReader = createModelAssetReader({base, manifest, cache, signal, options});
+  sourceProvider?.setProgress?.(options?.onProgress);
+  const assetReader = createModelAssetReader({
+    base,
+    manifest,
+    cache,
+    signal,
+    options,
+    fetchImpl: sourceProvider?.fetch,
+    progressPhase: sourceProvider?.bundledProgressPhase
+  });
   const {read} = assetReader;
   let runtime,
     gpuDevice,
@@ -126,6 +141,7 @@ async function loadKevModel(options, description, readManifest, uploadHeads) {
     const cacheManifest = parseJson(tensorCacheBytes, 'tensor-cache.json');
     checkCacheManifest(manifest, cacheManifest);
     signal?.throwIfAborted();
+    if (sourceProvider?.assetProgressPhase) assetReader.setProgressPhase(sourceProvider.assetProgressPhase);
     let gpu;
     try {
       gpu = await detectGPUDevice(undefined, signal);
@@ -224,6 +240,8 @@ async function loadKevModel(options, description, readManifest, uploadHeads) {
     signal?.throwIfAborted();
     if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
     throw new WebDecisionError('MODEL_LOAD_FAILED', 'Could not load the decision model.', {cause});
+  } finally {
+    await sourceProvider?.dispose?.();
   }
 }
 
@@ -231,7 +249,10 @@ export function loadKev06DecisionModel(options, description) {
   return loadKevModel(options, description, readKev06ManifestResponse);
 }
 
-export function loadKevDecisionModel(options, description) {
+export async function loadKevDecisionModel(options, description) {
+  if (description.model === EXPERIMENTAL_KEV_MODEL) {
+    return loadKevModel(options, description, readExperimentalKevManifest, undefined, createKevReconstructedSource());
+  }
   if (description.model !== REFLEXES_ID) return loadKev06DecisionModel(options, description);
   return loadKevModel(options, description, readReflexesManifestResponse, uploadReflexesHeads);
 }

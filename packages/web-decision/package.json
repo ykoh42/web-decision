@@ -107,7 +107,9 @@
     "VERDICT-NOTICE",
     "SAFEDECIDE-NOTICE",
     "CRIVO-NOTICE",
-    "CRIVO_SUPPORT.md"
+    "CRIVO_SUPPORT.md",
+    "assets/experimental-kev-upstream/notices",
+    "assets/experimental-kev-upstream/PROVENANCE.md"
   ],
   "sideEffects": false,
   "scripts": {

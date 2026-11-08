@@ -1,6 +1,12 @@
 import {KEV_MAX_BRANCH_TOKENS, KEV_MAX_OPTIONS, KEV_MAX_STATE_TOKENS, WebDecisionError} from './kev.js';
 import {KEV_REQUIRED_LIMITS} from './kev-gpu.js';
 import {KEV06_MANIFEST_SHA256} from './kev06/contract.js';
+import {
+  EXPERIMENTAL_KEV_UPSTREAM_MANIFEST_SHA256,
+  EXPERIMENTAL_KEV_UPSTREAM_MODEL,
+  EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
+  EXPERIMENTAL_KEV_UPSTREAM_WASM_SHA256
+} from './kev06/upstream-contract.js';
 import {DEBERTA_REQUIRED_LIMITS} from './deberta/device.mjs';
 import debertaContract from './deberta/contract.json' with {type: 'json'};
 import reflexesContract from './kev-reflexes-contract.json' with {type: 'json'};
@@ -240,6 +246,7 @@ function registration({
   cpuWasmVerification = 'verified',
   javascriptVerification = 'not-revalidated',
   additionalFiles = 'Weight shards or ranges listed by the model manifest are also required.',
+  priorEvidence = 'See the package README for each model.',
   modelTerms = 'separate-review-required',
   modelLicenseUrl,
   sourceModelCard
@@ -252,7 +259,7 @@ function registration({
       checkpoint,
       assets: {
         ...assets,
-        location: 'separate',
+        location: assets.location ?? 'separate',
         requiredFiles,
         additionalFiles
       },
@@ -316,7 +323,7 @@ function registration({
               ? 'not-revalidated'
               : 'not-applicable',
         currentBundleJavascript: backend === 'javascript' ? javascriptVerification : 'not-applicable',
-        priorEvidence: 'See the package README for each model.'
+        priorEvidence
       }
     }
   });
@@ -670,6 +677,40 @@ const models = [
     typedTextQuestionTypes: ['choice', 'noul', 'score'],
     requiredLimits: KEV_REQUIRED_LIMITS,
     gpuVerification: 'verified'
+  }),
+  registration({
+    family: 'kev',
+    model: EXPERIMENTAL_KEV_UPSTREAM_MODEL,
+    precision: 'q4f16',
+    checkpoint: {
+      repository: 'onnx-community/kev-0.6b-ONNX',
+      revision: '5a827091b3d58fe4fdfc02a5a5b2ce364047d678',
+      weightSha256: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256
+    },
+    assets: {
+      integrity: 'candidate-pinned-manifest-and-shards',
+      manifestSha256: EXPERIMENTAL_KEV_UPSTREAM_MANIFEST_SHA256,
+      sourceDataSha256: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
+      candidateWasmSha256: EXPERIMENTAL_KEV_UPSTREAM_WASM_SHA256,
+      location: 'package-and-pinned-upstream'
+    },
+    requiredFiles: kevFiles,
+    limits: kevLimits,
+    maxOptions: KEV_MAX_OPTIONS,
+    maxOptionsDescription: 'Upstream Kev config declares a maximum of 255 options per question.',
+    minOptions: 1,
+    handling: packed,
+    tokenCount: packed,
+    temperature: 1,
+    typedTextQuestionTypes: ['choice', 'noul', 'score'],
+    requiredLimits: KEV_REQUIRED_LIMITS,
+    gpuVerification: 'not-revalidated',
+    additionalFiles:
+      'Five pinned runtime assets, including the candidate TVM WebAssembly, are embedded in a lazily loaded packaged JavaScript chunk. Nine verified shards are reconstructed from the pinned 335,357,952-byte upstream ONNX external-data file and cached.',
+    priorEvidence:
+      'The q2-k128 candidate was exercised in Windows Chrome 156. Its WASM differs from the stable Kev route; the current main package bundle and broad numerical parity have not been revalidated.',
+    modelTerms:
+      'Apache-2.0 is declared for the pinned Qwen base; training-data terms and redistribution review remain outstanding.'
   }),
   registration({
     family: 'kev',

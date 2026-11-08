@@ -161,10 +161,10 @@ async function findCachedAsset(cache, url, sharedKey, metadata, signal) {
   return null;
 }
 
-async function fetchVerifiedAsset(url, name, metadata, signal) {
+async function fetchVerifiedAsset(url, name, metadata, signal, fetchImpl = globalThis.fetch) {
   let response;
   try {
-    response = await waitForAbort(() => fetch(url, {signal}), signal, cancelResponse);
+    response = await waitForAbort(() => fetchImpl(url, {signal}), signal, cancelResponse);
   } catch (cause) {
     signal?.throwIfAborted();
     throw new WebDecisionError('ASSET_LOAD_FAILED', `Could not fetch ${name}.`, {cause});
@@ -211,7 +211,7 @@ export async function readVerifiedAsset(
   base,
   manifest,
   name,
-  {cache, signal, onBytes, onCacheStatus, offline = false, maxAssetBytes = MAX_ASSET_BYTES} = {}
+  {cache, signal, onBytes, onCacheStatus, offline = false, maxAssetBytes = MAX_ASSET_BYTES, fetchImpl} = {}
 ) {
   const metadata = manifest.files[name];
   if (!metadata) throw error(`Asset not listed in manifest: ${name}`);
@@ -233,7 +233,7 @@ export async function readVerifiedAsset(
   signal?.throwIfAborted();
   if (!result) {
     if (offline) throw new WebDecisionError('ASSET_LOAD_FAILED', `Verified asset is not available offline: ${name}.`);
-    const buffer = await fetchVerifiedAsset(url, name, metadata, signal);
+    const buffer = await fetchVerifiedAsset(url, name, metadata, signal, fetchImpl);
     result = {buffer, cachedByHash: await writeAssetCache(cache, cacheKey.href, buffer, signal)};
   }
   signal?.throwIfAborted();
