@@ -59,7 +59,8 @@ jobs:
           fi
           uv run --locked --no-sync --only-group quality python scripts/ci/check_python_quality.py
       - name: Install hash-locked model test dependencies
-        run: uv pip install --require-hashes --only-binary=:all: --python .venv/bin/python -r requirements-preview-build.lock
+        run: |
+          uv pip install --require-hashes --only-binary=:all: --python .venv/bin/python -r requirements-preview-build.lock
       - name: Test Python quality gates and model scripts
         run: |
           uv run --locked --no-sync --only-group quality pytest -q \
