@@ -2,7 +2,7 @@ import type {ModelProgress} from './curated/types.js';
 
 /** Inputs shared by verified, model-specific asset readers. */
 export interface AssetSourceOptions {
-  readonly base: string | URL;
+  readonly base: URL;
   readonly signal?: AbortSignal | undefined;
   readonly cacheEnabled?: boolean | undefined;
   readonly offline?: boolean | undefined;

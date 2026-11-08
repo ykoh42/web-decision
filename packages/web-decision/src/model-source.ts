@@ -4,7 +4,33 @@ import {requestF16Adapter} from './gpu-preflight.js';
 import {WebDecisionError} from './kev.js';
 import {validatePrefetchBytes} from './shard-prefetch.js';
 
-function validateSource(options, validateModelOptions) {
+interface ModelSourceOptions {
+  readonly assetsUrl?: unknown;
+  readonly offline?: unknown;
+  readonly cache?: unknown;
+  readonly maxPrefetchBytes?: unknown;
+  readonly signal?: AbortSignal | undefined;
+}
+
+interface ModelSourceDependencies<Options extends ModelSourceOptions> {
+  readonly validateModelOptions?: ((options: Options) => unknown) | undefined;
+  readonly offlineMissingMessage?: string | undefined;
+}
+
+interface PreparedModelSource {
+  readonly base: URL;
+  readonly cache: Cache | null;
+  readonly signal: AbortSignal | undefined;
+  readonly manifestUrl: string;
+  readonly response: Response;
+  readonly maxPrefetchBytes: number;
+  readonly modelOptions: unknown;
+}
+
+function validateSource<Options extends ModelSourceOptions>(
+  options: Options,
+  validateModelOptions?: (options: Options) => unknown
+) {
   if (!options || typeof options.assetsUrl !== 'string' || !options.assetsUrl)
     throw new WebDecisionError('INVALID_INPUT', 'assetsUrl is required.');
   if (options.offline !== undefined && typeof options.offline !== 'boolean')
@@ -22,7 +48,7 @@ function validateSource(options, validateModelOptions) {
     throw new WebDecisionError('UNSUPPORTED_ENVIRONMENT', 'Web Crypto is unavailable. Use HTTPS or localhost.');
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    base = new URL(options.assetsUrl as string, globalThis.location?.href);
   } catch (cause) {
     throw new WebDecisionError('INVALID_INPUT', 'Invalid assetsUrl.', {cause});
   }
@@ -36,7 +62,13 @@ function validateSource(options, validateModelOptions) {
   return {base, maxPrefetchBytes, modelOptions};
 }
 
-async function getManifestResponse(options, cache, manifestUrl, signal, offlineMissingMessage) {
+async function getManifestResponse(
+  options: ModelSourceOptions,
+  cache: Cache | null,
+  manifestUrl: string,
+  signal: AbortSignal | null | undefined,
+  offlineMissingMessage: string | undefined
+): Promise<Response> {
   if (options.offline) {
     if (!cache) throw new WebDecisionError('ASSET_LOAD_FAILED', 'The model cache is unavailable for offline loading.');
     let response;
@@ -48,13 +80,17 @@ async function getManifestResponse(options, cache, manifestUrl, signal, offlineM
     }
     if (!response) {
       signal?.throwIfAborted();
-      throw new WebDecisionError('ASSET_LOAD_FAILED', offlineMissingMessage);
+      throw new WebDecisionError('ASSET_LOAD_FAILED', offlineMissingMessage!);
     }
     return response;
   }
   let response;
   try {
-    response = await waitForAbort(() => fetch(manifestUrl, {signal, cache: 'no-cache'}), signal, cancelResponse);
+    response = await waitForAbort(
+      () => fetch(manifestUrl, {signal, cache: 'no-cache'} as RequestInit),
+      signal,
+      cancelResponse
+    );
   } catch (cause) {
     signal?.throwIfAborted();
     throw new WebDecisionError('ASSET_LOAD_FAILED', 'Could not fetch manifest.json.', {cause});
@@ -68,14 +104,26 @@ async function getManifestResponse(options, cache, manifestUrl, signal, offlineM
 }
 
 /** Validate source options and obtain the matching manifest without creating a GPU device. */
-export async function prepareModelSource(options, {validateModelOptions, offlineMissingMessage}) {
-  const {base, maxPrefetchBytes, modelOptions} = validateSource(options, validateModelOptions);
-  const signal = options.signal;
+export async function prepareModelSource<Options extends ModelSourceOptions>(
+  options: Options,
+  {validateModelOptions, offlineMissingMessage}: ModelSourceDependencies<Options>
+): Promise<PreparedModelSource> {
+  const sourceOptions = options;
+  const {base, maxPrefetchBytes, modelOptions} = validateSource(sourceOptions, validateModelOptions);
+  const signal = sourceOptions.signal;
   signal?.throwIfAborted();
   await requestF16Adapter(navigator.gpu, signal);
-  const cache = await openAssetCache(options.cache !== false, signal);
+  const cache = await openAssetCache(sourceOptions.cache !== false, signal);
   signal?.throwIfAborted();
   const manifestUrl = assetUrl(base, 'manifest.json');
-  const response = await getManifestResponse(options, cache, manifestUrl, signal, offlineMissingMessage);
-  return {base, cache, signal, manifestUrl, response, maxPrefetchBytes, modelOptions};
+  const response = await getManifestResponse(sourceOptions, cache, manifestUrl, signal, offlineMissingMessage);
+  return {
+    base,
+    cache,
+    signal,
+    manifestUrl,
+    response,
+    maxPrefetchBytes,
+    modelOptions
+  };
 }
