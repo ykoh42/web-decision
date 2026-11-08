@@ -1,5 +1,5 @@
 [
-  "browser-only-ws.js",
+  "browser-only-ws.ts",
   "kev08/device.js",
   "kev08/loader.js",
   "mapika-q4/loader.js",

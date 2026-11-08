@@ -75,7 +75,7 @@ export default defineConfig({
       }
     }
   ],
-  resolve: {alias: [{find: 'ws', replacement: fileURLToPath(new URL('./src/browser-only-ws.js', import.meta.url))}]},
+  resolve: {alias: [{find: 'ws', replacement: fileURLToPath(new URL('./src/browser-only-ws.ts', import.meta.url))}]},
   build: {
     lib: {
       entry: fileURLToPath(new URL('./src/curated/index.ts', import.meta.url)),

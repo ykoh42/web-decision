@@ -14,5 +14,11 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/curated/**/*.ts", "test/curated-*.test.mts", "test/build-normalization.test.mts", "vite.config.ts"]
+  "include": [
+    "src/curated/**/*.ts",
+    "src/browser-only-ws.ts",
+    "test/curated-*.test.mts",
+    "test/build-normalization.test.mts",
+    "vite.config.ts"
+  ]
 }
