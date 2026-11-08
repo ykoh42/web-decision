@@ -1,4 +1,5 @@
 export type ModelId = 'kev-0.6b-q4f16';
+export type ModelIdTuple = readonly ['kev-0.6b-q4f16'];
 export type ModelAdapterId = 'kev06';
 export interface CatalogModelLimit {
   readonly resource: 'tokens' | 'options' | 'questions';
@@ -71,6 +72,6 @@ export interface ModelCatalogEntry {
   readonly description: CatalogModelDescription;
   readonly artifacts: ModelArtifactLock;
 }
-export declare const MODEL_IDS: readonly ['kev-0.6b-q4f16'];
+export declare const MODEL_IDS: ModelIdTuple;
 export declare const MODEL_CATALOG: readonly ModelCatalogEntry[];
 export declare const MODEL_CATALOG_BY_ID: Readonly<Record<ModelId, ModelCatalogEntry>>;

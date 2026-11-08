@@ -1,5 +1,5 @@
 import {CACHE_NAME} from '../assets.js';
-import {MODEL_CATALOG, MODEL_CATALOG_BY_ID} from '../catalog/index.generated.js';
+import {MODEL_CATALOG, MODEL_CATALOG_BY_ID} from '../catalog/index.generated.ts';
 import type {ModelId} from '../catalog/types.generated.js';
 import {WebDecisionError} from './errors.ts';
 import {readLoadOptions} from './load-options.ts';

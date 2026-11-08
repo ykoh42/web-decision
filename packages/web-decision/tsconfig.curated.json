@@ -17,11 +17,14 @@
   "include": [
     "src/curated/**/*.ts",
     "src/browser-only-ws.ts",
+    "src/catalog/index.generated.ts",
+    "scripts/build-model-catalog.mts",
+    "test/catalog.test.mts",
     "test/curated-*.test.mts",
     "test/build-normalization.test.mts",
-    "vite.config.ts",
     "test/kev06-contract.test.mts",
     "test/model-assets.test.mts",
-    "test/runtime-lifecycle.test.mts"
+    "test/runtime-lifecycle.test.mts",
+    "vite.config.ts"
   ]
 }

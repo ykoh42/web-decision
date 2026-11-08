@@ -5,24 +5,24 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
-import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.js';
+import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
 import {getModelRegistration} from '../src/model-registry.js';
-import {createModelArtifactLock, validateSpec} from '../scripts/build-model-catalog.mjs';
+import {createModelArtifactLock, validateSpec} from '../scripts/build-model-catalog.mts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packageFile = (relativePath) => path.join(packageRoot, relativePath);
+const packageFile = (relativePath: string): string => path.join(packageRoot, relativePath);
 
-function sha256(bytes) {
+function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function canonical(value) {
+function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(
     Object.keys(value)
       .sort()
-      .map((key) => [key, canonical(value[key])])
+      .map((key) => [key, canonical((value as Record<string, unknown>)[key])])
   );
 }
 
@@ -30,7 +30,7 @@ test('catalog exposes one ID-only TVM descriptor with the kev06 adapter', () => 
   assert.deepEqual(MODEL_IDS, ['kev-0.6b-q4f16']);
   assert.equal(MODEL_CATALOG.length, 1);
 
-  const entry = MODEL_CATALOG_BY_ID[MODEL_IDS[0]];
+  const entry = MODEL_CATALOG_BY_ID[MODEL_IDS[0]!];
   assert.equal(entry, MODEL_CATALOG[0]);
   assert.equal(entry.modelId, MODEL_IDS[0]);
   assert.equal(entry.description.adapter, 'kev06');
@@ -45,7 +45,7 @@ test('catalog exposes one ID-only TVM descriptor with the kev06 adapter', () => 
 });
 
 test('catalog description retains the existing Kev contract and narrows bundle verification', () => {
-  const entry = MODEL_CATALOG[0];
+  const entry = MODEL_CATALOG[0]!;
   const {adapter, ...description} = entry.description;
   const legacy = getModelRegistration(entry.modelId).description;
   const {model, ...expected} = structuredClone(legacy);
@@ -100,7 +100,7 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
 });
 
 test('artifact lock hashes the manifest, bundled files, and upstream map', async () => {
-  const entry = MODEL_CATALOG[0];
+  const entry = MODEL_CATALOG[0]!;
   const lock = entry.artifacts;
   const lockFile = JSON.parse(await readFile(packageFile('src/catalog/artifacts.lock.json'), 'utf8'));
   const manifestBytes = await readFile(packageFile(lock.manifest.sourcePath));
@@ -121,7 +121,7 @@ test('artifact lock hashes the manifest, bundled files, and upstream map', async
     const bytes = await readFile(packageFile(artifact.sourcePath));
     assert.equal(artifact.bytes, bytes.byteLength);
     assert.equal(artifact.sha256, sha256(bytes));
-    assert.equal(artifact.sha256, lock.manifest.files[artifact.manifestName].sha256);
+    assert.equal(artifact.sha256, lock.manifest.files[artifact.manifestName]!.sha256);
   }
 
   const mapBytes = await readFile(packageFile(lock.upstream.shardMapPath));
@@ -131,11 +131,12 @@ test('artifact lock hashes the manifest, bundled files, and upstream map', async
 
 test('generated files are deterministic and the ModelId union follows the curated spec', async () => {
   const typeFile = await readFile(packageFile('src/catalog/types.generated.d.ts'), 'utf8');
-  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0] + "';";
+  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0]! + "';";
   assert.ok(typeFile.includes(expectedIdType));
+  assert.ok(typeFile.includes("export type ModelIdTuple = readonly ['" + MODEL_IDS[0]! + "'];"));
   assert.ok(typeFile.includes("export type ModelAdapterId = 'kev06';"));
   assert.equal(typeFile.includes("from '../index.js'"), false);
-  execFileSync(process.execPath, ['scripts/build-model-catalog.mjs', '--check'], {
+  execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-model-catalog.mts', '--check'], {
     cwd: packageRoot,
     stdio: 'pipe'
   });
