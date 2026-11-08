@@ -11,7 +11,7 @@
     "lint": "oxlint . --max-warnings=2",
     "format": "oxfmt '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
     "format:check": "oxfmt --check '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
-    "check:quality": "pnpm run format:check && pnpm run lint && pnpm run test:quality:complexity && pnpm run test:quality:package && pnpm run test:quality:coverage && node scripts/ci/check_cognitive_complexity.mjs && pnpm --filter web-decision check:catalog && pnpm --filter web-decision typecheck:curated && pnpm --filter web-decision typecheck:kev && tsc --project tests/browser/tsconfig.curated.json && tsc --project tsconfig.tools.json",
+    "check:quality": "pnpm run format:check && pnpm run lint && pnpm run test:quality:complexity && pnpm run test:quality:package && pnpm run test:quality:coverage && pnpm run test:quality:release && node scripts/ci/check_cognitive_complexity.mjs && pnpm --filter web-decision check:catalog && pnpm --filter web-decision typecheck:curated && pnpm --filter web-decision typecheck:kev && tsc --project tests/browser/tsconfig.curated.json && tsc --project tsconfig.tools.json",
     "test:quality:complexity": "node --test scripts/ci/test_cognitive_complexity.mjs",
     "test:quality:package": "node --import tsx --test scripts/ci/asset-key.test.ts",
     "test:quality:coverage": "node --import tsx --test scripts/ci/coverage-groups.test.ts scripts/ci/uncovered-files.test.ts",
@@ -41,7 +41,8 @@
     "test:typescript-policy": "node --import tsx --test scripts/ci/typescript-policy.test.mts",
     "check:javascript-policy": "node --import tsx scripts/ci/check-typescript-policy.mts",
     "check:typescript": "pnpm run typecheck && pnpm run test:typescript-policy && pnpm run check:javascript-policy",
-    "check:typescript:complete": "pnpm run typecheck && pnpm run test:typescript-policy && node --import tsx scripts/ci/check-typescript-policy.mts --require-complete"
+    "check:typescript:complete": "pnpm run typecheck && pnpm run test:typescript-policy && node --import tsx scripts/ci/check-typescript-policy.mts --require-complete",
+    "test:quality:release": "node --import tsx --test scripts/release/verify-release-evidence.test.ts tests/browser/kev06-release-evidence.test.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
