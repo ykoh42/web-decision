@@ -1,7 +1,8 @@
 /** FP32-rounded approximation; it is not guaranteed bitwise equal to Torch. */
-export function approximateSoftmax(rows) {
+export function approximateSoftmax(rows: unknown): Float32Array[] {
   if (!Array.isArray(rows) || !rows.length) throw new Error('Invalid score rows');
-  return rows.map((row) => {
+  const input: unknown[] = rows;
+  return input.map((row) => {
     if (!(row instanceof Float32Array) || !row.length || row.some((value) => !Number.isFinite(value)))
       throw new Error('Invalid FP32 scores');
     const max = Math.max(...row);
