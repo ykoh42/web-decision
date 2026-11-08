@@ -2,11 +2,18 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import build_tvm_q4 as builder
 import pytest
+
+
+def test_custom_operator_modules_are_loaded_before_building():
+    expected = {"tvm_selective_params", "tvm_narrow_int64", "tvm_q4_operators"}
+    assert set(builder.CUSTOM_OPERATOR_MODULES) == expected
+    assert expected <= sys.modules.keys()
 
 
 def make_root(root: Path) -> Path:
