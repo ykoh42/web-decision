@@ -44,8 +44,5 @@ export async function readPinnedManifest(
 }
 
 function isAbortError(cause: unknown): boolean {
-  return (
-    ((typeof cause === 'object' && cause !== null) || typeof cause === 'function') &&
-    (cause as {readonly name?: unknown}).name === 'AbortError'
-  );
+  return (cause as {readonly name?: unknown} | null | undefined)?.name === 'AbortError';
 }

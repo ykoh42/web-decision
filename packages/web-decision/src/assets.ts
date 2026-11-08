@@ -53,10 +53,7 @@ export const CACHE_NAME = 'web-decision-assets-v1';
 const error = (message: string) => new WebDecisionError('INVALID_ASSET', message);
 
 function isAbortError(cause: unknown): boolean {
-  return (
-    ((typeof cause === 'object' && cause !== null) || typeof cause === 'function') &&
-    (cause as {readonly name?: unknown}).name === 'AbortError'
-  );
+  return (cause as {readonly name?: unknown} | null | undefined)?.name === 'AbortError';
 }
 
 export function assetUrl(base: URL, path: string): string {
