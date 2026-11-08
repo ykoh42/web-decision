@@ -18,12 +18,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20.19.0, 22.13.0, 24.0.0]
+        node: [20.19.0, 22.13.0, 24.0.0, 26.0.0]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Install Node runtime dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libatomic1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node }}
