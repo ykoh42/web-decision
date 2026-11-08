@@ -22,6 +22,7 @@ interface AssetFile {
 
 interface AssetManifest {
   files: Record<string, AssetFile>;
+  [key: string]: unknown;
 }
 
 interface ProviderProgress {
