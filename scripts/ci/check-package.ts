@@ -5,8 +5,8 @@ import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {checkConsumerTypes} from './check-types.mjs';
-import {findPackedContentIssues} from './packed-content.mjs';
-import {withTemporaryDirectories} from './temporary-directories.mjs';
+import {findPackedContentIssues} from './packed-content.ts';
+import {withTemporaryDirectories} from './temporary-directories.ts';
 
 const stableKevModelId = 'kev-0.6b-q4f16';
 const stableKevManifestSha256 = '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767';
