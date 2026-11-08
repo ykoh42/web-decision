@@ -120,6 +120,7 @@ interface VerificationContext {
   manifests: Map<string, ArchiveManifestEvidence>;
   models: ModelRequirement[];
   policy: EvidencePolicy;
+  workspaceRoot: string;
 }
 
 interface ReleaseEvidenceOptions {
@@ -1198,6 +1199,8 @@ export function validatePlaywrightReport(
   context: VerificationContext
 ): {modelCount: number; browserCount: number; caseCount: number} {
   const tests = collectPlaywrightTests(report.suites);
+  const reportRoot = report.config?.rootDir;
+  fail(typeof reportRoot === 'string' && isAbsolute(reportRoot), 'Playwright report has no absolute test root.');
   const models = context.models;
   const browsers = context.policy.browsers;
   const expectedCount = models.length * browsers.length;
@@ -1217,8 +1220,13 @@ export function validatePlaywrightReport(
   const browserByProject = new Map<string, BrowserRequirement>(browsers.map((browser) => [browser.project, browser]));
   const cases = new Set();
   for (const item of tests) {
-    const file = String(item.file ?? '').replaceAll('\\', '/');
-    assert.ok(file.endsWith(context.policy.testFile), `Only the dedicated release GPU test is accepted: ${file}`);
+    const file = item.file;
+    fail(typeof file === 'string' && file.length > 0, 'Playwright test file is missing.');
+    assert.equal(
+      resolve(reportRoot, file),
+      resolve(context.workspaceRoot, context.policy.testFile),
+      `Only the dedicated release GPU test is accepted: ${file}`
+    );
     fail(typeof item.test.projectName === 'string', 'Playwright test is missing its browser project.');
     const browser = browserByProject.get(item.test.projectName);
     assert.ok(browser, `Unexpected Playwright project: ${item.test.projectName}`);
@@ -1257,7 +1265,8 @@ export async function verifyReleaseArtifacts({
   const browserResults = validatePlaywrightReport(report, {
     ...inputs,
     models: inputs.models,
-    policy: checkedPolicy
+    policy: checkedPolicy,
+    workspaceRoot
   });
   const finalArchive = await verifyArchiveInstall(archivePath, installedPackagePath);
   assert.equal(

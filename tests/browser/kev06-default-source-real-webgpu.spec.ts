@@ -71,7 +71,7 @@ const baselineOptionOrder = baselineQuestion.options;
 const upstreamPath =
   '/onnx-community/kev-0.6b-ONNX/resolve/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/onnx/model_q4f16.onnx_data';
 
-test('stable Kev model ID loads pinned upstream weights and emits measured release evidence', async ({
+test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release evidence', async ({
   page,
   browser,
   browserName

@@ -294,6 +294,7 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
     catalogSha256,
     manifests,
     report: {
+      config: {rootDir: fixture.root},
       errors: [],
       stats: {expected: tests.length, skipped: 0, unexpected: 0, flaky: 0},
       suites: [{title: 'release gpu evidence', specs: tests}]
@@ -422,7 +423,8 @@ test('allows a catalog model with no required features but keeps Kev shader-f16 
     catalogSha256: valid.catalogSha256,
     manifests: valid.manifests,
     models: valid.models,
-    policy: POLICY
+    policy: POLICY,
+    workspaceRoot: fixture.root
   };
   required(valid.models[0], 'Curated Kev model').backend.requiredFeatures = [];
   const report = structuredClone(valid.report);
@@ -476,7 +478,8 @@ test('rejects any skip, failure, retry, or omitted required browser case', async
     catalogSha256: valid.catalogSha256,
     manifests: valid.manifests,
     models: valid.models,
-    policy: POLICY
+    policy: POLICY,
+    workspaceRoot: fixture.root
   };
 
   const skipped = structuredClone(valid.report);
@@ -506,7 +509,8 @@ test('rejects evidence detached from the archive, install, model manifest, or ph
     catalogSha256: valid.catalogSha256,
     manifests: valid.manifests,
     models: valid.models,
-    policy: POLICY
+    policy: POLICY,
+    workspaceRoot: fixture.root
   };
   const mutations: Array<(record: AnyRecord) => void> = [
     (record) => {
@@ -628,6 +632,28 @@ test('rejects archive manifest changes and installed-package drift', async (t) =
   await assert.rejects(readArchiveModelManifests(changedArchive, models), /Artifact manifest SHA differs/u);
 });
 
+test('resolves Playwright test paths from its test root and rejects a different root', async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  const valid = await prepareValidReport(fixture);
+  const context = {
+    archive: valid.archive,
+    catalogSha256: valid.catalogSha256,
+    manifests: valid.manifests,
+    models: valid.models,
+    policy: POLICY,
+    workspaceRoot: fixture.root
+  };
+  const report = structuredClone(valid.report);
+  report.config.rootDir = join(fixture.root, 'tests/browser');
+  report.suites[0].specs[0].file = 'kev06-default-source-real-webgpu.spec.ts';
+  assert.deepEqual(validatePlaywrightReport(report, context), {modelCount: 1, browserCount: 1, caseCount: 1});
+  report.config.rootDir = join(fixture.root, 'other');
+  assert.throws(() => validatePlaywrightReport(report, context), /Only the dedicated release GPU test/u);
+  delete report.config.rootDir;
+  assert.throws(() => validatePlaywrightReport(report, context), /absolute test root/u);
+});
+
 test('rejects old browser test files even when their results passed', async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
@@ -637,7 +663,8 @@ test('rejects old browser test files even when their results passed', async (t) 
     catalogSha256: valid.catalogSha256,
     manifests: valid.manifests,
     models: valid.models,
-    policy: POLICY
+    policy: POLICY,
+    workspaceRoot: fixture.root
   };
   const oldTest = structuredClone(valid.report);
   oldTest.suites[0].specs[0].file = 'tests/browser/kev06-real-webgpu.spec.mjs';
