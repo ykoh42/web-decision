@@ -199,10 +199,9 @@ test('accepts a new generated-code exception only with its exact path and reason
       parseTypeScriptMigrationPolicy(
         {
           ...fixture.policy,
-          exceptions: [
-            ...fixture.policy.exceptions,
-            {path: 'src/catalog.js', reason: generatedReason}
-          ].sort((left, right) => left.path.localeCompare(right.path))
+          exceptions: [...fixture.policy.exceptions, {path: 'src/catalog.js', reason: generatedReason}].sort(
+            (left, right) => left.path.localeCompare(right.path)
+          )
         },
         'test policy'
       ),

@@ -50,7 +50,7 @@ function isExactJavaScriptPath(path: string): boolean {
     !path.startsWith('/') &&
     !path.includes('\\') &&
     !path.includes('\0') &&
-    !/[?*\[\]{}]/u.test(path) &&
+    !/[?*[\]{}]/u.test(path) &&
     path.split('/').every((part) => part !== '' && part !== '.' && part !== '..') &&
     javascriptExtension.test(path)
   );
@@ -169,9 +169,7 @@ export function validateTypeScriptMigrationPolicy(
       currentPaths,
       context.previousPolicy ? previousManaged : context.seedJavaScriptPaths,
       new Set(
-        policy.exceptions
-          .filter(({reason}) => reason.startsWith('Immutable historical release '))
-          .map(({path}) => path)
+        policy.exceptions.filter(({reason}) => reason.startsWith('Immutable historical release ')).map(({path}) => path)
       )
     )
   ];

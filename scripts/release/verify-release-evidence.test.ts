@@ -80,12 +80,17 @@ function makeDescriptor(modelId: string, salt: string): AnyRecord {
 
 function apiSource(descriptors: AnyRecord[]): string {
   const publicDescriptors = descriptors.map(({publicDescriptor}) => publicDescriptor);
-  return `const entries = ${JSON.stringify(publicDescriptors)};\n` +
+  return (
+    `const entries = ${JSON.stringify(publicDescriptors)};\n` +
     'export function listModels() { return entries; }\n' +
-    'export function describeModel(modelId) { return entries.find((entry) => entry.modelId === modelId); }\n';
+    'export function describeModel(modelId) { return entries.find((entry) => entry.modelId === modelId); }\n'
+  );
 }
 
-async function putPackageTree(root: string, descriptors: AnyRecord[]): Promise<{packageRoot: string; sourceRoot: string}> {
+async function putPackageTree(
+  root: string,
+  descriptors: AnyRecord[]
+): Promise<{packageRoot: string; sourceRoot: string}> {
   const packageRoot = join(root, 'package');
   const sourceRoot = join(root, 'source-package');
   await mkdir(join(packageRoot, 'src', 'catalog'), {recursive: true});
@@ -102,14 +107,20 @@ async function putPackageTree(root: string, descriptors: AnyRecord[]): Promise<{
   await writeFile(join(packageRoot, 'package.json'), `${JSON.stringify(packageJson)}\n`);
   await writeFile(join(packageRoot, 'dist/index.js'), source);
   await writeFile(join(sourceRoot, 'dist/index.js'), source);
-  await writeFile(join(sourceRoot, 'src/catalog/model-spec.json'), `${JSON.stringify({
-    schemaVersion: 1,
-    models: descriptors.map(({modelId, description}) => ({modelId, description}))
-  })}\n`);
-  await writeFile(join(sourceRoot, 'src/catalog/artifacts.lock.json'), `${JSON.stringify({
-    schemaVersion: 1,
-    byModelId: Object.fromEntries(descriptors.map(({modelId, artifacts}) => [modelId, artifacts]))
-  })}\n`);
+  await writeFile(
+    join(sourceRoot, 'src/catalog/model-spec.json'),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      models: descriptors.map(({modelId, description}) => ({modelId, description}))
+    })}\n`
+  );
+  await writeFile(
+    join(sourceRoot, 'src/catalog/artifacts.lock.json'),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      byModelId: Object.fromEntries(descriptors.map(({modelId, artifacts}) => [modelId, artifacts]))
+    })}\n`
+  );
   for (const descriptor of descriptors) {
     const manifestPath = join(packageRoot, 'assets', descriptor.modelId, 'manifest.json');
     await mkdir(dirname(manifestPath), {recursive: true});
@@ -158,7 +169,10 @@ function makeRecord({model, browser, archive, catalogSha256, manifest}: AnyRecor
       manifestPath: model.manifestPath,
       manifestSha256: asset.manifestSha256,
       filesSha256: asset.filesSha256,
-      verifiedFiles: Object.entries(model.manifestFiles).map(([path, metadata]) => ({path, ...(metadata as AnyRecord)})),
+      verifiedFiles: Object.entries(model.manifestFiles).map(([path, metadata]) => ({
+        path,
+        ...(metadata as AnyRecord)
+      })),
       manifest
     },
     archive: {
@@ -261,11 +275,13 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
             expectedStatus: 'passed',
             status: 'expected',
             projectName: browser.project,
-            results: [{
-              status: 'passed',
-              errors: [],
-              stdout: [`${POLICY.evidencePrefix}${JSON.stringify(record)}\n`]
-            }]
+            results: [
+              {
+                status: 'passed',
+                errors: [],
+                stdout: [`${POLICY.evidencePrefix}${JSON.stringify(record)}\n`]
+              }
+            ]
           }
         ]
       });
@@ -328,15 +344,32 @@ test('rejects policy edits that drop browser requirements or leave the matrix em
   const empty = Buffer.from(JSON.stringify({...POLICY, browsers: []}));
 
   assert.throws(() => validatePolicyBytes(reduced, digest), /differs from its committed pin/u);
+  assert.throws(() => validatePolicyBytes(empty, digest), /differs from its committed pin/u);
   assert.throws(() => validatePolicy({...POLICY, browsers: []}), /matrix must not be empty/u);
 });
 
 test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () => {
-  assert.throws(() => validateArtifactManifest(
-    {modelId: 'missing', manifestSha256: 'a'.repeat(64), requiredFiles: []} as unknown as Parameters<typeof validateArtifactManifest>[0],
-    {}
-  ), /ID mismatch/u);
-  assert.throws(() => validatePolicy({...POLICY, browsers: [{name: 'chromium', project: 'chromium'}, {name: 'chromium', project: 'other'}]}), /Duplicate browser/u);
+  assert.throws(
+    () =>
+      validateArtifactManifest(
+        {modelId: 'missing', manifestSha256: 'a'.repeat(64), requiredFiles: []} as unknown as Parameters<
+          typeof validateArtifactManifest
+        >[0],
+        {}
+      ),
+    /ID mismatch/u
+  );
+  assert.throws(
+    () =>
+      validatePolicy({
+        ...POLICY,
+        browsers: [
+          {name: 'chromium', project: 'chromium'},
+          {name: 'chromium', project: 'other'}
+        ]
+      }),
+    /Duplicate browser/u
+  );
 
   const fixture = await makeFixture();
   try {
@@ -355,8 +388,10 @@ test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () =
 test('derives release expectations from curated JSON inputs and never imports the legacy registry', async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
-  await writeFile(join(fixture.sourceRoot, 'src/index.js'),
-    'throw new Error("Legacy model registry must not be imported by the release gate.");\n');
+  await writeFile(
+    join(fixture.sourceRoot, 'src/index.js'),
+    'throw new Error("Legacy model registry must not be imported by the release gate.");\n'
+  );
 
   const inputs = await collectReleaseEvidenceInputs({
     archivePath: fixture.archivePath,
@@ -364,7 +399,10 @@ test('derives release expectations from curated JSON inputs and never imports th
     sourcePackageRoot: fixture.sourceRoot
   });
 
-  assert.deepEqual(inputs.models.map(({modelId}) => modelId), ['kev-0.6b-q4f16']);
+  assert.deepEqual(
+    inputs.models.map(({modelId}) => modelId),
+    ['kev-0.6b-q4f16']
+  );
   assert.equal(inputs.manifests.get('kev-0.6b-q4f16')?.manifest.model, 'kev-0.6b-q4f16');
 });
 
@@ -407,20 +445,26 @@ test('derives a non-empty exact asset requirement set from the committed manifes
   const modelSpec = JSON.parse(await readFile(modelSpecPath, 'utf8'));
   modelSpec.models = [];
   await writeFile(modelSpecPath, JSON.stringify(modelSpec));
-  await assert.rejects(collectReleaseEvidenceInputs({
-    archivePath: fixture.archivePath,
-    installedPackagePath: fixture.packageRoot,
-    sourcePackageRoot: fixture.sourceRoot
-  }), /model spec must not be empty/u);
+  await assert.rejects(
+    collectReleaseEvidenceInputs({
+      archivePath: fixture.archivePath,
+      installedPackagePath: fixture.packageRoot,
+      sourcePackageRoot: fixture.sourceRoot
+    }),
+    /model spec must not be empty/u
+  );
 
   modelSpec.models = fixture.descriptors.map(({modelId, description}) => ({modelId, description}));
   modelSpec.models[0].description.assets.requiredFiles = ['manifest.json'];
   await writeFile(modelSpecPath, JSON.stringify(modelSpec));
-  await assert.rejects(collectReleaseEvidenceInputs({
-    archivePath: fixture.archivePath,
-    installedPackagePath: fixture.packageRoot,
-    sourcePackageRoot: fixture.sourceRoot
-  }), /derive requiredFiles from its pinned manifest/u);
+  await assert.rejects(
+    collectReleaseEvidenceInputs({
+      archivePath: fixture.archivePath,
+      installedPackagePath: fixture.packageRoot,
+      sourcePackageRoot: fixture.sourceRoot
+    }),
+    /derive requiredFiles from its pinned manifest/u
+  );
 });
 
 test('rejects any skip, failure, retry, or omitted required browser case', async (t) => {
@@ -465,36 +509,88 @@ test('rejects evidence detached from the archive, install, model manifest, or ph
     policy: POLICY
   };
   const mutations: Array<(record: AnyRecord) => void> = [
-    (record) => { record.archive.sha256 = '0'.repeat(64); },
-    (record) => { record.archive.bundleSha256 = '0'.repeat(64); },
-    (record) => { record.archive.installedPackagePathSha256 = '0'.repeat(64); },
-    (record) => { record.archive.entryPathSha256 = '0'.repeat(64); },
-    (record) => { record.model.loadedId = 'other-model'; },
-    (record) => { record.model.assetManifestSha256 = '0'.repeat(64); },
-    (record) => { record.inference.reference.fixtureSha256 = '0'.repeat(64); },
-    (record) => { record.inference.reference.packageSha256 = '0'.repeat(64); },
-    (record) => { record.inference.upstreamReference.fixtureSha256 = '0'.repeat(64); },
-    (record) => { record.inference.upstreamReference.modelId = 'other-model'; },
-    (record) => { record.inference.online.referenceMatched = false; },
-    (record) => { record.inference.online.optionOrder.reverse(); },
-    (record) => { record.inference.online.logits[0] = 10; },
-    (record) => { record.inference.online.probabilities[0] = 0; },
-    (record) => { record.inference.online.optionIndices = [0, 1]; },
-    (record) => { record.inference.offline.logits[0] += 0.01; },
-    (record) => { record.inference.offline.networkAttempts.push('https://example.invalid/model'); },
-    (record) => { record.artifact.modelId = 'other-model'; },
-    (record) => { record.artifact.manifestPath = 'assets/other/manifest.json'; },
-    (record) => { record.artifact.manifest.files['model.wasm'].sha256 = '0'.repeat(64); },
-    (record) => { record.artifact.verifiedFiles.pop(); },
-    (record) => { record.artifact.verifiedFiles[0].sha256 = '0'.repeat(64); },
-    (record) => { record.device.isVirtual = true; },
+    (record) => {
+      record.archive.sha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.archive.bundleSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.archive.installedPackagePathSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.archive.entryPathSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.model.loadedId = 'other-model';
+    },
+    (record) => {
+      record.model.assetManifestSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.inference.reference.fixtureSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.inference.reference.packageSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.inference.upstreamReference.fixtureSha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.inference.upstreamReference.modelId = 'other-model';
+    },
+    (record) => {
+      record.inference.online.referenceMatched = false;
+    },
+    (record) => {
+      record.inference.online.optionOrder.reverse();
+    },
+    (record) => {
+      record.inference.online.logits[0] = 10;
+    },
+    (record) => {
+      record.inference.online.probabilities[0] = 0;
+    },
+    (record) => {
+      record.inference.online.optionIndices = [0, 1];
+    },
+    (record) => {
+      record.inference.offline.logits[0] += 0.01;
+    },
+    (record) => {
+      record.inference.offline.networkAttempts.push('https://example.invalid/model');
+    },
+    (record) => {
+      record.artifact.modelId = 'other-model';
+    },
+    (record) => {
+      record.artifact.manifestPath = 'assets/other/manifest.json';
+    },
+    (record) => {
+      record.artifact.manifest.files['model.wasm'].sha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.artifact.verifiedFiles.pop();
+    },
+    (record) => {
+      record.artifact.verifiedFiles[0].sha256 = '0'.repeat(64);
+    },
+    (record) => {
+      record.device.isVirtual = true;
+    },
     (record) => {
       record.device.model = 'Microsoft Virtual Machine';
       record.device.evidence.host.raw.Model = 'Microsoft Virtual Machine';
     },
-    (record) => { record.gpu.isFallbackAdapter = true; },
-    (record) => { record.gpu.features = []; },
-    (record) => { record.browser.version = ''; }
+    (record) => {
+      record.gpu.isFallbackAdapter = true;
+    },
+    (record) => {
+      record.gpu.features = [];
+    },
+    (record) => {
+      record.browser.version = '';
+    }
   ];
 
   for (const mutate of mutations) {
@@ -511,13 +607,21 @@ test('rejects archive manifest changes and installed-package drift', async (t) =
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
   const valid = await prepareValidReport(fixture);
-  const changed = join(fixture.packageRoot, 'assets', required(fixture.descriptors[0], 'Fixture descriptor').modelId, 'manifest.json');
+  const changed = join(
+    fixture.packageRoot,
+    'assets',
+    required(fixture.descriptors[0], 'Fixture descriptor').modelId,
+    'manifest.json'
+  );
   const models = valid.models;
   const originalArchive = await verifyArchiveInstall(fixture.archivePath, fixture.packageRoot);
   assert.equal((await readArchiveModelManifests(originalArchive, models)).size, 1);
 
   await writeFile(changed, '{"model":"kev-0.6b-q4f16","files":{}}\n');
-  await assert.rejects(verifyArchiveInstall(fixture.archivePath, fixture.packageRoot), /differs from the release archive/u);
+  await assert.rejects(
+    verifyArchiveInstall(fixture.archivePath, fixture.packageRoot),
+    /differs from the release archive/u
+  );
   const changedArchivePath = join(fixture.root, 'changed-manifest.tgz');
   execFileSync(TAR, ['-czf', changedArchivePath, '-C', dirname(fixture.packageRoot), 'package']);
   const changedArchive = await verifyArchiveInstall(changedArchivePath, fixture.packageRoot);
