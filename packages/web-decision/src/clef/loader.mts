@@ -13,7 +13,7 @@ import {openClefSource} from './source.mjs';
 import {createClefTokenizer} from './tokenizer.mjs';
 import {uploadClefParameters} from './upload.mjs';
 import type {ErrorCode} from '../curated/types.js';
-import type {ClefTokenizer, ClefSource, ClefTensorEntry} from './types.mjs';
+import type {ClefTokenizer, ClefSource, ClefTensorEntry} from './types.js';
 
 const KEYS = new Set([
   'model',

@@ -1,5 +1,5 @@
 import {WebDecisionError} from '../kev.js';
-import type {ClefTokenizer} from './types.mjs';
+import type {ClefTokenizer} from './types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

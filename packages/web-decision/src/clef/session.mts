@@ -4,7 +4,7 @@ import {WebDecisionError} from '../kev.js';
 import {validateDecisionFields, validateRequestFields} from '../request-fields.mjs';
 import {CLEF_MAX_OPTIONS, packChoiceRequest, unpackChoiceScores} from './protocol.mjs';
 import {approximateSoftmax} from './softmax.mjs';
-import type {ClefTokenizer, PackedClefChoice} from './types.mjs';
+import type {ClefTokenizer, PackedClefChoice} from './types.js';
 
 interface ClefSessionRunner {
   run(packed: PackedClefChoice, options: {signal?: AbortSignal | undefined}): Promise<Float32Array[]>;

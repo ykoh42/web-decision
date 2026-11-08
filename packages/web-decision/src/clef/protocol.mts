@@ -309,4 +309,4 @@ export function unpackChoiceScores(
   });
   return {tokenCount: packed.ids.length, answers};
 }
-import type {ClefTokenizer, PackedClefChoice} from './types.mjs';
+import type {ClefTokenizer, PackedClefChoice} from './types.js';

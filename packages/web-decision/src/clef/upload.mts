@@ -1,5 +1,5 @@
 import {sha256, waitForAbort} from '../assets.js';
-import type {ClefRangePart, ClefTensorEntry} from './types.mjs';
+import type {ClefRangePart, ClefTensorEntry} from './types.js';
 
 interface RangeUploadOptions {
   fake?: boolean;

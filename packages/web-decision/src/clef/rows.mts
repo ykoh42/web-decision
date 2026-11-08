@@ -6,7 +6,7 @@ import type {
   ClefRangeReader,
   ClefRowSelectOptions,
   SelectedClefRows
-} from './types.mjs';
+} from './types.js';
 
 const ROWS = [65536, 65536, 65536, 51712],
   MAX_RANGE = 4 * 1024 * 1024;

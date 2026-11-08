@@ -12,7 +12,7 @@ import type {
   ClefTensorEntry,
   GraphInput,
   SelectedClefRows
-} from './types.mjs';
+} from './types.js';
 
 export interface TvmTensor {
   byteOffset: number;

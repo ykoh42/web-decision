@@ -1,6 +1,6 @@
 // Choice-only packed protocol to the experimental Clef graph's 11 user tensors.
 import {validatePacked} from './protocol.mjs';
-import type {ClefChoiceGraph, ClefQuestion, GraphInput, GraphInputData, GraphInputDType} from './types.mjs';
+import type {ClefChoiceGraph, ClefQuestion, GraphInput, GraphInputData, GraphInputDType} from './types.js';
 
 const mappings = new WeakMap<ClefChoiceGraph, number[]>();
 function item(name: string, dtype: GraphInputDType, shape: number[], data: GraphInputData): GraphInput {

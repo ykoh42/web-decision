@@ -1,7 +1,7 @@
 import {assetUrl, sha256, waitForAbort} from '../assets.js';
 import {cancelResponse, readBoundedResponse} from '../bounded-response.js';
 import {WebDecisionError} from '../kev.js';
-import type {ClefRangePart, ClefTensorEntry} from './types.mjs';
+import type {ClefRangePart, ClefTensorEntry} from './types.js';
 
 export async function readClefRange(
   base: URL,

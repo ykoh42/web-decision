@@ -5,7 +5,7 @@ import {parseStrictJson} from '../h2o/strict-json.mjs';
 import {WebDecisionError} from '../kev.js';
 import {CLEF_ABI_SHA256, CLEF_GRAPH_SHA256, CLEF_INVENTORY_SHA256, CLEF_MODEL} from './contract.mjs';
 import {readClefRange} from './range.mjs';
-import type {ClefRangePart, ClefSource, ClefSourceIndex, ClefTensorEntry} from './types.mjs';
+import type {ClefRangePart, ClefSource, ClefSourceIndex, ClefTensorEntry} from './types.js';
 
 const FILES = Object.freeze({
   'inventory.json': {bytes: 325498, sha256: CLEF_INVENTORY_SHA256},
