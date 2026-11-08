@@ -53,6 +53,7 @@ const packagedSourceFiles = [
   'assets/experimental-kev-upstream/notices/TVM-FFI-NOTICE.txt',
   'assets/experimental-kev-upstream/notices/TVM-LICENSE.txt',
   'assets/experimental-kev-upstream/notices/TVM-NOTICE.txt',
+  'src/catalog/README.md',
   'src/catalog/types.generated.d.ts',
   'src/curated/index.d.ts'
 ];
