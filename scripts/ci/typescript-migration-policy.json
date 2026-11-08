@@ -58,7 +58,6 @@
     "packages/web-decision/src/h2o/session.mjs",
     "packages/web-decision/src/h2o/sha256.mjs",
     "packages/web-decision/src/h2o/source-entry.mjs",
-    "packages/web-decision/src/h2o/source-evidence.mjs",
     "packages/web-decision/src/h2o/source.mjs",
     "packages/web-decision/src/h2o/strict-json.mjs",
     "packages/web-decision/src/h2o/teardown.mjs",

@@ -4,7 +4,13 @@ import {readVerifiedRange} from '../strands/range-reader.mjs';
 import {PINS} from './binding.mjs';
 import {validateH2oSignal} from './signal.mjs';
 
-export async function readH2oInventory(baseValue, signal) {
+const readInventoryRange = readVerifiedRange as unknown as (
+  base: URL,
+  descriptor: {path: string; totalBytes: number; offset: number; length: number; sha256: string},
+  options: {cache: false; offline: false; signal?: AbortSignal | undefined}
+) => Promise<{bytes: ArrayBuffer}>;
+
+export async function readH2oInventory(baseValue: string | URL, signal?: AbortSignal): Promise<Uint8Array> {
   validateH2oSignal(signal);
   signal?.throwIfAborted();
   let base;
@@ -23,7 +29,7 @@ export async function readH2oInventory(baseValue, signal) {
   )
     throw new WebDecisionError('INVALID_ASSET', 'Expected an HTTP(S) asset directory');
   const bytes = 187681;
-  const result = await readVerifiedRange(
+  const result = await readInventoryRange(
     base,
     {path: 'evidence/inventory.json', totalBytes: bytes, offset: 0, length: bytes, sha256: PINS.inventory},
     {cache: false, offline: false, signal}

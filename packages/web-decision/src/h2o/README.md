@@ -23,7 +23,7 @@ Unless otherwise shown, paths above are under `models/h2o-integration-20261030/`
 The 681 inventory files total 2,382,544,174 bytes, including 2,369,736,192
 bytes of converted weights and the tokenizer; the WASM, config, contract and
 metadata are additional. Inventory ranges and whole-file hashes
-must remain byte-for-byte unchanged. `source-evidence.mjs` retrieves the pinned
+must remain byte-for-byte unchanged. `source-evidence.mts` retrieves the pinned
 inventory, and `source.mjs` verifies the path-free projection and manifest
 before opening the assets. Every requested range
 requires a correct HTTP 206 and `Content-Range`; cross-origin deployments must
