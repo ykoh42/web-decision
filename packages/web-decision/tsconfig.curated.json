@@ -19,6 +19,9 @@
     "src/browser-only-ws.ts",
     "test/curated-*.test.mts",
     "test/build-normalization.test.mts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "test/kev06-contract.test.mts",
+    "test/model-assets.test.mts",
+    "test/runtime-lifecycle.test.mts"
   ]
 }
