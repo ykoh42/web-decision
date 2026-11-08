@@ -15,8 +15,9 @@ import {
   sourceNamesInWorkingTree,
   validateFindings
 } from './check_cognitive_complexity.mjs';
+import type {ComplexityBaseline, ComplexityFinding, OxlintDiagnostic} from './check_cognitive_complexity.mjs';
 
-function diagnostic(source, marker, file = 'fixture.mjs', score = 16) {
+function diagnostic(source: string, marker: string, file = 'fixture.mjs', score = 16): OxlintDiagnostic {
   const index = source.indexOf(marker);
   assert.notEqual(index, -1, `Missing diagnostic marker ${marker}`);
   return {
@@ -26,9 +27,25 @@ function diagnostic(source, marker, file = 'fixture.mjs', score = 16) {
   };
 }
 
-const versions = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).devDependencies;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-function baseline(findings) {
+function readToolVersions(): {oxlint: string; 'eslint-plugin-sonarjs': string} {
+  const packageJson: unknown = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  if (!isRecord(packageJson) || !isRecord(packageJson.devDependencies)) {
+    throw new Error('package.json is missing devDependencies.');
+  }
+  const {oxlint, 'eslint-plugin-sonarjs': sonarjs} = packageJson.devDependencies;
+  if (typeof oxlint !== 'string' || typeof sonarjs !== 'string') {
+    throw new Error('package.json is missing pinned Oxlint or SonarJS versions.');
+  }
+  return {oxlint, 'eslint-plugin-sonarjs': sonarjs};
+}
+
+const versions = readToolVersions();
+
+function baseline(findings: readonly ComplexityFinding[]): ComplexityBaseline {
   return {
     schemaVersion: 1,
     threshold: 15,
@@ -42,7 +59,7 @@ function baseline(findings) {
   };
 }
 
-function makeCacheFixture(prefix) {
+function makeCacheFixture(prefix: string): string {
   const cacheDirectory = path.join(ROOT, 'node_modules/.cache');
   fs.mkdirSync(cacheDirectory, {recursive: true});
   return fs.mkdtempSync(path.join(cacheDirectory, prefix));
@@ -122,7 +139,9 @@ test('rejects new and worsened violations relative to the trusted baseline', () 
       ),
     /New SonarJS cognitive complexity violation/u
   );
-  assert.throws(() => checkBaseline(baseline([{...initial.findings[0], score: 17}]), initial), /increased/u);
+  const initialFinding = initial.findings[0];
+  assert.ok(initialFinding);
+  assert.throws(() => checkBaseline(baseline([{...initialFinding, score: 17}]), initial), /increased/u);
   assert.throws(
     () => checkBaseline(initial, {...initial, versions: {...initial.versions, sonarjs: '5.0.0'}}),
     /tool versions differ/u
@@ -193,7 +212,11 @@ test('ambiguous anonymous callbacks produce duplicate identities and fail closed
     const diagnostics = runOxlint([relativePath]);
     assert.equal(diagnostics.length, 2);
     const findings = diagnostics.map((item) => diagnosticIdentity(item, source, relativePath));
-    assert.equal(findings[0].identity, findings[1].identity);
+    const firstFinding = findings[0];
+    const secondFinding = findings[1];
+    assert.ok(firstFinding);
+    assert.ok(secondFinding);
+    assert.equal(firstFinding.identity, secondFinding.identity);
     assert.throws(() => validateFindings(findings), /duplicate function identities/u);
   } finally {
     fs.rmSync(fixtureDirectory, {recursive: true, force: true});
