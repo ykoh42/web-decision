@@ -91,6 +91,8 @@ test('discovers maintained inline scripts while allowing external modules and JS
   context.after(() => rmSync(fixture.root, {recursive: true, force: true}));
   write(fixture.root, 'src/inline.html', '<script type="module">run()</script>');
   write(fixture.root, 'src/spoofed.html', '<script data-src="app.ts">run()</script>');
+  write(fixture.root, 'src/quoted.html', '<script data-value=" src=app.ts > ">run()</script>');
+  write(fixture.root, 'src/template.html', '<template><script>run()</script></template>');
   write(fixture.root, 'src/external.html', '<script type="module" src="app.ts"></script>');
   write(fixture.root, 'src/data.html', '<script type="application/json">{}</script>');
   write(fixture.root, 'src/comment.html', '<!-- <script>run()</script> -->');
@@ -100,7 +102,9 @@ test('discovers maintained inline scripts while allowing external modules and JS
   assert.deepEqual(discoverInlineJavaScriptPaths(fixture.root), [
     'releases/web-decision-0.3.0/example.html',
     'src/inline.html',
-    'src/spoofed.html'
+    'src/quoted.html',
+    'src/spoofed.html',
+    'src/template.html'
   ]);
 });
 

@@ -52,6 +52,7 @@
     "eslint-plugin-sonarjs": "4.2.2",
     "oxfmt": "0.77.0",
     "oxlint": "1.92.0",
+    "parse5": "8.1.0",
     "publint": "0.3.25",
     "tsx": "4.23.15",
     "typescript": "7.0.2",

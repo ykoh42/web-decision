@@ -2,6 +2,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {defaultTreeAdapter, parse, type DefaultTreeAdapterTypes} from 'parse5';
 
 const policyPath = 'scripts/ci/typescript-migration-policy.json';
 const initialInventoryCommit = 'baa3c144d23e1882ba29084c9f95897b8c56accb';
@@ -291,25 +292,33 @@ export function discoverJavaScriptPaths(root: string): string[] {
     .sort();
 }
 
+function isInlineScript(node: DefaultTreeAdapterTypes.Node): boolean {
+  if (!defaultTreeAdapter.isElementNode(node) || node.tagName !== 'script') return false;
+  if (node.attrs.some(({name}) => name === 'src')) return false;
+  const type =
+    node.attrs
+      .find(({name}) => name === 'type')
+      ?.value.trim()
+      .toLowerCase() ?? '';
+  if (['application/json', 'application/ld+json', 'importmap', 'speculationrules'].includes(type)) return false;
+  return node.childNodes.some((child) => defaultTreeAdapter.isTextNode(child) && child.value.trim().length > 0);
+}
+
+function containsInlineScript(node: DefaultTreeAdapterTypes.Node): boolean {
+  if (isInlineScript(node)) return true;
+  if (defaultTreeAdapter.isElementNode(node) && node.tagName === 'template' && 'content' in node) {
+    if (containsInlineScript(defaultTreeAdapter.getTemplateContent(node))) return true;
+  }
+  return 'childNodes' in node && node.childNodes.some(containsInlineScript);
+}
+
 /** Find executable inline scripts in tracked or nonignored HTML. */
 export function discoverInlineJavaScriptPaths(root: string): string[] {
   const output = runGit(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']);
   const paths = [...new Set(parseGitPathList(output))].filter(
     (path) => /\.html?$/iu.test(path) && existsSync(join(root, path))
   );
-  return paths
-    .filter((path) => {
-      const html = readFileSync(join(root, path), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
-      return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)].some((match) => {
-        const attributes = match[1] ?? '';
-        const content = match[2] ?? '';
-        if (!content.trim() || /(?:^|\s)src\s*=/iu.test(attributes)) return false;
-        const type = attributes.match(/(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/iu);
-        const value = (type?.[1] ?? type?.[2] ?? type?.[3] ?? '').trim().toLowerCase();
-        return !['application/json', 'application/ld+json', 'importmap', 'speculationrules'].includes(value);
-      });
-    })
-    .sort();
+  return paths.filter((path) => containsInlineScript(parse(readFileSync(join(root, path), 'utf8')))).sort();
 }
 
 function discoverSeedJavaScriptPaths(root: string, baselineCommit: string): Set<string> {
