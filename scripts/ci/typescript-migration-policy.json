@@ -149,7 +149,6 @@
     "packages/web-decision/src/safedecide/protocol.mjs",
     "packages/web-decision/src/safedecide/runner.mjs",
     "packages/web-decision/src/safedecide/session.mjs",
-    "packages/web-decision/src/safedecide/tokenizer.mjs",
     "packages/web-decision/src/shard-prefetch.js",
     "packages/web-decision/src/skejja-preview-entry.mjs",
     "packages/web-decision/src/skejja-preview-registry.mjs",
