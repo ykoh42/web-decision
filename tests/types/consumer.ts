@@ -274,6 +274,17 @@ const tamevOptions: TamevMicroLoadOptions = {
   cache: true,
   offline: false
 };
+const tamevMicroDefaultOptions: TamevMicroLoadOptions = {
+  model: 'experimental-tamev-micro-minilm-int8'
+};
+const tamevNanoDefaultOptions: TamevNanoLoadOptions = {
+  model: 'experimental-tamev-nano-tinybert-int8'
+};
+const tamevMicroDefault = loadDecisionModel(tamevMicroDefaultOptions);
+const tamevNanoDefault = loadDecisionModel(tamevNanoDefaultOptions);
+// @ts-expect-error Nano Flash still requires a caller-provided asset URL.
+loadDecisionModel({model: 'experimental-tamev-nano-flash-tinybert-int8'});
+void [tamevMicroDefault, tamevNanoDefault];
 const tamevTypedOptions = loadDecisionModel(tamevOptions);
 void tamevTypedOptions.then((model) => {
   const tamev: LoadedTamevMicroModel = model;

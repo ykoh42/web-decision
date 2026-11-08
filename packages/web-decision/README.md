@@ -1,6 +1,6 @@
 # web-decision
 
-`web-decision` runs decision models in the browser. The model computes the answer on the user's device; the library downloads model assets from an application-configured URL and verifies their pinned hashes.
+`web-decision` runs decision models in the browser. The model computes the answer on the user's device; the library downloads model assets from pinned sources or a trusted application-configured mirror and verifies their hashes.
 
 This workspace package is `0.0.0-preview.34` and is not the stable npm release. The latest stable release is `web-decision@0.3.0`; its supported scope is listed in the repository's [main README](../../README.md).
 
@@ -9,10 +9,7 @@ This workspace package is `0.0.0-preview.34` and is not the stable npm release. 
 ```js
 import {loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({
-  model: 'experimental-tamev-micro-minilm-int8',
-  assetsUrl: 'https://your-origin.example/models/tamev-micro-minilm/'
-});
+const model = await loadDecisionModel({model: 'experimental-tamev-micro-minilm-int8'});
 
 try {
   const result = await model.decide({
@@ -42,7 +39,9 @@ The local result is in the [M4 Pro verification report](https://github.com/ykoh4
 
 ## Model assets
 
-The npm package contains library code and notices, not model weights. Host the matching asset pack separately and pass its trusted base URL. Do not let untrusted input choose `assetsUrl`. The library verifies the pinned assets before use; it does not send decision inputs to an inference server.
+TAMEV Nano TinyBERT and Micro MiniLM load from their pinned public revisions when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
+
+Browser caching is enabled by default for TAMEV. Once all verified files are cached, pass `offline: true` to require an offline load. The application must also make its own code and pages available offline.
 
 Model files have their own terms. Review the model and asset terms for the files you choose to host or use.
 

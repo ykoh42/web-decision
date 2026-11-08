@@ -645,11 +645,17 @@ test('TAMEV session calibrates generic choices and preserves the raw typed proto
   });
 });
 
-test('TAMEV loader pins the direct browser path and rejects bad options', async () => {
-  assert.equal(
-    validateTamevLoadOptions({model: TAMEV_MICRO_MODEL, assetsUrl: 'https://example.test/model/'}).base.href,
-    'https://example.test/model/'
-  );
+test('TAMEV loader defaults Nano and Micro to pinned revisions, allows mirrors, and rejects bad options', async () => {
+  for (const profile of [TAMEV_MICRO_PROFILE, TAMEV_NANO_PROFILE]) {
+    const checked = validateTamevLoadOptions({model: profile.model}, profile);
+    assert.equal(checked.base.href, `https://huggingface.co/${profile.repository}/resolve/${profile.revision}/`);
+    assert.equal(checked.cacheEnabled, true);
+    assert.equal(checked.offline, false);
+    assert.equal(
+      validateTamevLoadOptions({model: profile.model, assetsUrl: 'https://example.test/model'}, profile).base.href,
+      'https://example.test/model/'
+    );
+  }
   assert.equal(
     validateTamevLoadOptions({
       model: TAMEV_MICRO_MODEL,
@@ -666,6 +672,14 @@ test('TAMEV loader pins the direct browser path and rejects bad options', async 
   assert.throws(() => validateTamevLoadOptions({model: TAMEV_MICRO_MODEL, assetsUrl: 'file:///model/'}), {
     code: 'INVALID_INPUT'
   });
+  assert.throws(() => validateTamevLoadOptions({model: TAMEV_NANO_FLASH_MODEL}, TAMEV_NANO_FLASH_PROFILE), {
+    code: 'INVALID_INPUT'
+  });
+  assert.equal(validateTamevLoadOptions({model: TAMEV_NANO_MODEL, offline: true}, TAMEV_NANO_PROFILE).offline, true);
+  assert.throws(
+    () => validateTamevLoadOptions({model: TAMEV_NANO_MODEL, offline: true, cache: false}, TAMEV_NANO_PROFILE),
+    {code: 'INVALID_INPUT'}
+  );
   assert.throws(() => validateTamevLoadOptions({model: TAMEV_MICRO_MODEL, assetsUrl: '/model/', other: true}), {
     code: 'INVALID_INPUT'
   });
@@ -713,9 +727,21 @@ test('TAMEV loader checks pinned configuration and ONNX interface before returni
       }
     }
   };
+  let sourceBase;
   const loaded = await loadTamevMicro(
-    {model: TAMEV_MICRO_MODEL, assetsUrl: 'https://example.test/model/', cache: false},
-    {ort, Tokenizer: FakeTokenizer, openSource: async () => source}
+    {model: TAMEV_MICRO_MODEL, cache: false},
+    {
+      ort,
+      Tokenizer: FakeTokenizer,
+      openSource: async (checked) => {
+        sourceBase = checked.base.href;
+        return source;
+      }
+    }
+  );
+  assert.equal(
+    sourceBase,
+    `https://huggingface.co/${TAMEV_MICRO_PROFILE.repository}/resolve/${TAMEV_MICRO_PROFILE.revision}/`
   );
   assert.deepEqual(sessionOptions, {
     executionProviders: ['wasm'],
@@ -772,9 +798,21 @@ test('TAMEV Nano loader accepts the pinned cross-fusion ONNX graph and typed API
       }
     }
   };
+  let sourceBase;
   const loaded = await loadTamevNano(
-    {model: TAMEV_NANO_MODEL, assetsUrl: 'https://example.test/model/', cache: false},
-    {ort, Tokenizer: FakeTokenizer, openSource: async () => source}
+    {model: TAMEV_NANO_MODEL},
+    {
+      ort,
+      Tokenizer: FakeTokenizer,
+      openSource: async (checked) => {
+        sourceBase = checked.base.href;
+        return source;
+      }
+    }
+  );
+  assert.equal(
+    sourceBase,
+    `https://huggingface.co/${TAMEV_NANO_PROFILE.repository}/resolve/${TAMEV_NANO_PROFILE.revision}/`
   );
   const typed = await loaded.systemOne('state', {
     route: {type: 'choice', criteria: {billing: 'billing', fraud: 'fraud'}}

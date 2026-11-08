@@ -971,14 +971,18 @@ export interface DecimaAgentLoadOptions extends Omit<DecimaSmallLoadOptions, 'mo
 
 export type DecimaLoadOptions = DecimaSmallLoadOptions | DecimaBaseCleanLoadOptions | DecimaAgentLoadOptions;
 
-export interface TamevMicroLoadOptions extends CommonLoadOptions {
+export interface TamevMicroLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-tamev-micro-minilm-int8';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface TamevNanoLoadOptions extends CommonLoadOptions {
+export interface TamevNanoLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-tamev-nano-tinybert-int8';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }

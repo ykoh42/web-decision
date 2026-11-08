@@ -2,7 +2,7 @@ import {Tokenizer} from '@huggingface/tokenizers';
 import * as defaultOrt from 'onnxruntime-web/wasm';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {TAMEV_MICRO_PROFILE, TAMEV_MICRO_MODEL, TAMEV_PROFILES} from './contract.mjs';
+import {TAMEV_MICRO_PROFILE, TAMEV_MICRO_MODEL, TAMEV_NANO_MODEL, TAMEV_PROFILES} from './contract.mjs';
 import {createTamevRunner} from './runner.mjs';
 import {createTamevSession} from './session.mjs';
 import {openTamevSource} from './source.mjs';
@@ -18,6 +18,7 @@ const LOAD_KEYS = new Set([
   'maxPrefetchBytes',
   'debertaReadback'
 ]);
+const ID_ONLY_MODELS = new Set([TAMEV_MICRO_MODEL, TAMEV_NANO_MODEL]);
 const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
 
 export function validateTamevLoadOptions(options, profile = TAMEV_MICRO_PROFILE) {
@@ -31,8 +32,8 @@ export function validateTamevLoadOptions(options, profile = TAMEV_MICRO_PROFILE)
   const values = Object.fromEntries(Reflect.ownKeys(options).map((key) => [key, options[key]]));
   if (
     (values.model !== undefined && values.model !== profile.model) ||
-    typeof values.assetsUrl !== 'string' ||
-    !values.assetsUrl ||
+    (values.assetsUrl !== undefined && (typeof values.assetsUrl !== 'string' || !values.assetsUrl)) ||
+    (values.assetsUrl === undefined && !ID_ONLY_MODELS.has(profile.model)) ||
     (values.cache !== undefined && typeof values.cache !== 'boolean') ||
     (values.offline !== undefined && typeof values.offline !== 'boolean') ||
     (values.offline && values.cache === false) ||
@@ -47,7 +48,8 @@ export function validateTamevLoadOptions(options, profile = TAMEV_MICRO_PROFILE)
     throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
   let base;
   try {
-    base = new URL(values.assetsUrl, globalThis.location?.href);
+    const sourceUrl = values.assetsUrl ?? `https://huggingface.co/${profile.repository}/resolve/${profile.revision}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', `Invalid ${profile.name} assetsUrl.`, cause);
   }
