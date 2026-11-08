@@ -31,6 +31,11 @@ const POLICY_PATH = join(WORKSPACE_ROOT, 'scripts/release/release-evidence-polic
 const POLICY = JSON.parse(await readFile(POLICY_PATH, 'utf8'));
 const TAR = process.platform === 'win32' ? 'tar.exe' : 'tar';
 
+function required<T>(value: T | undefined, description: string): T {
+  if (value === undefined) throw new Error(`${description} is missing.`);
+  return value;
+}
+
 function makeDescriptor(modelId: string, salt: string): AnyRecord {
   const manifest = {
     formatVersion: 1,
@@ -246,7 +251,7 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
         browser,
         archive,
         catalogSha256,
-        manifest: manifests.get(model.modelId)!.manifest
+        manifest: required(manifests.get(model.modelId), `Manifest for ${model.modelId}`).manifest
       });
       tests.push({
         file: POLICY.testFile,
@@ -335,7 +340,7 @@ test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () =
 
   const fixture = await makeFixture();
   try {
-    const nonTvm = structuredClone(fixture.descriptors[0]);
+    const nonTvm = structuredClone(required(fixture.descriptors[0], 'Fixture descriptor'));
     nonTvm.description.backend.name = 'onnxruntime-web-webgpu';
     nonTvm.publicDescriptor.backend.name = 'onnxruntime-web-webgpu';
     const {packageRoot, sourceRoot} = await putPackageTree(fixture.root, [nonTvm]);
@@ -366,12 +371,12 @@ test('derives release expectations from curated JSON inputs and never imports th
 test('allows a catalog model with no required features but keeps Kev shader-f16 mandatory', async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
-  const featureless = structuredClone(fixture.descriptors[0]);
+  const featureless = structuredClone(required(fixture.descriptors[0], 'Fixture descriptor'));
   featureless.description.backend.requiredFeatures = [];
   featureless.publicDescriptor.backend.requiredFeatures = [];
   const {sourceRoot} = await putPackageTree(join(fixture.root, 'featureless'), [featureless]);
   const publicCatalog = await loadPublicCatalog(sourceRoot, 'dist/index.js');
-  assert.deepEqual(publicCatalog[0].backend.requiredFeatures, []);
+  assert.deepEqual(required(publicCatalog[0], 'Public fixture descriptor').backend.requiredFeatures, []);
 
   const valid = await prepareValidReport(fixture);
   const context = {
@@ -381,7 +386,7 @@ test('allows a catalog model with no required features but keeps Kev shader-f16 
     models: valid.models,
     policy: POLICY
   };
-  valid.models[0].backend.requiredFeatures = [];
+  required(valid.models[0], 'Curated Kev model').backend.requiredFeatures = [];
   const report = structuredClone(valid.report);
   const stdout = report.suites[0].specs[0].tests[0].results[0].stdout[0];
   const record = JSON.parse(stdout.slice(POLICY.evidencePrefix.length));
@@ -506,7 +511,7 @@ test('rejects archive manifest changes and installed-package drift', async (t) =
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
   const valid = await prepareValidReport(fixture);
-  const changed = join(fixture.packageRoot, 'assets', fixture.descriptors[0].modelId, 'manifest.json');
+  const changed = join(fixture.packageRoot, 'assets', required(fixture.descriptors[0], 'Fixture descriptor').modelId, 'manifest.json');
   const models = valid.models;
   const originalArchive = await verifyArchiveInstall(fixture.archivePath, fixture.packageRoot);
   assert.equal((await readArchiveModelManifests(originalArchive, models)).size, 1);

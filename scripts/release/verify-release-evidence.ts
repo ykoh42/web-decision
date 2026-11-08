@@ -543,6 +543,7 @@ async function loadCommittedCatalog(packageRoot: string): Promise<ModelRequireme
 
   const models = modelSpec.models.map(({modelId, description}) => {
     const artifacts = artifactLock.byModelId[modelId];
+    fail(artifacts !== undefined, `Artifact lock is missing model ${modelId}.`);
     const assets = description.assets as AnyRecord;
     const backend = description.backend as AnyRecord;
     fail(assets && backend, `Committed model ${modelId} is missing assets or backend metadata.`);
@@ -654,6 +655,7 @@ export async function readArchiveModelManifests(
     assert.equal(matches.filter((item) => item.path === wanted).length, 1, `Archive is missing the pinned manifest path for ${model.modelId}.`);
     assert.equal(matches.length, 1, `Archive must contain exactly one static manifest for ${model.modelId}.`);
     const item = matches[0];
+    fail(item !== undefined, `Archive is missing the static manifest for ${model.modelId}.`);
     const validated = validateArtifactManifest(model, item.manifest);
     result.set(model.modelId, {...item, ...validated});
   }
@@ -693,7 +695,13 @@ export async function collectReleaseEvidenceInputs({
 function collectPlaywrightTests(suites: PlaywrightSuite[] | undefined, result: PlaywrightTestItem[] = []): PlaywrightTestItem[] {
   for (const suite of suites ?? []) {
     for (const spec of suite.specs ?? []) {
-      for (const test of spec.tests ?? []) result.push({file: spec.file ?? suite.file, title: spec.title, test});
+      for (const test of spec.tests ?? []) {
+        const item: PlaywrightTestItem = {test};
+        const file = spec.file ?? suite.file;
+        if (file !== undefined) item.file = file;
+        if (spec.title !== undefined) item.title = spec.title;
+        result.push(item);
+      }
     }
     collectPlaywrightTests(suite.suites, result);
   }
@@ -710,11 +718,14 @@ function recordFromTest(test: PlaywrightTest, evidencePrefix: string): AnyRecord
   assert.equal(test.expectedStatus, 'passed', 'Every release GPU test must expect a pass.');
   assert.equal(test.status, 'expected', 'Every release GPU test must pass without skip or retry.');
   const result = results[0];
+  fail(result !== undefined, 'Release GPU test has no execution result.');
   assert.equal(result.status, 'passed', 'Release GPU test did not pass.');
   assert.deepEqual(result.errors ?? [], [], 'Release GPU test contains errors.');
   const lines = playwrightStdout(result).split(/\r?\n/u).filter((line) => line.startsWith(evidencePrefix));
   assert.equal(lines.length, 1, 'Each passing release GPU test must emit exactly one structured evidence record.');
-  return JSON.parse(lines[0].slice(evidencePrefix.length));
+  const line = lines[0];
+  fail(line !== undefined, 'Release GPU test has no structured evidence record.');
+  return JSON.parse(line.slice(evidencePrefix.length));
 }
 
 function requireText(value: unknown, description: string): void {
@@ -787,7 +798,7 @@ function validateGpuWmiEvidence(gpu: AnyRecord, modelId: string): void {
   assert.equal(evidence?.source, 'windows-wmi/Win32_VideoController', `GPU hardware source is required for ${modelId}.`);
   const raw = evidence.raw;
   const reported = gpu.hardware;
-  const fields = [
+  const fields: Array<[string, string]> = [
     ['manufacturer', 'AdapterCompatibility'],
     ['model', 'Name'],
     ['driverVersion', 'DriverVersion'],
@@ -994,6 +1005,7 @@ function parseArguments(args: string[]): Pick<ReleaseEvidenceOptions, 'archivePa
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index];
     const value = args[index + 1];
+    fail(typeof key === 'string', 'Missing option name.');
     fail(['--archive', '--installed-package', '--playwright-report'].includes(key), `Unknown option: ${key}`);
     fail(typeof value === 'string' && !value.startsWith('--'), `Missing value for ${key}.`);
     fail(!values.has(key), `Duplicate option: ${key}`);
