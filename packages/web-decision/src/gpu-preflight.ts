@@ -4,7 +4,7 @@ import {WebDecisionError} from './kev.js';
 /** Check a required feature before model reads without requesting a device.
  * Do not return the adapter: it can expire while model files are downloading.
  */
-export async function requestF16Adapter(gpu, signal) {
+export async function requestF16Adapter(gpu: GPU, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   let adapter;
   try {
