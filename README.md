@@ -51,6 +51,16 @@ try {
 }
 ```
 
+## Development direction
+
+This describes ongoing development, not the current `0.3.0` release behavior.
+
+- Prefer TVM WebGPU for browser inference while preserving supported ONNX paths; this is not a TVM-only migration.
+- Target model-ID-only loading with pinned artifacts fetched and verified automatically, cached, and available offline after warmup. Keep `assetsUrl` optional for trusted mirrors as routes migrate; not every current route supports ID-only loading.
+- Keep each route's backend and model behavior explicit. Never silently substitute a backend, model, or behavior.
+- Retain real-model browser verification for backend changes and report the models and environments measured.
+- TAMEV's TVM transition is separately owned and is not complete.
+
 ## Verification
 
 Release `0.3.0` was tested with real models in Chromium, Firefox, and WebKit on an Apple M4 Pro. See the [GitHub release](https://github.com/ykoh42/web-decision/releases/tag/v0.3.0) and [verification record](releases/web-decision-0.3.0/verification/package-archive.json).
