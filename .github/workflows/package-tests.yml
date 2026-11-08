@@ -98,6 +98,8 @@ jobs:
           pnpm check:quality
       - name: Run package tests
         run: pnpm test
+      - name: Check package coverage
+        run: pnpm test:coverage
       - name: Check released package types
         run: pnpm test:types:0.3.0
       - name: Build and verify the package archive
