@@ -12,6 +12,8 @@ The two WASMs differ in their code section. The build environment and execution 
 
 At commit `ba6262c7908b3e8b40a75631a00d4fbe0474cfee`, the exact npm archive with SHA-256 `a0958e02f1df70f7058f83af84eb2686cbc7fed22f799854804612632f9d0d8a` passed the Windows release evidence verifier. The installed archive ran one baseline request on Chrome 156 with a non-fallback WebGPU adapter and `shader-f16`; Windows reported an Intel UHD Graphics display device. The test measured all 14 cached assets, confirmed online inference and an offline rerun without network attempts, and matched the pinned historical and one-input ONNX CPU references. The Playwright JSON report SHA-256 was `c1fbe57ac3a9b4a19ceda69a0d7880e35298a80edd7c0dd739f75caceacfd718`.
 
+After the shared asset pipeline was converted to TypeScript, commit `670e19ef2a0824e637f100cc1a6460187709719d` passed the same Windows check with archive SHA-256 `bafa517a15ea64e9a67c5f8ef3cc76bcc7db655b5a05ab58a57a2ccd4b7885d3` and Playwright report SHA-256 `6fbda42741c2bbef40ae4c9634246cff94a28dcff42785a396ba168b2517a7e6`.
+
 The verifier also matched the package WASM to the separately built `ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0` artifact and its build report. This is evidence for that archive, one browser, one host, and one reference input; later package changes need a new check. It does not resolve the broader numerical and model-quality questions below.
 
 ## Exploratory output comparison
