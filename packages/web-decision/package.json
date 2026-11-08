@@ -41,7 +41,7 @@
     "test:kanana-runtime": "pnpm run typecheck:kanana-runtime && node --test test/kanana-tvm-runtime.test.mjs",
     "typecheck:kanana-core": "tsc --project tsconfig.kanana-core.json",
     "typecheck:kanana-runtime": "tsc --project tsconfig.kanana-runtime.json",
-    "test:coverage": "c8 --all --src src --include=src/** --exclude-after-remap --exclude=src/*.d.ts --exclude=src/**/*.d.ts --exclude=src/tinydecide/corrections.js --check-coverage --lines 85 --branches 80 --reporter=text --reporter=json-summary node --import tsx ../../scripts/kanana/run-node-tests.mts && node --import tsx ../../scripts/ci/check-uncovered.ts",
+    "test:coverage": "c8 --all --src src --include=src/** --extension .js --extension .cjs --extension .mjs --extension .ts --extension .tsx --extension .jsx --extension .mts --extension .cts --exclude-after-remap --exclude=src/*.d.ts --exclude=src/**/*.d.ts --exclude=src/*.d.mts --exclude=src/**/*.d.mts --exclude=src/*.d.cts --exclude=src/**/*.d.cts --exclude=src/tinydecide/corrections.js --check-coverage --lines 85 --branches 80 --reporter=text --reporter=json-summary node --import tsx ../../scripts/kanana/run-node-tests.mts && node --import tsx ../../scripts/ci/check-uncovered.ts",
     "build:kev-preview": "vite build --config vite.kev-preview.config.mjs",
     "build:tinydecide-preview": "vite build --config vite.tinydecide-preview.config.mjs",
     "build:kev-deberta-preview": "vite build --config vite.kev-deberta-preview.config.mjs",

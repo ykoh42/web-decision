@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
+import {mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {test} from 'node:test';
-import {compareUncoveredFiles, findUncoveredFiles} from './uncovered-files.ts';
+import {
+  compareUncoveredFiles,
+  findCoverageInventoryMismatches,
+  findUncoveredFiles,
+  listRuntimeSourceFiles,
+  RUNTIME_SOURCE_EXTENSIONS
+} from './uncovered-files.ts';
 
 const sourceRoot = '/workspace/src';
 
@@ -21,6 +30,62 @@ test('reports newly uncovered and resolved paths while preserving baseline order
     added: ['src/new.mjs'],
     resolved: ['src/old.mjs']
   });
+});
+
+test('discovers each executable source extension and skips declarations and the pinned correction file', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'coverage-inventory-'));
+  const sourceDirectory = join(temporaryRoot, 'src');
+  const nestedDirectory = join(sourceDirectory, 'nested');
+  const correctionsDirectory = join(sourceDirectory, 'tinydecide');
+  mkdirSync(nestedDirectory, {recursive: true});
+  mkdirSync(correctionsDirectory, {recursive: true});
+
+  try {
+    for (const extension of RUNTIME_SOURCE_EXTENSIONS) {
+      writeFileSync(join(nestedDirectory, `runtime${extension}`), '');
+    }
+    for (const extension of ['.d.ts', '.d.mts', '.d.cts']) {
+      writeFileSync(join(nestedDirectory, `declaration${extension}`), '');
+    }
+    writeFileSync(join(correctionsDirectory, 'corrections.js'), '');
+
+    assert.deepEqual(
+      listRuntimeSourceFiles(sourceDirectory),
+      RUNTIME_SOURCE_EXTENSIONS.map((extension) => `nested/runtime${extension}`).sort()
+    );
+  } finally {
+    rmSync(temporaryRoot, {recursive: true, force: true});
+  }
+});
+
+test('fails inventory reconciliation when an .mts or .cts file is absent from the coverage report', () => {
+  const sourceFiles = ['runtime.cts', 'runtime.mts', 'runtime.js'];
+  const summary = {
+    total: {lines: {total: 30, covered: 30}},
+    [`${sourceRoot}/runtime.cts`]: {lines: {total: 10, covered: 10}},
+    [`${sourceRoot}/runtime.js`]: {lines: {total: 10, covered: 10}},
+    [`${sourceRoot}/extra.mjs`]: {lines: {total: 10, covered: 10}}
+  };
+
+  assert.deepEqual(findCoverageInventoryMismatches(summary, sourceRoot, sourceFiles), {
+    missing: ['runtime.mts'],
+    unexpected: ['extra.mjs']
+  });
+});
+
+test('keeps c8 configured for the complete executable source extension set and excludes declarations', () => {
+  const packageConfiguration = JSON.parse(
+    readFileSync(new URL('../../packages/web-decision/package.json', import.meta.url), 'utf8')
+  ) as {scripts: {'test:coverage': string}};
+  const script = packageConfiguration.scripts['test:coverage'];
+  const configuredExtensions = [...script.matchAll(/--extension\s+(\S+)/g)].map((match) => match[1]);
+
+  assert.deepEqual(configuredExtensions, RUNTIME_SOURCE_EXTENSIONS);
+  assert.match(script, /--exclude=src\/\*\.d\.mts/);
+  assert.match(script, /--exclude=src\/\*\*\/\*\.d\.mts/);
+  assert.match(script, /--exclude=src\/\*\.d\.cts/);
+  assert.match(script, /--exclude=src\/\*\*\/\*\.d\.cts/);
+  assert.match(script, /--exclude=src\/tinydecide\/corrections\.js/);
 });
 
 test('rejects coverage paths outside the source root and invalid line counts', () => {
