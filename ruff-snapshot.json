@@ -1073,19 +1073,6 @@
           "message": "Import block is un-sorted or un-formatted"
         }
       ]
-    },
-    {
-      "path": "scripts/verify_preview_build_requirements.py",
-      "sha256": "3330ec7ecc82345c6b05995e3da65da38d231b9adc7383eb538f1c8b49af80ad",
-      "format": true,
-      "lint": [
-        {
-          "code": "I001",
-          "row": 3,
-          "column": 1,
-          "message": "Import block is un-sorted or un-formatted"
-        }
-      ]
     }
   ]
 }

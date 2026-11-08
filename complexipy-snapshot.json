@@ -104,25 +104,5 @@
         "complexity": 46
       }
     ]
-  },
-  {
-    "path": "scripts/tvm_kev_shape_order.py",
-    "file_name": "tvm_kev_shape_order.py",
-    "functions": [
-      {
-        "name": "normalize",
-        "complexity": 17
-      }
-    ]
-  },
-  {
-    "path": "scripts/verify_preview_build_requirements.py",
-    "file_name": "verify_preview_build_requirements.py",
-    "functions": [
-      {
-        "name": "read_locked_requirements",
-        "complexity": 20
-      }
-    ]
   }
 ]

@@ -71,6 +71,7 @@ jobs:
             scripts/test_safe_output.py \
             scripts/test_verify_q4_cache.py \
             scripts/test_specialize_q4_direct_serialization.py \
+            scripts/test_preview_build_requirements.py \
             scripts/test_tvm_kev_shape_order.py
       - name: Enforce Python complexity completion
         run: uv run --locked --no-sync --only-group quality python scripts/ci/check_python_complexity_completion.py

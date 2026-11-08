@@ -5,20 +5,20 @@ from tvm import tirx
 from tvm.ir import prim
 
 
-def normalize(mod):
-    """Sort Kev's twelve output writes after proving they are independent."""
-    gv = mod.get_global_var("shape_func")
-    fn = mod[gv]
+def _is_single_integer_store(store):
+    return (
+        isinstance(store, tirx.BufferStore)
+        and len(store.indices) == 1
+        and isinstance(store.indices[0], prim.IntImm)
+    )
+
+
+def _validate_stores(fn):
     if not isinstance(fn.body, tirx.SeqStmt) or len(fn.body.seq) != 12:
         raise ValueError("Unexpected Kev shape function; refusing to reorder.")
 
     stores = list(fn.body.seq)
-    if not all(
-        isinstance(store, tirx.BufferStore)
-        and len(store.indices) == 1
-        and isinstance(store.indices[0], prim.IntImm)
-        for store in stores
-    ):
+    if not all(_is_single_integer_store(store) for store in stores):
         raise ValueError("Unexpected Kev shape stores; refusing to reorder.")
 
     buffer = stores[0].buffer
@@ -30,24 +30,32 @@ def normalize(mod):
         not store.buffer.same_as(buffer) for store in stores
     ):
         raise ValueError("Unexpected shape buffer or indexes; refusing to reorder.")
+    return stores, buffer
 
-    def is_supported_expression(expression):
-        if isinstance(expression, prim.IntImm):
-            return True
-        if isinstance(expression, prim.Mul):
-            return is_supported_expression(expression.a) and is_supported_expression(
-                expression.b
-            )
-        if isinstance(expression, tvm.ir.expr.TensorLoad):
-            return (
-                expression.source.same_as(buffer)
-                and len(expression.indices) == 1
-                and isinstance(expression.indices[0], prim.IntImm)
-                and int(expression.indices[0]) == 0
-            )
-        return False
 
-    if not all(is_supported_expression(store.value) for store in stores):
+def _is_supported_expression(expression, buffer):
+    if isinstance(expression, prim.IntImm):
+        return True
+    if isinstance(expression, prim.Mul):
+        return _is_supported_expression(
+            expression.a, buffer
+        ) and _is_supported_expression(expression.b, buffer)
+    if isinstance(expression, tvm.ir.expr.TensorLoad):
+        return (
+            expression.source.same_as(buffer)
+            and len(expression.indices) == 1
+            and isinstance(expression.indices[0], prim.IntImm)
+            and int(expression.indices[0]) == 0
+        )
+    return False
+
+
+def normalize(mod):
+    """Sort Kev's twelve output writes after proving they are independent."""
+    gv = mod.get_global_var("shape_func")
+    fn = mod[gv]
+    stores, buffer = _validate_stores(fn)
+    if not all(_is_supported_expression(store.value, buffer) for store in stores):
         raise ValueError("Shape stores have unknown dependencies; refusing to reorder.")
 
     normalized = sorted(stores, key=lambda store: int(store.indices[0]))
