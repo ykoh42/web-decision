@@ -88,7 +88,7 @@ tvm = ROOT / '.toolchains/apache-tvm-src'
 emscripten = ROOT / '.toolchains/emsdk/upstream/emscripten'
 notice_sources = {
     'PROVENANCE.md': ROOT / 'scripts/asset-notices/PROVENANCE.md',
-    'MODEL-APACHE-2.0.txt': ROOT / 'scripts/asset-notices/QWEN-LICENSE-APACHE-2.0.txt',
+    'MODEL-APACHE-2.0.txt': ROOT / 'packages/web-decision/assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt',
     'EMSCRIPTEN-LICENSE.txt': emscripten / 'LICENSE',
     'MUSL-COPYRIGHT.txt': emscripten / 'system/lib/libc/musl/COPYRIGHT',
     'LIBCXX-LICENSE.txt': emscripten / 'system/lib/libcxx/LICENSE.TXT',
@@ -102,6 +102,7 @@ notice_sources = {
     'COMPILER-RT-LICENSE.txt': tvm / 'licenses/LICENSE.builtin_fp16.txt',
 }
 expected_notice_hashes = {
+    'PROVENANCE.md': 'b649e445aba65d3aa12c855c4d2e5ecfbef608100bfdaead3b0e46cfee4dfc9a',
     'MODEL-APACHE-2.0.txt': '832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e',
     'EMSCRIPTEN-LICENSE.txt': '620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86',
     'MUSL-COPYRIGHT.txt': 'f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af',

@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {access, mkdtemp, mkdir, rm, symlink} from 'node:fs/promises';
+import {access, mkdtemp, mkdir, readFile, rm, symlink} from 'node:fs/promises';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 
 const packager = fileURLToPath(new URL('../../../scripts/prepare_web_decision_assets.py', import.meta.url));
+const provenancePath = fileURLToPath(new URL('../../../scripts/asset-notices/PROVENANCE.md', import.meta.url));
 const workspaceRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const modelMetadataPath = fileURLToPath(new URL('../src/kev-preview-model.json', import.meta.url));
+const modelLicensePath = fileURLToPath(
+  new URL('../assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt', import.meta.url)
+);
 
 test('Kev asset packager help loads without a release-only helper module', () => {
   const python = process.env.PYTHON ?? 'python3';
@@ -35,4 +41,29 @@ test('Kev asset packager refuses an output path under a symlinked parent', async
   } finally {
     await rm(tempRoot, {recursive: true, force: true});
   }
+});
+
+test('Kev asset packager uses the current provenance and unchanged pinned model license', async () => {
+  const [packagerSource, provenance, modelMetadataText, modelLicense] = await Promise.all([
+    readFile(packager, 'utf8'),
+    readFile(provenancePath, 'utf8'),
+    readFile(modelMetadataPath, 'utf8'),
+    readFile(modelLicensePath)
+  ]);
+  const modelMetadata = JSON.parse(modelMetadataText);
+  const provenanceSha256 = createHash('sha256').update(provenance).digest('hex');
+  const modelLicenseSha256 = createHash('sha256').update(modelLicense).digest('hex');
+
+  assert.ok(provenance.includes(modelMetadata.checkpoint.revision));
+  assert.ok(provenance.includes(modelMetadata.assets.manifestSha256));
+  assert.doesNotMatch(provenance, /q2-k128|experimental-kev-0\.6b-q4f16-upstream|78026118/);
+  assert.ok(packagerSource.includes("'PROVENANCE.md': ROOT / 'scripts/asset-notices/PROVENANCE.md'"));
+  assert.ok(packagerSource.includes(`'PROVENANCE.md': '${provenanceSha256}'`));
+  assert.ok(
+    packagerSource.includes(
+      "'MODEL-APACHE-2.0.txt': ROOT / 'packages/web-decision/assets/experimental-kev-upstream/notices/MODEL-APACHE-2.0.txt'"
+    )
+  );
+  assert.equal(modelLicenseSha256, '832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e');
+  assert.ok(packagerSource.includes(`'MODEL-APACHE-2.0.txt': '${modelLicenseSha256}'`));
 });
