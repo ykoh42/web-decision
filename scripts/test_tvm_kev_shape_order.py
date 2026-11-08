@@ -26,6 +26,11 @@ class CanonicalShapeTest(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'indexes'):normalize(module(list(range(2,13))+[2]))
  def test_rejects_unrecognized_expression(self):
   with self.assertRaisesRegex(ValueError,'unknown dependencies'):normalize(module(list(range(1,13)),unsupported=True))
+ def test_rejection_does_not_partially_reorder_the_module(self):
+  mod=module(list(range(12,0,-1)),unsupported=True)
+  before=mod.script()
+  with self.assertRaisesRegex(ValueError,'unknown dependencies'):normalize(mod)
+  self.assertEqual(mod.script(),before)
  def test_rejects_multiple_buffer_parameters(self):
   lines=['@I.ir_module','class Module:','    @T.prim_func(s_tir=True)',
          '    def shape_func(H: T.Buffer((T.int64(13),), "int64"), J: T.Buffer((T.int64(13),), "int64")):',
