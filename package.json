@@ -30,7 +30,8 @@
     "test:coverage": "pnpm --filter web-decision test:coverage",
     "check:package": "node scripts/ci/check-package.mjs",
     "verify:package": "pnpm build:package && pnpm check:package",
-    "test:example": "node scripts/ci/check-example.mjs"
+    "test:example": "node scripts/ci/check-example.mjs",
+    "test:browser:strands-qwen2": "pnpm exec playwright test --config=playwright.config.mjs tests/browser/strands-qwen2-real-webgpu.spec.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

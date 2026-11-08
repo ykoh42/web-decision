@@ -853,11 +853,20 @@ const models = [
         'The compiled fused TVM candidate has a dynamic row shape from 2 through 4,096 tokens; requests above 4,096 are rejected without truncation.'
       )
     ],
+    maxOptions: 255,
+    maxOptionsDescription:
+      'The pinned fused TVM graph supports 2–255 options per question; 256 or more are rejected before inference.',
     handling: independent,
     tokenCount: sumRows,
     temperature: 0.8629556148274228,
     requiredLimits: bindingLimits(LARGEST_BINDING),
-    requiresNonFallbackAdapter: true
+    requiresNonFallbackAdapter: true,
+    gpuVerification: 'verified',
+    modelTerms: 'Apache-2.0 (publisher-declared; training-data source terms vary)',
+    modelLicenseUrl:
+      'https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/blob/216d1ccb46a9e9b036eb9187b248db98480f77d4/LICENSE.md',
+    sourceModelCard:
+      'https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/blob/216d1ccb46a9e9b036eb9187b248db98480f77d4/README.md'
   }),
   registration({
     family: 'strands-gemma4',

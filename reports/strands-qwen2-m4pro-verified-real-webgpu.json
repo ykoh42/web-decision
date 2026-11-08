@@ -1,0 +1,281 @@
+{
+  "state": "completed",
+  "date": "2026-11-08T10:57:05.569Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "totalMemoryBytes": 25769803776,
+    "freeMemoryAfterRunBytes": 6570508288
+  },
+  "browserVersion": "158.0.8127.18",
+  "browserName": "chromium",
+  "chromeGpu": {
+    "webGpuStatus": "Hardware accelerated",
+    "device": "Apple M4 Pro"
+  },
+  "package": {
+    "name": "web-decision",
+    "version": "0.0.0-preview.34",
+    "bundleSha256": "f694102f8c7f9ea5ae9b4a7e674f5aa97a17dd9072ebedf384a6e8598862970b"
+  },
+  "model": {
+    "id": "experimental-strands-qwen-2b-fp16",
+    "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "license": "Apache-2.0 (publisher-declared; training-data source terms vary)",
+    "assets": {
+      "fused-ordered-manifest-4096-candidate-v1.json": {
+        "bytes": 258565,
+        "sha256": "74eb7f501ab64d5906a498dac20e161044616cfb67607ddd5c24030887132209"
+      },
+      "full-fused-tvm-4096-candidate-v1/model.wasm": {
+        "bytes": 5199127,
+        "sha256": "020720bae0d99b592b3985130daac08a2c41adadad76143ab649f4afe109bc6e"
+      },
+      "checkpoint/tokenizer.json": {
+        "bytes": 19989592,
+        "sha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86"
+      },
+      "checkpoint/tokenizer_config.json": {
+        "bytes": 1128,
+        "sha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45"
+      }
+    },
+    "weightManifest": {
+      "records": 328,
+      "chunks": 635,
+      "bytes": 3776255872
+    }
+  },
+  "modelLoadElapsedMs": 6982.0999999940395,
+  "adapterInfo": {
+    "vendor": "apple",
+    "architecture": "metal-3",
+    "isFallbackAdapter": false
+  },
+  "progress": {
+    "loadedBytes": 3776255872,
+    "totalBytes": 3776255872,
+    "fraction": 1
+  },
+  "syntheticReferenceCases": [
+    {
+      "state": "A red parcel goes to the first desk.",
+      "instructions": "Which color matches?",
+      "options": [
+        "red",
+        "blue"
+      ],
+      "tokenCount": 59,
+      "selected": "red",
+      "selectedIndex": 0,
+      "probabilities": [
+        {
+          "option": "red",
+          "logit": 2.9769446849823,
+          "probability": 0.994484414494821
+        },
+        {
+          "option": "blue",
+          "logit": -1.5058047771453857,
+          "probability": 0.005515585505179028
+        }
+      ],
+      "elapsedMs": 460.80000001192093
+    },
+    {
+      "state": "A red parcel goes to the first desk.",
+      "instructions": "Which color matches?",
+      "options": [
+        "blue",
+        "red"
+      ],
+      "tokenCount": 59,
+      "selected": "red",
+      "selectedIndex": 1,
+      "probabilities": [
+        {
+          "option": "blue",
+          "logit": -1.8451144695281982,
+          "probability": 0.004789480679482862
+        },
+        {
+          "option": "red",
+          "logit": 2.7600760459899902,
+          "probability": 0.9952105193205172
+        }
+      ],
+      "elapsedMs": 173.19999998807907
+    },
+    {
+      "state": "A billing ticket must go to finance; delivery issues go to shipping. This ticket concerns billing.",
+      "instructions": "Which team should handle it?",
+      "options": [
+        "finance",
+        "shipping",
+        "technical support"
+      ],
+      "tokenCount": 76,
+      "selected": "finance",
+      "selectedIndex": 0,
+      "probabilities": [
+        {
+          "option": "finance",
+          "logit": 2.668623447418213,
+          "probability": 0.9687417816524804
+        },
+        {
+          "option": "shipping",
+          "logit": -0.7095406651496887,
+          "probability": 0.019324118708512195
+        },
+        {
+          "option": "technical support",
+          "logit": -1.1254457235336304,
+          "probability": 0.011934099639007274
+        }
+      ],
+      "elapsedMs": 184.40000000596046
+    },
+    {
+      "state": "고객이 결제 취소를 요청했습니다.",
+      "instructions": "문의 유형은 무엇인가요?",
+      "options": [
+        "결제 취소",
+        "배송 조회",
+        "계정 잠금"
+      ],
+      "tokenCount": 68,
+      "selected": "결제 취소",
+      "selectedIndex": 0,
+      "probabilities": [
+        {
+          "option": "결제 취소",
+          "logit": 3.647817850112915,
+          "probability": 0.9983270786513332
+        },
+        {
+          "option": "배송 조회",
+          "logit": -2.2656941413879395,
+          "probability": 0.0010549095860006804
+        },
+        {
+          "option": "계정 잠금",
+          "logit": -2.727118968963623,
+          "probability": 0.0006180117626661124
+        }
+      ],
+      "elapsedMs": 181.19999998807907
+    },
+    {
+      "state": "Please cancel the order before it ships.",
+      "instructions": "What is the request?",
+      "options": [
+        "cancel",
+        "return",
+        "delivery status"
+      ],
+      "tokenCount": 64,
+      "selected": "cancel",
+      "selectedIndex": 0,
+      "probabilities": [
+        {
+          "option": "cancel",
+          "logit": 3.03853440284729,
+          "probability": 0.9761028720786914
+        },
+        {
+          "option": "return",
+          "logit": -0.3283989429473877,
+          "probability": 0.01972601216460586
+        },
+        {
+          "option": "delivery status",
+          "logit": -1.669220209121704,
+          "probability": 0.004171115756702825
+        }
+      ],
+      "elapsedMs": 167.09999999403954
+    }
+  ],
+  "multipleQuestionRows": {
+    "tokenCount": 118,
+    "answers": [
+      {
+        "selected": "red",
+        "selectedIndex": 0,
+        "probabilities": [
+          {
+            "option": "red",
+            "logit": 2.9769446849823,
+            "probability": 0.994484414494821
+          },
+          {
+            "option": "blue",
+            "logit": -1.5058047771453857,
+            "probability": 0.005515585505179028
+          }
+        ]
+      },
+      {
+        "selected": "red",
+        "selectedIndex": 1,
+        "probabilities": [
+          {
+            "option": "blue",
+            "logit": -1.8451144695281982,
+            "probability": 0.004789480679482862
+          },
+          {
+            "option": "red",
+            "logit": 2.7600760459899902,
+            "probability": 0.9952105193205172
+          }
+        ]
+      }
+    ]
+  },
+  "maximumOptions": {
+    "count": 255,
+    "elapsedMs": 2607.699999988079,
+    "selected": "option-240",
+    "selectedIndex": 240,
+    "outputCount": 255,
+    "firstOption": "option-0",
+    "lastOption": "option-254",
+    "probabilitySum": 0.9999999999999999
+  },
+  "overMaximumOptions": {
+    "code": "INVALID_INPUT",
+    "message": "Unsupported decision request or option field."
+  },
+  "maximumContext": {
+    "elapsedMs": 4664.9000000059605,
+    "result": {
+      "tokenCount": 4096,
+      "answers": [
+        {
+          "selected": "no",
+          "selectedIndex": 0,
+          "probabilities": [
+            {
+              "option": "no",
+              "logit": 1.6361217498779297,
+              "probability": 0.8784785539115704
+            },
+            {
+              "option": "yes",
+              "logit": -0.07089138776063919,
+              "probability": 0.12152144608842964
+            }
+          ]
+        }
+      ]
+    },
+    "expectedTokens": 4096
+  },
+  "overContext": {
+    "code": "INVALID_INPUT",
+    "message": "Could not encode a Strands choice question."
+  }
+}

@@ -52,7 +52,8 @@ const currentGpuVerification = new Map([
   ['experimental-gliner2.5-decide-mobile-q4f16', 'verified'],
   ['experimental-d1-omni-600m-q8', 'not-revalidated'],
   ['experimental-openjev-verdict-151m-fp16', 'not-revalidated'],
-  ['kev-0.6b-q4f16', 'verified']
+  ['kev-0.6b-q4f16', 'verified'],
+  ['experimental-strands-qwen-2b-fp16', 'verified']
 ]);
 
 const backendByFamily = {
@@ -830,6 +831,20 @@ test('asset descriptions pin the Kev 0.6B manifest and distinguish other contrac
     assert.equal(describeModel(name).assets.integrity, 'pinned-manifest');
     assert.equal(describeModel(name).assets.manifestSha256, expected);
   }
+});
+
+test('Strands Qwen 2B records its verified WebGPU route and declared model terms', () => {
+  const description = describeModel('experimental-strands-qwen-2b-fp16');
+  assert.equal(description.checkpoint.repository, 'StrandsAgents/strands-decider-2B-qwen3.5-v1-2610');
+  assert.equal(description.checkpoint.revision, '216d1ccb46a9e9b036eb9187b248db98480f77d4');
+  assert.equal(description.backend.name, 'tvm-webgpu');
+  assert.equal(description.verification.currentBundleGpu, 'verified');
+  assert.equal(description.features.textChoice.limits.find((limit) => limit.resource === 'tokens').max, 4096);
+  const optionLimit = description.features.textChoice.limits.find((limit) => limit.resource === 'options');
+  assert.deepEqual([optionLimit.min, optionLimit.max], [2, 255]);
+  assert.match(optionLimit.description, /pinned fused TVM graph.*2–255.*rejected before inference/u);
+  assert.equal(description.licenses.modelTerms, 'Apache-2.0 (publisher-declared; training-data source terms vary)');
+  assert.match(description.licenses.modelLicenseUrl, /\/blob\/216d1ccb46a9e9b036eb9187b248db98480f77d4\/LICENSE\.md$/u);
 });
 
 test('Gemma 4 registration reports the pinned E2B runtime contract and source limits', () => {

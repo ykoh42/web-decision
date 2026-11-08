@@ -63,6 +63,27 @@ test('packer accepts 128, 129, and 4096 token rows and rejects 4097 without trun
   });
 });
 
+test('choice packer accepts 255 options in order and rejects 256', () => {
+  const tokenizer = new Tokenizer();
+  const options = Array.from({length: 255}, (_, index) => `option-${index}`);
+  const packed = packStrandsRequest(tokenizer, {
+    state: 's',
+    questions: [{instructions: 'Pick', options}]
+  });
+
+  assert.deepEqual(packed.rows[0].options, options);
+  assert.equal(packed.rows[0].optionIndices.length, 255);
+
+  assert.throws(
+    () =>
+      packStrandsRequest(tokenizer, {
+        state: 's',
+        questions: [{instructions: 'Pick', options: [...options, 'option-255']}]
+      }),
+    {code: 'INVALID_INPUT'}
+  );
+});
+
 test('checkpoint protocol boundary accepts 4096 tokens and rejects 4097', () => {
   assert.equal(STRANDS_CHECKPOINT_MAX_LENGTH, 4096);
   const accepted = encodeChoice(tokenizerForRowLength(STRANDS_CHECKPOINT_MAX_LENGTH), 's', question());
