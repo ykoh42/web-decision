@@ -8,7 +8,6 @@ from pathlib import Path
 
 import onnx
 from onnx import TensorProto, helper
-
 from safe_output import atomic_write_serialized_message, open_directory
 
 

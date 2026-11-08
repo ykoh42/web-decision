@@ -35,7 +35,9 @@ def normalize(mod):
         if isinstance(expression, prim.IntImm):
             return True
         if isinstance(expression, prim.Mul):
-            return is_supported_expression(expression.a) and is_supported_expression(expression.b)
+            return is_supported_expression(expression.a) and is_supported_expression(
+                expression.b
+            )
         if isinstance(expression, tvm.ir.expr.TensorLoad):
             return (
                 expression.source.same_as(buffer)

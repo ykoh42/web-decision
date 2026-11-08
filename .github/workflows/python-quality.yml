@@ -42,5 +42,29 @@ jobs:
             export WEB_DECISION_COMPLEXITY_BASELINE="$RUNNER_TEMP/base-complexipy-snapshot.json"
           fi
           uv run --locked --no-sync --only-group quality python scripts/ci/check_python_complexity.py
-      - name: Test the complexity gate
-        run: uv run --locked --no-sync --only-group quality pytest scripts/ci/test_python_complexity.py
+      - name: Read the previous Ruff snapshot
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
+            export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          fi
+          python scripts/ci/prepare_python_quality_baseline.py "$RUNNER_TEMP/base-ruff-snapshot.json"
+      - name: Check Ruff formatting and lint
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/base-ruff-snapshot.json" ]]; then
+            export WEB_DECISION_RUFF_BASELINE="$RUNNER_TEMP/base-ruff-snapshot.json"
+          fi
+          uv run --locked --no-sync --only-group quality python scripts/ci/check_python_quality.py
+      - name: Install hash-locked model test dependencies
+        run: uv pip install --require-hashes --only-binary=:all: --python .venv/bin/python -r requirements-preview-build.lock
+      - name: Test Python quality gates and model scripts
+        run: |
+          uv run --locked --no-sync --only-group quality pytest -q \
+            scripts/ci/test_python_complexity.py \
+            scripts/ci/test_python_quality.py \
+            scripts/test_safe_output.py \
+            scripts/test_specialize_q4_direct_serialization.py \
+            scripts/test_tvm_kev_shape_order.py
