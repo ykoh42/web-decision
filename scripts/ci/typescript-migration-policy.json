@@ -52,7 +52,6 @@
     "packages/web-decision/src/gliner-mobile/source.mjs",
     "packages/web-decision/src/gliner-mobile/tokenizer.mjs",
     "packages/web-decision/src/gpu-session-utils.js",
-    "packages/web-decision/src/h2o/hasher.mjs",
     "packages/web-decision/src/h2o/loader.mjs",
     "packages/web-decision/src/h2o/owner.mjs",
     "packages/web-decision/src/h2o/plan.mjs",
