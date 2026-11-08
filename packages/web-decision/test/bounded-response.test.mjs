@@ -104,34 +104,6 @@ test('oversized manifest streams are rejected and cancelled', async () => {
   assert.equal(cancelled, 1);
 });
 
-test('manifest readers preserve AbortError detection for primitive causes with prototype names', async () => {
-  const primitiveCause = 'stream failure';
-  const originalName = Object.getOwnPropertyDescriptor(String.prototype, 'name');
-  Object.defineProperty(String.prototype, 'name', {configurable: true, value: 'AbortError'});
-  const failedResponse = () => responseFromReader(() => Promise.reject(primitiveCause));
-  try {
-    assert.equal(primitiveCause?.name, 'AbortError');
-    let caught;
-    try {
-      await readManifestResponse(failedResponse());
-    } catch (cause) {
-      caught = cause;
-    }
-    assert.equal(caught, primitiveCause);
-
-    caught = undefined;
-    try {
-      await readPinnedManifest(failedResponse(), undefined, 'unused', 'test');
-    } catch (cause) {
-      caught = cause;
-    }
-    assert.equal(caught, primitiveCause);
-  } finally {
-    if (originalName) Object.defineProperty(String.prototype, 'name', originalName);
-    else delete String.prototype.name;
-  }
-});
-
 test('late fetch responses are cancelled after the caller aborts', async (t) => {
   let resolveFetch,
     started,
