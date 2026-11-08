@@ -6,6 +6,7 @@ import {dirname, join} from 'node:path';
 import {test} from 'node:test';
 import {
   discoverChangedJavaScriptPaths,
+  discoverInlineJavaScriptPaths,
   discoverJavaScriptPaths,
   parseTypeScriptMigrationPolicy,
   validateTypeScriptMigrationPolicy,
@@ -83,6 +84,24 @@ test('discovers tracked and nonignored untracked JavaScript while honoring git i
   assert.deepEqual(discoverJavaScriptPaths(fixture.root), [historicalPath, 'src/legacy.mjs', 'src/new.jsx']);
   const result = check(fixture);
   assert.ok(result.problems.some((problem) => problem.includes('src/new.jsx')));
+});
+
+test('discovers maintained inline scripts while allowing external modules and JSON data', (context) => {
+  const fixture = createGitFixture();
+  context.after(() => rmSync(fixture.root, {recursive: true, force: true}));
+  write(fixture.root, 'src/inline.html', '<script type="module">run()</script>');
+  write(fixture.root, 'src/spoofed.html', '<script data-src="app.ts">run()</script>');
+  write(fixture.root, 'src/external.html', '<script type="module" src="app.ts"></script>');
+  write(fixture.root, 'src/data.html', '<script type="application/json">{}</script>');
+  write(fixture.root, 'src/comment.html', '<!-- <script>run()</script> -->');
+  write(fixture.root, 'releases/web-decision-0.3.0/example.html', '<script>run()</script>');
+  write(fixture.root, 'ignored/example.html', '<script>run()</script>');
+
+  assert.deepEqual(discoverInlineJavaScriptPaths(fixture.root), [
+    'releases/web-decision-0.3.0/example.html',
+    'src/inline.html',
+    'src/spoofed.html'
+  ]);
 });
 
 test('rejects edits to an existing managed JavaScript file until it is converted', (context) => {

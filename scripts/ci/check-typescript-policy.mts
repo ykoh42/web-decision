@@ -291,6 +291,27 @@ export function discoverJavaScriptPaths(root: string): string[] {
     .sort();
 }
 
+/** Find executable inline scripts in tracked or nonignored HTML. */
+export function discoverInlineJavaScriptPaths(root: string): string[] {
+  const output = runGit(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']);
+  const paths = [...new Set(parseGitPathList(output))].filter(
+    (path) => /\.html?$/iu.test(path) && existsSync(join(root, path))
+  );
+  return paths
+    .filter((path) => {
+      const html = readFileSync(join(root, path), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
+      return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)].some((match) => {
+        const attributes = match[1] ?? '';
+        const content = match[2] ?? '';
+        if (!content.trim() || /(?:^|\s)src\s*=/iu.test(attributes)) return false;
+        const type = attributes.match(/(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/iu);
+        const value = (type?.[1] ?? type?.[2] ?? type?.[3] ?? '').trim().toLowerCase();
+        return !['application/json', 'application/ld+json', 'importmap', 'speculationrules'].includes(value);
+      });
+    })
+    .sort();
+}
+
 function discoverSeedJavaScriptPaths(root: string, baselineCommit: string): Set<string> {
   const output = runGit(root, ['ls-tree', '-r', '-z', '--name-only', baselineCommit]);
   return new Set(parseGitPathList(output).filter((path) => javascriptExtension.test(path)));
@@ -336,7 +357,13 @@ export function checkTypeScriptMigration(
     changedJavaScriptPaths: discoverChangedJavaScriptPaths(root, baseCommit),
     requireComplete: options.requireComplete ?? false
   };
-  return validateTypeScriptMigrationPolicy(policy, context);
+  const result = validateTypeScriptMigrationPolicy(policy, context);
+  if (context.requireComplete) {
+    for (const path of discoverInlineJavaScriptPaths(root)) {
+      result.problems.push(`${path} contains inline JavaScript; move it to a TypeScript module.`);
+    }
+  }
+  return result;
 }
 
 function parseArguments(arguments_: string[]): {baseRef?: string; requireComplete: boolean} {
