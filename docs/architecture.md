@@ -31,7 +31,7 @@ Build a final candidate archive once. Install that exact archive in a clean cons
 
 Existing release snapshots and their original pins remain historical records; they are not evidence that a new package has passed. The current source tree is responsible for future packages. Prior GPU measurements must name the exact tested package, browser and device rather than imply broad support.
 
-Reproduce a historical release from its own Git tag: its source lock covers the files in that checkout. The release scripts in a later checkout are not a substitute for the tagged source.
+Reproduce a historical release from its own Git tag and verify its source lock. The `0.2.0` tag omits its TVM source overlay; recover that overlay from commit `baa3c144d23e1882ba29084c9f95897b8c56accb` and check every file against the tag's lock before use. The release scripts in a later checkout are not a substitute for the tagged source.
 
 ## Quality gates
 
