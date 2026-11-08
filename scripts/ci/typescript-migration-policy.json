@@ -94,8 +94,6 @@
     "packages/web-decision/src/kev-preview-registry.js",
     "packages/web-decision/src/kev-reflexes.js",
     "packages/web-decision/src/kev/system-one.mjs",
-    "packages/web-decision/src/kev06/bundled-assets.js",
-    "packages/web-decision/src/kev06/stable-bundled-assets.js",
     "packages/web-decision/src/kev08.js",
     "packages/web-decision/src/kev08/contract.js",
     "packages/web-decision/src/kev08/loader.js",

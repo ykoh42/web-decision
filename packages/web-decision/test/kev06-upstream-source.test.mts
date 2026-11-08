@@ -12,8 +12,8 @@ import {
 import {KEV06_MANIFEST_SHA256, readKev06ManifestResponse} from '../src/kev06/contract.js';
 import type {ModelProgress} from '../src/curated/types.js';
 
-const bundledAssetsUrl = new URL('../src/kev06/bundled-assets.js', import.meta.url).href;
-const stableBundledAssetsUrl = new URL('../src/kev06/stable-bundled-assets.js', import.meta.url).href;
+const bundledAssetsUrl = new URL('../src/kev06/bundled-assets.ts', import.meta.url).href;
+const stableBundledAssetsUrl = new URL('../src/kev06/stable-bundled-assets.ts', import.meta.url).href;
 const upstreamSourceUrl = new URL('../src/kev06/upstream-source.mts', import.meta.url).href;
 const inlineAssets: Readonly<Record<string, string>> = Object.freeze({
   'model.wasm': 'data:application/wasm;base64,AQID',
