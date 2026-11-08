@@ -306,7 +306,6 @@
     "packages/web-decision/test/nari-source.test.mjs",
     "packages/web-decision/test/nari-tokenizer.test.mjs",
     "packages/web-decision/test/nari-upload.test.mjs",
-    "packages/web-decision/test/opendecider-nano-gpu-compat.test.mjs",
     "packages/web-decision/test/opendecider-nano.test.mjs",
     "packages/web-decision/test/parallel-model-assets.test.mjs",
     "packages/web-decision/test/parameter-upload-count.test.mjs",

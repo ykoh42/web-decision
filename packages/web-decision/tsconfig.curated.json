@@ -24,6 +24,7 @@
     "test/build-normalization.test.mts",
     "test/kev06-contract.test.mts",
     "test/model-assets.test.mts",
+    "test/opendecider-nano-gpu-compat.test.mts",
     "test/runtime-lifecycle.test.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"

@@ -2,11 +2,44 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {WebDecisionError} from '../src/kev.js';
 import {
-  installOpenDeciderNanoGpuCompatibility,
-  rewriteOpenDeciderNanoShader
+  installOpenDeciderNanoGpuCompatibility as installOpenDeciderNanoGpuCompatibilityUntyped,
+  rewriteOpenDeciderNanoShader as rewriteOpenDeciderNanoShaderUntyped
 } from '../src/opendecider-nano/gpu-compat.mjs';
 
-const contextPrototype = {
+type ShaderInfo = Readonly<Record<string, unknown>>;
+type RewriteResult = Readonly<{
+  code: string;
+  changed: boolean;
+  arrayCount: number;
+  storeCount: number;
+}>;
+type ShaderModule = Readonly<{
+  kind: 'sync' | 'async';
+  info: ShaderInfo;
+  code: string;
+}>;
+type RuntimeContext = {
+  createShader(info: ShaderInfo, code: string): ShaderModule;
+  createShaderAsync(info: ShaderInfo, code: string): Promise<ShaderModule>;
+  deviceAllocDataSpace(nbytes: number): number;
+};
+type CompatibilityReport = Readonly<{
+  shaderModules: number;
+  i8ArrayDeclarations: number;
+  boolStores: number;
+  expandedStorageAllocations: number;
+}>;
+type Compatibility = Readonly<{
+  report: CompatibilityReport;
+  restore(): void;
+}>;
+type RewriteShader = (code: string) => RewriteResult;
+type InstallCompatibility = (context: RuntimeContext) => Compatibility;
+
+const rewriteOpenDeciderNanoShader: RewriteShader = rewriteOpenDeciderNanoShaderUntyped;
+const installOpenDeciderNanoGpuCompatibility: InstallCompatibility = installOpenDeciderNanoGpuCompatibilityUntyped;
+
+const contextPrototype: RuntimeContext = {
   createShader(info, code) {
     return {kind: 'sync', info, code};
   },
@@ -18,8 +51,9 @@ const contextPrototype = {
   }
 };
 
-function createContext() {
-  return Object.assign(Object.create(contextPrototype), {id: Symbol('runtime-context')});
+function createContext(): RuntimeContext & {id: symbol} {
+  const context = Object.create(contextPrototype) as RuntimeContext;
+  return Object.assign(context, {id: Symbol('runtime-context')});
 }
 
 test('rewrites scalar i8 arrays and nested boolean stores', () => {
@@ -56,7 +90,7 @@ test('leaves unrelated integer and boolean shaders unchanged', () => {
 test('rejects i8 uses outside the pinned array layout', () => {
   assert.throws(
     () => rewriteOpenDeciderNanoShader('var<private> value: i8;'),
-    (error) => error instanceof WebDecisionError && error.code === 'UNSUPPORTED_ENVIRONMENT'
+    (error: unknown) => error instanceof WebDecisionError && error.code === 'UNSUPPORTED_ENVIRONMENT'
   );
 });
 
@@ -78,9 +112,10 @@ test('rewrites one runtime context and expands small TVM storage allocations onl
   assert.match(asyncShader.code, /array<i32>/);
   assert.equal(second.deviceAllocDataSpace(4096), 4096);
   assert.match(second.createShader({}, 'var<storage> flags: array<i8>;').code, /array<i8>/);
-  assert.equal(Object.getPrototypeOf(first).deviceAllocDataSpace, originalAlloc);
-  assert.equal(Object.getPrototypeOf(first).createShader, originalShader);
-  assert.equal(Object.getPrototypeOf(first).createShaderAsync, originalAsyncShader);
+  const installedPrototype = Object.getPrototypeOf(first) as RuntimeContext;
+  assert.equal(installedPrototype.deviceAllocDataSpace, originalAlloc);
+  assert.equal(installedPrototype.createShader, originalShader);
+  assert.equal(installedPrototype.createShaderAsync, originalAsyncShader);
   assert.deepEqual(compatibility.report, {
     shaderModules: 2,
     i8ArrayDeclarations: 2,
