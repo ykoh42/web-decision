@@ -256,6 +256,17 @@ export function loadKev06DecisionModel(options, description) {
   return loadKevModel(options, description, readKev06ManifestResponse);
 }
 
+/** Load the curated stable artifact using its pinned upstream source. */
+export function loadCuratedKevModel(options, description) {
+  return loadKevModel(
+    options,
+    description,
+    readKev06ManifestResponse,
+    undefined,
+    createKev06StableReconstructedSource()
+  );
+}
+
 export async function loadKevDecisionModel(options, description, stableModelId) {
   if (description.model === EXPERIMENTAL_KEV_MODEL) {
     return loadKevModel(options, description, readExperimentalKevManifest, undefined, createKevReconstructedSource());

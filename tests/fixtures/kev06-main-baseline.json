@@ -1,0 +1,21 @@
+{
+  "scope": "baseline-preservation-only",
+  "sourceCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
+  "packageSha256": "5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f",
+  "manifestSha256": "8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767",
+  "environment": "Windows Chrome 156 on Intel UHD Graphics, TVM WebGPU",
+  "request": {
+    "state": "A customer was charged twice.",
+    "questions": [
+      {
+        "instructions": "Which team should handle this request?",
+        "options": ["billing", "shipping"]
+      }
+    ]
+  },
+  "selected": "billing",
+  "probabilities": [
+    {"option": "billing", "probability": 0.9955294431288633, "logit": 4.62109375},
+    {"option": "shipping", "probability": 0.004470556871136836, "logit": -0.78466796875}
+  ]
+}

@@ -70,6 +70,7 @@ jobs:
         working-directory: examples/basic
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
           npm run build
           npm test
       - name: Check the example uses the installed package

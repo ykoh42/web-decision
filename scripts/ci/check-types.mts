@@ -10,14 +10,10 @@ const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/
 const fixture = join(root, 'tests/types');
 
 /** Type-check the packed package where a consumer has installed it. */
-export function checkConsumerTypes(consumer, typescriptCompiler = compiler) {
+export function checkConsumerTypes(consumer: string, typescriptCompiler = compiler): void {
   for (const name of ['consumer.ts', 'tsconfig.base.json', 'tsconfig.bundler.json', 'tsconfig.nodenext.json']) {
     copyFileSync(join(fixture, name), join(consumer, name));
   }
-  copyFileSync(
-    join(root, 'packages/web-decision/src/kev-deberta-preview.d.ts'),
-    join(consumer, 'kev-deberta-preview.d.ts')
-  );
   for (const project of ['tsconfig.bundler.json', 'tsconfig.nodenext.json']) {
     for (const exactOptionalPropertyTypes of ['false', 'true']) {
       execFileSync(

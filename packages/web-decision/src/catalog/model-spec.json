@@ -13,14 +13,6 @@
         "assets": {
           "integrity": "pinned-manifest",
           "location": "package-and-pinned-upstream",
-          "requiredFiles": [
-            "manifest.json",
-            "model.wasm",
-            "tokenizer.json",
-            "tokenizer_config.json",
-            "model_config.json",
-            "weights/tensor-cache.json"
-          ],
           "additionalFiles": "Five pinned runtime assets, including the stable TVM WebAssembly, are embedded in a lazily loaded package chunk. Nine verified shards are reconstructed from the pinned 335,357,952-byte upstream ONNX external-data file and cached."
         },
         "licenses": {
@@ -30,7 +22,9 @@
         },
         "backend": {
           "name": "tvm-webgpu",
-          "requiredFeatures": ["shader-f16"],
+          "requiredFeatures": [
+            "shader-f16"
+          ],
           "requiredLimits": {
             "maxBufferSize": 268435456,
             "maxStorageBufferBindingSize": 134217728,
@@ -83,9 +77,17 @@
               "calibration": "not-guaranteed"
             }
           },
-          "typedTextQuestionTypes": ["choice", "noul", "score"],
-          "imageChoice": {"status": "not-implemented"},
-          "rating": {"status": "not-implemented"}
+          "typedTextQuestionTypes": [
+            "choice",
+            "noul",
+            "score"
+          ],
+          "imageChoice": {
+            "status": "not-implemented"
+          },
+          "rating": {
+            "status": "not-implemented"
+          }
         },
         "verification": {
           "currentBundleGpu": "not-revalidated",

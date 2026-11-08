@@ -21,8 +21,7 @@ The stable `modelId` route has no `assetsUrl` override: the model WASM and
 small tokenizer/config/cache metadata are bundled in a lazy JavaScript chunk,
 and the pinned ONNX external-data file is fetched from the immutable upstream
 revision, reconstructed into TVM shards, and verified before use. The raw ONNX
-external-data file is not cached. The legacy `model` asset-pack route remains
-available separately. The notice files are outside the inference manifest and
+external-data file is not cached. The notice files are outside the inference manifest and
 are not fetched or checked by the browser loader. The JavaScript API/input code
 attribution is documented separately in `KEV-NOTICE`.
 

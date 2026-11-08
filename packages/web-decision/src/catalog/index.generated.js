@@ -14,7 +14,11 @@ export const MODEL_CATALOG = deepFreeze(
       modelId: model.modelId,
       description: {
         ...model.description,
-        assets: {...model.description.assets, manifestSha256: artifacts.manifest.canonicalSha256}
+        assets: {
+          ...model.description.assets,
+          requiredFiles: ['manifest.json', ...Object.keys(artifacts.manifest.files)],
+          manifestSha256: artifacts.manifest.canonicalSha256
+        }
       },
       artifacts
     };

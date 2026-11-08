@@ -10,7 +10,7 @@ export interface CatalogModelLimit {
 export interface CatalogModelDescription {
   readonly adapter: ModelAdapterId;
   readonly precision: string;
-  readonly checkpoint: Readonly<Record<string, string>>;
+  readonly checkpoint: Readonly<{repository: string; revision: string; weightSha256?: string}>;
   readonly assets: Readonly<{
     integrity: 'pinned-manifest';
     manifestSha256: string;

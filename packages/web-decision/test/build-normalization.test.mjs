@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import config, {assertPreviewWebgpuHash, browserOnlyTvmWasiExport, stripNodeOnlyWasiExport} from '../vite.config.mjs';
+import config, {assertPreviewWebgpuHash, browserOnlyTvmWasiExport, stripNodeOnlyWasiExport} from '../vite.config.ts';
 const plugin = config.plugins.find((p) => p.name === 'normalize-tvm-source-markers');
 
 test('TVM source marker normalization removes checkout-depth differences', () => {

@@ -4,7 +4,8 @@ import {createHash} from 'node:crypto';
 import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {checkConsumerTypes} from './check-types.mjs';
+import {hasQuotedAssetKey} from './asset-key.ts';
+import {checkConsumerTypes} from './check-types.mts';
 import {findPackedContentIssues} from './packed-content.ts';
 import {withTemporaryDirectories} from './temporary-directories.ts';
 
@@ -55,7 +56,8 @@ const packagedSourceFiles = [
   'assets/experimental-kev-upstream/notices/TVM-NOTICE.txt',
   'src/catalog/README.md',
   'src/catalog/types.generated.d.ts',
-  'src/curated/index.d.ts'
+  'src/curated/index.d.ts',
+  'src/curated/types.d.ts'
 ];
 
 function canonical(value: unknown): unknown {
@@ -131,10 +133,8 @@ function inlineDataHashes(chunks: readonly BundleChunk[]): Set<string> {
 function verifyInlineAssets(chunks: readonly BundleChunk[], assets: readonly AssetInput[], description: string): void {
   const dataHashes = inlineDataHashes(chunks);
   for (const [name, sourcePath] of assets) {
-    const key = name.replace(/[.*+?^$|(){}[\]\\]/gu, '\\$&');
-    const keyPattern = new RegExp('["\\x27]' + key + '\\s*:', 'u');
     assert.ok(
-      chunks.some(({text}) => keyPattern.test(text)),
+      chunks.some(({text}) => hasQuotedAssetKey(text, name)),
       'The ' + description + ' lazy chunk is missing the asset key ' + name + '.'
     );
     const source = readFileSync(join(pkg, sourcePath));
@@ -369,7 +369,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   assert.equal(installed.version, metadata.version);
   assert.equal(installed.license, metadata.license);
   assertConsumerBytes(npmConsumer, packageFiles, distFiles);
-  runInstalledApiSmoke(npmConsumer, Object.keys(stableManifest.files));
+  runInstalledApiSmoke(npmConsumer, ['manifest.json', ...Object.keys(stableManifest.files)]);
   runInstalledAssetSmoke(
     npmConsumer,
     stableAssetChunks.map(({name}) => name),
@@ -397,7 +397,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   assert.equal(pnpmInstalled.version, metadata.version);
   assert.equal(pnpmInstalled.license, metadata.license);
   assertConsumerBytes(pnpmConsumer, packageFiles, distFiles);
-  runInstalledApiSmoke(pnpmConsumer, Object.keys(stableManifest.files));
+  runInstalledApiSmoke(pnpmConsumer, ['manifest.json', ...Object.keys(stableManifest.files)]);
   runInstalledAssetSmoke(
     pnpmConsumer,
     stableAssetChunks.map(({name}) => name),

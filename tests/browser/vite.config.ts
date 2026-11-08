@@ -1,9 +1,8 @@
-import {defineConfig} from 'vite';
+import {defineConfig, type Connect} from 'vite';
 import {createReadStream, realpathSync} from 'node:fs';
 import {stat} from 'node:fs/promises';
 import {dirname, extname, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import exampleConfig from '../../examples/basic/vite.config.js';
 
 const workspace = fileURLToPath(new URL('../../', import.meta.url));
 const openDeciderAssets = process.env.WEB_DECISION_OPENDECIDER_NANO_ASSETS
@@ -11,7 +10,6 @@ const openDeciderAssets = process.env.WEB_DECISION_OPENDECIDER_NANO_ASSETS
   : fileURLToPath(
       new URL('../../experiments/opendecider-nano-tvm-20261102/webgpu-build-int32-export/', import.meta.url)
     );
-const openDeciderAssetRoot = resolve(openDeciderAssets);
 const publicAssetsRoot = process.env.WEB_DECISION_PUBLIC_ASSET_ROOT
   ? resolve(process.env.WEB_DECISION_PUBLIC_ASSET_ROOT)
   : fileURLToPath(new URL('../../models/web-decision-assets/', import.meta.url));
@@ -66,32 +64,13 @@ const contentTypes = new Map([
   ['.wasm', 'application/wasm']
 ]);
 
-async function serveOpenDeciderAsset(request, response, next) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return next();
-  let file;
-  try {
-    const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    file = resolve(openDeciderAssets, `.${pathname}`);
-    if (file !== openDeciderAssetRoot && !file.startsWith(`${openDeciderAssetRoot}${sep}`)) return next();
-    const info = await stat(file);
-    if (!info.isFile()) return next();
-    response.statusCode = 200;
-    response.setHeader('Content-Length', info.size);
-    response.setHeader('Content-Type', contentTypes.get(extname(file)) ?? 'application/octet-stream');
-    if (request.method === 'HEAD') return response.end();
-    createReadStream(file).pipe(response);
-  } catch {
-    next();
-  }
-}
-
-function serveModelAsset(assets) {
+function serveModelAsset(assets: string): Connect.NextHandleFunction {
   const root = resolve(assets);
   return async function serve(request, response, next) {
     if (request.method !== 'GET' && request.method !== 'HEAD') return next();
     let file;
     try {
-      const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+      const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
       file = resolve(assets, `.${pathname}`);
       if (file !== root && !file.startsWith(`${root}${sep}`)) return next();
       const info = await stat(file);
@@ -107,6 +86,7 @@ function serveModelAsset(assets) {
   };
 }
 
+const serveOpenDeciderAsset = serveModelAsset(openDeciderAssets);
 const serveDecimaSmallAsset = serveModelAsset(decimaSmallAssets);
 const serveDecimaBaseCleanAsset = serveModelAsset(decimaBaseCleanAssets);
 const serveDecimaAgentAsset = serveModelAsset(decimaAgentAssets);
@@ -141,7 +121,6 @@ export default defineConfig({
     fs: {allow: [workspace, ...(packageConsumerRoot ? [packageConsumerRoot] : [])]}
   },
   plugins: [
-    ...exampleConfig.plugins,
     {
       name: 'browser-test-manifests',
       configureServer(server) {

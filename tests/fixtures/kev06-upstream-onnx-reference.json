@@ -1,0 +1,17 @@
+{
+  "scope": "single-input-upstream-onnx-cpu-reference",
+  "modelId": "kev-0.6b-q4f16",
+  "repository": "onnx-community/kev-0.6b-ONNX",
+  "revision": "5a827091b3d58fe4fdfc02a5a5b2ce364047d678",
+  "graphSha256": "26e059ddd954efd9897772b098db10b9eeda9b873984dc1c73b32a9ce177c7c8",
+  "weightsSha256": "777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b",
+  "tokenizerSha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+  "referenceRuntime": "onnxruntime 1.31.1 CPUExecutionProvider",
+  "referenceTokenizer": "tokenizers 0.22.2",
+  "tokenIds": [151659, 32, 6002, 572, 11430, 10917, 13, 151660, 23085, 2083, 1265, 3705, 419, 1681, 30, 151648, 38637, 151649, 151648, 26508, 151649, 151661],
+  "optionIndices": [17, 20],
+  "logits": [4.56640625, -0.8623046875],
+  "probabilities": [0.9956304274292445, 0.0043695725707555465],
+  "maxAbsoluteLogitDifference": 0.15,
+  "maxAbsoluteProbabilityDifference": 0.001
+}

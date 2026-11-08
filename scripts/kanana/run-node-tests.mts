@@ -9,7 +9,7 @@ const packageRequire = createRequire(join(packageRoot, 'package.json'));
 const compiler = join(dirname(packageRequire.resolve('typescript/package.json')), 'bin/tsc');
 const testDirectory = join(packageRoot, 'test');
 const allTests = (await readdir(testDirectory))
-  .filter((file) => file.endsWith('.test.mjs'))
+  .filter((file) => /\.test\.(?:mjs|mts|ts)$/u.test(file))
   .sort()
   .map((file) => join('test', file));
 const coreTests = [
@@ -47,7 +47,7 @@ try {
     ],
     {cwd: packageRoot, stdio: 'inherit'}
   );
-  const testArguments = ['--test', ...tests];
+  const testArguments = ['--import', 'tsx', '--test', ...tests];
   if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');
   execFileSync(process.execPath, testArguments, {
     cwd: packageRoot,

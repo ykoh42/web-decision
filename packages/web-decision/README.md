@@ -1,25 +1,20 @@
 # web-decision
 
-`web-decision` runs decision models in the browser. The model computes the answer on the user's device; the library downloads model assets from pinned sources or a trusted application-configured mirror and verifies their hashes.
+`web-decision` runs curated decision models locally in the browser using TVM. A model ID selects a package-pinned model and its verified assets. Applications cannot register an arbitrary model or asset URL.
 
-This workspace package is `0.0.0-preview.34` and is not the stable npm release. The latest stable release is `web-decision@0.3.0`; its supported scope is listed in the repository's [main README](../../README.md).
-
-## Try the preview package
+This workspace is a preview. The latest published stable package and its supported models are documented in the [main README](../../README.md).
 
 ```js
-import {loadDecisionModel} from 'web-decision';
+import {describeModel, listModels, loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({modelId: 'tamev-micro-minilm-int8'});
+console.log(listModels());
+console.log(describeModel('kev-0.6b-q4f16'));
 
+const model = await loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
 try {
   const result = await model.decide({
     state: 'A customer reports a duplicate charge.',
-    questions: [
-      {
-        instructions: 'Which team should review this?',
-        options: ['Billing', 'Support']
-      }
-    ]
+    questions: [{instructions: 'Which team should review this?', options: ['Billing', 'Support']}]
   });
   console.log(result.answers[0]?.selected);
 } finally {
@@ -27,27 +22,17 @@ try {
 }
 ```
 
-Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; stable Kev also loads without one and rejects `assetsUrl`. The legacy `model: 'kev-0.6b-q4f16'` asset-pack route continues to require `assetsUrl`.
+## Model files and offline use
 
-Use `StableModelId` values with `loadDecisionModel({modelId})` as the stable interface.
+Kev uses the TVM WebGPU model WASM and metadata included in the package. On first load it fetches the pinned 335,357,952-byte upstream external-data file and reconstructs the TVM weight shards. The loader verifies the source, mapping and each shard against pinned hashes before use. Decision inputs remain local.
 
-Some models also expose typed `systemOne` inputs. Check the route descriptor before using typed questions, abstention, scores, or multimodal fields. The library preserves each model's option order and output meaning. Any truncation follows the model protocol and is reported in the result.
+Verified shards can be cached for subsequent loads. `offline: true` requires all necessary cached files and does not fetch missing model assets. A successful online load alone does not guarantee that the browser saved the files: storage availability and quota vary. For offline use, the application must also make its own code and pages available offline.
 
-## Model assets
-
-Stable Kev loads its pinned TVM WASM and metadata from the package, then fetches the pinned 335,357,952-byte ONNX external-data file and reconstructs the nine verified TVM shards in the browser. The stable `modelId` route always uses this pinned source and does not accept `assetsUrl`. The raw source file is not cached; verified shards can be cached for offline loads. The legacy `model` asset-pack route remains available with its required `assetsUrl`; every file must match the pinned manifest. The library verifies assets before use and keeps decision inputs in the browser.
-
-Browser caching is enabled by default for stable model-ID routes. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. The application must also make its own code and pages available offline.
-
-Model files have their own terms. Review the model and asset terms for the files you choose to host or use.
-
-## Browser requirements
-
-A route's descriptor identifies its runtime. TVM WebGPU routes require the GPU features and limits reported by that route. ONNX Runtime Web may partition unsupported operators to CPU or WebAssembly, as documented by the route's provider configuration.
+The model requires WebGPU and `shader-f16`. GPU, browser and model-specific limitations and actual verification evidence are described in the model catalog and release record. Model files have separate terms; see the model notices.
 
 ## Development
 
-Run commands from the repository root with pnpm:
+Run from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -56,12 +41,4 @@ pnpm check:quality
 pnpm verify:package
 ```
 
-The package build uses the pinned Apache TVM Web sources and Emscripten setup documented in the repository's package checks. Unit tests use synthetic runtime inputs unless a test explicitly requires local model assets. Local real-model browser results are reported separately from these tests.
-
-To run the real Kev 0.6B WebGPU boundary test, provide the verified asset-pack parent directory and run `WEB_DECISION_REAL_GPU=1 WEB_DECISION_KEV06_REAL_GPU=1 WEB_DECISION_PUBLIC_ASSET_ROOT=/path/to/model-assets pnpm test:browser:kev06`.
-
-To run the Strands Qwen 2B hardware test, point the asset root at the pinned local model directory and
-run `WEB_DECISION_REAL_GPU=1 WEB_DECISION_STRANDS_REAL_GPU=1 WEB_DECISION_PUBLIC_ASSET_ROOT=/path/to/strands-assets pnpm test:browser:strands-qwen2`.
-The test report records the package bundle hash and GPU device.
-
-The project code is Apache-2.0. See the package notices for bundled runtime and source attributions; model asset terms remain separate.
+The package build uses pinned Apache TVM Web sources and Emscripten setup. Unit tests do not by themselves prove real-model GPU execution. A model is eligible for release only after the exact candidate package and its artifacts pass the release verification gates.

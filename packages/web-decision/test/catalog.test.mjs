@@ -52,6 +52,7 @@ test('catalog description retains the existing Kev contract and narrows bundle v
   assert.equal(model, entry.modelId);
   expected.verification.currentBundleGpu = 'not-revalidated';
   expected.verification.priorEvidence = entry.description.verification.priorEvidence;
+  expected.assets.requiredFiles = ['manifest.json', ...Object.keys(entry.artifacts.manifest.files)];
 
   assert.equal(adapter, 'kev06');
   assert.deepEqual(description, expected);
@@ -109,6 +110,7 @@ test('artifact lock hashes the manifest, bundled files, and upstream map', async
   assert.equal(lock.manifest.rawSha256, sha256(manifestBytes));
   assert.equal(lock.manifest.canonicalSha256, sha256(canonicalManifest));
   assert.equal(entry.description.assets.manifestSha256, lock.manifest.canonicalSha256);
+  assert.deepEqual(entry.description.assets.requiredFiles, ['manifest.json', ...Object.keys(manifest.files)]);
   assert.deepEqual(lock.manifest.files, manifest.files);
   assert.equal(lock.manifest.experimental, true);
   assert.deepEqual(Object.keys(lockFile.byModelId), MODEL_IDS);

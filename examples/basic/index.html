@@ -15,12 +15,9 @@
 </head>
 <body>
   <h1>Decision model example</h1>
-  <p id="intro">Run a decision model locally in your browser. Model files are separate from the package. Results can be incorrect, even at high probability.</p>
+  <p id="intro">Run a decision model locally in your browser. The model downloads on first use. Results can be incorrect, even at high probability.</p>
   <label for="model">Model</label>
   <select id="model"></select>
-  <label for="assets">Matching asset directory URL</label>
-  <input id="assets" placeholder="For example, /kev-0.6b-q4f16/">
-  <p id="asset-help">Some models require a separately configured asset server.</p>
   <button id="load" type="button">Load model</button>
   <button id="unload" type="button" disabled>Unload model</button>
   <form id="form">
@@ -36,6 +33,6 @@ technical team</textarea>
   </form>
   <p id="status" role="status">Load the model to begin.</p>
   <pre id="result"></pre>
-  <script type="module" src="/main.js"></script>
+  <script type="module" src="/main.ts"></script>
 </body>
 </html>

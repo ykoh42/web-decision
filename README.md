@@ -30,7 +30,7 @@ This interface is not in npm `0.3.0` yet. It is the clean model-ID interface cur
 ```ts
 import {loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({modelId: 'tamev-micro-minilm-int8'});
+const model = await loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
 
 try {
   const result = await model.decide({
@@ -46,11 +46,9 @@ try {
 }
 ```
 
-The selected model identifies its pinned revision, which the library fetches and verifies automatically. Stable Kev loads through its pinned upstream source when using `modelId`; the legacy `model` route still accepts the complete asset pack through a caller-provided `assetsUrl`.
+The workspace preview exposes only curated TVM models. `listModels()` and `describeModel(id)` show model capabilities and runtime requirements; `loadDecisionModel({modelId})` loads only a listed ID. Caller-supplied model URLs and unregistered models are not accepted.
 
-The workspace exposes `listStableModelIds()` and `describeStableModel(id)` for discovering stable IDs and runtime requirements. Stable model IDs load TAMEV Micro, Nano, Nano Flash, and Kev without a caller-supplied `assetsUrl`. Kev fetches its pinned ONNX external-data file and reconstructs the verified TVM shards locally; the stable Kev `modelId` route does not accept an `assetsUrl`. Other model routes will join this interface as they are migrated and verified.
-
-Each model keeps its own backend and input/output behavior. The library does not silently switch models or runtimes.
+The Kev route fetches its pinned upstream data and reconstructs its TVM shards locally. The library checks the expected hashes and does not silently switch models or runtimes. Inclusion in a published release requires the exact package and model artifacts to pass the release verification gates.
 
 ## Verification
 

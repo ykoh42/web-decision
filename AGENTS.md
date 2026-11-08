@@ -1,7 +1,7 @@
 # web-decision development
 
-- Build local decision inference. Prefer TVM; preserve supported backends.
-- Aim for model-ID-only loading. Pin, verify, and cache assets for offline reuse. Allow trusted mirrors.
-- Preserve model semantics, pins, and protocol limits. Never silently change backends or data.
-- Use supported APIs and pnpm. Keep code simple.
-- Test changes and report real-model and hardware limits. Follow the [release procedure](.github/RELEASING.md).
+- Ship only verified TVM models with curated IDs.
+- Pin and verify assets; support offline reuse.
+- Preserve model semantics and limits.
+- Keep code simple; enforce complexity gates.
+- Test the exact package and report hardware limits. Follow the [release procedure](.github/RELEASING.md).

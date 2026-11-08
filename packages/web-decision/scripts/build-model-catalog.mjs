@@ -73,7 +73,7 @@ export function validateSpec(spec) {
       failUnless(!Object.hasOwn(model.description, key), 'Catalog descriptions must not accept custom asset URLs.');
       failUnless(!Object.hasOwn(model.description.assets, key), 'Catalog assets must not accept custom asset URLs.');
     }
-    for (const key of ['manifestSha256', 'wasmSha256', 'sourceDataSha256']) {
+    for (const key of ['manifestSha256', 'wasmSha256', 'sourceDataSha256', 'requiredFiles']) {
       failUnless(!Object.hasOwn(model.description.assets, key), 'Artifact hashes must be generated, not curated.');
     }
   }
@@ -194,7 +194,11 @@ function renderCatalogModule() {
     '      modelId: model.modelId,\n' +
     '      description: {\n' +
     '        ...model.description,\n' +
-    '        assets: {...model.description.assets, manifestSha256: artifacts.manifest.canonicalSha256}\n' +
+    '        assets: {\n' +
+    '          ...model.description.assets,\n' +
+    "          requiredFiles: ['manifest.json', ...Object.keys(artifacts.manifest.files)],\n" +
+    '          manifestSha256: artifacts.manifest.canonicalSha256\n' +
+    '        }\n' +
     '      },\n' +
     '      artifacts\n' +
     '    };\n' +
@@ -226,7 +230,7 @@ function renderTypeFiles(models) {
       'export interface CatalogModelDescription {',
       '  readonly adapter: ModelAdapterId;',
       '  readonly precision: string;',
-      '  readonly checkpoint: Readonly<Record<string, string>>;',
+      '  readonly checkpoint: Readonly<{repository: string; revision: string; weightSha256?: string}>;',
       '  readonly assets: Readonly<{',
       "    integrity: 'pinned-manifest';",
       '    manifestSha256: string;',

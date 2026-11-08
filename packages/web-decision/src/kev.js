@@ -1,3 +1,7 @@
+import {WebDecisionError} from './curated/errors.ts';
+
+export {WebDecisionError};
+
 /** Kev input packing, kept independent from the GPU runtime. */
 export const KEV_DELIMITERS = Object.freeze({
   state: 151659,
@@ -12,14 +16,6 @@ export const KEV_MAX_STATE_TOKENS = 8192;
 export const KEV_MAX_BRANCH_TOKENS = 8192;
 // The pinned Kev API declares at most 255 options per question.
 export const KEV_MAX_OPTIONS = 255;
-
-export class WebDecisionError extends Error {
-  constructor(code, message, options) {
-    super(message, options);
-    this.name = 'WebDecisionError';
-    this.code = code;
-  }
-}
 
 function invalid(message) {
   return new WebDecisionError('INVALID_INPUT', message);

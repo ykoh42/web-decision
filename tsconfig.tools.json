@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "allowJs": true,
+    "checkJs": false,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": [
+    "playwright.config.ts",
+    "tests/browser/vite.config.ts",
+    "scripts/kanana/run-node-tests.mts",
+    "scripts/ci/asset-key.ts",
+    "scripts/ci/asset-key.test.ts",
+    "scripts/ci/check-package.ts",
+    "scripts/ci/check-types.mts",
+    "scripts/ci/packed-content.ts",
+    "scripts/ci/temporary-directories.ts"
+  ]
+}

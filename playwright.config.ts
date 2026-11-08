@@ -6,7 +6,11 @@ import {join} from 'node:path';
 const port = Number(process.env.WEB_DECISION_BROWSER_PORT || 41773);
 const baseURL = `http://127.0.0.1:${port}`;
 const realGPU = process.env.WEB_DECISION_REAL_GPU === '1';
-const browserName = process.env.WEB_DECISION_BROWSER_NAME || 'chromium';
+const requestedBrowser = process.env.WEB_DECISION_BROWSER_NAME || 'chromium';
+if (!['chromium', 'firefox', 'webkit'].includes(requestedBrowser)) {
+  throw new Error(`Unsupported browser: ${requestedBrowser}`);
+}
+const browserName = requestedBrowser as 'chromium' | 'firefox' | 'webkit';
 const channel =
   process.env.WEB_DECISION_BROWSER_CHANNEL || (realGPU && browserName === 'chromium' ? 'chromium' : undefined);
 const chromiumArgs = [
@@ -26,7 +30,7 @@ if (firefoxAppDataHome) {
 
 export default defineConfig({
   testDir: './tests/browser',
-  testMatch: '**/*.spec.mjs',
+  testMatch: '**/*.spec.{mjs,ts}',
   timeout: 30000,
   workers: 1,
   reporter: 'list',
@@ -43,7 +47,7 @@ export default defineConfig({
     }
   },
   webServer: {
-    command: 'pnpm exec vite --config tests/browser/vite.config.mjs',
+    command: 'pnpm exec vite --config tests/browser/vite.config.ts',
     url: baseURL,
     reuseExistingServer: false,
     timeout: 30000

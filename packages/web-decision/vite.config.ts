@@ -1,10 +1,10 @@
-import {defineConfig} from 'vite';
+import {defineConfig, type Plugin} from 'vite';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
 // This preview uses the exact pinned original TVM WebGPU source.
-export function assertPreviewWebgpuHash(actual) {
+export function assertPreviewWebgpuHash(actual: string): void {
   if (actual !== '77003ab2bc6c7ae103b38fb52c12a5a7a3d49597260b43f010deaacc5d65b7c1') {
     throw new Error(
       'This preview requires its verified TVM WebGPU source; use a clean pinned checkout for this build.'
@@ -16,7 +16,7 @@ export function assertPreviewWebgpuHash(actual) {
 // CommonJS export is in the Node branch and has no browser consumer. Change
 // only the exact pinned glue sequence; if that sequence changes, the build
 // must be reviewed rather than silently rewritten.
-export function stripNodeOnlyWasiExport(code) {
+export function stripNodeOnlyWasiExport(code: string): string {
   const target = 'if(typeof module!="undefined"){module["exports"]=Module}';
   if (code.split(target).length !== 2) {
     throw new Error('Expected exactly one Node-only export in the TVM WASI glue.');
@@ -24,7 +24,7 @@ export function stripNodeOnlyWasiExport(code) {
   return code.replace(target, '');
 }
 
-export function browserOnlyTvmWasiExport() {
+export function browserOnlyTvmWasiExport(): Plugin {
   let seen = false;
   return {
     name: 'browser-only-tvm-wasi-export',
@@ -33,7 +33,7 @@ export function browserOnlyTvmWasiExport() {
       seen = false;
     },
     transform(code, id) {
-      const path = id.split('?')[0].replaceAll('\\', '/');
+      const path = (id.split('?', 1)[0] ?? '').replaceAll('\\', '/');
       if (!path.endsWith('/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js')) return null;
       seen = true;
       return {code: stripNodeOnlyWasiExport(code), map: null};
@@ -78,12 +78,12 @@ export default defineConfig({
   resolve: {alias: [{find: 'ws', replacement: fileURLToPath(new URL('./src/browser-only-ws.js', import.meta.url))}]},
   build: {
     lib: {
-      entry: fileURLToPath(new URL('./src/index.js', import.meta.url)),
+      entry: fileURLToPath(new URL('./src/curated/index.ts', import.meta.url)),
       formats: ['es'],
       fileName: () => 'index.js'
     },
     target: 'es2022',
     minify: false,
-    rollupOptions: {external: ['@huggingface/tokenizers', 'onnxruntime-web/wasm', 'onnxruntime-web/webgpu']}
+    rollupOptions: {external: ['@huggingface/tokenizers']}
   }
 });
