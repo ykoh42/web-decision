@@ -21,7 +21,7 @@ function validSignal(signal) {
   );
 }
 
-export function validateLayaLoadOptions(options, model = LAYA_MODEL) {
+export function validateLayaLoadOptions(options, model = LAYA_MODEL, spec = LAYA_SPEC) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw fail('INVALID_INPUT', 'Laya load options are required.');
   for (const key of Reflect.ownKeys(options)) {
@@ -31,8 +31,7 @@ export function validateLayaLoadOptions(options, model = LAYA_MODEL) {
   }
   if (
     options.model !== model ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -44,7 +43,8 @@ export function validateLayaLoadOptions(options, model = LAYA_MODEL) {
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl = options.assetsUrl ?? `https://huggingface.co/${spec.repository}/resolve/${spec.revision}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid Laya assetsUrl.', cause);
   }
@@ -150,7 +150,7 @@ export async function loadLayaModel(
     spec = LAYA_SPEC
   } = {}
 ) {
-  const checked = validateLayaLoadOptions(options, model);
+  const checked = validateLayaLoadOptions(options, model, spec);
   const {signal} = checked;
   let session;
   try {

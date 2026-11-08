@@ -1,6 +1,7 @@
 export const D1_OMNI_MODEL = 'experimental-d1-omni-600m-q8';
 export const D1_OMNI_REPOSITORY = 'onnx-community/d1-omni-600M-ONNX';
 export const D1_OMNI_REVISION = '4ebc1b97bf1477485371c79d1cf8d5e4e8eebfa0';
+export const D1_OMNI_ASSETS_URL = `https://huggingface.co/${D1_OMNI_REPOSITORY}/resolve/${D1_OMNI_REVISION}/`;
 export const D1_OMNI_SOURCE_REPOSITORY = 'LiquidAI/d1-omni-600M';
 export const D1_OMNI_SOURCE_REVISION = '02b55d7076f15129e59ab3f94783f32c4b088674';
 export const D1_OMNI_MODEL_MAX_TOKENS = 16384;

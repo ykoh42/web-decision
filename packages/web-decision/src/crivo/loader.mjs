@@ -1,7 +1,7 @@
 import {Tokenizer} from '@huggingface/tokenizers';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {getCrivoSpec} from './contract.mjs';
+import {CRIVO_REPOSITORY, CRIVO_REVISION, getCrivoSpec} from './contract.mjs';
 import {createCrivoRunner} from './runner.mjs';
 import {createCrivoSession} from './session.mjs';
 import {openCrivoSource} from './source.mjs';
@@ -30,8 +30,7 @@ export function validateCrivoLoadOptions(options) {
   const spec = getCrivoSpec(options.model);
   if (
     !spec ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache !== true) ||
@@ -42,7 +41,9 @@ export function validateCrivoLoadOptions(options) {
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      options.assetsUrl ?? `https://huggingface.co/${CRIVO_REPOSITORY}/resolve/${CRIVO_REVISION}/models/32m/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid Crivo assetsUrl.', cause);
   }

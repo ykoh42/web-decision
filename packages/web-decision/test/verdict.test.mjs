@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  VERDICT_ASSETS_URL,
   VERDICT_FILES,
   VERDICT_GLOBAL_TEMPERATURE,
   VERDICT_MAX_CANDIDATES,
@@ -405,12 +406,14 @@ test('Verdict session preserves explicit abstention through the generic decision
 test('Verdict load options reject unknown fields, malformed URLs, and online prefetch', () => {
   const valid = {model: VERDICT_MODEL, assetsUrl: 'https://example.test/verdict/'};
   assert.equal(validateVerdictLoadOptions(valid).base.href, valid.assetsUrl);
+  assert.equal(validateVerdictLoadOptions({model: VERDICT_MODEL}).base.href, VERDICT_ASSETS_URL);
   assert.throws(() => validateVerdictLoadOptions({...valid, maxPrefetchBytes: 1}), {code: 'INVALID_INPUT'});
   assert.throws(() => validateVerdictLoadOptions({...valid, offline: true, cache: false}), {code: 'INVALID_INPUT'});
   assert.throws(() => validateVerdictLoadOptions({...valid, unknown: true}), {code: 'INVALID_INPUT'});
   assert.throws(() => validateVerdictLoadOptions({...valid, assetsUrl: 'file:///tmp/verdict/'}), {
     code: 'INVALID_INPUT'
   });
+  assert.throws(() => validateVerdictLoadOptions({model: VERDICT_MODEL, assetsUrl: null}), {code: 'INVALID_INPUT'});
 });
 
 test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback adapter', async () => {
@@ -493,17 +496,21 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
       }
     }
   };
+  let sourceBase;
   const model = await loadVerdictModel(
-    {model: VERDICT_MODEL, assetsUrl: 'https://example.test/verdict/', cache: false},
+    {model: VERDICT_MODEL, cache: false},
     {
       ort,
       Tokenizer,
-      openSource: async () => ({
-        async read(name) {
-          reads.push(name);
-          return assets[name];
-        }
-      }),
+      openSource: async ({base}) => {
+        sourceBase = base.href;
+        return {
+          async read(name) {
+            reads.push(name);
+            return assets[name];
+          }
+        };
+      },
       gpuApi: {
         async requestAdapter(options) {
           assert.deepEqual(options, {powerPreference: 'high-performance', forceFallbackAdapter: false});
@@ -512,6 +519,7 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
       }
     }
   );
+  assert.equal(sourceBase, VERDICT_ASSETS_URL);
   assert.deepEqual(reads.sort(), Object.keys(VERDICT_FILES).sort());
   assert.equal(ort.env.webgpu.adapter, adapter);
   assert.equal(ort.env.webgpu.forceFallbackAdapter, false);

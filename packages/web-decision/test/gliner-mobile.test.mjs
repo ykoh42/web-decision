@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   GLINER_MOBILE_FILES,
   GLINER_MOBILE_MODEL,
+  GLINER_MOBILE_SPEC,
   GLINER_MOBILE_TOTAL_BYTES,
   GLINER_MAX_OPTIONS,
   GLINER_MAX_TOKENS
@@ -386,26 +387,44 @@ test('GLiNER Mobile generic decide preserves option order and returns per-option
   await model.dispose();
 });
 
-test('GLiNER Mobile creates a hardware WebGPU session, runs typed inference, and disposes every tensor', async () => {
-  const fixture = loaderDependencies();
-  const model = await loadGlinerMobileModel(
-    {model: GLINER_MOBILE_MODEL, assetsUrl: 'https://example.test/gliner/', cache: false},
-    fixture.dependencies
-  );
-  const result = await model.systemOne('A case.', {
-    pick: {type: 'choice', instructions: 'Choose.', criteria: ['one', 'two']}
-  });
-  assert.equal(result.answers.pick.choice, 'two');
-  assert.deepEqual(fixture.reads.sort(), Object.keys(GLINER_MOBILE_FILES).sort());
-  assert.equal(fixture.runCalls[0].outputNames[0], 'logits');
-  assert.equal(fixture.runCalls[0].feeds.input_ids.dims[0], 1);
-  assert.equal(fixture.runCalls[0].feeds.marker_positions.dims[1], 2);
-  assert.ok(fixture.tensors.every((tensor) => tensor.disposed));
-  await model.dispose();
-  assert.equal(fixture.released.count, 1);
+test('GLiNER Mobile loads by ID or mirror with hardware WebGPU and typed inference intact', async () => {
+  for (const assetsUrl of [undefined, 'https://example.test/gliner/']) {
+    const fixture = loaderDependencies();
+    let sourceBase;
+    const openSource = fixture.dependencies.openSource;
+    fixture.dependencies.openSource = async (options) => {
+      sourceBase = options.base.href;
+      return openSource(options);
+    };
+    const options = {model: GLINER_MOBILE_MODEL, cache: false};
+    if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
+    const model = await loadGlinerMobileModel(options, fixture.dependencies);
+    assert.equal(
+      sourceBase,
+      assetsUrl ?? `https://huggingface.co/${GLINER_MOBILE_SPEC.repository}/resolve/${GLINER_MOBILE_SPEC.revision}/`
+    );
+    const result = await model.systemOne('A case.', {
+      pick: {type: 'choice', instructions: 'Choose.', criteria: ['one', 'two']}
+    });
+    assert.equal(result.answers.pick.choice, 'two');
+    assert.deepEqual(fixture.reads.sort(), Object.keys(GLINER_MOBILE_FILES).sort());
+    assert.equal(fixture.runCalls[0].outputNames[0], 'logits');
+    assert.equal(fixture.runCalls[0].feeds.input_ids.dims[0], 1);
+    assert.equal(fixture.runCalls[0].feeds.marker_positions.dims[1], 2);
+    assert.ok(fixture.tensors.every((tensor) => tensor.disposed));
+    await model.dispose();
+    assert.equal(fixture.released.count, 1);
+  }
 });
 
 test('GLiNER Mobile rejects unsupported loading options before reading assets', async () => {
+  const defaults = validateGlinerMobileLoadOptions({model: GLINER_MOBILE_MODEL});
+  assert.equal(
+    defaults.base.href,
+    `https://huggingface.co/${GLINER_MOBILE_SPEC.repository}/resolve/${GLINER_MOBILE_SPEC.revision}/`
+  );
+  assert.equal(defaults.cacheEnabled, true);
+  assert.equal(defaults.offline, false);
   assert.throws(() => validateGlinerMobileLoadOptions({model: GLINER_MOBILE_MODEL, assetsUrl: 'file:///model/'}), {
     code: 'INVALID_INPUT'
   });

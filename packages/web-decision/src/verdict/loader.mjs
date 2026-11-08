@@ -1,7 +1,13 @@
 import {Tokenizer} from '@huggingface/tokenizers';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {VERDICT_GLOBAL_TEMPERATURE, VERDICT_MODEL, VERDICT_SPEC, VERDICT_TEMPERATURES} from './contract.mjs';
+import {
+  VERDICT_ASSETS_URL,
+  VERDICT_GLOBAL_TEMPERATURE,
+  VERDICT_MODEL,
+  VERDICT_SPEC,
+  VERDICT_TEMPERATURES
+} from './contract.mjs';
 import {createVerdictRunner, VERDICT_INPUT_NAMES, VERDICT_OUTPUT_NAMES} from './runner.mjs';
 import {createVerdictSession} from './session.mjs';
 import {openVerdictSource} from './source.mjs';
@@ -27,10 +33,11 @@ export function validateVerdictLoadOptions(options) {
     if (typeof key !== 'string' || !LOAD_KEYS.has(key) || !descriptor || !Object.hasOwn(descriptor, 'value'))
       throw fail('INVALID_INPUT', 'Unsupported Verdict load option.');
   }
+  const assetsUrl = options.assetsUrl === undefined ? VERDICT_ASSETS_URL : options.assetsUrl;
   if (
     options.model !== VERDICT_MODEL ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    typeof assetsUrl !== 'string' ||
+    !assetsUrl ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -42,7 +49,7 @@ export function validateVerdictLoadOptions(options) {
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    base = new URL(assetsUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid Verdict assetsUrl.', cause);
   }

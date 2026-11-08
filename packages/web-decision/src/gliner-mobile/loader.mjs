@@ -3,7 +3,7 @@ import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {createGlinerMobileRunner} from './runner.mjs';
 import {createGlinerMobileSession} from './session.mjs';
-import {GLINER_MOBILE_MODEL} from './contract.mjs';
+import {GLINER_MOBILE_MODEL, GLINER_MOBILE_SPEC} from './contract.mjs';
 import {openGlinerMobileSource} from './source.mjs';
 import {createGlinerMobileTokenizer} from './tokenizer.mjs';
 
@@ -31,8 +31,7 @@ export function validateGlinerMobileLoadOptions(options) {
   }
   if (
     options.model !== GLINER_MOBILE_MODEL ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -44,7 +43,10 @@ export function validateGlinerMobileLoadOptions(options) {
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      options.assetsUrl ??
+      `https://huggingface.co/${GLINER_MOBILE_SPEC.repository}/resolve/${GLINER_MOBILE_SPEC.revision}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid GLiNER assetsUrl.', cause);
   }

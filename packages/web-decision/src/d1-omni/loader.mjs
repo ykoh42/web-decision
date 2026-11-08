@@ -2,7 +2,7 @@ import {Tokenizer} from '@huggingface/tokenizers';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {createD1OmniSession} from './session.mjs';
-import {D1_OMNI_MODEL, D1_OMNI_SPEC, D1_OMNI_TEMPERATURES} from './contract.mjs';
+import {D1_OMNI_ASSETS_URL, D1_OMNI_MODEL, D1_OMNI_SPEC, D1_OMNI_TEMPERATURES} from './contract.mjs';
 import {openD1OmniSource} from './source.mjs';
 import {createD1OmniTokenizer} from './tokenizer.mjs';
 import {createD1OmniRunner, D1_OMNI_INPUT_NAMES, D1_OMNI_OUTPUT_NAMES} from './runner.mjs';
@@ -27,10 +27,11 @@ export function validateD1OmniLoadOptions(options) {
     if (typeof key !== 'string' || !LOAD_KEYS.has(key) || !descriptor || !Object.hasOwn(descriptor, 'value'))
       throw fail('INVALID_INPUT', 'Unsupported d1-omni load option.');
   }
+  const assetsUrl = options.assetsUrl === undefined ? D1_OMNI_ASSETS_URL : options.assetsUrl;
   if (
     options.model !== D1_OMNI_MODEL ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    typeof assetsUrl !== 'string' ||
+    !assetsUrl ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -42,7 +43,7 @@ export function validateD1OmniLoadOptions(options) {
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    base = new URL(assetsUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid d1-omni assetsUrl.', cause);
   }

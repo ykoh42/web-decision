@@ -6,6 +6,8 @@ import {
   CRIVO_FP32_SPEC,
   CRIVO_INT8_SPEC,
   CRIVO_MAX_SEQUENCE_TOKENS,
+  CRIVO_REPOSITORY,
+  CRIVO_REVISION,
   getCrivoSpec
 } from '../src/crivo/contract.mjs';
 import {loadCrivoModel, validateCrivoLoadOptions} from '../src/crivo/loader.mjs';
@@ -540,20 +542,37 @@ test('Crivo batches questions by the upstream row and token budgets', async () =
   await runner.dispose();
 });
 
-test('Crivo loader requires an explicit model route and a directory URL', () => {
+test('Crivo loader defaults to the pinned public assets and accepts trusted mirrors', () => {
+  const expectedBase = `https://huggingface.co/${CRIVO_REPOSITORY}/resolve/${CRIVO_REVISION}/models/32m/`;
+  for (const spec of [CRIVO_FP32_SPEC, CRIVO_INT8_SPEC]) {
+    const defaultOptions = validateCrivoLoadOptions({model: spec.model});
+    assert.equal(defaultOptions.base.href, expectedBase);
+    assert.equal(defaultOptions.spec, spec);
+    assert.equal(defaultOptions.cacheEnabled, true);
+    assert.equal(defaultOptions.offline, false);
+    assert.equal(
+      validateCrivoLoadOptions({model: spec.model, assetsUrl: 'https://example.test/crivo'}).base.href,
+      'https://example.test/crivo/'
+    );
+  }
   assert.throws(() => validateCrivoLoadOptions({assetsUrl: 'https://example.test/crivo/'}), {code: 'INVALID_INPUT'});
   assert.throws(() => validateCrivoLoadOptions({model: CRIVO_FP32_SPEC.model, assetsUrl: 'file:///tmp/crivo/'}), {
     code: 'INVALID_INPUT'
   });
+  for (const assetsUrl of [null, '']) {
+    assert.throws(() => validateCrivoLoadOptions({model: CRIVO_FP32_SPEC.model, assetsUrl}), {
+      code: 'INVALID_INPUT'
+    });
+  }
   assert.throws(
     () =>
       validateCrivoLoadOptions({
         model: CRIVO_INT8_SPEC.model,
-        assetsUrl: 'https://example.test/crivo/',
         offline: true
       }),
     {code: 'INVALID_INPUT'}
   );
+  assert.equal(validateCrivoLoadOptions({model: CRIVO_INT8_SPEC.model, offline: true, cache: true}).offline, true);
   assert.equal(
     validateCrivoLoadOptions({model: CRIVO_INT8_SPEC.model, assetsUrl: 'https://example.test/crivo'}).base.pathname,
     '/crivo/'
@@ -605,7 +624,7 @@ test('Crivo loader selects WebGPU or single-thread WASM and loads only the pinne
       }
     };
     const loaded = await loadCrivoModel(
-      {model: spec.model, assetsUrl: 'https://example.test/crivo/'},
+      {model: spec.model},
       {
         ort,
         gpuApi: {
@@ -614,16 +633,19 @@ test('Crivo loader selects WebGPU or single-thread WASM and loads only the pinne
             return adapter;
           }
         },
-        openSource: async () => ({
-          async read(name) {
-            reads.push(name);
-            if (name === 'config.json') return jsonBytes(config);
-            if (name === 'tokenizer_config.json') return jsonBytes(tokenizerConfig);
-            if (name === 'tokenizer.json') return jsonBytes(tokenizerJson);
-            assert.equal(name, spec.graphFile);
-            return graphBytes;
-          }
-        }),
+        openSource: async ({base}) => {
+          assert.equal(base.href, `https://huggingface.co/${CRIVO_REPOSITORY}/resolve/${CRIVO_REVISION}/models/32m/`);
+          return {
+            async read(name) {
+              reads.push(name);
+              if (name === 'config.json') return jsonBytes(config);
+              if (name === 'tokenizer_config.json') return jsonBytes(tokenizerConfig);
+              if (name === 'tokenizer.json') return jsonBytes(tokenizerJson);
+              assert.equal(name, spec.graphFile);
+              return graphBytes;
+            }
+          };
+        },
         createTokenizer: () => fakeTokenizer()
       }
     );

@@ -1,7 +1,7 @@
 import {parseJson} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {TinyDecide} from './engine.js';
-import {TINYDECIDE_MODEL} from './contract.mjs';
+import {TINYDECIDE_MODEL, TINYDECIDE_REPOSITORY, TINYDECIDE_REVISION} from './contract.mjs';
 import {createTinyDecideSession} from './session.mjs';
 import {openTinyDecideSource} from './source.mjs';
 
@@ -18,8 +18,7 @@ export function validateTinyDecideLoadOptions(options) {
   }
   if (
     options.model !== TINYDECIDE_MODEL ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -29,7 +28,9 @@ export function validateTinyDecideLoadOptions(options) {
     throw fail('INVALID_INPUT', 'Invalid TinyDecide load option values.');
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      options.assetsUrl ?? `https://huggingface.co/${TINYDECIDE_REPOSITORY}/resolve/${TINYDECIDE_REVISION}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid TinyDecide assetsUrl.', cause);
   }

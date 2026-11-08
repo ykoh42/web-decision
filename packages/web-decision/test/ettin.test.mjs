@@ -476,7 +476,11 @@ test('Decider Ettin session queues calls, exposes the typed heads, and closes cl
   });
 });
 
-test('Decider Ettin load options require a pinned model and a web asset directory', () => {
+test('Decider Ettin load options default to the pinned source and support a trusted mirror', () => {
+  assert.equal(
+    validateEttinLoadOptions({model: ETTIN_MODEL}).base.href,
+    'https://huggingface.co/aravind1706/decider-ettin/resolve/df8600e1f6e220b302cdd49897c2b1ff76e021ae/'
+  );
   assert.deepEqual(validateEttinLoadOptions({model: ETTIN_MODEL, assetsUrl: 'https://example.test/ettin'}), {
     base: new URL('https://example.test/ettin/'),
     signal: undefined,
@@ -485,6 +489,9 @@ test('Decider Ettin load options require a pinned model and a web asset director
     onProgress: undefined
   });
   assert.throws(() => validateEttinLoadOptions({model: ETTIN_MODEL, assetsUrl: 'file:///model/'}), {
+    code: 'INVALID_INPUT'
+  });
+  assert.throws(() => validateEttinLoadOptions({model: ETTIN_MODEL, assetsUrl: null}), {
     code: 'INVALID_INPUT'
   });
   assert.throws(() => validateEttinLoadOptions({model: ETTIN_MODEL, assetsUrl: '/model/', maxPrefetchBytes: 1}), {

@@ -5,7 +5,8 @@ import {
   LAYA_MAX_HEAD_TOKENS,
   LAYA_MAX_OPTIONS,
   LAYA_MAX_SEQUENCE_TOKENS,
-  LAYA_MODEL
+  LAYA_MODEL,
+  LAYA_SPEC
 } from '../src/laya/contract.mjs';
 import {loadLayaModel, validateLayaLoadOptions} from '../src/laya/loader.mjs';
 import {createLayaSession} from '../src/laya/session.mjs';
@@ -336,23 +337,51 @@ test('Laya validates model selection, local assets URL, and bounded load options
   assert.doesNotThrow(() => validateLayaLoadOptions({model: LAYA_MODEL, assetsUrl: 'https://example.test/laya/'}));
 });
 
-test('Laya loader uses the pinned session interface and the WebGPU provider without silent fallback', async () => {
-  const fixture = loadDependencies();
-  const adapter = (fixture.dependencies.gpuApi.adapter = fixture.adapter);
-  const model = await loadLayaModel(
-    {model: LAYA_MODEL, assetsUrl: 'https://example.test/laya/', cache: false},
-    fixture.dependencies
-  );
-  assert.equal(fixture.ort.env.webgpu.adapter, adapter);
-  assert.equal(fixture.ort.env.webgpu.forceFallbackAdapter, false);
-  const result = await model.systemOne('state', {
-    route: {type: 'choice', instructions: 'choose', criteria: ['a', 'b']}
-  });
-  assert.equal(result.answers.route.choice, 'b');
-  assert.equal(fixture.calls.length, 1);
-  assert.ok(Object.values(fixture.calls[0]).every((tensor) => tensor.disposed));
-  await model.dispose();
-  assert.equal(fixture.released.count, 1);
+test('Laya routes default to distinct pinned Hugging Face revisions and preserve mirror directories', () => {
+  for (const [model, spec] of [
+    [LAYA_MODEL, LAYA_SPEC],
+    [LAYA_TYPED_MODEL, LAYA_TYPED_SPEC]
+  ]) {
+    const expectedBase = `https://huggingface.co/${spec.repository}/resolve/${spec.revision}/`;
+    const defaults = validateLayaLoadOptions({model}, model, spec);
+    assert.equal(defaults.base.href, expectedBase);
+    assert.equal(defaults.cacheEnabled, true);
+    assert.equal(defaults.offline, false);
+
+    const mirror = validateLayaLoadOptions({model, assetsUrl: 'https://mirror.example.test/laya'}, model, spec);
+    assert.equal(mirror.base.href, 'https://mirror.example.test/laya/');
+    assert.equal(mirror.cacheEnabled, true);
+  }
+});
+
+test('Laya loader defaults to its pinned source, preserves mirrors, and keeps WebGPU without fallback', async () => {
+  for (const assetsUrl of [undefined, 'https://example.test/laya/']) {
+    const fixture = loadDependencies();
+    const adapter = (fixture.dependencies.gpuApi.adapter = fixture.adapter);
+    let sourceBase;
+    const openSource = fixture.dependencies.openSource;
+    fixture.dependencies.openSource = async (options) => {
+      sourceBase = options.base.href;
+      return openSource(options);
+    };
+    const options = {model: LAYA_MODEL, cache: false};
+    if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
+    const model = await loadLayaModel(options, fixture.dependencies);
+    assert.equal(
+      sourceBase,
+      assetsUrl ?? `https://huggingface.co/${LAYA_SPEC.repository}/resolve/${LAYA_SPEC.revision}/`
+    );
+    assert.equal(fixture.ort.env.webgpu.adapter, adapter);
+    assert.equal(fixture.ort.env.webgpu.forceFallbackAdapter, false);
+    const result = await model.systemOne('state', {
+      route: {type: 'choice', instructions: 'choose', criteria: ['a', 'b']}
+    });
+    assert.equal(result.answers.route.choice, 'b');
+    assert.equal(fixture.calls.length, 1);
+    assert.ok(Object.values(fixture.calls[0]).every((tensor) => tensor.disposed));
+    await model.dispose();
+    assert.equal(fixture.released.count, 1);
+  }
 });
 
 test('Laya and xDecision accept larger requests and keep ONNX chunks within the row and token bounds', async () => {
@@ -426,16 +455,16 @@ test('Laya Typed-Decisions preserves its tokenizer IDs and typed outputs through
   });
   fixture.dependencies.Tokenizer = TypedCharacterTokenizer;
   const openSource = fixture.dependencies.openSource;
+  let sourceBase;
   fixture.dependencies.openSource = async (options) => {
     assert.equal(options.spec, LAYA_TYPED_SPEC);
+    sourceBase = options.base.href;
     return openSource(options);
   };
   fixture.dependencies.gpuApi.adapter = fixture.adapter;
 
-  const model = await loadLayaTypedDecisionsModel(
-    {model: LAYA_TYPED_MODEL, assetsUrl: 'https://example.test/laya-typed/', cache: false},
-    fixture.dependencies
-  );
+  const model = await loadLayaTypedDecisionsModel({model: LAYA_TYPED_MODEL, cache: false}, fixture.dependencies);
+  assert.equal(sourceBase, `https://huggingface.co/${LAYA_TYPED_SPEC.repository}/resolve/${LAYA_TYPED_SPEC.revision}/`);
   const result = await model.systemOne('The package arrived.', {
     delivery: {type: 'choice', instructions: 'Choose the status.', criteria: ['arrived', 'pending']}
   });

@@ -22,8 +22,7 @@ export function validateDecimaLoadOptions(options) {
   const spec = DECIMA_MODELS[options.model];
   if (
     !spec ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache === false) ||
@@ -34,7 +33,9 @@ export function validateDecimaLoadOptions(options) {
     throw fail('INVALID_INPUT', 'Invalid Decima load option values.');
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      options.assetsUrl ?? `https://huggingface.co/${spec.repository}/resolve/${spec.revision}/onnx/int8/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid Decima assetsUrl.', cause);
   }

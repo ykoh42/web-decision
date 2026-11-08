@@ -76,6 +76,14 @@ test('SafeDecide pins the complete asset set and permits the declared large grap
 });
 
 test('SafeDecide load options use opt-in browser caching for the 563 MB graph', () => {
+  const defaults = validateSafeDecideLoadOptions({model: SAFEDECIDE_MODEL});
+  assert.equal(
+    defaults.base.href,
+    `https://huggingface.co/${SAFEDECIDE_SPEC.repository}/resolve/${SAFEDECIDE_SPEC.revision}/`
+  );
+  assert.equal(defaults.cacheEnabled, false);
+  assert.equal(defaults.offline, false);
+
   const checked = validateSafeDecideLoadOptions({
     model: SAFEDECIDE_MODEL,
     assetsUrl: 'https://localhost/assets/safedecide/'
@@ -126,12 +134,14 @@ test('SafeDecide loader creates a WebGPU session only after checking metadata an
     }
   };
   const loaded = {fakeLoaded: true};
+  let sourceBase;
   const result = await loadFakeSafeDecide(
-    {model: SAFEDECIDE_MODEL, assetsUrl: 'https://localhost/assets/'},
+    {model: SAFEDECIDE_MODEL},
     {
       fake: true,
-      openSource: async ({spec}) => {
+      openSource: async ({spec, base}) => {
         assert.equal(spec, SAFEDECIDE_SPEC);
+        sourceBase = base.href;
         return {
           async read(name) {
             readNames.push(name);
@@ -178,6 +188,7 @@ test('SafeDecide loader creates a WebGPU session only after checking metadata an
   );
 
   assert.equal(result, loaded);
+  assert.equal(sourceBase, `https://huggingface.co/${SAFEDECIDE_SPEC.repository}/resolve/${SAFEDECIDE_SPEC.revision}/`);
   assert.deepEqual(readNames, [
     'config.json',
     'safedecide_config.json',

@@ -1,6 +1,7 @@
 export const VERDICT_MODEL = 'experimental-openjev-verdict-151m-fp16';
 export const VERDICT_REPOSITORY = 'heman10x/rlcd-modernbert-151m';
 export const VERDICT_REVISION = '8af2496eb63c7fa66d7d234e1f62629380030eb4';
+export const VERDICT_ASSETS_URL = `https://huggingface.co/${VERDICT_REPOSITORY}/resolve/${VERDICT_REVISION}/`;
 export const VERDICT_SOURCE_REPOSITORY = 'Heman10x-NGU/Verdict-open-jev';
 export const VERDICT_SOURCE_REVISION = '30f15564821626ca5c1ad5b2638c4eb7078787dd';
 

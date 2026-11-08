@@ -22,8 +22,7 @@ export function validateEttinLoadOptions(options) {
   const values = Object.fromEntries(Reflect.ownKeys(options).map((key) => [key, options[key]]));
   if (
     values.model !== ETTIN_MODEL ||
-    typeof values.assetsUrl !== 'string' ||
-    !values.assetsUrl ||
+    (values.assetsUrl !== undefined && (typeof values.assetsUrl !== 'string' || !values.assetsUrl)) ||
     (values.cache !== undefined && typeof values.cache !== 'boolean') ||
     (values.offline !== undefined && typeof values.offline !== 'boolean') ||
     (values.offline && values.cache === false) ||
@@ -38,7 +37,9 @@ export function validateEttinLoadOptions(options) {
 
   let base;
   try {
-    base = new URL(values.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      values.assetsUrl ?? `https://huggingface.co/${ETTIN_PROFILE.repository}/resolve/${ETTIN_PROFILE.revision}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid Decider Ettin assetsUrl.', cause);
   }

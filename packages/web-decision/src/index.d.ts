@@ -903,6 +903,7 @@ export type StandardLoadOptions =
         | {model?: PrefetchModelName; debertaReadback?: undefined; maxPrefetchBytes?: number}
         | {model: 'experimental-strands-qwen-2b-fp16'; debertaReadback?: undefined; maxPrefetchBytes?: 0 | undefined}
       ))
+  | TinyDecideLoadOptions
   | TamevMicroLoadOptions
   | SafeDecideLoadOptions
   | CrivoLoadOptions
@@ -966,7 +967,8 @@ export interface StrandsGemma4LoadOptions {
 
 export interface DecimaSmallLoadOptions {
   model: 'experimental-decima-small-int8';
-  assetsUrl: string;
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   cache?: boolean;
   offline?: boolean;
   signal?: AbortSignal;
@@ -1000,8 +1002,10 @@ export interface TamevNanoLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl
   debertaReadback?: undefined;
 }
 
-export interface TamevNanoFlashLoadOptions extends CommonLoadOptions {
+export interface TamevNanoFlashLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-tamev-nano-flash-tinybert-int8';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
@@ -1018,20 +1022,26 @@ export interface SkejjaInt8DynLoadOptions extends CommonLoadOptions {
   debertaReadback?: undefined;
 }
 
-export interface EttinLoadOptions extends CommonLoadOptions {
+export interface EttinLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-ettin-68m-int8';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface LayaLoadOptions extends CommonLoadOptions {
+export interface LayaLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-laya-multilingual-fp16';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface LayaTypedDecisionsLoadOptions extends CommonLoadOptions {
+export interface LayaTypedDecisionsLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-laya-typed-decisions-fp16';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
@@ -1042,20 +1052,26 @@ export interface XDecisionLoadOptions extends CommonLoadOptions {
   debertaReadback?: undefined;
 }
 
-export interface GlinerMobileLoadOptions extends CommonLoadOptions {
+export interface GlinerMobileLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-gliner2.5-decide-mobile-q4f16';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface D1OmniLoadOptions extends CommonLoadOptions {
+export interface D1OmniLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-d1-omni-600m-q8';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface VerdictLoadOptions extends CommonLoadOptions {
+export interface VerdictLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-openjev-verdict-151m-fp16';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
@@ -1189,8 +1205,10 @@ export interface VerdictDecisionResult extends Omit<DecisionResult, 'answers'> {
   readonly answers: VerdictDecisionAnswer[];
 }
 
-export interface TinyDecideLoadOptions extends CommonLoadOptions {
+export interface TinyDecideLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-tinydecide-10m-q4';
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
@@ -1422,7 +1440,8 @@ export interface LoadedStrandsGemma4Model extends LoadedDecisionModel {
 
 export interface SafeDecideLoadOptions {
   model: 'experimental-safedecide-140m-fp32';
-  assetsUrl: string;
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   /** Browser caching is opt-in because the FP32 graph is 563 MB. */
   cache?: boolean;
   /** Offline mode requires `cache: true`. */
@@ -1474,7 +1493,8 @@ export interface CrivoSystemOneResult {
 
 export interface CrivoLoadOptions {
   model: CrivoModelName;
-  assetsUrl: string;
+  /** Optional trusted mirror; defaults to the model's pinned public revision. */
+  assetsUrl?: string;
   /** Browser caching is enabled by default. */
   cache?: boolean;
   /** Offline mode requires a previously cached set of verified assets and cache: true. */

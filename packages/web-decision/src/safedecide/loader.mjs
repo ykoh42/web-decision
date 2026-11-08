@@ -29,8 +29,7 @@ export function validateSafeDecideLoadOptions(options, model = SAFEDECIDE_MODEL)
   }
   if (
     options.model !== model ||
-    typeof options.assetsUrl !== 'string' ||
-    !options.assetsUrl ||
+    (options.assetsUrl !== undefined && (typeof options.assetsUrl !== 'string' || !options.assetsUrl)) ||
     (options.cache !== undefined && typeof options.cache !== 'boolean') ||
     (options.offline !== undefined && typeof options.offline !== 'boolean') ||
     (options.offline && options.cache !== true) ||
@@ -41,7 +40,9 @@ export function validateSafeDecideLoadOptions(options, model = SAFEDECIDE_MODEL)
 
   let base;
   try {
-    base = new URL(options.assetsUrl, globalThis.location?.href);
+    const sourceUrl =
+      options.assetsUrl ?? `https://huggingface.co/${SAFEDECIDE_SPEC.repository}/resolve/${SAFEDECIDE_SPEC.revision}/`;
+    base = new URL(sourceUrl, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', 'Invalid SafeDecide assetsUrl.', cause);
   }

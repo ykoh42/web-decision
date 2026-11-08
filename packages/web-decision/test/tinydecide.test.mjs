@@ -5,6 +5,7 @@ import test from 'node:test';
 import {encodeRequest, WordPiece} from '../src/tinydecide/engine.js';
 import {WebDecisionError} from '../src/kev.js';
 import {loadTinyDecide, validateTinyDecideLoadOptions} from '../src/tinydecide/loader.mjs';
+import {TINYDECIDE_MODEL, TINYDECIDE_REPOSITORY, TINYDECIDE_REVISION} from '../src/tinydecide/contract.mjs';
 import {openTinyDecideSource} from '../src/tinydecide/source.mjs';
 import {createTinyDecideSession} from '../src/tinydecide/session.mjs';
 
@@ -117,14 +118,24 @@ test('TinyDecide verifies and reports separately loaded model assets', async () 
 });
 
 test('TinyDecide load options reject unsafe or unsupported values', () => {
+  const model = validateTinyDecideLoadOptions({model: TINYDECIDE_MODEL});
+  assert.equal(model.base.href, `https://huggingface.co/${TINYDECIDE_REPOSITORY}/resolve/${TINYDECIDE_REVISION}/`);
+  assert.equal(model.cacheEnabled, true);
+  assert.equal(model.offline, false);
   assert.equal(
     validateTinyDecideLoadOptions({
-      model: 'experimental-tinydecide-10m-q4',
+      model: TINYDECIDE_MODEL,
       assetsUrl: 'https://assets.example/tiny/',
       cache: false
     }).base.href,
     'https://assets.example/tiny/'
   );
+  assert.throws(() => validateTinyDecideLoadOptions({model: TINYDECIDE_MODEL, assetsUrl: null}), {
+    code: 'INVALID_INPUT'
+  });
+  assert.throws(() => validateTinyDecideLoadOptions({model: TINYDECIDE_MODEL, assetsUrl: ''}), {
+    code: 'INVALID_INPUT'
+  });
   assert.throws(() => validateTinyDecideLoadOptions({model: 'other', assetsUrl: 'https://assets.example/'}), {
     code: 'INVALID_INPUT'
   });
@@ -151,11 +162,12 @@ test('TinyDecide loader checks pinned metadata and constructs the native engine'
   const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
   const modelBytes = new ArrayBuffer(1);
   const loaded = [];
+  const assetsBase = `https://huggingface.co/${TINYDECIDE_REPOSITORY}/resolve/${TINYDECIDE_REVISION}/`;
   const model = await loadTinyDecide(
-    {model: 'experimental-tinydecide-10m-q4', assetsUrl: 'https://assets.example/tiny/', cache: false},
+    {model: TINYDECIDE_MODEL, cache: false},
     {
       openSource: async (options) => {
-        assert.equal(options.base.href, 'https://assets.example/tiny/');
+        assert.equal(options.base.href, assetsBase);
         return {read: async (name) => (loaded.push(name), name === 'meta.json' ? metadataBytes : modelBytes)};
       },
       TinyDecideClass: class {

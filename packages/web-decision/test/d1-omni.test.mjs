@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  D1_OMNI_ASSETS_URL,
   D1_OMNI_FILES,
   D1_OMNI_MAX_TOKENS,
   D1_OMNI_MODEL,
@@ -293,10 +294,15 @@ test('d1-omni runner batches dynamic rows with explicit int64 inputs and preserv
 });
 
 test('d1-omni load validation rejects malformed URLs and unsupported loader options', () => {
-  assert.throws(() => validateD1OmniLoadOptions({model: D1_OMNI_MODEL}), {code: 'INVALID_INPUT'});
+  assert.equal(validateD1OmniLoadOptions({model: D1_OMNI_MODEL}).base.href, D1_OMNI_ASSETS_URL);
+  assert.equal(
+    validateD1OmniLoadOptions({model: D1_OMNI_MODEL, assetsUrl: 'https://mirror.example.test/d1/'}).base.href,
+    'https://mirror.example.test/d1/'
+  );
   assert.throws(() => validateD1OmniLoadOptions({model: D1_OMNI_MODEL, assetsUrl: 'file:///model/'}), {
     code: 'INVALID_INPUT'
   });
+  assert.throws(() => validateD1OmniLoadOptions({model: D1_OMNI_MODEL, assetsUrl: null}), {code: 'INVALID_INPUT'});
   assert.throws(
     () =>
       validateD1OmniLoadOptions({model: D1_OMNI_MODEL, assetsUrl: 'https://example.test/model/', maxPrefetchBytes: 1}),
@@ -343,13 +349,17 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
     },
     'tokenizer.json': {model: {vocab: {}}}
   };
-  const openSource = async () => ({
-    async read(name) {
-      return new TextEncoder().encode(JSON.stringify(values[name] ?? {}));
-    }
-  });
+  let sourceBase;
+  const openSource = async ({base}) => {
+    sourceBase = base.href;
+    return {
+      async read(name) {
+        return new TextEncoder().encode(JSON.stringify(values[name] ?? {}));
+      }
+    };
+  };
   const model = await loadD1OmniModel(
-    {model: D1_OMNI_MODEL, assetsUrl: 'https://example.test/d1-omni/'},
+    {model: D1_OMNI_MODEL},
     {
       ort,
       Tokenizer,
@@ -361,6 +371,7 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
       }
     }
   );
+  assert.equal(sourceBase, D1_OMNI_ASSETS_URL);
   const result = await model.systemOne('state', {
     team: {type: 'choice', instructions: 'Select a team', criteria: ['billing', 'technical']}
   });

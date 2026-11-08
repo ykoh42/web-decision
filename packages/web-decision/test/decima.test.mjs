@@ -317,6 +317,20 @@ test('Decima runner pads int64 token inputs, checks graph outputs and releases b
 });
 
 test('Decima load options accept HTTP(S) assets and reject unsupported fields', () => {
+  for (const [model, repository, revision] of [
+    [DECIMA_SMALL_MODEL, 'decima-small', '480c4ea9e54f2946b947fb3ceb3c7cc7ece77522'],
+    [DECIMA_BASE_CLEAN_MODEL, 'decima-base-clean', 'a37e006fd4015c3c96176c341f3d6620f8a101f3'],
+    [DECIMA_AGENT_MODEL, 'decima-agent', '1acd2c4b1461c15ebc6b2b8f84dd9f8af18be245']
+  ]) {
+    const options = validateDecimaLoadOptions({model});
+    assert.equal(options.base.href, `https://huggingface.co/amyrmahdy/${repository}/resolve/${revision}/onnx/int8/`);
+    assert.equal(options.cacheEnabled, true);
+    assert.equal(options.offline, false);
+    assert.equal(
+      validateDecimaLoadOptions({model, assetsUrl: 'https://example.test/mirror'}).base.href,
+      'https://example.test/mirror/'
+    );
+  }
   assert.equal(
     validateDecimaLoadOptions({model: DECIMA_SMALL_MODEL, assetsUrl: 'https://example.test/model'}).base.href,
     'https://example.test/model/'
@@ -328,6 +342,12 @@ test('Decima load options accept HTTP(S) assets and reject unsupported fields', 
   assert.equal(baseClean.model, DECIMA_BASE_CLEAN_MODEL);
   assert.equal(baseClean.spec.stateOverflow, 'reject');
   assert.throws(() => validateDecimaLoadOptions(null), {code: 'INVALID_INPUT'});
+  assert.throws(() => validateDecimaLoadOptions({model: DECIMA_SMALL_MODEL, assetsUrl: null}), {
+    code: 'INVALID_INPUT'
+  });
+  assert.throws(() => validateDecimaLoadOptions({model: DECIMA_SMALL_MODEL, assetsUrl: ''}), {
+    code: 'INVALID_INPUT'
+  });
   assert.throws(() => validateDecimaLoadOptions({model: DECIMA_SMALL_MODEL, assetsUrl: 'file:///model/'}), {
     code: 'INVALID_INPUT'
   });

@@ -136,6 +136,8 @@ const crivoOptions: CrivoLoadOptions = {
   cache: false
 };
 const crivoModel: Promise<LoadedCrivoModel> = loadDecisionModel(crivoOptions);
+void loadDecisionModel({model: 'experimental-crivo-32m-v2-int8'});
+void loadDecisionModel({model: 'experimental-crivo-32m-v2-fp32'});
 void crivoModel.then((model) => {
   const result: Promise<CrivoSystemOneResult> = model.systemOne(
     {ticket: {message: 'A customer was charged twice.'}},
@@ -236,6 +238,7 @@ const safeDecideOptions: SafeDecideLoadOptions = {
   }
 };
 const safeDecideModel = loadDecisionModel(safeDecideOptions);
+void loadDecisionModel({model: 'experimental-safedecide-140m-fp32'});
 void safeDecideModel.then((model) => {
   const typed: Promise<SafeDecideSystemOneResult> = model.systemOne(
     {ticket: {message: 'A customer was charged twice.'}},
@@ -261,6 +264,10 @@ const decimaOptions: LoadOptions = {
     void fraction;
   }
 };
+loadDecisionModel({model: 'experimental-ettin-68m-int8'});
+loadDecisionModel({model: 'experimental-decima-small-int8'});
+loadDecisionModel({model: 'experimental-decima-base-clean-int8'});
+loadDecisionModel({model: 'experimental-decima-agent-int8'});
 const decimaTypedOptions = loadDecisionModel({
   assetsUrl: '/decima-small/',
   model: 'experimental-decima-small-int8',
@@ -306,7 +313,6 @@ const tamevNanoDefaultOptions: TamevNanoLoadOptions = {
 };
 const tamevMicroDefault = loadDecisionModel(tamevMicroDefaultOptions);
 const tamevNanoDefault = loadDecisionModel(tamevNanoDefaultOptions);
-// @ts-expect-error Nano Flash still requires a caller-provided asset URL.
 loadDecisionModel({model: 'experimental-tamev-nano-flash-tinybert-int8'});
 void [tamevMicroDefault, tamevNanoDefault];
 const tamevTypedOptions = loadDecisionModel(tamevOptions);
@@ -422,6 +428,7 @@ const layaOptions: LayaLoadOptions = {
   cache: false
 };
 const layaModelPromise = loadDecisionModel(layaOptions);
+void loadDecisionModel({model: 'experimental-laya-multilingual-fp16'});
 void layaModelPromise.then((model) => {
   const laya: LoadedLayaModel = model;
   const result: Promise<LayaSystemOneResult> = laya.systemOne('customer request', {
@@ -452,6 +459,7 @@ const layaTypedOptions: LayaTypedDecisionsLoadOptions = {
   cache: false
 };
 const layaTypedModelPromise = loadDecisionModel(layaTypedOptions);
+void loadDecisionModel({model: 'experimental-laya-typed-decisions-fp16'});
 void layaTypedModelPromise.then((model) => {
   const layaTyped: LoadedLayaTypedDecisionsModel = model;
   const result: Promise<LayaTypedDecisionsSystemOneResult> = layaTyped.systemOne('A support request.', {
@@ -471,6 +479,7 @@ const glinerMobileOptions: GlinerMobileLoadOptions = {
   cache: false
 };
 const glinerMobileModelPromise = loadDecisionModel(glinerMobileOptions);
+void loadDecisionModel({model: 'experimental-gliner2.5-decide-mobile-q4f16'});
 void glinerMobileModelPromise.then((model) => {
   const gliner: LoadedGlinerMobileModel = model;
   const result: Promise<GlinerMobileSystemOneResult> = gliner.systemOne('customer request', {
@@ -488,6 +497,7 @@ const d1OmniOptions: D1OmniLoadOptions = {
   cache: false
 };
 const d1OmniModelPromise = loadDecisionModel(d1OmniOptions);
+void loadDecisionModel({model: 'experimental-d1-omni-600m-q8'});
 void d1OmniModelPromise.then((model) => {
   const d1: LoadedD1OmniModel = model;
   const result: Promise<D1OmniSystemOneResult> = d1.systemOne('A support request.', {
@@ -519,6 +529,7 @@ const tinyDecideOptions: TinyDecideLoadOptions = {
   cache: true,
   offline: true
 };
+loadDecisionModel({model: 'experimental-tinydecide-10m-q4'});
 const tinyDecideTypedOptions = loadDecisionModel(tinyDecideOptions);
 void tinyDecideTypedOptions.then((model) => {
   const typedModel: LoadedTinyDecideModel = model;
@@ -708,6 +719,7 @@ const verdictOptions: VerdictLoadOptions = {
   assetsUrl: '/models/openjev-verdict/'
 };
 const verdictModel: Promise<LoadedVerdictModel> = loadDecisionModel(verdictOptions);
+void loadDecisionModel({model: 'experimental-openjev-verdict-151m-fp16'});
 void verdictModel.then((model) => {
   const typed: Promise<VerdictSystemOneResult> = model.systemOne('A customer was charged twice.', {
     route: {

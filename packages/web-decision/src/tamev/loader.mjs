@@ -2,7 +2,13 @@ import {Tokenizer} from '@huggingface/tokenizers';
 import * as defaultOrt from 'onnxruntime-web/wasm';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {TAMEV_MICRO_PROFILE, TAMEV_MICRO_MODEL, TAMEV_NANO_MODEL, TAMEV_PROFILES} from './contract.mjs';
+import {
+  TAMEV_MICRO_PROFILE,
+  TAMEV_MICRO_MODEL,
+  TAMEV_NANO_MODEL,
+  TAMEV_NANO_FLASH_MODEL,
+  TAMEV_PROFILES
+} from './contract.mjs';
 import {createTamevRunner} from './runner.mjs';
 import {createTamevSession} from './session.mjs';
 import {openTamevSource} from './source.mjs';
@@ -18,7 +24,7 @@ const LOAD_KEYS = new Set([
   'maxPrefetchBytes',
   'debertaReadback'
 ]);
-const ID_ONLY_MODELS = new Set([TAMEV_MICRO_MODEL, TAMEV_NANO_MODEL]);
+const ID_ONLY_MODELS = new Set([TAMEV_MICRO_MODEL, TAMEV_NANO_MODEL, TAMEV_NANO_FLASH_MODEL]);
 const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
 
 export function validateTamevLoadOptions(options, profile = TAMEV_MICRO_PROFILE) {

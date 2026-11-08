@@ -39,11 +39,11 @@ The local result is in the [M4 Pro verification report](https://github.com/ykoh4
 
 ## Model assets
 
-TAMEV Nano TinyBERT and Micro MiniLM load from their pinned public revisions when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
+TAMEV Nano TinyBERT, Nano Flash and Micro MiniLM, Decima Small, Base Clean and Agent, Ettin, TinyDecide, GLiNER Mobile, SafeDecide, D1 Omni, Verdict, and both Laya and Crivo routes load their pinned public assets when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
 
 The separate `experimental-kev-0.6b-q4f16-upstream` model ID uses TVM WebGPU and downloads its pinned upstream ONNX weights on first use. It is an experimental build with its own executable and does not replace the existing `kev-0.6b-q4f16` route. It currently does not accept an `assetsUrl` override. Its first load downloads about 335 MB and needs substantial browser memory; check GPU requirements and verification status in `describeModel`.
 
-Browser caching is enabled by default for TAMEV. Once all verified files are cached, pass `offline: true` to require an offline load. The application must also make its own code and pages available offline.
+Browser caching is enabled by default for these routes except SafeDecide, which requires `cache: true`. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. Chromium private sessions cannot cache individual files of 256 MiB or larger. The application must also make its own code and pages available offline.
 
 Model files have their own terms. Review the model and asset terms for the files you choose to host or use.
 

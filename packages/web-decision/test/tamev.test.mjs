@@ -15,7 +15,8 @@ import {
   TAMEV_NANO_FLASH_PROFILE,
   TAMEV_NANO_FLASH_TOTAL_BYTES
 } from '../src/tamev/contract.mjs';
-import {loadTamevMicro, loadTamevNano, validateTamevLoadOptions} from '../src/tamev/loader.mjs';
+import {loadTamev, loadTamevMicro, loadTamevNano, validateTamevLoadOptions} from '../src/tamev/loader.mjs';
+import {openTamevSource} from '../src/tamev/source.mjs';
 import {calibrateTamevProbabilities, finishTamevDecision, prepareTamevDecision} from '../src/tamev/protocol.mjs';
 import {createTamevRunner} from '../src/tamev/runner.mjs';
 import {createTamevSession} from '../src/tamev/session.mjs';
@@ -645,8 +646,8 @@ test('TAMEV session calibrates generic choices and preserves the raw typed proto
   });
 });
 
-test('TAMEV loader defaults Nano and Micro to pinned revisions, allows mirrors, and rejects bad options', async () => {
-  for (const profile of [TAMEV_MICRO_PROFILE, TAMEV_NANO_PROFILE]) {
+test('TAMEV loader defaults to pinned revisions, allows mirrors, and rejects bad options', async () => {
+  for (const profile of [TAMEV_MICRO_PROFILE, TAMEV_NANO_PROFILE, TAMEV_NANO_FLASH_PROFILE]) {
     const checked = validateTamevLoadOptions({model: profile.model}, profile);
     assert.equal(checked.base.href, `https://huggingface.co/${profile.repository}/resolve/${profile.revision}/`);
     assert.equal(checked.cacheEnabled, true);
@@ -672,17 +673,144 @@ test('TAMEV loader defaults Nano and Micro to pinned revisions, allows mirrors, 
   assert.throws(() => validateTamevLoadOptions({model: TAMEV_MICRO_MODEL, assetsUrl: 'file:///model/'}), {
     code: 'INVALID_INPUT'
   });
-  assert.throws(() => validateTamevLoadOptions({model: TAMEV_NANO_FLASH_MODEL}, TAMEV_NANO_FLASH_PROFILE), {
-    code: 'INVALID_INPUT'
-  });
   assert.equal(validateTamevLoadOptions({model: TAMEV_NANO_MODEL, offline: true}, TAMEV_NANO_PROFILE).offline, true);
   assert.throws(
     () => validateTamevLoadOptions({model: TAMEV_NANO_MODEL, offline: true, cache: false}, TAMEV_NANO_PROFILE),
     {code: 'INVALID_INPUT'}
   );
+  assert.throws(
+    () =>
+      validateTamevLoadOptions({model: TAMEV_NANO_FLASH_MODEL, offline: true, cache: false}, TAMEV_NANO_FLASH_PROFILE),
+    {code: 'INVALID_INPUT'}
+  );
   assert.throws(() => validateTamevLoadOptions({model: TAMEV_MICRO_MODEL, assetsUrl: '/model/', other: true}), {
     code: 'INVALID_INPUT'
   });
+});
+
+test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a trusted mirror', async () => {
+  const config = {
+    ...TAMEV_NANO_FLASH_PROFILE.expectedConfig,
+    calibration_by_k: TAMEV_NANO_FLASH_PROFILE.calibrationByK
+  };
+  const source = {
+    async read(name) {
+      if (name === 'tokenizer.json') return new TextEncoder().encode(JSON.stringify(tokenizerData)).buffer;
+      if (name === 'tokenizer_config.json') return new TextEncoder().encode(JSON.stringify(tokenizerConfig)).buffer;
+      if (name === 'config.json') return new TextEncoder().encode(JSON.stringify(config)).buffer;
+      if (name === 'model_int8.onnx') return Uint8Array.of(1, 2, 3).buffer;
+      throw new Error(`unexpected asset ${name}`);
+    }
+  };
+
+  for (const assetsUrl of [undefined, 'https://mirror.example.test/tamev/nano-flash']) {
+    let sourceBase;
+    let sessionOptions;
+    const ort = {
+      Tensor: class {
+        constructor(type, data, dims) {
+          Object.assign(this, {type, data, dims});
+        }
+      },
+      InferenceSession: {
+        async create(bytes, options) {
+          assert.equal(bytes.byteLength, 3);
+          sessionOptions = options;
+          return {
+            inputNames: ['ctx_input_ids', 'ctx_attention_mask', 'opt_input_ids', 'opt_attention_mask'],
+            outputNames: ['logits', 'probs'],
+            async run() {
+              return {
+                logits: {type: 'float32', dims: [1, 2], data: Float32Array.of(0.2, 0.8)},
+                probs: {type: 'float32', dims: [1, 2], data: Float32Array.of(0.4, 0.6)}
+              };
+            },
+            async release() {}
+          };
+        }
+      }
+    };
+    const options = {model: TAMEV_NANO_FLASH_MODEL};
+    if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
+    const loaded = await loadTamev(options, {
+      ort,
+      Tokenizer: FakeTokenizer,
+      openSource: async (checked) => {
+        sourceBase = checked.base.href;
+        return source;
+      }
+    });
+
+    const expectedBase =
+      assetsUrl ??
+      `https://huggingface.co/${TAMEV_NANO_FLASH_PROFILE.repository}/resolve/${TAMEV_NANO_FLASH_PROFILE.revision}/`;
+    assert.equal(sourceBase, expectedBase.endsWith('/') ? expectedBase : `${expectedBase}/`);
+    assert.deepEqual(sessionOptions, {
+      executionProviders: ['wasm'],
+      intraOpNumThreads: 1,
+      interOpNumThreads: 1,
+      graphOptimizationLevel: 'all'
+    });
+    const result = await loaded.systemOne('state', {
+      route: {type: 'choice', criteria: {billing: 'billing', fraud: 'fraud'}}
+    });
+    assert.equal(result.model, TAMEV_NANO_FLASH_MODEL);
+    assert.equal(result.answers.route.choice, 'fraud');
+    await loaded.dispose();
+  }
+});
+
+test('TAMEV Nano Flash verifies default and mirror bytes and stays offline on cache misses', async (t) => {
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requests.push(String(url));
+    return new Response(new Uint8Array(TAMEV_NANO_FLASH_FILES['config.json'].bytes));
+  });
+
+  const sources = [
+    {
+      options: {model: TAMEV_NANO_FLASH_MODEL},
+      base: `https://huggingface.co/${TAMEV_NANO_FLASH_PROFILE.repository}/resolve/${TAMEV_NANO_FLASH_PROFILE.revision}/`
+    },
+    {
+      options: {model: TAMEV_NANO_FLASH_MODEL, assetsUrl: 'https://mirror.example.test/tamev/nano-flash/'},
+      base: 'https://mirror.example.test/tamev/nano-flash/'
+    }
+  ];
+  for (const {options} of sources) {
+    const checked = validateTamevLoadOptions(options, TAMEV_NANO_FLASH_PROFILE);
+    const source = await openTamevSource(checked, TAMEV_NANO_FLASH_PROFILE);
+    await assert.rejects(source.read('config.json'), {code: 'INVALID_ASSET', message: /Integrity check failed/u});
+  }
+  assert.deepEqual(
+    requests,
+    sources.map(({base}) => new URL('config.json', base).href)
+  );
+
+  const previousCaches = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: {
+      async open() {
+        return {
+          async match() {
+            return null;
+          }
+        };
+      }
+    }
+  });
+  t.after(() => {
+    if (previousCaches) Object.defineProperty(globalThis, 'caches', previousCaches);
+    else delete globalThis.caches;
+  });
+  const offline = validateTamevLoadOptions({model: TAMEV_NANO_FLASH_MODEL, offline: true}, TAMEV_NANO_FLASH_PROFILE);
+  const offlineSource = await openTamevSource(offline, TAMEV_NANO_FLASH_PROFILE);
+  await assert.rejects(offlineSource.read('config.json'), {
+    code: 'ASSET_LOAD_FAILED',
+    message: /not available offline/u
+  });
+  assert.equal(requests.length, 2);
 });
 
 test('TAMEV loader checks pinned configuration and ONNX interface before returning a session', async () => {
