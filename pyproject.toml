@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.16"
 [dependency-groups]
 quality = [
   "complexipy==8.3.0",
+  "pyyaml==6.0.3",
   "pytest==9.2.0",
   "ruff==0.17.4",
 ]
