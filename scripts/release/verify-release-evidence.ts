@@ -5,6 +5,7 @@ import {createReadStream} from 'node:fs';
 import {lstat, readFile, readdir, realpath} from 'node:fs/promises';
 import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
 
 type AnyRecord = Record<string, any>;
 type RequiredFiles = string[];
@@ -127,6 +128,7 @@ interface ReleaseEvidenceOptions {
   archivePath: string;
   installedPackagePath: string;
   playwrightReportPath: string;
+  buildEvidencePath?: string;
   workspaceRoot?: string;
   sourcePackageRoot?: string;
 }
@@ -1301,7 +1303,36 @@ export async function verifyReleaseEvidence(options: ReleaseEvidenceOptions): Pr
   const policy = await loadTrustedPolicy(root);
   await assertCommittedReferenceFixtures(root);
   assertCommittedCatalogSources(root);
-  return verifyReleaseArtifacts({...options, workspaceRoot: root, policy});
+  fail(options.buildEvidencePath, 'TVM build evidence is required.');
+  const sourceRoot = options.sourcePackageRoot ?? join(root, 'packages/web-decision');
+  const models = await loadCommittedCatalog(sourceRoot);
+  const buildModels = await Promise.all(
+    models.map(async (model) => {
+      const manifest: unknown = JSON.parse(await readFile(join(sourceRoot, model.manifestPath), 'utf8'));
+      fail(
+        typeof manifest === 'object' &&
+          manifest !== null &&
+          !Array.isArray(manifest) &&
+          'tvmVersion' in manifest &&
+          typeof manifest.tvmVersion === 'string',
+        `No TVM version is recorded for ${model.modelId}.`
+      );
+      assert.equal(canonicalSha256(manifest), model.manifestSha256, `Source manifest changed for ${model.modelId}.`);
+      const sourceArtifacts = Object.fromEntries(
+        model.bundledRuntimeFiles.map(({manifestName, sourcePath}) => [manifestName, join(sourceRoot, sourcePath)])
+      );
+      return {...model, tvmVersion: manifest.tvmVersion, sourceArtifacts};
+    })
+  );
+  const forbiddenRoots = [sourceRoot, options.installedPackagePath];
+  const builds = await verifyTvmBuildEvidence(resolve(options.buildEvidencePath), buildModels, forbiddenRoots);
+  const result = await verifyReleaseArtifacts({...options, workspaceRoot: root, policy});
+  assert.deepEqual(
+    await verifyTvmBuildEvidence(resolve(options.buildEvidencePath), buildModels, forbiddenRoots),
+    builds,
+    'TVM build evidence changed during verification.'
+  );
+  return {...result, builds};
 }
 
 function packageEntryPath(metadata: AnyRecord): string {
@@ -1315,18 +1346,21 @@ function packageEntryPath(metadata: AnyRecord): string {
 
 function parseArguments(
   args: string[]
-): Pick<ReleaseEvidenceOptions, 'archivePath' | 'installedPackagePath' | 'playwrightReportPath'> {
+): Pick<ReleaseEvidenceOptions, 'archivePath' | 'installedPackagePath' | 'playwrightReportPath' | 'buildEvidencePath'> {
   const values = new Map<string, string>();
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index];
     const value = args[index + 1];
     fail(typeof key === 'string', 'Missing option name.');
-    fail(['--archive', '--installed-package', '--playwright-report'].includes(key), `Unknown option: ${key}`);
+    fail(
+      ['--archive', '--installed-package', '--playwright-report', '--build-evidence'].includes(key),
+      `Unknown option: ${key}`
+    );
     fail(typeof value === 'string' && !value.startsWith('--'), `Missing value for ${key}.`);
     fail(!values.has(key), `Duplicate option: ${key}`);
     values.set(key, value);
   }
-  for (const key of ['--archive', '--installed-package', '--playwright-report']) {
+  for (const key of ['--archive', '--installed-package', '--playwright-report', '--build-evidence']) {
     fail(values.has(key), `Required option is missing: ${key}`);
   }
   const requiredValue = (key: string): string => {
@@ -1337,7 +1371,8 @@ function parseArguments(
   return {
     archivePath: requiredValue('--archive'),
     installedPackagePath: requiredValue('--installed-package'),
-    playwrightReportPath: requiredValue('--playwright-report')
+    playwrightReportPath: requiredValue('--playwright-report'),
+    buildEvidencePath: requiredValue('--build-evidence')
   };
 }
 

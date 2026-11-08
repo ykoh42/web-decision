@@ -140,7 +140,7 @@ def mark_stage(report, started, name):
 
 
 def build_report(args, path):
-    return {
+    report = {
         "kind": "tvm-kev-q4-webgpu-build",
         "tvmVersion": tvm.__version__,
         "model": str(path.relative_to(ROOT)),
@@ -154,6 +154,13 @@ def build_report(args, path):
             "Shape and int32/boolean handling are restricted to this prototype.",
         ],
     }
+    if args.dynamic:
+        report.update(
+            evidenceSchema="web-decision-tvm-build-v1",
+            modelId="kev-0.6b-q4f16",
+            artifact="model.wasm",
+        )
+    return report
 
 
 def load_and_import_model(args, path, workspace, report, started):

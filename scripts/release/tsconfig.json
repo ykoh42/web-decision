@@ -11,5 +11,5 @@
     "rewriteRelativeImportExtensions": true,
     "noEmit": true
   },
-  "include": ["./verify-release-evidence.ts", "./verify-release-evidence.test.ts"]
+  "include": ["./verify-release-evidence.ts", "./verify-release-evidence.test.ts", "./tvm-build-evidence.test.ts"]
 }

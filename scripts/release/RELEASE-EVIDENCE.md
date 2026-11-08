@@ -1,6 +1,6 @@
 # Release browser evidence gate
 
-The gate connects a candidate npm archive, the package installed by the browser test, curated catalog inputs, static asset manifests, and one real Chromium WebGPU test per curated model. It accepts only the dedicated test file pinned by [release-evidence-policy.json](./release-evidence-policy.json). The policy bytes are pinned in the verifier and must also match the committed `HEAD` copy.
+The gate connects a candidate npm archive, the package installed by the browser test, curated catalog inputs, static asset manifests, independently built TVM artifacts, and one real Chromium WebGPU test per curated model. It accepts only the dedicated test file pinned by [release-evidence-policy.json](./release-evidence-policy.json). The policy bytes are pinned in the verifier and must also match the committed `HEAD` copy.
 
 The expected model IDs and artifact digests come from the committed `packages/web-decision/src/catalog/model-spec.json` and `artifacts.lock.json`. The gate checks that the model spec and artifact lock have the same non-empty ID set, that each manifest digest and static manifest path match the lock, and that the built and installed public APIs (`listModels()` and `describeModel(id)`) match those committed inputs. It does not read the legacy model registry. The source API is built from `src/curated/index.ts`; the verifier imports its built `dist/index.js` so the CLI also runs on Node 20, which cannot execute TypeScript source directly.
 
@@ -24,13 +24,31 @@ pnpm exec playwright test tests/browser/kev06-default-source-real-webgpu.spec.ts
 
 The Playwright project must be `chromium`. Its report must contain exactly one passing execution per curated model, with no skip, retry, flaky result, global error, or unrelated test. The browser spec must load the package at `WEB_DECISION_RELEASE_PACKAGE_DIR`.
 
+Supply a JSON build-evidence file with one entry for every `.wasm` in every curated model manifest. `buildRoot` is absolute or relative to the evidence file; `wasm` and `report` are resolved from that root. Both files must be inside the build root and outside the source and installed packages. Build the artifact independently from the pinned source and toolchain; do not copy the packaged WASM as a substitute. For the current build script, an entry has this shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "builds": [{
+    "modelId": "kev-0.6b-q4f16",
+    "artifact": "model.wasm",
+    "buildRoot": "path/to/independent-build",
+    "wasm": "public/tvm-kev-q4-dynamic.wasm",
+    "report": "reports/tvm-q4-build-dynamic.json"
+  }]
+}
+```
+
+The verifier checks the actual rebuilt bytes, their size and SHA-256, and the successful build report against the committed manifest. The report must identify the model, artifact and built WASM, and record `target: webgpu / wasm32`, the manifest's TVM version, and no embedded build root. The verifier rejects the package artifact itself, including a hardlink where the filesystem reports inode identity; copies and fabricated reports cannot be detected as such. This is an integrity check, not a signature or independent proof of the reported build environment. Retain and review the source and toolchain records separately.
+
 Run the gate using the same archive and installation paths:
 
 ```powershell
 ./scripts/release/run-release-evidence.ps1 -Mode verify `
   -Archive $env:WEB_DECISION_RELEASE_ARCHIVE `
   -InstalledPackage $env:WEB_DECISION_RELEASE_PACKAGE_DIR `
-  -PlaywrightReport $env:PLAYWRIGHT_JSON_OUTPUT_NAME
+  -PlaywrightReport $env:PLAYWRIGHT_JSON_OUTPUT_NAME `
+  -BuildEvidence $env:WEB_DECISION_TVM_BUILD_EVIDENCE
 ```
 
 The PowerShell runner compiles the TypeScript verifier to a temporary directory before launching it, so Node 20 can run the CLI. Run the verifier's strict typecheck with:
@@ -45,10 +63,10 @@ Run its tests with the same Node 20-compatible runner:
 ./scripts/release/run-release-evidence.ps1 -Mode test
 ```
 
-On Node 22.13 or newer, the test file can also be run directly with Node's TypeScript support:
+On Node 20 or newer, the tests can also be run with the project TypeScript loader:
 
 ```sh
-node --test scripts/release/verify-release-evidence.test.ts
+node --import tsx --test scripts/release/tvm-build-evidence.test.ts scripts/release/verify-release-evidence.test.ts
 ```
 
 ## Evidence record

@@ -16,6 +16,16 @@ def test_custom_operator_modules_are_loaded_before_building():
     assert expected <= sys.modules.keys()
 
 
+def test_dynamic_build_report_identifies_the_curated_artifact():
+    path = (
+        builder.ROOT / "models/kev-0.6b-onnx/onnx/model_q4f16_direct_dynamic_u32.onnx"
+    )
+    report = builder.build_report(SimpleNamespace(dynamic=True, seq_len=69), path)
+    assert report["evidenceSchema"] == "web-decision-tvm-build-v1"
+    assert report["modelId"] == "kev-0.6b-q4f16"
+    assert report["artifact"] == "model.wasm"
+
+
 def make_root(root: Path) -> Path:
     for name in ("models", "public", "reports"):
         (root / name).mkdir()
