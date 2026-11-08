@@ -114,7 +114,7 @@ export class DecisionModel {
       mask.copyFrom(new Int32Array(n).fill(1));
       const y = this.fn(ids, mask, ...this.weights);
       const host = this.runtime.empty([1, n], 'float16', this.runtime.cpu()).copyFrom(y);
-      await this.device.sync();
+      await waitForAbort(() => this.device.sync(), this.lifecycle.lossSignal);
       if (this.lifecycle.loss || this.lifecycle.disposed) throw new Error('The GPU device was lost.');
       const raw = host.toRawBytes();
       if (raw.byteLength !== n * 2) throw new Error('Unexpected output length.');
@@ -127,12 +127,14 @@ export class DecisionModel {
       failure = cause;
     } finally {
       try {
-        const gpuError = scopePushed ? await this.gpu.popErrorScope() : null;
+        const gpuError = scopePushed
+          ? await waitForAbort(() => this.gpu.popErrorScope(), this.lifecycle.lossSignal)
+          : null;
         if (gpuError && failure === noFailure) failure = gpuError;
       } catch (cause) {
         if (failure === noFailure) failure = cause;
       }
-      if (scopeStarted && !this.lifecycle.disposed) {
+      if (scopeStarted && !this.lifecycle.loss && !this.lifecycle.lossSignal?.aborted && !this.lifecycle.disposed) {
         try {
           this.runtime.endScope();
         } catch (cause) {
@@ -165,18 +167,20 @@ export class DecisionModel {
         this.gpu.pushErrorScope('validation');
         scopePushed = true;
         this.runtime.getGlobalFunc('vm.builtin.memory_manager.clear')();
-        await this.device.sync();
+        await waitForAbort(() => this.device.sync(), this.lifecycle.lossSignal);
         if (this.lifecycle.loss || this.lifecycle.disposed) throw new Error('The GPU device was lost.');
       } catch (cause) {
         failure = cause;
       } finally {
         try {
-          const gpuError = scopePushed ? await this.gpu.popErrorScope() : null;
+          const gpuError = scopePushed
+            ? await waitForAbort(() => this.gpu.popErrorScope(), this.lifecycle.lossSignal)
+            : null;
           if (gpuError && failure === noFailure) failure = gpuError;
         } catch (cause) {
           if (failure === noFailure) failure = cause;
         }
-        if (scopeStarted && !this.lifecycle.disposed) {
+        if (scopeStarted && !this.lifecycle.loss && !this.lifecycle.lossSignal?.aborted && !this.lifecycle.disposed) {
           try {
             this.runtime.endScope();
           } catch (cause) {

@@ -27,7 +27,9 @@ if (supportsHooks) {
     export async function readManifestResponse() { return fixture().manifest; }
     export async function readKev06ManifestResponse() { return fixture().manifest; }
     export const EXPERIMENTAL_KEV_MODEL = 'experimental-kev-0.6b-q4f16-upstream';
+    export const KEV06_STABLE_MODEL = 'kev-0.6b-q4f16';
     export function createKevReconstructedSource(overrides = {}) {
+      fixture().candidateSourceCreates++;
       fixture().bundledUrls = overrides.bundledUrls;
       return {
         async prepare(options) {
@@ -48,14 +50,46 @@ if (supportsHooks) {
         dispose() {}
       };
     }
+    export function createKev06StableReconstructedSource() {
+      fixture().stableSourceCreates++;
+      return {
+        async prepare(options) {
+          fixture().events.push('stable-prepare');
+          fixture().stablePrepareOptions = options;
+          options.signal?.throwIfAborted();
+          if (!fixture().gpuAvailable) throw Object.assign(new Error('WebGPU unavailable'), {code: 'UNSUPPORTED_ENVIRONMENT'});
+          if (options.offline && !fixture().warmCache)
+            throw Object.assign(new Error('The stable model is not cached.'), {code: 'ASSET_LOAD_FAILED'});
+          return {base: 'https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/', signal: options.signal, cache: null, response: {}, maxPrefetchBytes: options.maxPrefetchBytes ?? 0};
+        },
+        async fetch(url, {signal} = {}) {
+          fixture().stableFetchUrls.push(url);
+          if (!fixture().stableBundledUrls) {
+            const module = await import('./kev06/stable-bundled-assets.js');
+            fixture().stableBundledUrls = module.stableKevBundledUrls;
+          }
+          signal?.throwIfAborted();
+          return new Response(new Uint8Array([4]));
+        },
+        setProgress() {},
+        dispose() { fixture().stableSourceDisposals++; }
+      };
+    }
     export async function readExperimentalKevManifest() { return fixture().manifest; }
     export async function commitCachedManifest() {}
-    export async function prepareModelSource(options) { return {signal: options.signal, response: {}, cache: null}; }
+    export async function prepareModelSource(options) {
+      fixture().externalPrepares++;
+      fixture().externalOptions = options;
+      return {base: options.assetsUrl ?? 'https://legacy-assets.example.test/', signal: options.signal, response: {}, cache: null};
+    }
     export function createModelAssetReader({base, fetchImpl, signal}) {
       return {
         async read(name, readSignal = signal) {
-          if (fetchImpl && !fixture().warmCache)
-            await fetchImpl(new URL(name, base).href, {signal: readSignal});
+          if (fetchImpl && !fixture().warmCache) {
+            const url = new URL(name, base).href;
+            fixture().assetFetches.push(url);
+            await fetchImpl(url, {signal: readSignal});
+          }
           return new ArrayBuffer(1);
         },
         isCacheComplete() { return fixture().warmCache; },
@@ -118,11 +152,25 @@ if (supportsHooks) {
     });
   `;
   const fakeBundledModule = `data:text/javascript;base64,${Buffer.from(fakeBundledAssets).toString('base64')}`;
+  const fakeStableBundledAssets = `
+    globalThis.__fakeKevLoader.stableHelperLoads++;
+    globalThis.__fakeKevLoader.events.push('stable-helper');
+    export const stableKevBundledUrls = Object.freeze({
+      'model.wasm': 'data:application/wasm;base64,BAUG',
+      'tokenizer.json': 'data:application/json;base64,e30=',
+      'tokenizer_config.json': 'data:application/json;base64,e30=',
+      'model_config.json': 'data:application/json;base64,e30=',
+      'weights/tensor-cache.json': 'data:application/json;base64,e30='
+    });
+  `;
+  const fakeStableBundledModule = `data:text/javascript;base64,${Buffer.from(fakeStableBundledAssets).toString('base64')}`;
   installFakeBundledAssetsHook = () =>
     nodeModule.registerHooks({
       resolve(specifier, context, nextResolve) {
         if (context.parentURL === fakeModule && specifier === './kev06/bundled-assets.js')
           return {url: fakeBundledModule, shortCircuit: true};
+        if (context.parentURL === fakeModule && specifier === './kev06/stable-bundled-assets.js')
+          return {url: fakeStableBundledModule, shortCircuit: true};
         return nextResolve(specifier, context);
       }
     });
@@ -215,7 +263,14 @@ function setup(t) {
   const fake = {
     ...state,
     helperLoads: 0,
+    stableHelperLoads: 0,
     events: [],
+    candidateSourceCreates: 0,
+    stableSourceCreates: 0,
+    stableSourceDisposals: 0,
+    stableFetchUrls: [],
+    assetFetches: [],
+    externalPrepares: 0,
     gpuAvailable: true,
     warmCache: false,
     tamevSystemOneMode: 'method',
@@ -461,6 +516,106 @@ test(
         assert.equal(Object.getOwnPropertyDescriptor(model, 'systemOne').enumerable, true);
         await model.dispose();
         assert.equal(f.fake.tamevDisposals, 1);
+      });
+    }
+  }
+);
+
+test('stable Kev modelId loads its pinned source without an assetsUrl', {skip: !supportsHooks}, async (t) => {
+  const f = setup(t);
+  const helperHook = installFakeBundledAssetsHook();
+  t.after(() => helperHook?.deregister());
+  const loading = loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
+  await f.started;
+  f.resolveRuntime(f.runtime);
+  const model = await loading;
+
+  assert.equal(f.fake.stableSourceCreates, 1);
+  assert.equal(f.fake.candidateSourceCreates, 0);
+  assert.equal(f.fake.externalPrepares, 0);
+  assert.equal(f.fake.stablePrepareOptions.model, 'kev-0.6b-q4f16');
+  assert.equal(Object.hasOwn(f.fake.stablePrepareOptions, 'assetsUrl'), false);
+  assert.equal(f.fake.stableHelperLoads, 1);
+  assert.equal(f.fake.helperLoads, 0);
+  assert.equal(f.fake.stableFetchUrls.length, 5);
+  assert.ok(
+    f.fake.stableFetchUrls.every((url) => url.startsWith('https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/'))
+  );
+  assert.equal(model.description, describeStableModel('kev-0.6b-q4f16'));
+  model.dispose();
+  assert.equal(f.fake.stableSourceDisposals, 1);
+});
+
+test(
+  'stable Kev modelId rejects assetsUrl while the legacy asset-pack route remains available',
+  {skip: !supportsHooks},
+  async (t) => {
+    for (const options of [
+      {modelId: 'kev-0.6b-q4f16', assetsUrl: 'https://mirror.example.test/kev/'},
+      {modelId: 'kev-0.6b-q4f16', assetsUrl: undefined}
+    ]) {
+      await t.test(
+        `rejects assetsUrl ${options.assetsUrl === undefined ? 'when undefined' : 'when supplied'}`,
+        async (t) => {
+          const f = setup(t);
+          await assert.rejects(loadDecisionModel(options), {
+            code: 'INVALID_INPUT',
+            message: 'assetsUrl is not supported for the stable Kev model ID.'
+          });
+          assert.equal(f.fake.stableSourceCreates, 0);
+          assert.equal(f.fake.externalPrepares, 0);
+        }
+      );
+    }
+
+    await t.test('keeps the legacy asset-pack route', async (t) => {
+      const f = setup(t);
+      const options = {model: 'kev-0.6b-q4f16', assetsUrl: 'https://legacy.example.test/kev/'};
+      const loading = loadDecisionModel(options);
+      await f.started;
+      f.resolveRuntime(f.runtime);
+      const model = await loading;
+      assert.equal(f.fake.stableSourceCreates, 0);
+      assert.equal(f.fake.externalPrepares, 1);
+      assert.equal(f.fake.externalOptions.assetsUrl, options.assetsUrl);
+      assert.equal(model.description.model, 'kev-0.6b-q4f16');
+    });
+  }
+);
+
+test(
+  'stable Kev source avoids helper loading for a warm offline cache and honors pre-abort',
+  {skip: !supportsHooks},
+  async (t) => {
+    for (const kind of ['warm-offline', 'pre-abort']) {
+      await t.test(kind, async (t) => {
+        const f = setup(t);
+        const helperHook = installFakeBundledAssetsHook();
+        t.after(() => helperHook?.deregister());
+        if (kind === 'warm-offline') {
+          f.fake.warmCache = true;
+          const loading = loadDecisionModel({modelId: 'kev-0.6b-q4f16', offline: true});
+          await f.started;
+          f.resolveRuntime(f.runtime);
+          const model = await loading;
+          assert.equal(f.fake.stableSourceCreates, 1);
+          assert.deepEqual(f.fake.assetFetches, []);
+          assert.deepEqual(f.fake.stableFetchUrls, []);
+          assert.equal(f.fake.stableHelperLoads, 0);
+          model.dispose();
+        } else {
+          const controller = new AbortController();
+          const reason = new Error('cancel stable model load');
+          controller.abort(reason);
+          await assert.rejects(
+            loadDecisionModel({modelId: 'kev-0.6b-q4f16', signal: controller.signal}),
+            (error) => error === reason
+          );
+          assert.equal(f.fake.stableSourceCreates, 1);
+          assert.equal(f.fake.stableHelperLoads, 0);
+          assert.equal(f.fake.externalPrepares, 0);
+          assert.equal(f.state.instantiations, 0);
+        }
       });
     }
   }

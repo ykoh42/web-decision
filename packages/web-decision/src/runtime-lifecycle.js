@@ -5,6 +5,7 @@ import {retainStrandsResources} from './strands/disposal-guard.mjs';
 export function trackRuntime(runtime, gpu) {
   let disposed = false;
   let loss = null;
+  const lossController = new AbortController();
   const dispose = runtime.dispose.bind(runtime);
   runtime.dispose = (...args) => {
     if (disposed) return;
@@ -15,13 +16,20 @@ export function trackRuntime(runtime, gpu) {
   // runtime.dispose() must not turn a deliberate close into a lost device.
   gpu.lost.then(
     (info) => {
-      if (!disposed) loss = info;
+      if (!disposed) {
+        loss = info;
+        lossController.abort(new Error('The GPU device was lost.'));
+      }
     },
     (error) => {
-      if (!disposed) loss = {message: String(error)};
+      if (!disposed) {
+        loss = {message: String(error)};
+        lossController.abort(new Error('The GPU device was lost.'));
+      }
     }
   );
   return {
+    lossSignal: lossController.signal,
     get disposed() {
       return disposed;
     },

@@ -8,6 +8,78 @@ import {checkConsumerTypes} from './check-types.mjs';
 import {findPackedContentIssues} from './packed-content.mjs';
 import {withTemporaryDirectories} from './temporary-directories.mjs';
 
+const stableKevManifestSha256 = '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767';
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonical(value[key])])
+    );
+  return value;
+}
+
+function localChunkImports(text) {
+  const imports = new Set();
+  const pattern = /\b(?:from\s*|import\s*(?:\(\s*)?)["']\.\/([^"']+\.js)["']/gu;
+  for (const match of text.matchAll(pattern)) imports.add(match[1]);
+  return imports;
+}
+
+function collectChunkGraph(directory, entryFiles) {
+  const pending = [...entryFiles];
+  const visited = new Set();
+  const chunks = [];
+  while (pending.length) {
+    const name = pending.pop();
+    if (visited.has(name)) continue;
+    visited.add(name);
+    const text = readFileSync(join(directory, name), 'utf8');
+    chunks.push({name, text});
+    for (const imported of localChunkImports(text)) {
+      if (!visited.has(imported)) pending.push(imported);
+    }
+  }
+  return chunks;
+}
+
+function verifyInlineAssets(chunks, assets, description) {
+  const uniqueChunks = [...new Map(chunks.map((chunk) => [chunk.name, chunk])).values()];
+  const dataHashes = new Set();
+  for (const {text} of uniqueChunks) {
+    for (const match of text.matchAll(/["'](data:[^"']+)["']/gu)) {
+      const dataUrl = match[1];
+      const comma = dataUrl.indexOf(',');
+      if (comma <= 5) continue;
+      const metadata = dataUrl.slice(5, comma);
+      const payload = dataUrl.slice(comma + 1);
+      let bytes;
+      try {
+        bytes = metadata.includes(';base64')
+          ? Buffer.from(payload, 'base64')
+          : Buffer.from(decodeURIComponent(payload));
+      } catch {
+        continue;
+      }
+      dataHashes.add(createHash('sha256').update(bytes).digest('hex'));
+    }
+  }
+
+  for (const [name, sourcePath] of assets) {
+    const key = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const keyPattern = new RegExp(`["']${key}["']\\s*:`, 'u');
+    assert.ok(
+      uniqueChunks.some(({text}) => keyPattern.test(text)),
+      `The ${description} lazy chunk is missing the asset key ${name}.`
+    );
+    const source = readFileSync(join(pkg, sourcePath));
+    const sourceHash = createHash('sha256').update(source).digest('hex');
+    assert.ok(dataHashes.has(sourceHash), `The ${description} lazy chunk changed the pinned asset ${name}.`);
+  }
+}
+
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const pkg = join(root, 'packages/web-decision');
 withTemporaryDirectories((makeTempDirectory) => {
@@ -26,6 +98,10 @@ withTemporaryDirectories((makeTempDirectory) => {
     'tamev-nano-flash-tinybert-int8',
     'kev-0.6b-q4f16'
   ]);
+  const stableKev = library.describeStableModel('kev-0.6b-q4f16');
+  assert.equal(stableKev.assets.integrity, 'pinned-manifest');
+  assert.equal(stableKev.assets.manifestSha256, '${stableKevManifestSha256}');
+  assert.equal(stableKev.assets.location, 'package-and-pinned-upstream');
   assert.equal(library.isStableModelId('tamev-micro-minilm-int8'), true);
   assert.equal(library.isStableModelId('tamev-nano-flash-tinybert-int8'), true);
   assert.equal(library.isStableModelId('experimental-tamev-micro-minilm-int8'), false);
@@ -140,8 +216,66 @@ withTemporaryDirectories((makeTempDirectory) => {
   });
   const [archive] = JSON.parse(output);
   const files = archive.files.map((file) => file.path).sort();
-  const kevChunkFiles = readdirSync(join(pkg, 'dist')).filter((name) => /^bundled-assets-.+\.js$/u.test(name));
-  assert.equal(kevChunkFiles.length, 1, 'The build must emit exactly one lazy Kev asset chunk.');
+  const distDirectory = join(pkg, 'dist');
+  const distFiles = readdirSync(distDirectory).sort();
+  const bundle = readFileSync(join(distDirectory, 'index.js'));
+  const bundleText = bundle.toString('utf8');
+  const dynamicKevChunkFiles = [...bundleText.matchAll(/\bimport\s*\(\s*["']\.\/([^"']+\.js)["']\s*\)/gu)]
+    .map((match) => match[1])
+    .filter((name) => name.includes('bundled-assets'));
+  const kevChunkFiles = [...new Set(dynamicKevChunkFiles)].sort();
+  assert.ok(kevChunkFiles.length > 0, 'The build must emit lazy Kev asset chunks.');
+  assert.ok(
+    kevChunkFiles.every((name) => distFiles.includes(name)),
+    'Every lazy Kev asset chunk must be in dist.'
+  );
+  const kevChunkGroups = new Map(kevChunkFiles.map((name) => [name, collectChunkGraph(distDirectory, [name])]));
+  const experimentalKevChunks = [...kevChunkGroups.values()]
+    .filter((chunks) => chunks.some(({text}) => text.includes('experimentalKevBundledUrls')))
+    .flat();
+  const stableKevChunks = [...kevChunkGroups.values()]
+    .filter((chunks) => chunks.some(({text}) => text.includes('stableKevBundledUrls')))
+    .flat();
+  assert.ok(experimentalKevChunks.length, 'The candidate Kev lazy chunk must remain packaged.');
+  assert.ok(stableKevChunks.length, 'The stable Kev lazy chunk must remain packaged.');
+
+  const stableManifest = JSON.parse(readFileSync(join(pkg, 'assets/kev06-stable/manifest.json'), 'utf8'));
+  const stableManifestHash = createHash('sha256')
+    .update(JSON.stringify(canonical(stableManifest)) + '\n')
+    .digest('hex');
+  assert.equal(stableManifestHash, stableKevManifestSha256, 'The bundled stable manifest must match its released pin.');
+  assert.ok(bundleText.includes(stableManifestHash), 'The package entry must retain the stable manifest pin.');
+  for (const [name, metadata] of Object.entries(stableManifest.files)) {
+    assert.ok(bundleText.includes(metadata.sha256), `The package entry must embed the stable pin for ${name}.`);
+  }
+
+  const experimentalAssetInputs = [
+    ['model.wasm', 'assets/experimental-kev-upstream/model.wasm'],
+    ['tokenizer.json', 'assets/experimental-kev-upstream/tokenizer.json'],
+    ['tokenizer_config.json', 'assets/experimental-kev-upstream/tokenizer_config.json'],
+    ['model_config.json', 'assets/experimental-kev-upstream/model_config.json'],
+    ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
+  ];
+  const stableAssetInputs = [
+    ['model.wasm', 'assets/kev06-stable/model.wasm'],
+    ['tokenizer.json', 'assets/experimental-kev-upstream/tokenizer.json'],
+    ['tokenizer_config.json', 'assets/experimental-kev-upstream/tokenizer_config.json'],
+    ['model_config.json', 'assets/experimental-kev-upstream/model_config.json'],
+    ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
+  ];
+  verifyInlineAssets(experimentalKevChunks, experimentalAssetInputs, 'experimental Kev');
+  for (const [name, sourcePath] of stableAssetInputs) {
+    const source = readFileSync(join(pkg, sourcePath));
+    const metadata = stableManifest.files[name];
+    assert.equal(source.byteLength, metadata.bytes, `The stable source asset size differs from its manifest: ${name}.`);
+    assert.equal(
+      createHash('sha256').update(source).digest('hex'),
+      metadata.sha256,
+      `The stable source asset differs from its manifest: ${name}.`
+    );
+  }
+  verifyInlineAssets(stableKevChunks, stableAssetInputs, 'stable Kev');
+
   const expectedFiles = [
     'CLEF-NOTICE',
     'CRIVO-NOTICE',
@@ -202,8 +336,9 @@ withTemporaryDirectories((makeTempDirectory) => {
     'assets/experimental-kev-upstream/notices/TVM-FFI-NOTICE.txt',
     'assets/experimental-kev-upstream/notices/TVM-LICENSE.txt',
     'assets/experimental-kev-upstream/notices/TVM-NOTICE.txt',
-    'dist/index.js',
-    `dist/${kevChunkFiles[0]}`,
+    'assets/kev06-stable/PROVENANCE.md',
+    'assets/kev06-stable/notices/MODEL-APACHE-2.0.txt',
+    ...distFiles.map((name) => `dist/${name}`),
     'package.json',
     'src/STRANDS-GEMMA4-NOTICE',
     'src/abort.js',
@@ -395,49 +530,51 @@ withTemporaryDirectories((makeTempDirectory) => {
     );
   }
   execFileSync(process.execPath, ['--input-type=module', '-e', smokeTest], {cwd: consumer, stdio: 'inherit'});
+  const lazyChunkSmokeTest = `
+    import assert from 'node:assert/strict';
+    import {createHash} from 'node:crypto';
+    const entry = import.meta.resolve('web-decision');
+    const modules = await Promise.all(
+      ${JSON.stringify(kevChunkFiles)}.map((name) => import(new URL('./' + name, entry)))
+    );
+    const bundles = modules.flatMap((module) => Object.values(module));
+    const stableExports = modules.flatMap((module) => Object.entries(module));
+    assert.ok(stableExports.some(([name]) => name === 'stableKevBundledUrls'));
+    assert.ok(stableExports.some(([name]) => name === 'experimentalKevBundledUrls'));
+    const assetMaps = bundles.filter((value) => value && typeof value === 'object' && value['model.wasm']);
+    const hashDataUrl = (dataUrl) => {
+      const comma = dataUrl.indexOf(',');
+      const metadata = dataUrl.slice(5, comma);
+      const payload = dataUrl.slice(comma + 1);
+      const bytes = metadata.includes(';base64') ? Buffer.from(payload, 'base64') : Buffer.from(decodeURIComponent(payload));
+      return createHash('sha256').update(bytes).digest('hex');
+    };
+    const wasmHashes = assetMaps.map((assets) => hashDataUrl(assets['model.wasm']));
+    assert.ok(wasmHashes.includes('68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb'));
+    assert.ok(wasmHashes.includes('78026118d5c1f85941f75e0929d88d72edfc1a0418895d3f26bf6738a506882d'));
+  `;
+  execFileSync(process.execPath, ['--input-type=module', '-e', lazyChunkSmokeTest], {cwd: consumer, stdio: 'inherit'});
   checkConsumerTypes(consumer);
-  const bundle = readFileSync(join(consumer, 'node_modules/web-decision/dist/index.js'));
-  const bundleText = bundle.toString('utf8');
-  const kevChunkName = kevChunkFiles[0];
-  assert.ok(
-    bundleText.includes(`import("./${kevChunkName}")`),
-    'The experimental Kev assets must load through a dynamic package chunk.'
-  );
-  const kevChunkPath = join(consumer, 'node_modules/web-decision/dist', kevChunkName);
-  const kevChunk = readFileSync(kevChunkPath);
-  const kevChunkText = kevChunk.toString('utf8');
-  assert.doesNotMatch(
-    kevChunkText,
-    /\?url(?:&|["'])/u,
-    'The published lazy chunk must not depend on consumer asset plugins.'
-  );
-  for (const [name, sourcePath] of [
-    ['model.wasm', 'assets/experimental-kev-upstream/model.wasm'],
-    ['tokenizer.json', 'assets/experimental-kev-upstream/tokenizer.json'],
-    ['tokenizer_config.json', 'assets/experimental-kev-upstream/tokenizer_config.json'],
-    ['model_config.json', 'assets/experimental-kev-upstream/model_config.json'],
-    ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
-  ]) {
-    const key = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-    const match = kevChunkText.match(new RegExp(`["']${key}["']\\s*:\\s*["'](data:[^"']+)["']`, 'u'));
-    assert.ok(match, `The lazy package chunk is missing the inline asset ${name}.`);
-    const dataUrl = match[1];
-    const comma = dataUrl.indexOf(',');
-    assert.ok(comma > 5, `The lazy package chunk has an invalid data URL for ${name}.`);
-    const metadata = dataUrl.slice(5, comma);
-    const payload = dataUrl.slice(comma + 1);
-    const bytes = metadata.includes(';base64')
-      ? Buffer.from(payload, 'base64')
-      : Buffer.from(decodeURIComponent(payload));
-    const source = readFileSync(join(pkg, sourcePath));
-    assert.equal(
-      createHash('sha256').update(bytes).digest('hex'),
-      createHash('sha256').update(source).digest('hex'),
-      `The lazy package chunk changed the pinned asset ${name}.`
+  const installedDist = join(consumer, 'node_modules/web-decision/dist');
+  const installedBundle = readFileSync(join(installedDist, 'index.js'));
+  assert.deepEqual(installedBundle, bundle);
+  for (const name of kevChunkFiles) {
+    const kevChunkText = readFileSync(join(installedDist, name), 'utf8');
+    assert.doesNotMatch(
+      kevChunkText,
+      /\?url(?:&|["'])/u,
+      'The published lazy chunk must not depend on consumer asset plugins.'
+    );
+  }
+  for (const name of distFiles.filter((file) => file !== 'index.js')) {
+    assert.deepEqual(
+      readFileSync(join(installedDist, name)),
+      readFileSync(join(distDirectory, name)),
+      `The tarball must preserve dist/${name}.`
     );
   }
   console.log(
-    `Installed ${metadata.name}@${metadata.version}; bundle SHA-256: ${createHash('sha256').update(bundle).digest('hex')}; lazy Kev chunk: ${kevChunkName}`
+    `Installed ${metadata.name}@${metadata.version}; bundle SHA-256: ${createHash('sha256').update(bundle).digest('hex')}; lazy Kev chunks: ${kevChunkFiles.join(', ')}`
   );
   const pnpmConsumer = makeTempDirectory('web-decision-ci-pnpm-consumer-');
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -451,8 +588,18 @@ withTemporaryDirectories((makeTempDirectory) => {
   assert.equal(pnpmInstalled.version, metadata.version);
   assert.equal(pnpmInstalled.license, metadata.license);
   assert.deepEqual(readFileSync(join(pnpmConsumer, 'node_modules/web-decision/dist/index.js')), bundle);
-  assert.deepEqual(readFileSync(join(pnpmConsumer, 'node_modules/web-decision/dist', kevChunkName)), kevChunk);
+  for (const name of distFiles.filter((file) => file !== 'index.js')) {
+    assert.deepEqual(
+      readFileSync(join(pnpmConsumer, 'node_modules/web-decision/dist', name)),
+      readFileSync(join(distDirectory, name)),
+      `The pnpm consumer must receive dist/${name}.`
+    );
+  }
   execFileSync(process.execPath, ['--input-type=module', '-e', smokeTest], {cwd: pnpmConsumer, stdio: 'inherit'});
+  execFileSync(process.execPath, ['--input-type=module', '-e', lazyChunkSmokeTest], {
+    cwd: pnpmConsumer,
+    stdio: 'inherit'
+  });
   checkConsumerTypes(pnpmConsumer);
   console.log('The archive installs, imports, and type-checks in clean npm and pnpm consumers.');
   console.log('This check imports the package in Node; it does not run browser inference.');

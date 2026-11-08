@@ -92,6 +92,8 @@ test('records device loss and makes TVM and caller disposal share one cleanup', 
   resolveLoss({reason: 'unknown', message: 'device lost'});
   await gpu.lost;
   assert.equal(state.loss.reason, 'unknown');
+  assert.equal(state.lossSignal.aborted, true);
+  assert.match(state.lossSignal.reason.message, /GPU device was lost/);
   runtime.dispose(); // Simulates TVM's own device-loss handler.
   runtime.dispose(); // Simulates a caller closing the session.
   assert.equal(calls, 1);
@@ -116,6 +118,7 @@ test('normal disposal does not misclassify the device destroy it causes', async 
   runtime.dispose();
   await gpu.lost;
   assert.equal(state.loss, null);
+  assert.equal(state.lossSignal.aborted, false);
   assert.equal(calls, 1);
 });
 
@@ -131,4 +134,5 @@ test('a loss promise rejection does not become an unhandled rejection', async ()
   rejectLoss(new Error('test failure'));
   await gpu.lost.catch(() => {});
   assert.match(state.loss.message, /test failure/);
+  assert.equal(state.lossSignal.aborted, true);
 });

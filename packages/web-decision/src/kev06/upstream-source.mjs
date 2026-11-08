@@ -1,4 +1,5 @@
 import candidateManifest from '../../assets/experimental-kev-upstream/manifest.json' with {type: 'json'};
+import stableManifest from '../../assets/kev06-stable/manifest.json' with {type: 'json'};
 import sourceShardMapText from '../../assets/experimental-kev-upstream/source-shard-map.json?raw';
 import {cancelBody, MAX_ASSET_BYTES, ResponseSizeError} from '../bounded-response.js';
 import {assetUrl, openAssetCache, sha256, waitForAbort} from '../assets.js';
@@ -21,9 +22,11 @@ import {
 } from './upstream-contract.js';
 
 export const EXPERIMENTAL_KEV_MODEL = EXPERIMENTAL_KEV_UPSTREAM_MODEL;
+export const KEV06_STABLE_MODEL = 'kev-0.6b-q4f16';
 
 const MAX_PREFETCH_BYTES = 0;
-const CACHE_BASE = new URL('https://kev-assets.web-decision.invalid/experimental-kev-upstream/');
+const EXPERIMENTAL_CACHE_BASE = new URL('https://kev-assets.web-decision.invalid/experimental-kev-upstream/');
+const STABLE_CACHE_BASE = new URL('https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/');
 const BUNDLED_ASSETS = new Set([
   'model.wasm',
   'tokenizer.json',
@@ -43,7 +46,7 @@ function invalidAsset(message, cause) {
   return new WebDecisionError('INVALID_ASSET', message, cause ? {cause} : undefined);
 }
 
-function requireBundledDataUrls(value) {
+function requireBundledDataUrls(value, modelName = 'experimental Kev') {
   if (
     !value ||
     typeof value !== 'object' ||
@@ -52,11 +55,11 @@ function requireBundledDataUrls(value) {
       ([key, url]) => typeof key !== 'string' || typeof url !== 'string' || !url.startsWith('data:')
     )
   )
-    throw invalidAsset('The experimental Kev bundle is missing pinned inline assets.');
+    throw invalidAsset(`The ${modelName} bundle is missing pinned inline assets.`);
   return Object.freeze({...value});
 }
 
-function requireExperimentalWebGpu() {
+function requireKevWebGpu() {
   const gpu = globalThis.navigator?.gpu;
   if (!gpu)
     throw new WebDecisionError(
@@ -95,7 +98,7 @@ function responseFromDataUrl(value, signal) {
   return new Response(bytes, {headers: {'content-type': mime}});
 }
 
-function validateLoadOptions(options) {
+function validateExperimentalLoadOptions(options) {
   const allowed = new Set([
     'model',
     'cache',
@@ -126,6 +129,43 @@ function validateLoadOptions(options) {
     validatePrefetchBytes(options.maxPrefetchBytes) !== MAX_PREFETCH_BYTES
   )
     throw new WebDecisionError('INVALID_INPUT', 'Invalid experimental Kev load option values.');
+  return MAX_PREFETCH_BYTES;
+}
+
+function validateStableLoadOptions(options) {
+  const allowed = new Set([
+    'model',
+    'cache',
+    'offline',
+    'signal',
+    'onProgress',
+    'maxPrefetchBytes',
+    'maxInputTokens',
+    'maxInputCharacters',
+    'debertaReadback'
+  ]);
+  if (!options || typeof options !== 'object' || Array.isArray(options))
+    throw new WebDecisionError('INVALID_INPUT', 'Stable Kev load options are required.');
+  for (const key of Reflect.ownKeys(options)) {
+    const descriptor = Object.getOwnPropertyDescriptor(options, key);
+    if (typeof key !== 'string' || !allowed.has(key) || !descriptor || !Object.hasOwn(descriptor, 'value'))
+      throw new WebDecisionError('INVALID_INPUT', 'Unsupported stable Kev load option.');
+  }
+  const maxPrefetchBytes = validatePrefetchBytes(options.maxPrefetchBytes);
+  if (
+    options.model !== KEV06_STABLE_MODEL ||
+    (options.cache !== undefined && typeof options.cache !== 'boolean') ||
+    (options.offline !== undefined && typeof options.offline !== 'boolean') ||
+    (options.offline && options.cache === false) ||
+    (options.signal != null &&
+      (typeof options.signal.throwIfAborted !== 'function' ||
+        typeof options.signal.addEventListener !== 'function' ||
+        typeof options.signal.removeEventListener !== 'function')) ||
+    (options.onProgress !== undefined && typeof options.onProgress !== 'function') ||
+    options.debertaReadback !== undefined
+  )
+    throw new WebDecisionError('INVALID_INPUT', 'Invalid stable Kev load option values.');
+  return maxPrefetchBytes;
 }
 
 async function validatedMapping(signal, profile) {
@@ -133,7 +173,7 @@ async function validatedMapping(signal, profile) {
   if (!mappingPromise) {
     mappingPromise = (async () => {
       if ((await sha256(new TextEncoder().encode(profile.sourceShardMapText))) !== profile.mapSha256)
-        throw invalidAsset('The experimental Kev source map does not match its pinned digest.');
+        throw invalidAsset(`The ${profile.displayName} source map does not match its pinned digest.`);
       const mapping = JSON.parse(profile.sourceShardMapText);
       if (
         mapping.source?.repository !== profile.repository ||
@@ -147,7 +187,7 @@ async function validatedMapping(signal, profile) {
         !Array.isArray(mapping.target?.shards) ||
         !mapping.target.shards.length
       )
-        throw invalidAsset('The experimental Kev source map metadata is invalid.');
+        throw invalidAsset(`The ${profile.displayName} source map metadata is invalid.`);
 
       const sourceRecords = [...mapping.records].sort((left, right) => left.sourceOffset - right.sourceOffset);
       let sourceCursor = profile.parameterRegionStart;
@@ -163,11 +203,11 @@ async function validatedMapping(signal, profile) {
           record.shardIndex < 0 ||
           record.shardIndex >= mapping.target.shards.length
         )
-          throw invalidAsset('The experimental Kev source map has a source gap or overlap.');
+          throw invalidAsset(`The ${profile.displayName} source map has a source gap or overlap.`);
         sourceCursor += record.bytes;
       }
       if (sourceCursor !== profile.sourceBytes)
-        throw invalidAsset('The experimental Kev source map has incomplete coverage.');
+        throw invalidAsset(`The ${profile.displayName} source map has incomplete coverage.`);
 
       for (let shardIndex = 0; shardIndex < mapping.target.shards.length; shardIndex++) {
         const shard = mapping.target.shards[shardIndex];
@@ -336,24 +376,12 @@ function acquireSourceLease(profile) {
   };
 }
 
-export function createKevReconstructedSource(overrides = {}) {
+function createKevReconstructedSourceFor(defaults, overrides, validateOptions) {
   const {bundledUrls: providedBundledUrls, ...sourceOverrides} = overrides;
   const profile = {
-    manifest: candidateManifest,
-    sourceShardMapText,
-    sourceUrl: SOURCE_URL,
-    sourceBytes: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_BYTES,
-    sourceSha256: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
-    mapSha256: EXPERIMENTAL_KEV_UPSTREAM_MAP_SHA256,
-    repository: EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
-    revision: EXPERIMENTAL_KEV_UPSTREAM_REVISION,
-    sourcePath: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_PATH,
-    parameterRegionStart: EXPERIMENTAL_KEV_UPSTREAM_PARAMETER_REGION_START,
-    tensorCount: EXPERIMENTAL_KEV_UPSTREAM_TENSOR_COUNT,
-    progressChunkBytes: 16 * 1024 * 1024,
-    bundledUrls: providedBundledUrls === undefined ? undefined : requireBundledDataUrls(providedBundledUrls),
-    loadBundledAssets: () => import('./bundled-assets.js'),
-    cacheBase: CACHE_BASE,
+    ...defaults,
+    bundledUrls:
+      providedBundledUrls === undefined ? undefined : requireBundledDataUrls(providedBundledUrls, defaults.displayName),
     fetchSource: (url, init) => fetch(url, init),
     preflight: (signal, gpu) => requestF16Adapter(gpu, signal),
     openCache: (enabled, signal) => openAssetCache(enabled, signal),
@@ -370,7 +398,7 @@ export function createKevReconstructedSource(overrides = {}) {
     if (!bundledUrlsPromise) {
       const pending = Promise.resolve()
         .then(() => profile.loadBundledAssets())
-        .then((module) => requireBundledDataUrls(module.experimentalKevBundledUrls));
+        .then((module) => requireBundledDataUrls(module[profile.bundledAssetExport], profile.displayName));
       bundledUrlsPromise = pending;
       pending.catch(() => {
         if (bundledUrlsPromise === pending) bundledUrlsPromise = undefined;
@@ -380,14 +408,14 @@ export function createKevReconstructedSource(overrides = {}) {
   }
 
   async function prepare(options) {
-    validateLoadOptions(options);
+    const maxPrefetchBytes = validateOptions(options);
     signal = options.signal;
     signal?.throwIfAborted();
-    const gpu = requireExperimentalWebGpu();
+    const gpu = requireKevWebGpu();
     if (!globalThis.crypto?.subtle)
       throw new WebDecisionError(
         'UNSUPPORTED_ENVIRONMENT',
-        'Web Crypto is required to verify the experimental Kev source.'
+        `Web Crypto is required to verify the ${profile.displayName} source.`
       );
     mapping = await validatedMapping(signal, profile);
     await profile.preflight(signal, gpu);
@@ -397,25 +425,41 @@ export function createKevReconstructedSource(overrides = {}) {
     const response = new Response(JSON.stringify(profile.manifest), {
       headers: {'content-type': 'application/json'}
     });
-    return {base: profile.cacheBase, cache, signal, manifestUrl, response, maxPrefetchBytes: MAX_PREFETCH_BYTES};
+    return {base: profile.cacheBase, cache, signal, manifestUrl, response, maxPrefetchBytes};
   }
 
   async function fetchAsset(url, init = {}) {
     const requestSignal = init.signal ?? signal;
-    const parsed = new URL(url);
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (cause) {
+      throw invalidAsset(`Invalid ${profile.displayName} asset URL.`, cause);
+    }
+    const base = profile.cacheBase;
+    if (
+      parsed.origin !== base.origin ||
+      !parsed.pathname.startsWith(base.pathname) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.href !== `${parsed.origin}${parsed.pathname}`
+    )
+      throw invalidAsset(`Unexpected ${profile.displayName} asset URL.`);
     const relative = parsed.pathname.slice(profile.cacheBase.pathname.length);
     if (BUNDLED_ASSETS.has(relative)) {
       const bundledUrls = await getBundledUrls(requestSignal);
       const bundledUrl = bundledUrls[relative];
-      if (!bundledUrl) throw invalidAsset(`Missing experimental Kev asset: ${relative}`);
+      if (!bundledUrl) throw invalidAsset(`Missing ${profile.displayName} asset: ${relative}`);
       if (bundledUrl.startsWith('data:')) return responseFromDataUrl(bundledUrl, requestSignal);
       return fetch(bundledUrl, {signal: requestSignal, credentials: 'omit'});
     }
     const match = /^weights\/params_shard_(\d+)\.bin$/u.exec(relative);
-    if (!match) throw invalidAsset(`Unknown experimental Kev asset: ${relative}`);
+    if (!match) throw invalidAsset(`Unknown ${profile.displayName} asset: ${relative}`);
     const shardIndex = Number(match[1]);
     const shard = mapping.target.shards[shardIndex];
-    if (!shard || shard.path !== relative) throw invalidAsset(`Unknown experimental Kev shard: ${relative}`);
+    if (!shard || shard.path !== relative) throw invalidAsset(`Unknown ${profile.displayName} shard: ${relative}`);
     sourceLease ??= acquireSourceLease(profile);
     const sourceBytes = await sourceLease.read(requestSignal, (loadedBytes) => {
       if (!requestSignal?.aborted)
@@ -474,6 +518,56 @@ export function createKevReconstructedSource(overrides = {}) {
       mapping = undefined;
     }
   };
+}
+
+export function createKevReconstructedSource(overrides = {}) {
+  return createKevReconstructedSourceFor(
+    {
+      displayName: 'experimental Kev',
+      bundledAssetExport: 'experimentalKevBundledUrls',
+      manifest: candidateManifest,
+      sourceShardMapText,
+      sourceUrl: SOURCE_URL,
+      sourceBytes: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_BYTES,
+      sourceSha256: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
+      mapSha256: EXPERIMENTAL_KEV_UPSTREAM_MAP_SHA256,
+      repository: EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
+      revision: EXPERIMENTAL_KEV_UPSTREAM_REVISION,
+      sourcePath: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_PATH,
+      parameterRegionStart: EXPERIMENTAL_KEV_UPSTREAM_PARAMETER_REGION_START,
+      tensorCount: EXPERIMENTAL_KEV_UPSTREAM_TENSOR_COUNT,
+      progressChunkBytes: 16 * 1024 * 1024,
+      loadBundledAssets: () => import('./bundled-assets.js'),
+      cacheBase: EXPERIMENTAL_CACHE_BASE
+    },
+    overrides,
+    validateExperimentalLoadOptions
+  );
+}
+
+export function createKev06StableReconstructedSource(overrides = {}) {
+  return createKevReconstructedSourceFor(
+    {
+      displayName: 'stable Kev',
+      bundledAssetExport: 'stableKevBundledUrls',
+      manifest: stableManifest,
+      sourceShardMapText,
+      sourceUrl: SOURCE_URL,
+      sourceBytes: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_BYTES,
+      sourceSha256: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256,
+      mapSha256: EXPERIMENTAL_KEV_UPSTREAM_MAP_SHA256,
+      repository: EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
+      revision: EXPERIMENTAL_KEV_UPSTREAM_REVISION,
+      sourcePath: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_PATH,
+      parameterRegionStart: EXPERIMENTAL_KEV_UPSTREAM_PARAMETER_REGION_START,
+      tensorCount: EXPERIMENTAL_KEV_UPSTREAM_TENSOR_COUNT,
+      progressChunkBytes: 16 * 1024 * 1024,
+      loadBundledAssets: () => import('./stable-bundled-assets.js'),
+      cacheBase: STABLE_CACHE_BASE
+    },
+    overrides,
+    validateStableLoadOptions
+  );
 }
 
 export async function readExperimentalKevManifest(response, signal) {

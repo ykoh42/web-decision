@@ -46,9 +46,9 @@ try {
 }
 ```
 
-The model ID selects a pinned revision, which the library fetches and verifies automatically. No `assetsUrl` is needed. The optional `assetsUrl` setting is only for a trusted mirror.
+The selected model identifies its pinned revision, which the library fetches and verifies automatically. Stable Kev loads through its pinned upstream source when using `modelId`; the legacy `model` route still accepts the complete asset pack through a caller-provided `assetsUrl`.
 
-The workspace exposes `listStableModelIds()` and `describeStableModel(id)` for discovering stable IDs and runtime requirements. The current model ID flow loads TAMEV Micro, Nano and Nano Flash without `assetsUrl`. Kev still requires a hosted asset pack. Other model routes will join this interface as they are migrated and verified.
+The workspace exposes `listStableModelIds()` and `describeStableModel(id)` for discovering stable IDs and runtime requirements. Stable model IDs load TAMEV Micro, Nano, Nano Flash, and Kev without a caller-supplied `assetsUrl`. Kev fetches its pinned ONNX external-data file and reconstructs the verified TVM shards locally; the stable Kev `modelId` route does not accept an `assetsUrl`. Other model routes will join this interface as they are migrated and verified.
 
 Each model keeps its own backend and input/output behavior. The library does not silently switch models or runtimes.
 

@@ -109,7 +109,9 @@
     "CRIVO-NOTICE",
     "CRIVO_SUPPORT.md",
     "assets/experimental-kev-upstream/notices",
-    "assets/experimental-kev-upstream/PROVENANCE.md"
+    "assets/experimental-kev-upstream/PROVENANCE.md",
+    "assets/kev06-stable/PROVENANCE.md",
+    "assets/kev06-stable/notices"
   ],
   "sideEffects": false,
   "scripts": {

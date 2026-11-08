@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DecisionModel} from '../src/model.js';
 import {ExperimentalDebertaSession} from '../src/deberta/model.mjs';
+import {trackRuntime} from '../src/runtime-lifecycle.js';
 
 const request = {state: 'state', questions: [{instructions: 'choose', options: ['a', 'b']}]};
 const tokenizer = {encode: (text) => ({ids: Array.from(text, (c) => c.codePointAt(0) + 200)})};
 
-function kevSession({pop, sync = () => {}, end = () => {}} = {}) {
-  const lifecycle = {loss: null, disposed: false},
+function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = false} = {}) {
+  const state = {loss: null, disposed: false},
     events = [],
     uncaptured = [];
   const runtime = {
@@ -20,7 +21,7 @@ function kevSession({pop, sync = () => {}, end = () => {}} = {}) {
     },
     dispose() {
       events.push('dispose');
-      lifecycle.disposed = true;
+      state.disposed = true;
     },
     cpu() {
       return 'cpu';
@@ -45,7 +46,11 @@ function kevSession({pop, sync = () => {}, end = () => {}} = {}) {
       return sync();
     }
   };
+  let resolveLost;
   const gpu = {
+    lost: new Promise((resolve) => {
+      resolveLost = resolve;
+    }),
     pushErrorScope() {
       events.push('push');
     },
@@ -54,6 +59,8 @@ function kevSession({pop, sync = () => {}, end = () => {}} = {}) {
       return pop?.(lifecycle, uncaptured) ?? null;
     }
   };
+  const lifecycle = trackDeviceLoss ? trackRuntime(runtime, gpu) : state;
+  if (trackDeviceLoss) gpu.lost.then(() => runtime.dispose());
   const model = new DecisionModel(
     runtime,
     device,
@@ -65,7 +72,7 @@ function kevSession({pop, sync = () => {}, end = () => {}} = {}) {
     uncaptured,
     lifecycle
   );
-  return {model, lifecycle, events};
+  return {model, lifecycle, events, lose: resolveLost};
 }
 
 function debertaSession({pop, sync = () => {}, end = () => {}} = {}) {
@@ -142,7 +149,7 @@ test('Kev 0.6B decision rejects when the device is lost during GPU scope cleanup
     (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
   );
   await fixture.model.dispose();
-  assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'end', 'dispose']);
+  assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'dispose']);
 });
 
 test('Kev 0.6B memory release rejects when runtime disposal occurs during GPU scope cleanup', async () => {
@@ -157,6 +164,69 @@ test('Kev 0.6B memory release rejects when runtime disposal occurs during GPU sc
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'clear', 'sync', 'pop']);
+});
+
+test('Kev inference succeeds while the tracked device-loss signal remains active', async () => {
+  const fixture = kevSession({trackDeviceLoss: true});
+  const result = await fixture.model.decide(request);
+  assert.equal(result.answers[0].selected, 'a');
+  assert.equal(fixture.lifecycle.lossSignal.aborted, false);
+  await fixture.model.dispose();
+  assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'end', 'end', 'dispose']);
+});
+
+for (const action of ['decide', 'releaseCachedMemory']) {
+  test(`Kev ${action} rejects promptly when device loss interrupts a pending sync`, {timeout: 1000}, async () => {
+    let startSync;
+    const syncStarted = new Promise((resolve) => {
+        startSync = resolve;
+      }),
+      fixture = kevSession({
+        trackDeviceLoss: true,
+        sync: () => {
+          startSync();
+          return new Promise(() => {});
+        }
+      });
+    const operation = action === 'decide' ? fixture.model.decide(request) : fixture.model.releaseCachedMemory();
+    await syncStarted;
+    fixture.lose({reason: 'unknown', message: 'test device loss'});
+    await assert.rejects(
+      operation,
+      (error) =>
+        error.code === 'INFERENCE_ERROR' && error.cause instanceof Error && /device was lost/i.test(error.cause.message)
+    );
+    assert.equal(fixture.lifecycle.lossSignal.aborted, true);
+    await fixture.model.dispose();
+    assert.deepEqual(
+      fixture.events,
+      action === 'decide' ? ['begin', 'push', 'sync', 'dispose'] : ['begin', 'push', 'clear', 'sync', 'dispose']
+    );
+  });
+}
+
+test('Kev decision rejects promptly when device loss interrupts error-scope cleanup', {timeout: 1000}, async () => {
+  let startPop;
+  const popStarted = new Promise((resolve) => {
+      startPop = resolve;
+    }),
+    fixture = kevSession({
+      trackDeviceLoss: true,
+      pop: () => {
+        startPop();
+        return new Promise(() => {});
+      }
+    });
+  const decision = fixture.model.decide(request);
+  await popStarted;
+  fixture.lose({reason: 'unknown', message: 'test device loss'});
+  await assert.rejects(
+    decision,
+    (error) =>
+      error.code === 'INFERENCE_ERROR' && error.cause instanceof Error && /device was lost/i.test(error.cause.message)
+  );
+  await fixture.model.dispose();
+  assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'dispose']);
 });
 
 test('DeBERTa decision rejects when the device is lost during GPU scope cleanup', async () => {

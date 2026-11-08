@@ -164,7 +164,9 @@ test('the catalog and router describe the same implemented routes', () => {
     assert.match(description.licenses.modelCard, /^https:\/\/huggingface\.co\//);
     assert.equal(
       description.assets.location,
-      name === 'experimental-kev-0.6b-q4f16-upstream' ? 'package-and-pinned-upstream' : 'separate'
+      ['kev-0.6b-q4f16', 'experimental-kev-0.6b-q4f16-upstream'].includes(name)
+        ? 'package-and-pinned-upstream'
+        : 'separate'
     );
     assert.ok(description.assets.requiredFiles.length >= 2);
     assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').min, 1);

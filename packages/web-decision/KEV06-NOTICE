@@ -14,15 +14,17 @@ recorded in `training_config.json` at the pinned Kev revision above. This
 revision pin comes from that training configuration; the model card itself
 names the Qwen repository without a commit hash. The pinned Qwen `LICENSE`
 declares Apache-2.0 and includes Copyright 2024 Alibaba Cloud. Its exact text
-is included in the separately prepared model asset pack as
-`notices/MODEL-APACHE-2.0.txt`.
+is included in this package at
+`assets/kev06-stable/notices/MODEL-APACHE-2.0.txt`.
 
-The `notices/` directory is outside the inference manifest and is not fetched
-or checked by the browser loader. This code package excludes the model files
-and the separate asset notice directory. An application hosting the model
-assets must make applicable notices available alongside that hosting. The
-JavaScript API/input code attribution is documented separately in
-`KEV-NOTICE`.
+The stable `modelId` route has no `assetsUrl` override: the model WASM and
+small tokenizer/config/cache metadata are bundled in a lazy JavaScript chunk,
+and the pinned ONNX external-data file is fetched from the immutable upstream
+revision, reconstructed into TVM shards, and verified before use. The raw ONNX
+external-data file is not cached. The legacy `model` asset-pack route remains
+available separately. The notice files are outside the inference manifest and
+are not fetched or checked by the browser loader. The JavaScript API/input code
+attribution is documented separately in `KEV-NOTICE`.
 
 The pinned Kev card lists ten training data sources and says those datasets
 have their own licenses. These cards and notices record upstream declarations

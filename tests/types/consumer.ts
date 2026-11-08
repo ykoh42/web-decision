@@ -112,6 +112,17 @@ const kevLoadOptionsWithCaps: LoadOptions = {
   maxInputCharacters: 65_536
 };
 const kevLoadOptionsWithoutCaps: LoadOptions = {assetsUrl: '/models/kev-0.6b-q4f16/'};
+const stableKevWithoutAssetsUrl: Promise<LoadedStableKev06DecisionModel> = loadDecisionModel({
+  modelId: 'kev-0.6b-q4f16'
+});
+const legacyKevAssetPack: Promise<LoadedKev06DecisionModel> = loadDecisionModel({
+  model: 'kev-0.6b-q4f16',
+  assetsUrl: '/models/kev-0.6b-q4f16/'
+});
+// @ts-expect-error Stable Kev modelId always reconstructs its pinned source and rejects assetsUrl.
+loadDecisionModel({modelId: 'kev-0.6b-q4f16', assetsUrl: '/models/kev-0.6b-q4f16/'});
+// @ts-expect-error The legacy model route still requires an asset-pack URL.
+loadDecisionModel({model: 'kev-0.6b-q4f16'});
 const kevReflexesLoadOptionsWithCaps: LoadOptions = {
   assetsUrl: '/models/kev-0.6b-reflexes-q4f16/',
   model: 'kev-0.6b-reflexes-q4f16',
@@ -140,7 +151,14 @@ void kevUpstream.then((model) => {
 loadDecisionModel({model: 'experimental-kev-0.6b-q4f16-upstream', assetsUrl: '/models/kev-upstream/'});
 // @ts-expect-error The experimental source provider disables shard read-ahead to constrain extra memory.
 loadDecisionModel({model: 'experimental-kev-0.6b-q4f16-upstream', maxPrefetchBytes: 1});
-void [kevLoadOptionsWithCaps, kevLoadOptionsWithoutCaps, kevReflexesLoadOptionsWithCaps, kevUpstream];
+void [
+  kevLoadOptionsWithCaps,
+  kevLoadOptionsWithoutCaps,
+  stableKevWithoutAssetsUrl,
+  legacyKevAssetPack,
+  kevReflexesLoadOptionsWithCaps,
+  kevUpstream
+];
 const crivoOptions: CrivoLoadOptions = {
   model: 'experimental-crivo-32m-v2-int8',
   assetsUrl: '/models/crivo-32m-v2/',
@@ -332,8 +350,7 @@ const stableTamevNano: Promise<LoadedStableTamevNanoModel> = loadDecisionModel({
   assetsUrl: 'https://mirror.example.test/tamev-nano/'
 });
 const stableKev: Promise<LoadedStableKev06DecisionModel> = loadDecisionModel({
-  modelId: 'kev-0.6b-q4f16',
-  assetsUrl: '/models/kev-0.6b-q4f16/'
+  modelId: 'kev-0.6b-q4f16'
 });
 void stableTamevMicro.then((model) => {
   const description: StableModelDescription = model.description;
@@ -806,12 +823,9 @@ async function useInstalledPackage(): Promise<void> {
   const stableIdInput: unknown = stableIds[0];
   if (isStableModelId(stableIdInput)) {
     const dynamicStableModel: Promise<LoadedStableDecisionModel> = loadDecisionModel({
-      modelId: stableIdInput,
-      assetsUrl: '/stable-model-assets/'
+      modelId: stableIdInput
     });
     void dynamicStableModel;
-    // @ts-expect-error A dynamic stable ID may select Kev, whose asset pack requires a URL.
-    loadDecisionModel({modelId: stableIdInput});
   }
   const description = describeModel('mapika-0.8b-q4f16');
   const temperature = describeModel('experimental-nari-decision-4b-q4f16').features.textChoice.score.temperature;
@@ -1180,8 +1194,6 @@ describeModel('imajev-4b');
 loadDecisionModel({modelId: 'experimental-tamev-micro-minilm-int8'});
 // @ts-expect-error Unknown IDs are not part of the stable catalog.
 loadDecisionModel({modelId: 'unknown-model'});
-// @ts-expect-error The stable Kev ID still needs its separately hosted asset pack.
-loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
 // @ts-expect-error Stable and legacy selectors cannot be mixed.
 loadDecisionModel({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'});
 // @ts-expect-error The default model does not support DeBERTa readback.

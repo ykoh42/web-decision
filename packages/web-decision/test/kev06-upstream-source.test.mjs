@@ -4,8 +4,15 @@ import {readFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import * as nodeModule from 'node:module';
 import test from 'node:test';
+import {
+  EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
+  EXPERIMENTAL_KEV_UPSTREAM_REVISION,
+  EXPERIMENTAL_KEV_UPSTREAM_SOURCE_PATH
+} from '../src/kev06/upstream-contract.js';
+import {KEV06_MANIFEST_SHA256, readKev06ManifestResponse} from '../src/kev06/contract.js';
 
 const bundledAssetsUrl = new URL('../src/kev06/bundled-assets.js', import.meta.url).href;
+const stableBundledAssetsUrl = new URL('../src/kev06/stable-bundled-assets.js', import.meta.url).href;
 const upstreamSourceUrl = new URL('../src/kev06/upstream-source.mjs', import.meta.url).href;
 const inlineAssets = Object.freeze({
   'model.wasm': 'data:application/wasm;base64,AQID',
@@ -14,16 +21,22 @@ const inlineAssets = Object.freeze({
   'model_config.json': `data:application/json;base64,${Buffer.from('{"hidden_size":4}').toString('base64')}`,
   'weights/tensor-cache.json': 'data:application/json,%7B%22records%22%3A%5B%5D%7D'
 });
+const stableInlineAssets = Object.freeze({
+  ...inlineAssets,
+  'model.wasm': 'data:application/wasm;base64,BAUG'
+});
 
 function moduleDataUrl(source) {
   return `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 }
 
 function resolveTestAssetImport(specifier, context, nextResolve) {
-  if (context.parentURL === bundledAssetsUrl && specifier.endsWith('?url&inline')) {
+  if ([bundledAssetsUrl, stableBundledAssetsUrl].includes(context.parentURL) && specifier.endsWith('?url&inline')) {
     const assetUrl = new URL(specifier.slice(0, specifier.indexOf('?')), context.parentURL);
-    const assetPath = assetUrl.pathname.split('/experimental-kev-upstream/').at(-1);
-    const value = inlineAssets[assetPath];
+    const isStableWasm = context.parentURL === stableBundledAssetsUrl && assetUrl.pathname.includes('/kev06-stable/');
+    const assetPath = assetUrl.pathname.split(isStableWasm ? '/kev06-stable/' : '/experimental-kev-upstream/').at(-1);
+    const assets = isStableWasm ? stableInlineAssets : inlineAssets;
+    const value = assets[assetPath];
     if (typeof value !== 'string') throw new Error(`No inline asset fixture for ${assetPath}.`);
     return {url: moduleDataUrl(`export default ${JSON.stringify(value)};`), shortCircuit: true};
   }
@@ -39,13 +52,15 @@ const hooks =
   typeof nodeModule.registerHooks === 'function'
     ? nodeModule.registerHooks({resolve: resolveTestAssetImport})
     : nodeModule.register(new URL('./kev06-asset-import-loader.mjs', import.meta.url), import.meta.url, {
-        data: {bundledAssetsUrl, upstreamSourceUrl, inlineAssets}
+        data: {bundledAssetsUrl, stableBundledAssetsUrl, upstreamSourceUrl, inlineAssets, stableInlineAssets}
       });
 
 const bundledAssets = await import('../src/kev06/bundled-assets.js');
+const stableBundledAssets = await import('../src/kev06/stable-bundled-assets.js');
 const upstreamSource = await import('../src/kev06/upstream-source.mjs');
 hooks?.deregister?.();
-const {createKevReconstructedSource, EXPERIMENTAL_KEV_MODEL} = upstreamSource;
+const {createKev06StableReconstructedSource, createKevReconstructedSource, EXPERIMENTAL_KEV_MODEL, KEV06_STABLE_MODEL} =
+  upstreamSource;
 
 const bytes = (...values) => new Uint8Array(values);
 const digest = (value) => createHash('sha256').update(value).digest('hex');
@@ -139,6 +154,74 @@ function makeFixture({seed = 0, responseBytes} = {}) {
   return {sourceBytes, shardBytes, manifest, mapping, state, overrides};
 }
 
+function makeStableFixture({responseBytes, responseStatus = 200} = {}) {
+  const sourceBytes = bytes(0xaa, 0xbb, 1, 2, 3, 4);
+  const shardBytes = sourceBytes.subarray(2);
+  const target = {
+    shards: [{path: shardName, bytes: shardBytes.byteLength, sha256: digest(shardBytes)}]
+  };
+  const mapping = {
+    source: {
+      repository: EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
+      revision: EXPERIMENTAL_KEV_UPSTREAM_REVISION,
+      path: EXPERIMENTAL_KEV_UPSTREAM_SOURCE_PATH,
+      bytes: sourceBytes.byteLength,
+      sha256: digest(sourceBytes),
+      parameterRegionStart: 2
+    },
+    target,
+    records: [
+      {sourceOffset: 2, targetOffset: 0, bytes: 2, shardIndex: 0},
+      {sourceOffset: 4, targetOffset: 2, bytes: 2, shardIndex: 0}
+    ]
+  };
+  const sourceShardMapText = JSON.stringify(mapping);
+  const manifest = {
+    files: {
+      [shardName]: {bytes: shardBytes.byteLength, sha256: digest(shardBytes)}
+    }
+  };
+  const state = {sourceReads: 0, cacheSettings: [], preflightGpus: [], events: []};
+  const overrides = {
+    manifest,
+    sourceShardMapText,
+    sourceBytes: sourceBytes.byteLength,
+    sourceSha256: digest(sourceBytes),
+    mapSha256: digest(sourceShardMapText),
+    parameterRegionStart: 2,
+    tensorCount: mapping.records.length,
+    progressChunkBytes: 2,
+    bundledUrls: stableInlineAssets,
+    preflight: async (_signal, gpu) => {
+      state.events.push('preflight');
+      state.preflightGpus.push(gpu);
+    },
+    openCache: async (enabled) => {
+      state.events.push('cache');
+      state.cacheSettings.push(enabled);
+      return {fixtureCache: true};
+    },
+    fetchSource: async (url, init) => {
+      state.sourceReads++;
+      state.sourceUrl = url;
+      state.fetchInit = init;
+      const bodyBytes = responseBytes ?? sourceBytes;
+      const body = new ReadableStream({
+        start(controller) {
+          for (let offset = 0; offset < bodyBytes.byteLength; offset += 2)
+            controller.enqueue(bodyBytes.slice(offset, offset + 2));
+          controller.close();
+        }
+      });
+      return new Response(body, {
+        status: responseStatus,
+        headers: {'content-length': String(bodyBytes.byteLength)}
+      });
+    }
+  };
+  return {sourceBytes, shardBytes, manifest, mapping, state, overrides};
+}
+
 function expectDecisionError(code, messagePattern) {
   return (error) => error?.code === code && messagePattern.test(error.message);
 }
@@ -199,6 +282,194 @@ test('validates the pinned map and serves real bundled-assets exports through in
   } finally {
     await source.dispose();
   }
+});
+
+test('stable Kev defaults to its pinned manifest and stable-only WASM bundle', async (t) => {
+  installTestGpu(t);
+  const source = createKev06StableReconstructedSource({
+    preflight: async () => {},
+    openCache: async () => null
+  });
+
+  try {
+    const prepared = await source.prepare({model: KEV06_STABLE_MODEL, cache: false});
+    const manifest = await readKev06ManifestResponse(prepared.response);
+    assert.equal(prepared.base.href, 'https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/');
+    assert.equal(prepared.manifestUrl, `${prepared.base.href}manifest.json`);
+    assert.equal(KEV06_MANIFEST_SHA256, '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767');
+    assert.equal(manifest.model, KEV06_STABLE_MODEL);
+    assert.equal(manifest.parameterCount, 394);
+    assert.deepEqual(manifest.files['model.wasm'], {
+      sha256: '68fe0331180dc1adfb3d1e4295c06133815b3f5bfc5ad8dbd73ae66f3a02b8fb',
+      bytes: 6807315
+    });
+    assert.deepEqual(stableBundledAssets.stableKevBundledUrls, stableInlineAssets);
+    assert.notEqual(
+      stableBundledAssets.stableKevBundledUrls['model.wasm'],
+      bundledAssets.experimentalKevBundledUrls['model.wasm']
+    );
+
+    const wasm = await source.fetch(new URL('model.wasm', prepared.base));
+    assert.equal(wasm.headers.get('content-type'), 'application/wasm');
+    assert.deepEqual(new Uint8Array(await wasm.arrayBuffer()), bytes(4, 5, 6));
+  } finally {
+    await source.dispose();
+  }
+});
+
+test('stable Kev reconstructs a shard from its pinned upstream source with its stable options', async (t) => {
+  const gpu = installTestGpu(t);
+  const fixture = makeStableFixture();
+  const progress = [];
+  const source = createKev06StableReconstructedSource(fixture.overrides);
+  source.setProgress((event) => progress.push(event));
+
+  try {
+    const prepared = await source.prepare({model: KEV06_STABLE_MODEL, cache: false, maxPrefetchBytes: 64});
+    assert.equal(prepared.base.href, 'https://kev-assets.web-decision.invalid/kev-0.6b-q4f16/');
+    assert.equal(prepared.maxPrefetchBytes, 64);
+    assert.deepEqual(fixture.state.events, ['preflight', 'cache']);
+    assert.deepEqual(fixture.state.cacheSettings, [false]);
+
+    const shard = await source.fetch(new URL(shardName, prepared.base));
+    assert.equal(shard.headers.get('content-length'), String(fixture.shardBytes.byteLength));
+    assert.deepEqual(new Uint8Array(await shard.arrayBuffer()), fixture.shardBytes);
+    assert.equal(fixture.state.sourceReads, 1);
+    assert.equal(
+      fixture.state.sourceUrl,
+      'https://huggingface.co/onnx-community/kev-0.6b-ONNX/resolve/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/onnx/model_q4f16.onnx_data'
+    );
+    assert.equal(fixture.state.fetchInit.credentials, 'omit');
+    assert.equal(fixture.state.fetchInit.cache, 'no-store');
+    assert.deepEqual(fixture.state.preflightGpus, [gpu]);
+    assert.deepEqual(
+      progress.map((event) => event.loadedBytes),
+      [2, 4, 6]
+    );
+    assert.ok(progress.every((event) => event.phase === 'upstream-source' && event.totalBytes === 6));
+  } finally {
+    await source.dispose();
+  }
+});
+
+test('stable Kev source rejects asset URLs outside its exact synthetic origin and path', async (t) => {
+  installTestGpu(t);
+  const fixture = makeStableFixture();
+  const source = createKev06StableReconstructedSource(fixture.overrides);
+  const prepared = await source.prepare({model: KEV06_STABLE_MODEL, cache: false});
+  const base = prepared.base;
+  const urls = [
+    `https://attacker.example.test${base.pathname}model.wasm`,
+    new URL('../outside/model.wasm', base),
+    `${base.href}model.wasm?variant=1`,
+    `${base.href}model.wasm#fragment`,
+    `${base.href}model.wasm?`,
+    `${base.href}model.wasm#`
+  ];
+
+  try {
+    for (const url of urls)
+      await assert.rejects(source.fetch(url), expectDecisionError('INVALID_ASSET', /Unexpected stable Kev asset URL/u));
+    assert.equal(fixture.state.sourceReads, 0);
+  } finally {
+    await source.dispose();
+  }
+});
+
+test('stable Kev source rejects invalid offline settings, pre-abort and mismatched source bytes', async (t) => {
+  installTestGpu(t);
+  const fixture = makeStableFixture();
+  const source = createKev06StableReconstructedSource(fixture.overrides);
+  await assert.rejects(
+    source.prepare({model: KEV06_STABLE_MODEL, cache: false, offline: true}),
+    expectDecisionError('INVALID_INPUT', /Invalid stable Kev load option values/u)
+  );
+  await assert.rejects(
+    source.prepare({model: KEV06_STABLE_MODEL, assetsUrl: undefined}),
+    expectDecisionError('INVALID_INPUT', /Unsupported stable Kev load option/u)
+  );
+  const invalidMap = createKev06StableReconstructedSource({...fixture.overrides, mapSha256: '0'.repeat(64)});
+  await assert.rejects(
+    invalidMap.prepare({model: KEV06_STABLE_MODEL, cache: false}),
+    expectDecisionError('INVALID_ASSET', /source map does not match its pinned digest/u)
+  );
+  await invalidMap.dispose();
+
+  const controller = new AbortController();
+  const reason = new Error('cancel stable source load');
+  controller.abort(reason);
+  await assert.rejects(
+    source.prepare({model: KEV06_STABLE_MODEL, signal: controller.signal}),
+    (error) => error === reason
+  );
+  await source.dispose();
+
+  const mismatch = makeStableFixture({responseBytes: bytes(0xaa, 0xbb, 7, 8, 9, 10)});
+  const mismatchedSource = createKev06StableReconstructedSource(mismatch.overrides);
+  const prepared = await mismatchedSource.prepare({model: KEV06_STABLE_MODEL, cache: false});
+  try {
+    await assert.rejects(
+      mismatchedSource.fetch(new URL(shardName, prepared.base)),
+      expectDecisionError('INVALID_ASSET', /failed SHA-256 verification/u)
+    );
+  } finally {
+    await mismatchedSource.dispose();
+  }
+
+  const errorResponse = makeStableFixture({responseStatus: 404});
+  const unavailableSource = createKev06StableReconstructedSource(errorResponse.overrides);
+  const unavailablePrepared = await unavailableSource.prepare({model: KEV06_STABLE_MODEL, cache: false});
+  try {
+    await assert.rejects(
+      unavailableSource.fetch(new URL(shardName, unavailablePrepared.base)),
+      expectDecisionError('ASSET_LOAD_FAILED', /HTTP 404/u)
+    );
+  } finally {
+    await unavailableSource.dispose();
+  }
+});
+
+test('stable Kev abort releases an in-flight upstream response when the load is disposed', async (t) => {
+  installTestGpu(t);
+  const fixture = makeStableFixture();
+  let resolveReadStarted, resolveStreamCancelled;
+  const readStarted = new Promise((resolve) => {
+    resolveReadStarted = resolve;
+  });
+  const streamCancelled = new Promise((resolve) => {
+    resolveStreamCancelled = resolve;
+  });
+  const overrides = {
+    ...fixture.overrides,
+    fetchSource: async (url, init) => {
+      fixture.state.sourceReads++;
+      fixture.state.sourceUrl = url;
+      fixture.state.fetchInit = init;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(bytes(0xaa, 0xbb));
+            resolveReadStarted();
+          },
+          cancel(reason) {
+            resolveStreamCancelled(reason);
+          }
+        }),
+        {headers: {'content-length': String(fixture.sourceBytes.byteLength)}}
+      );
+    }
+  };
+  const source = createKev06StableReconstructedSource(overrides);
+  const prepared = await source.prepare({model: KEV06_STABLE_MODEL, cache: false});
+  const controller = new AbortController();
+  const reason = new Error('cancel stable upstream read');
+  const pending = source.fetch(new URL(shardName, prepared.base), {signal: controller.signal});
+  await readStarted;
+  controller.abort(reason);
+  await assert.rejects(pending, (error) => error === reason);
+  await source.dispose();
+  assert.equal(fixture.state.fetchInit.signal.aborted, true);
+  await streamCancelled;
 });
 
 test('reconstructs a mapped shard from one verified source read and reports source progress', async (t) => {

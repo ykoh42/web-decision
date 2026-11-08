@@ -27,7 +27,7 @@ try {
 }
 ```
 
-Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so that model ID still requires an `assetsUrl`.
+Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; stable Kev also loads without one and rejects `assetsUrl`. The legacy `model: 'kev-0.6b-q4f16'` asset-pack route continues to require `assetsUrl`.
 
 Use `StableModelId` values with `loadDecisionModel({modelId})` as the stable interface.
 
@@ -35,9 +35,9 @@ Some models also expose typed `systemOne` inputs. Check the route descriptor bef
 
 ## Model assets
 
-Stable TAMEV model IDs load pinned public assets without an `assetsUrl`. To use a mirror, pass its trusted base URL; the files must match the pinned hashes. Kev still requires a separately hosted asset pack. The library verifies assets before use and keeps decision inputs in the browser.
+Stable Kev loads its pinned TVM WASM and metadata from the package, then fetches the pinned 335,357,952-byte ONNX external-data file and reconstructs the nine verified TVM shards in the browser. The stable `modelId` route always uses this pinned source and does not accept `assetsUrl`. The raw source file is not cached; verified shards can be cached for offline loads. The legacy `model` asset-pack route remains available with its required `assetsUrl`; every file must match the pinned manifest. The library verifies assets before use and keeps decision inputs in the browser.
 
-Browser caching is enabled by default for stable TAMEV routes. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. The application must also make its own code and pages available offline.
+Browser caching is enabled by default for stable model-ID routes. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. The application must also make its own code and pages available offline.
 
 Model files have their own terms. Review the model and asset terms for the files you choose to host or use.
 

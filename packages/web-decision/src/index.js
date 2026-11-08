@@ -41,7 +41,7 @@ export {describeStableModel, isStableModelId, listStableModelIds} from './stable
 function loadRegisteredModel(family, options, description, modelId) {
   const runtimeBindings = {Tokenizer, instantiate, createPolyfillWASI};
   const loaders = {
-    kev: () => loadKevDecisionModel(options, description),
+    kev: () => loadKevDecisionModel(options, description, modelId),
     deberta: () => loadExperimentalDeberta(options),
     mapika: () => loadExperimentalMapika(options),
     'mapika-q4': () => loadExperimentalMapikaQ4(options),
@@ -103,6 +103,8 @@ export async function loadDecisionModel(options) {
     throw new WebDecisionError('INVALID_INPUT', 'Pass a stable ID as the modelId property.');
   const stableRequest =
     options && typeof options === 'object' && 'modelId' in options ? normalizeStableModelOptions(options) : undefined;
+  if (stableRequest?.modelId === 'kev-0.6b-q4f16' && Object.hasOwn(stableRequest.options, 'assetsUrl'))
+    throw new WebDecisionError('INVALID_INPUT', 'assetsUrl is not supported for the stable Kev model ID.');
   const loadOptions = stableRequest?.options ?? options;
   const {family, description} = selectModelRegistration(loadOptions);
   const debertaReadback = loadOptions && Object.getOwnPropertyDescriptor(loadOptions, 'debertaReadback');

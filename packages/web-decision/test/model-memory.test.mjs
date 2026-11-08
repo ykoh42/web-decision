@@ -152,7 +152,7 @@ test('device loss while memory release is synchronizing rejects without poisonin
   lifecycle.loss = {reason: 'unknown'};
   wait.resolve();
   await assert.rejects(release, (e) => e.code === 'INFERENCE_ERROR' && /lost/.test(e.cause?.message));
-  assert.deepEqual(events, ['begin', 'push', 'vm.builtin.memory_manager.clear', 'clear', 'sync', 'pop', 'end']);
+  assert.deepEqual(events, ['begin', 'push', 'vm.builtin.memory_manager.clear', 'clear', 'sync', 'pop']);
   await model.dispose();
-  assert.ok(events.includes('dispose'));
+  assert.deepEqual(events, ['begin', 'push', 'vm.builtin.memory_manager.clear', 'clear', 'sync', 'pop', 'dispose']);
 });

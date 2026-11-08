@@ -11,10 +11,16 @@ function moduleDataUrl(source) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
-  if (context.parentURL === testConfig.bundledAssetsUrl && specifier.endsWith('?url&inline')) {
+  if (
+    [testConfig.bundledAssetsUrl, testConfig.stableBundledAssetsUrl].includes(context.parentURL) &&
+    specifier.endsWith('?url&inline')
+  ) {
     const assetUrl = new URL(specifier.slice(0, specifier.indexOf('?')), context.parentURL);
-    const assetPath = assetUrl.pathname.split('/experimental-kev-upstream/').at(-1);
-    const value = testConfig.inlineAssets[assetPath];
+    const isStableWasm =
+      context.parentURL === testConfig.stableBundledAssetsUrl && assetUrl.pathname.includes('/kev06-stable/');
+    const assetPath = assetUrl.pathname.split(isStableWasm ? '/kev06-stable/' : '/experimental-kev-upstream/').at(-1);
+    const assets = isStableWasm ? testConfig.stableInlineAssets : testConfig.inlineAssets;
+    const value = assets[assetPath];
     if (typeof value !== 'string') throw new Error(`No inline asset fixture for ${assetPath}.`);
     return {
       url: moduleDataUrl(`export default ${JSON.stringify(value)};`),

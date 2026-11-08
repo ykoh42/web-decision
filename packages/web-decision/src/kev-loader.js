@@ -13,8 +13,10 @@ import {prepareModelSource} from './model-source.js';
 import {createModelAssetReader, uploadModelShards} from './model-assets.js';
 import {readKev06ManifestResponse} from './kev06/contract.js';
 import {
+  createKev06StableReconstructedSource,
   createKevReconstructedSource,
   EXPERIMENTAL_KEV_MODEL,
+  KEV06_STABLE_MODEL,
   readExperimentalKevManifest
 } from './kev06/upstream-source.mjs';
 
@@ -249,9 +251,18 @@ export function loadKev06DecisionModel(options, description) {
   return loadKevModel(options, description, readKev06ManifestResponse);
 }
 
-export async function loadKevDecisionModel(options, description) {
+export async function loadKevDecisionModel(options, description, stableModelId) {
   if (description.model === EXPERIMENTAL_KEV_MODEL) {
     return loadKevModel(options, description, readExperimentalKevManifest, undefined, createKevReconstructedSource());
+  }
+  if (stableModelId === KEV06_STABLE_MODEL) {
+    return loadKevModel(
+      options,
+      description,
+      readKev06ManifestResponse,
+      undefined,
+      createKev06StableReconstructedSource()
+    );
   }
   if (description.model !== REFLEXES_ID) return loadKev06DecisionModel(options, description);
   return loadKevModel(options, description, readReflexesManifestResponse, uploadReflexesHeads);

@@ -665,7 +665,11 @@ const models = [
     model: DEFAULT_MODEL,
     precision: 'q4f16',
     checkpoint: {repository: 'onnx-community/kev-0.6b-ONNX', revision: '5a827091b3d58fe4fdfc02a5a5b2ce364047d678'},
-    assets: {integrity: 'pinned-manifest', manifestSha256: KEV06_MANIFEST_SHA256},
+    assets: {
+      integrity: 'pinned-manifest',
+      manifestSha256: KEV06_MANIFEST_SHA256,
+      location: 'package-and-pinned-upstream'
+    },
     requiredFiles: kevFiles,
     limits: kevLimits,
     maxOptions: KEV_MAX_OPTIONS,
@@ -676,7 +680,9 @@ const models = [
     temperature: 1,
     typedTextQuestionTypes: ['choice', 'noul', 'score'],
     requiredLimits: KEV_REQUIRED_LIMITS,
-    gpuVerification: 'verified'
+    gpuVerification: 'verified',
+    additionalFiles:
+      'Five pinned runtime assets, including the stable TVM WebAssembly, are embedded in a lazily loaded package chunk. Nine verified shards are reconstructed from the pinned 335,357,952-byte upstream ONNX external-data file and cached.'
   }),
   registration({
     family: 'kev',

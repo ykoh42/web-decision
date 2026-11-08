@@ -1022,7 +1022,7 @@ export interface TamevNanoFlashLoadOptions extends Omit<CommonLoadOptions, 'asse
   debertaReadback?: undefined;
 }
 
-export type StableKev06LoadOptions = Omit<Kev06LoadOptions, 'model'> & {
+export type StableKev06LoadOptions = Omit<Kev06LoadOptions, 'model' | 'assetsUrl'> & {
   modelId: 'kev-0.6b-q4f16';
   model?: undefined;
 };
@@ -1042,14 +1042,26 @@ export type StableTamevNanoFlashLoadOptions = Omit<TamevNanoFlashLoadOptions, 'm
   model?: undefined;
 };
 
+export type StableModelIdLoadOptions = Readonly<{
+  modelId: StableModelId;
+  model?: undefined;
+  cache?: boolean;
+  offline?: boolean;
+  signal?: AbortSignal;
+  onProgress?: (progress: ModelProgress) => void;
+  maxPrefetchBytes?: 0;
+  debertaReadback?: undefined;
+}>;
+
 export type StableModelLoadOptions =
   | StableKev06LoadOptions
   | StableTamevMicroLoadOptions
   | StableTamevNanoLoadOptions
-  | StableTamevNanoFlashLoadOptions;
+  | StableTamevNanoFlashLoadOptions
+  | StableModelIdLoadOptions;
 
 export type StableModelLoadOptionsWithAssetsUrl = Readonly<{
-  modelId: StableModelId;
+  modelId: Exclude<StableModelId, 'kev-0.6b-q4f16'>;
   model?: undefined;
   assetsUrl: string;
   cache?: boolean;
@@ -1999,7 +2011,7 @@ export function listStableModelIds(): readonly StableModelId[];
 export function isStableModelId(value: unknown): value is StableModelId;
 /** Describe a stable public ID without exposing its internal route ID. */
 export function describeStableModel(model: StableModelId): StableModelDescription;
-/** Load a stable public ID. Pinned-source models may omit assetsUrl; Kev requires its hosted asset pack. */
+/** Load a stable public ID. Kev reconstructs its pinned TVM assets from upstream source and does not accept assetsUrl. */
 export function loadDecisionModel(options: StableTamevMicroLoadOptions): Promise<LoadedStableTamevMicroModel>;
 export function loadDecisionModel(options: StableTamevNanoLoadOptions): Promise<LoadedStableTamevNanoModel>;
 export function loadDecisionModel(options: StableTamevNanoFlashLoadOptions): Promise<LoadedStableTamevNanoFlashModel>;
