@@ -19,6 +19,7 @@ $env:WEB_DECISION_RELEASE_ARCHIVE = 'C:\release\web-decision-x.y.z.tgz'
 $env:WEB_DECISION_RELEASE_PACKAGE_DIR = 'C:\release\consumer\node_modules\web-decision'
 $env:WEB_DECISION_INSTALLED_BUNDLE = 'C:\release\consumer\node_modules\web-decision\dist\index.js'
 $env:PLAYWRIGHT_JSON_OUTPUT_NAME = 'C:\release\playwright-report.json'
+$env:WEB_DECISION_TVM_BUILD_EVIDENCE = 'C:\release\tvm-build-evidence.json'
 pnpm exec playwright test tests/browser/kev06-default-source-real-webgpu.spec.ts --reporter=json
 ```
 
