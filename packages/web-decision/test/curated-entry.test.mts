@@ -47,3 +47,21 @@ test('invalid or caller-selected sources fail before making a network request', 
     globalThis.fetch = oldFetch;
   }
 });
+
+test('a cancelled curated model load preserves its reason without requesting assets', async () => {
+  const oldFetch = globalThis.fetch;
+  const reason = new Error('load cancelled');
+  const controller = new AbortController();
+  controller.abort(reason);
+  globalThis.fetch = () => {
+    throw new Error('unexpected fetch');
+  };
+  try {
+    await assert.rejects(library.loadDecisionModel({modelId: 'kev-0.6b-q4f16', signal: controller.signal}), (error) => {
+      assert.equal(error, reason);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = oldFetch;
+  }
+});
