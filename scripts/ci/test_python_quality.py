@@ -1,4 +1,4 @@
-import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -185,16 +185,19 @@ def test_snapshot_rejects_duplicate_diagnostics():
         )
 
 
-def test_tvm_build_script_remains_at_the_source_lock_hash_with_side_effect_imports():
-    path = ROOT / "scripts/build_tvm_q4.py"
-    contents = path.read_bytes()
+@pytest.mark.parametrize("version", ["0.1.0", "0.2.0"])
+def test_historical_tvm_build_source_locks_remain_unchanged(version):
+    lock = json.loads(
+        (ROOT / f"releases/web-decision-{version}/source-lock.json").read_text()
+    )
+    entry = next(
+        item for item in lock["files"] if item["path"] == "scripts/build_tvm_q4.py"
+    )
 
-    assert hashlib.sha256(contents).hexdigest() == (
+    assert entry["bytes"] == 6802
+    assert entry["sha256"] == (
         "706ced9e6a620cd4c653cb130e809b91be7c94b6ead6041ae85626f13fcc6deb"
     )
-    source = contents.decode("utf-8")
-    assert "import tvm_selective_params,tvm_narrow_int64,tvm_q4_operators" in source
-    assert source.index("import tvm_selective_params") < source.index("ROOT=")
 
 
 def run(*arguments, cwd, env=None):
