@@ -72,16 +72,6 @@
     ]
   },
   {
-    "path": "scripts/prepare_web_decision_assets.py",
-    "file_name": "prepare_web_decision_assets.py",
-    "functions": [
-      {
-        "name": "<module>",
-        "complexity": 42
-      }
-    ]
-  },
-  {
     "path": "scripts/specialize_q4_direct.py",
     "file_name": "specialize_q4_direct.py",
     "functions": [

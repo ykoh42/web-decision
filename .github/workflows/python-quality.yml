@@ -69,6 +69,7 @@ jobs:
             scripts/ci/test_python_quality.py \
             scripts/ci/test_workflow_syntax.py \
             scripts/test_safe_output.py \
+            scripts/test_prepare_web_decision_assets.py \
             scripts/test_verify_q4_cache.py \
             scripts/test_build_tvm_q4.py \
             scripts/test_specialize_q4_direct_serialization.py \
