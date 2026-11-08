@@ -27,29 +27,17 @@ try {
 }
 ```
 
-Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so its ID still requires an `assetsUrl`.
+Use `listStableModelIds()` for the stable-ID catalog and `describeStableModel(id)` to inspect a model's backend, input features, limits, and verification status. The IDs map to pinned model revisions and stay separate from internal adapter names. TAMEV Micro, Nano and Nano Flash load from their pinned public revisions without an `assetsUrl`; an optional URL is only a trusted mirror. Kev's derived TVM asset pack is not hosted at a canonical URL yet, so that model ID still requires an `assetsUrl`.
 
-`listDecisionModels()` and `describeModel(id)` remain available for the full development route registry, including preview adapters. Those route names are not part of the stable-ID interface.
+Use `StableModelId` values with `loadDecisionModel({modelId})` as the stable interface.
 
 Some models also expose typed `systemOne` inputs. Check the route descriptor before using typed questions, abstention, scores, or multimodal fields. The library preserves each model's option order and output meaning. Any truncation follows the model protocol and is reported in the result.
 
-The experimental Strands Qwen 2B route uses TVM WebGPU with FP16 assets: 3.78 GB of tensor data,
-up to 4,096 tokens per question, and up to 255 options. It has been verified on Apple M4 Pro with
-hardware WebGPU in Chromium 158; other adapters must meet the route's reported GPU limits. The
-publisher declares Apache-2.0 and notes varied training-data source terms in its
-[license](https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/blob/216d1ccb46a9e9b036eb9187b248db98480f77d4/LICENSE.md)
-and [model card](https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/blob/216d1ccb46a9e9b036eb9187b248db98480f77d4/README.md).
-The local result is in the [M4 Pro verification report](https://github.com/ykoh42/web-decision/blob/main/reports/strands-qwen2-m4pro-verified-real-webgpu.json).
-
 ## Model assets
 
-TAMEV Nano TinyBERT, Nano Flash and Micro MiniLM, Decima Small, Base Clean and Agent, Ettin, TinyDecide, GLiNER Mobile, SafeDecide, D1 Omni, Verdict, and both variants of Laya, Crivo and Skejja load their pinned public assets when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
+Stable TAMEV model IDs load pinned public assets without an `assetsUrl`. To use a mirror, pass its trusted base URL; the files must match the pinned hashes. Kev still requires a separately hosted asset pack. The library verifies assets before use and keeps decision inputs in the browser.
 
-Skejja ID-only loading downloads a 208 MB pinned archive and requires browser gzip decompression support.
-
-The separate `experimental-kev-0.6b-q4f16-upstream` model ID uses TVM WebGPU and downloads its pinned upstream ONNX weights on first use. It is an experimental build with its own executable and does not replace the existing `kev-0.6b-q4f16` route. It currently does not accept an `assetsUrl` override. Its first load downloads about 335 MB and needs substantial browser memory; check GPU requirements and verification status in `describeModel`.
-
-Browser caching is enabled by default for these routes except SafeDecide, which requires `cache: true`. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. Chromium private sessions cannot cache individual files of 256 MiB or larger. The application must also make its own code and pages available offline.
+Browser caching is enabled by default for stable TAMEV routes. Once all verified files are cached, pass `offline: true` to require an offline load. Caching depends on browser storage availability and quota. The application must also make its own code and pages available offline.
 
 Model files have their own terms. Review the model and asset terms for the files you choose to host or use.
 

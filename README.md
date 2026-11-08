@@ -1,14 +1,10 @@
 # web-decision
 
-Latest stable: `0.3.0`. Run decision models locally in the browser.
+Latest npm release: `0.3.0`. Run decision models locally in the browser.
 
-## Install
+The clean model ID interface below is on `main`; it is not included in npm `0.3.0` yet.
 
-```sh
-npm install web-decision
-```
-
-## Models
+## Models in npm 0.3.0
 
 Upstream model-card scores appear highest first within the same benchmark. They are not measurements from this library.
 
@@ -25,17 +21,16 @@ Upstream model-card scores appear highest first within the same benchmark. They 
 | --- | ---: | --- | ---: |
 | [Kev 0.6B Q4F16](https://huggingface.co/jaredpalmer/kev-0.6b/blob/dece6dba8d43f0f7ded45e9f5b9df12474d90843/README.md) | 64.2% | TVM WebGPU (`shader-f16`) | 349.1 MB |
 
-The npm package includes library code and notices. Host the model files at an application-controlled URL. See the [model setup guide](releases/web-decision-0.3.0/package/README.md) for asset links and protocol details.
+The published package includes library code and notices. Its model files must be hosted at an application-controlled URL. See the [0.3.0 setup guide](releases/web-decision-0.3.0/package/README.md) for installation, asset links, and protocol details.
 
-## Quick start
+## Interface preview on main
+
+This interface is not in npm `0.3.0` yet. It is the clean model-ID interface currently implemented on `main`.
 
 ```ts
 import {loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({
-  model: 'experimental-tamev-micro-minilm-int8',
-  assetsUrl: 'https://your-origin.example/models/tamev-micro-minilm/'
-});
+const model = await loadDecisionModel({modelId: 'tamev-micro-minilm-int8'});
 
 try {
   const result = await model.decide({
@@ -51,14 +46,11 @@ try {
 }
 ```
 
-## Development direction
+The model ID selects a pinned revision, which the library fetches and verifies automatically. No `assetsUrl` is needed. The optional `assetsUrl` setting is only for a trusted mirror.
 
-This describes ongoing development, not the current `0.3.0` release behavior.
+The workspace exposes `listStableModelIds()` and `describeStableModel(id)` for discovering stable IDs and runtime requirements. The current model ID flow loads TAMEV Micro, Nano and Nano Flash without `assetsUrl`. Kev still requires a hosted asset pack. Other model routes will join this interface as they are migrated and verified.
 
-- Prefer TVM WebGPU for browser inference while preserving supported ONNX paths; this is not a TVM-only migration.
-- Target model-ID-only loading with pinned artifacts fetched and verified automatically, cached, and available offline after warmup. Keep `assetsUrl` optional for trusted mirrors as routes migrate; not every current route supports ID-only loading.
-- Keep each route's backend and model behavior explicit. Never silently substitute a backend, model, or behavior.
-- Retain real-model browser verification for backend changes and report the models and environments measured.
+Each model keeps its own backend and input/output behavior. The library does not silently switch models or runtimes.
 
 ## Verification
 
