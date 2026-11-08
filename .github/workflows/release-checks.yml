@@ -42,12 +42,17 @@ jobs:
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          elif [[ -n "$REQUESTED_RELEASE_VERSION" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/tags/v${REQUESTED_RELEASE_VERSION}" ]]; then
+              echo "workflow_dispatch must run from the matching refs/tags/v${REQUESTED_RELEASE_VERSION} tag (checked out: ${GITHUB_REF})" >&2
+              exit 1
+            fi
             version="$REQUESTED_RELEASE_VERSION"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
           else
-            version="0.3.0"
+            echo "Release checks require a v* tag push or a workflow_dispatch on the matching release tag; checked out: ${GITHUB_REF}" >&2
+            exit 1
           fi
           case "$version" in
             0.1.0|0.2.0|0.3.0) ;;
