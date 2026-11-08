@@ -10,7 +10,23 @@ export const CRIVO_BATCH_TOKEN_BUDGET = 65_536;
 export const CRIVO_PAD_MULTIPLE = 16;
 export const CRIVO_OPT_TOKEN_ID = 50368;
 
-const COMMON_FILES = Object.freeze({
+interface CrivoFileMetadata {
+  readonly bytes: number;
+  readonly sha256: string;
+}
+
+type CrivoBackend = 'onnxruntime-web-webgpu' | 'onnxruntime-web-wasm';
+
+export interface CrivoSpec {
+  readonly model: string;
+  readonly precision: 'f32' | 'int8';
+  readonly backend: CrivoBackend;
+  readonly graphFile: string;
+  readonly files: Readonly<Record<string, CrivoFileMetadata>>;
+  readonly totalBytes: number;
+}
+
+const COMMON_FILES: Readonly<Record<string, CrivoFileMetadata>> = Object.freeze({
   'config.json': Object.freeze({
     bytes: 4360,
     sha256: 'dbd358b1345c10df6411c11953971322b6bdf3fce8e87aeb8e3e3c40183865e7'
@@ -25,7 +41,14 @@ const COMMON_FILES = Object.freeze({
   })
 });
 
-function spec(model, precision, backend, graphFile, graphBytes, graphSha256) {
+function spec(
+  model: string,
+  precision: 'f32' | 'int8',
+  backend: CrivoBackend,
+  graphFile: string,
+  graphBytes: number,
+  graphSha256: string
+): CrivoSpec {
   const files = Object.freeze({
     ...COMMON_FILES,
     [graphFile]: Object.freeze({bytes: graphBytes, sha256: graphSha256})
@@ -58,7 +81,7 @@ export const CRIVO_INT8_SPEC = spec(
   '2bd89b7d5a59ad6920971188862f360d1f2b80362f0539b0c62b4af7f67e4fa4'
 );
 
-export function getCrivoSpec(model) {
+export function getCrivoSpec(model: unknown): CrivoSpec | undefined {
   if (model === CRIVO_MODEL_FP32) return CRIVO_FP32_SPEC;
   if (model === CRIVO_MODEL_INT8) return CRIVO_INT8_SPEC;
   return undefined;

@@ -2,12 +2,10 @@
   "schemaVersion": 1,
   "baselineCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
   "managedJavaScript": [
-    "packages/web-decision/src/crivo/contract.mjs",
     "packages/web-decision/src/crivo/loader.mjs",
     "packages/web-decision/src/crivo/protocol.mjs",
     "packages/web-decision/src/crivo/runner.mjs",
     "packages/web-decision/src/crivo/session.mjs",
-    "packages/web-decision/src/crivo/tokenizer.mjs",
     "packages/web-decision/src/d1-omni/contract.mjs",
     "packages/web-decision/src/d1-omni/loader.mjs",
     "packages/web-decision/src/d1-omni/protocol.mjs",
