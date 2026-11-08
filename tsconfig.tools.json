@@ -21,7 +21,12 @@
     "scripts/ci/asset-key.test.ts",
     "scripts/ci/check-package.ts",
     "scripts/ci/check-types.mts",
+    "scripts/ci/check-uncovered.ts",
+    "scripts/ci/coverage-groups.ts",
+    "scripts/ci/coverage-groups.test.ts",
     "scripts/ci/packed-content.ts",
+    "scripts/ci/uncovered-files.ts",
+    "scripts/ci/uncovered-files.test.ts",
     "scripts/ci/temporary-directories.ts"
   ]
 }
