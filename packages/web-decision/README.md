@@ -39,7 +39,9 @@ The local result is in the [M4 Pro verification report](https://github.com/ykoh4
 
 ## Model assets
 
-TAMEV Nano TinyBERT, Nano Flash and Micro MiniLM, Decima Small, Base Clean and Agent, Ettin, TinyDecide, GLiNER Mobile, SafeDecide, D1 Omni, Verdict, and both Laya and Crivo routes load their pinned public assets when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
+TAMEV Nano TinyBERT, Nano Flash and Micro MiniLM, Decima Small, Base Clean and Agent, Ettin, TinyDecide, GLiNER Mobile, SafeDecide, D1 Omni, Verdict, and both variants of Laya, Crivo and Skejja load their pinned public assets when given only their model IDs. To use a mirror, pass its trusted base URL as `assetsUrl`; the files must match the pinned hashes. Other routes may still require a separately hosted asset pack, so check the route's documentation and options. Do not let untrusted input choose `assetsUrl`. The library verifies assets before use and keeps decision inputs in the browser.
+
+Skejja ID-only loading downloads a 208 MB pinned archive and requires browser gzip decompression support.
 
 The separate `experimental-kev-0.6b-q4f16-upstream` model ID uses TVM WebGPU and downloads its pinned upstream ONNX weights on first use. It is an experimental build with its own executable and does not replace the existing `kev-0.6b-q4f16` route. It currently does not accept an `assetsUrl` override. Its first load downloads about 335 MB and needs substantial browser memory; check GPU requirements and verification status in `describeModel`.
 

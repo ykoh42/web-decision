@@ -368,6 +368,7 @@ const skejjaInt8Options: SkejjaInt8LoadOptions = {
   cache: true
 };
 const skejjaInt8ModelPromise = loadDecisionModel(skejjaInt8Options);
+void loadDecisionModel({model: 'experimental-skejja-edge32k-ft6-int8'});
 void skejjaInt8ModelPromise.then((model) => {
   const skejja: LoadedSkejjaInt8Model = model;
   const result: Promise<SkejjaSystemOneResult<'experimental-skejja-edge32k-ft6-int8'>> = skejja.systemOne(
@@ -392,6 +393,7 @@ const skejjaInt8DynOptions: SkejjaInt8DynLoadOptions = {
   model: 'experimental-skejja-edge32k-ft6-int8dyn'
 };
 const skejjaInt8DynModelPromise = loadDecisionModel(skejjaInt8DynOptions);
+void loadDecisionModel({model: 'experimental-skejja-edge32k-ft6-int8dyn'});
 void skejjaInt8DynModelPromise.then((model) => {
   const skejja: LoadedSkejjaInt8DynModel = model;
   void skejja;

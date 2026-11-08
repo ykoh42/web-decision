@@ -2,6 +2,28 @@ export const SKEJJA_INT8_MODEL = 'experimental-skejja-edge32k-ft6-int8';
 export const SKEJJA_INT8DYN_MODEL = 'experimental-skejja-edge32k-ft6-int8dyn';
 export const SKEJJA_REPOSITORY = 'vincyber/skejja-edge32k-ft6';
 export const SKEJJA_REVISION = 'a076ad7d698b11b15dc70fe067d15c3d1140761f';
+export const SKEJJA_ARCHIVE = Object.freeze({
+  filename: 'skejja-edge32k-ft6_onnx-int8.tar.gz',
+  bytes: 208260729,
+  sha256: '751e243f1fba39421d36d44a832fc42a34bb74c6bec68f15d956e219e1131f42',
+  root: 'skejja-edge32k-ft6_onnx-int8',
+  maxExpandedBytes: 229000000,
+  files: Object.freeze({
+    LICENSE: 11357,
+    NOTICE: 3636,
+    'README.md': 1007,
+    'calibration.json': 1329,
+    'edge-v32k-ft6.int8.onnx': 571804,
+    'edge-v32k-ft6.int8.onnx.data': 100674628,
+    'edge-v32k-ft6.int8dyn.onnx': 1308215,
+    'edge-v32k-ft6.int8dyn.onnx.data': 124288004,
+    'export_check.json': 643,
+    'skejja_infer.py': 9468,
+    'special_tokens_map.json': 1051,
+    'tokenizer.json': 1891156,
+    'tokenizer_config.json': 2235
+  })
+});
 export const SKEJJA_MAX_TOKENS = 512;
 export const SKEJJA_MIN_BODY_TOKENS = 32;
 export const SKEJJA_MAX_CHOICES = 255;

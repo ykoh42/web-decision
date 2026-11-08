@@ -1010,14 +1010,18 @@ export interface TamevNanoFlashLoadOptions extends Omit<CommonLoadOptions, 'asse
   debertaReadback?: undefined;
 }
 
-export interface SkejjaInt8LoadOptions extends CommonLoadOptions {
+export interface SkejjaInt8LoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-skejja-edge32k-ft6-int8';
+  /** Optional trusted mirror; defaults to the model's pinned public archive. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }
 
-export interface SkejjaInt8DynLoadOptions extends CommonLoadOptions {
+export interface SkejjaInt8DynLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-skejja-edge32k-ft6-int8dyn';
+  /** Optional trusted mirror; defaults to the model's pinned public archive. */
+  assetsUrl?: string;
   maxPrefetchBytes?: 0;
   debertaReadback?: undefined;
 }

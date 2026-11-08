@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {gzipSync} from 'node:zlib';
 import test from 'node:test';
 import {
+  SKEJJA_ARCHIVE,
   SKEJJA_INT8_PROFILE,
   SKEJJA_INT8DYN_PROFILE,
   SKEJJA_INT8_MODEL,
@@ -8,6 +11,7 @@ import {
 } from '../src/skejja/contract.mjs';
 import {fitSkejjaPlatt} from '../src/skejja/calibration.mjs';
 import {loadSkejja, validateSkejjaLoadOptions} from '../src/skejja/loader.mjs';
+import {openSkejjaSource, parseSkejjaArchive} from '../src/skejja/source.mjs';
 import {describeSkejjaModel} from '../src/skejja-preview-registry.mjs';
 import {createSkejjaSession} from '../src/skejja/session.mjs';
 import {
@@ -31,6 +35,72 @@ class CharacterTokenizer {
 
 function bytes(value) {
   return new TextEncoder().encode(JSON.stringify(value)).buffer;
+}
+
+function digest(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function tarHeader(path, size, type = '\0', corruptChecksum = false) {
+  const header = Buffer.alloc(512);
+  const octal = (value, width) => `${value.toString(8).padStart(width - 1, '0')}\0`;
+  Buffer.from(path).copy(header, 0);
+  Buffer.from(octal(0o644, 8)).copy(header, 100);
+  Buffer.from(octal(0, 8)).copy(header, 108);
+  Buffer.from(octal(0, 8)).copy(header, 116);
+  Buffer.from(octal(size, 12)).copy(header, 124);
+  Buffer.from(octal(0, 12)).copy(header, 136);
+  header.fill(0x20, 148, 156);
+  header[156] = type === '\0' ? 0 : type.charCodeAt(0);
+  Buffer.from('ustar\0').copy(header, 257);
+  Buffer.from('00').copy(header, 263);
+  let checksum = 0;
+  for (const byte of header) checksum += byte;
+  const checksumText = `${(checksum + (corruptChecksum ? 1 : 0)).toString(8).padStart(6, '0')}\0 `;
+  Buffer.from(checksumText).copy(header, 148);
+  return header;
+}
+
+function makeTarGzip(files, {corruptChecksum = false} = {}) {
+  const root = `${SKEJJA_ARCHIVE.root}/`;
+  const chunks = [tarHeader(root, 0, '5')];
+  for (const [index, [name, value]] of files.entries()) {
+    const payload = Buffer.from(value);
+    chunks.push(tarHeader(`${root}${name}`, payload.byteLength, '\0', corruptChecksum && index === 0));
+    chunks.push(payload);
+    const padding = (512 - (payload.byteLength % 512)) % 512;
+    if (padding) chunks.push(Buffer.alloc(padding));
+  }
+  chunks.push(Buffer.alloc(10 * 1024));
+  return gzipSync(Buffer.concat(chunks));
+}
+
+function makeSmallArchiveFixture() {
+  const files = {
+    'tokenizer.json': Buffer.from('tokenizer'),
+    'edge-v32k-ft6.int8.onnx': Buffer.from('graph'),
+    'edge-v32k-ft6.int8.onnx.data': Buffer.from('weights'),
+    'archive-note.txt': Buffer.from('not selected')
+  };
+  const compressed = makeTarGzip(Object.entries(files));
+  const profileFiles = Object.fromEntries(
+    Object.entries(files)
+      .filter(([name]) => name !== 'archive-note.txt')
+      .map(([name, value]) => [name, {bytes: value.byteLength, sha256: digest(value)}])
+  );
+  const profile = {
+    files: profileFiles,
+    totalBytes: Object.values(profileFiles).reduce((sum, file) => sum + file.bytes, 0)
+  };
+  const archiveSpec = {
+    filename: 'skejja-test.tar.gz',
+    bytes: compressed.byteLength,
+    sha256: digest(compressed),
+    root: SKEJJA_ARCHIVE.root,
+    maxExpandedBytes: 64 * 1024,
+    files: Object.fromEntries(Object.entries(files).map(([name, value]) => [name, value.byteLength]))
+  };
+  return {files, compressed, profile, archiveSpec};
 }
 
 class TestOrtTensor {
@@ -131,6 +201,152 @@ test('Skejja profiles pin both official ONNX variants and their external weights
     SKEJJA_INT8_PROFILE.files['tokenizer.json'].sha256,
     SKEJJA_INT8DYN_PROFILE.files['tokenizer.json'].sha256
   );
+  assert.equal(SKEJJA_ARCHIVE.filename, 'skejja-edge32k-ft6_onnx-int8.tar.gz');
+  assert.equal(SKEJJA_ARCHIVE.bytes, 208260729);
+  assert.equal(SKEJJA_ARCHIVE.sha256, '751e243f1fba39421d36d44a832fc42a34bb74c6bec68f15d956e219e1131f42');
+});
+
+test('Skejja ID-only source shares a verified archive parse between concurrent reads', async () => {
+  const fixture = makeSmallArchiveFixture();
+  const calls = {cache: 0, archive: 0};
+  const progress = [];
+  const source = await openSkejjaSource(
+    {
+      base: new URL('https://example.test/revision/'),
+      cacheEnabled: true,
+      offline: true,
+      useArchive: true,
+      onProgress: (value) => progress.push(value)
+    },
+    fixture.profile,
+    {
+      archiveSpec: fixture.archiveSpec,
+      async openAssetCache(enabled) {
+        assert.equal(enabled, true);
+        calls.cache++;
+        return {name: 'existing-asset-cache'};
+      },
+      async readVerifiedAsset(base, manifest, name, options) {
+        assert.equal(base.href, 'https://example.test/revision/');
+        assert.deepEqual(manifest.files[name], {
+          bytes: fixture.archiveSpec.bytes,
+          sha256: fixture.archiveSpec.sha256
+        });
+        assert.equal(name, fixture.archiveSpec.filename);
+        assert.equal(options.cache.name, 'existing-asset-cache');
+        assert.equal(options.offline, true);
+        assert.equal(options.maxAssetBytes, fixture.archiveSpec.bytes);
+        calls.archive++;
+        return fixture.compressed.buffer.slice(
+          fixture.compressed.byteOffset,
+          fixture.compressed.byteOffset + fixture.compressed.byteLength
+        );
+      }
+    }
+  );
+
+  const [tokenizer, graph, data] = await Promise.all([
+    source.read('tokenizer.json'),
+    source.read('edge-v32k-ft6.int8.onnx'),
+    source.read('edge-v32k-ft6.int8.onnx.data')
+  ]);
+  assert.equal(calls.cache, 1);
+  assert.equal(calls.archive, 1);
+  assert.equal(Buffer.from(tokenizer).toString(), 'tokenizer');
+  assert.equal(Buffer.from(graph).toString(), 'graph');
+  assert.equal(Buffer.from(data).toString(), 'weights');
+  assert.deepEqual(progress, [
+    {loadedBytes: fixture.archiveSpec.bytes, totalBytes: fixture.archiveSpec.bytes, fraction: 1}
+  ]);
+
+  await source.release(['tokenizer.json', 'edge-v32k-ft6.int8.onnx', 'edge-v32k-ft6.int8.onnx.data']);
+  await assert.rejects(source.read('LICENSE'), {code: 'INVALID_ASSET'});
+});
+
+test('Skejja archive parser extracts only pinned-profile files and rejects malformed tar data', async () => {
+  const fixture = makeSmallArchiveFixture();
+  const parsed = await parseSkejjaArchive(fixture.compressed, fixture.profile, {archiveSpec: fixture.archiveSpec});
+  assert.equal(Buffer.from(parsed.get('tokenizer.json')).toString(), 'tokenizer');
+  assert.equal(parsed.has('archive-note.txt'), false);
+
+  const corrupt = makeTarGzip(Object.entries(fixture.files), {corruptChecksum: true});
+  const corruptSpec = {...fixture.archiveSpec, bytes: corrupt.byteLength};
+  await assert.rejects(parseSkejjaArchive(corrupt, fixture.profile, {archiveSpec: corruptSpec}), {
+    code: 'INVALID_ASSET'
+  });
+
+  const duplicate = makeTarGzip([
+    ['tokenizer.json', fixture.files['tokenizer.json']],
+    ['tokenizer.json', fixture.files['tokenizer.json']],
+    ...Object.entries(fixture.files).filter(([name]) => name !== 'tokenizer.json')
+  ]);
+  await assert.rejects(
+    parseSkejjaArchive(duplicate, fixture.profile, {
+      archiveSpec: {...fixture.archiveSpec, bytes: duplicate.byteLength}
+    }),
+    {code: 'INVALID_ASSET'}
+  );
+
+  const truncated = fixture.compressed.subarray(0, fixture.compressed.byteLength - 4);
+  await assert.rejects(
+    parseSkejjaArchive(truncated, fixture.profile, {
+      archiveSpec: {...fixture.archiveSpec, bytes: truncated.byteLength}
+    }),
+    {code: 'INVALID_ASSET'}
+  );
+
+  const aborted = new AbortController();
+  aborted.abort(new DOMException('Cancelled', 'AbortError'));
+  await assert.rejects(
+    parseSkejjaArchive(fixture.compressed, fixture.profile, {archiveSpec: fixture.archiveSpec, signal: aborted.signal}),
+    {
+      name: 'AbortError'
+    }
+  );
+});
+
+test('Skejja archive hashing aborts promptly while a digest is still pending', async () => {
+  const fixture = makeSmallArchiveFixture();
+  const controller = new AbortController();
+  const abortReason = new DOMException('Cancelled during file verification', 'AbortError');
+  let startHash;
+  const hashStarted = new Promise((resolve) => {
+    startHash = resolve;
+  });
+  let settleDigest;
+  let digestSettled = false;
+  const pendingDigest = new Promise((resolve) => {
+    settleDigest = resolve;
+  }).then((value) => {
+    digestSettled = true;
+    return value;
+  });
+  const parsing = parseSkejjaArchive(fixture.compressed, fixture.profile, {
+    archiveSpec: fixture.archiveSpec,
+    signal: controller.signal,
+    hashBytes() {
+      startHash();
+      return pendingDigest;
+    }
+  });
+
+  await hashStarted;
+  controller.abort(abortReason);
+  let timeout;
+  const outcome = await Promise.race([
+    parsing.then(
+      () => ({type: 'resolved'}),
+      (error) => ({type: 'rejected', error})
+    ),
+    new Promise((resolve) => {
+      timeout = setTimeout(() => resolve({type: 'timeout'}), 1000);
+    })
+  ]);
+  clearTimeout(timeout);
+  assert.equal(outcome.type, 'rejected');
+  assert.equal(outcome.error, abortReason);
+  assert.equal(digestSettled, false);
+  settleDigest('');
 });
 
 test('Skejja preview metadata separates row limits from the upstream question default', () => {
@@ -357,6 +573,16 @@ test('Skejja load options are strict and require a matching HTTPS directory', ()
   assert.equal(
     validateSkejjaLoadOptions({model: SKEJJA_INT8_MODEL, assetsUrl: 'https://example.test/models'}).base.href,
     'https://example.test/models/'
+  );
+  const defaults = validateSkejjaLoadOptions({model: SKEJJA_INT8_MODEL});
+  assert.equal(
+    defaults.base.href,
+    'https://huggingface.co/vincyber/skejja-edge32k-ft6/resolve/a076ad7d698b11b15dc70fe067d15c3d1140761f/'
+  );
+  assert.equal(defaults.useArchive, true);
+  assert.equal(
+    validateSkejjaLoadOptions({model: SKEJJA_INT8_MODEL, assetsUrl: 'https://example.test/models'}).useArchive,
+    false
   );
   for (const options of [
     {model: SKEJJA_INT8DYN_MODEL, assetsUrl: 'https://example.test/'},
