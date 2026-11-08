@@ -1,0 +1,903 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
+  "managedJavaScript": [
+    "packages/web-decision/src/abort.js",
+    "packages/web-decision/src/abortable-gpu-device.js",
+    "packages/web-decision/src/asset-batch.js",
+    "packages/web-decision/src/assets.js",
+    "packages/web-decision/src/bounded-response.js",
+    "packages/web-decision/src/clef/contract.mjs",
+    "packages/web-decision/src/clef/graph-inputs.mjs",
+    "packages/web-decision/src/clef/loader.mjs",
+    "packages/web-decision/src/clef/protocol.mjs",
+    "packages/web-decision/src/clef/range.mjs",
+    "packages/web-decision/src/clef/rows.mjs",
+    "packages/web-decision/src/clef/runner.mjs",
+    "packages/web-decision/src/clef/session.mjs",
+    "packages/web-decision/src/clef/softmax.mjs",
+    "packages/web-decision/src/clef/source.mjs",
+    "packages/web-decision/src/clef/tokenizer.mjs",
+    "packages/web-decision/src/clef/upload.mjs",
+    "packages/web-decision/src/crivo/contract.mjs",
+    "packages/web-decision/src/crivo/loader.mjs",
+    "packages/web-decision/src/crivo/protocol.mjs",
+    "packages/web-decision/src/crivo/runner.mjs",
+    "packages/web-decision/src/crivo/session.mjs",
+    "packages/web-decision/src/crivo/source.mjs",
+    "packages/web-decision/src/crivo/tokenizer.mjs",
+    "packages/web-decision/src/d1-omni/contract.mjs",
+    "packages/web-decision/src/d1-omni/loader.mjs",
+    "packages/web-decision/src/d1-omni/protocol.mjs",
+    "packages/web-decision/src/d1-omni/runner.mjs",
+    "packages/web-decision/src/d1-omni/session.mjs",
+    "packages/web-decision/src/d1-omni/source.mjs",
+    "packages/web-decision/src/d1-omni/tokenizer.mjs",
+    "packages/web-decision/src/deberta-single-preview-entry.js",
+    "packages/web-decision/src/deberta-single-preview-registry.mjs",
+    "packages/web-decision/src/deberta/contract.mjs",
+    "packages/web-decision/src/deberta/device.mjs",
+    "packages/web-decision/src/deberta/loader.mjs",
+    "packages/web-decision/src/deberta/model.mjs",
+    "packages/web-decision/src/deberta/packed-readback.mjs",
+    "packages/web-decision/src/deberta/packing.mjs",
+    "packages/web-decision/src/deberta/readback-mode.mjs",
+    "packages/web-decision/src/deberta/typed.mjs",
+    "packages/web-decision/src/deberta/validate.mjs",
+    "packages/web-decision/src/decima-base-clean-preview-entry.mjs",
+    "packages/web-decision/src/decima/contract.mjs",
+    "packages/web-decision/src/decima/loader.mjs",
+    "packages/web-decision/src/decima/normalize.mjs",
+    "packages/web-decision/src/decima/protocol.mjs",
+    "packages/web-decision/src/decima/runner.mjs",
+    "packages/web-decision/src/decima/session.mjs",
+    "packages/web-decision/src/decima/source.mjs",
+    "packages/web-decision/src/decima/tokenizer.mjs",
+    "packages/web-decision/src/decima/typed.mjs",
+    "packages/web-decision/src/elephant/contract.mjs",
+    "packages/web-decision/src/elephant/graph-inputs.mjs",
+    "packages/web-decision/src/elephant/loader.mjs",
+    "packages/web-decision/src/elephant/protocol.mjs",
+    "packages/web-decision/src/elephant/runner.mjs",
+    "packages/web-decision/src/elephant/session.mjs",
+    "packages/web-decision/src/elephant/source.mjs",
+    "packages/web-decision/src/elephant/tokenizer.mjs",
+    "packages/web-decision/src/ettin/contract.mjs",
+    "packages/web-decision/src/ettin/loader.mjs",
+    "packages/web-decision/src/ettin/protocol.mjs",
+    "packages/web-decision/src/ettin/runner.mjs",
+    "packages/web-decision/src/ettin/session.mjs",
+    "packages/web-decision/src/ettin/source.mjs",
+    "packages/web-decision/src/ettin/tokenizer.mjs",
+    "packages/web-decision/src/fp16-device.js",
+    "packages/web-decision/src/gliner-mobile/contract.mjs",
+    "packages/web-decision/src/gliner-mobile/loader.mjs",
+    "packages/web-decision/src/gliner-mobile/protocol.mjs",
+    "packages/web-decision/src/gliner-mobile/runner.mjs",
+    "packages/web-decision/src/gliner-mobile/session.mjs",
+    "packages/web-decision/src/gliner-mobile/source.mjs",
+    "packages/web-decision/src/gliner-mobile/tokenizer.mjs",
+    "packages/web-decision/src/gpu-preflight.js",
+    "packages/web-decision/src/gpu-session-utils.js",
+    "packages/web-decision/src/h2o/binding.mjs",
+    "packages/web-decision/src/h2o/hasher.mjs",
+    "packages/web-decision/src/h2o/loader.mjs",
+    "packages/web-decision/src/h2o/owner.mjs",
+    "packages/web-decision/src/h2o/plan.mjs",
+    "packages/web-decision/src/h2o/protocol.mjs",
+    "packages/web-decision/src/h2o/runner.mjs",
+    "packages/web-decision/src/h2o/session.mjs",
+    "packages/web-decision/src/h2o/sha256.mjs",
+    "packages/web-decision/src/h2o/signal.mjs",
+    "packages/web-decision/src/h2o/source-entry.mjs",
+    "packages/web-decision/src/h2o/source-evidence.mjs",
+    "packages/web-decision/src/h2o/source.mjs",
+    "packages/web-decision/src/h2o/strict-json.mjs",
+    "packages/web-decision/src/h2o/teardown.mjs",
+    "packages/web-decision/src/h2o/tokenizer-adapter.mjs",
+    "packages/web-decision/src/h2o/tokenizer.mjs",
+    "packages/web-decision/src/h2o/upload.mjs",
+    "packages/web-decision/src/imajev/candidate-loader.mjs",
+    "packages/web-decision/src/imajev/contract.mjs",
+    "packages/web-decision/src/imajev/fixture-session.mjs",
+    "packages/web-decision/src/imajev/loader.mjs",
+    "packages/web-decision/src/imajev/plan.mjs",
+    "packages/web-decision/src/imajev/protocol.mjs",
+    "packages/web-decision/src/imajev/result-processor.mjs",
+    "packages/web-decision/src/imajev/safe-outcome.mjs",
+    "packages/web-decision/src/imajev/session.mjs",
+    "packages/web-decision/src/imajev/source.mjs",
+    "packages/web-decision/src/imajev/upload.mjs",
+    "packages/web-decision/src/index.js",
+    "packages/web-decision/src/kev-deberta-preview-entry.js",
+    "packages/web-decision/src/kev-deberta-preview-registry.js",
+    "packages/web-decision/src/kev-deberta-reflexes-preview-entry.js",
+    "packages/web-decision/src/kev-deberta-reflexes-preview-registry.js",
+    "packages/web-decision/src/kev-gpu.js",
+    "packages/web-decision/src/kev-loader.js",
+    "packages/web-decision/src/kev-preview-entry.js",
+    "packages/web-decision/src/kev-preview-registry.js",
+    "packages/web-decision/src/kev-reflexes.js",
+    "packages/web-decision/src/kev.js",
+    "packages/web-decision/src/kev/system-one.mjs",
+    "packages/web-decision/src/kev06/bundled-assets.js",
+    "packages/web-decision/src/kev06/contract.js",
+    "packages/web-decision/src/kev06/stable-bundled-assets.js",
+    "packages/web-decision/src/kev06/upstream-contract.js",
+    "packages/web-decision/src/kev06/upstream-source.mjs",
+    "packages/web-decision/src/kev08.js",
+    "packages/web-decision/src/kev08/contract.js",
+    "packages/web-decision/src/kev08/device.js",
+    "packages/web-decision/src/kev08/loader.js",
+    "packages/web-decision/src/kev08/session.js",
+    "packages/web-decision/src/kev08/system-one.mjs",
+    "packages/web-decision/src/laya-typed/contract.mjs",
+    "packages/web-decision/src/laya-typed/loader.mjs",
+    "packages/web-decision/src/laya/contract.mjs",
+    "packages/web-decision/src/laya/loader.mjs",
+    "packages/web-decision/src/laya/protocol.mjs",
+    "packages/web-decision/src/laya/runner.mjs",
+    "packages/web-decision/src/laya/session.mjs",
+    "packages/web-decision/src/laya/source.mjs",
+    "packages/web-decision/src/laya/tokenizer.mjs",
+    "packages/web-decision/src/load-device-loss.js",
+    "packages/web-decision/src/mapika-q4/contract.js",
+    "packages/web-decision/src/mapika-q4/device.js",
+    "packages/web-decision/src/mapika-q4/loader.js",
+    "packages/web-decision/src/mapika-q4/upload.js",
+    "packages/web-decision/src/mapika.js",
+    "packages/web-decision/src/mapika/contract.js",
+    "packages/web-decision/src/mapika/device.js",
+    "packages/web-decision/src/mapika/loader.js",
+    "packages/web-decision/src/mapika/session.js",
+    "packages/web-decision/src/mapika/system-one.mjs",
+    "packages/web-decision/src/mapika/upload.js",
+    "packages/web-decision/src/mapika4b/contract.mjs",
+    "packages/web-decision/src/mapika4b/loader.mjs",
+    "packages/web-decision/src/mapika4b/runner.mjs",
+    "packages/web-decision/src/mapika4b/session.mjs",
+    "packages/web-decision/src/mapika4b/source.mjs",
+    "packages/web-decision/src/mapika4b/tokenizer.mjs",
+    "packages/web-decision/src/model-assets.js",
+    "packages/web-decision/src/model-family.js",
+    "packages/web-decision/src/model-registry.js",
+    "packages/web-decision/src/model-source.js",
+    "packages/web-decision/src/model.js",
+    "packages/web-decision/src/nari/adapter.mjs",
+    "packages/web-decision/src/nari/checkpoints.mjs",
+    "packages/web-decision/src/nari/loader.mjs",
+    "packages/web-decision/src/nari/options.mjs",
+    "packages/web-decision/src/nari/protocol.mjs",
+    "packages/web-decision/src/nari/runner.mjs",
+    "packages/web-decision/src/nari/runtime.mjs",
+    "packages/web-decision/src/nari/scope.mjs",
+    "packages/web-decision/src/nari/session.mjs",
+    "packages/web-decision/src/nari/source.mjs",
+    "packages/web-decision/src/nari/tokenizer.mjs",
+    "packages/web-decision/src/nari/upload-plan.mjs",
+    "packages/web-decision/src/nari/upload.mjs",
+    "packages/web-decision/src/nari/variants.mjs",
+    "packages/web-decision/src/opendecider-nano/contract.mjs",
+    "packages/web-decision/src/opendecider-nano/gpu-compat.mjs",
+    "packages/web-decision/src/opendecider-nano/loader.mjs",
+    "packages/web-decision/src/opendecider-nano/protocol.mjs",
+    "packages/web-decision/src/opendecider-nano/runner.mjs",
+    "packages/web-decision/src/opendecider-nano/session.mjs",
+    "packages/web-decision/src/opendecider-nano/source.mjs",
+    "packages/web-decision/src/opendecider-nano/tokenizer.mjs",
+    "packages/web-decision/src/opendecider-nano/typed.mjs",
+    "packages/web-decision/src/parameter-upload.mjs",
+    "packages/web-decision/src/pinned-manifest.js",
+    "packages/web-decision/src/pinned-text-loader.js",
+    "packages/web-decision/src/pplx/contract.mjs",
+    "packages/web-decision/src/pplx/graph-inputs.mjs",
+    "packages/web-decision/src/pplx/loader.mjs",
+    "packages/web-decision/src/pplx/protocol.mjs",
+    "packages/web-decision/src/pplx/runner.mjs",
+    "packages/web-decision/src/pplx/session.mjs",
+    "packages/web-decision/src/pplx/source.mjs",
+    "packages/web-decision/src/pplx/tokenizer.mjs",
+    "packages/web-decision/src/pplx/upload-parameters.mjs",
+    "packages/web-decision/src/request-fields.mjs",
+    "packages/web-decision/src/runtime-lifecycle.js",
+    "packages/web-decision/src/safedecide/contract.mjs",
+    "packages/web-decision/src/safedecide/loader.mjs",
+    "packages/web-decision/src/safedecide/protocol.mjs",
+    "packages/web-decision/src/safedecide/runner.mjs",
+    "packages/web-decision/src/safedecide/session.mjs",
+    "packages/web-decision/src/safedecide/source.mjs",
+    "packages/web-decision/src/safedecide/tokenizer.mjs",
+    "packages/web-decision/src/shard-prefetch.js",
+    "packages/web-decision/src/skejja-preview-entry.mjs",
+    "packages/web-decision/src/skejja-preview-registry.mjs",
+    "packages/web-decision/src/skejja/calibration.mjs",
+    "packages/web-decision/src/skejja/contract.mjs",
+    "packages/web-decision/src/skejja/loader.mjs",
+    "packages/web-decision/src/skejja/protocol.mjs",
+    "packages/web-decision/src/skejja/runner.mjs",
+    "packages/web-decision/src/skejja/session.mjs",
+    "packages/web-decision/src/skejja/source.mjs",
+    "packages/web-decision/src/skejja/tokenizer.mjs",
+    "packages/web-decision/src/stable-models.js",
+    "packages/web-decision/src/strands/choice.mjs",
+    "packages/web-decision/src/strands/contract.mjs",
+    "packages/web-decision/src/strands/disposal-guard.mjs",
+    "packages/web-decision/src/strands/fused-upload.mjs",
+    "packages/web-decision/src/strands/gemma4-e2b-contract.mjs",
+    "packages/web-decision/src/strands/gemma4-e2b-loader.mjs",
+    "packages/web-decision/src/strands/gemma4-e2b-runner.mjs",
+    "packages/web-decision/src/strands/gemma4-e2b-session.mjs",
+    "packages/web-decision/src/strands/gemma4-manifest.mjs",
+    "packages/web-decision/src/strands/gemma4-progress.mjs",
+    "packages/web-decision/src/strands/gemma4-protocol.mjs",
+    "packages/web-decision/src/strands/gemma4-upload.mjs",
+    "packages/web-decision/src/strands/loader-core.mjs",
+    "packages/web-decision/src/strands/loader.mjs",
+    "packages/web-decision/src/strands/manifest.mjs",
+    "packages/web-decision/src/strands/preflight.mjs",
+    "packages/web-decision/src/strands/protocol.mjs",
+    "packages/web-decision/src/strands/range-cache.mjs",
+    "packages/web-decision/src/strands/range-reader.mjs",
+    "packages/web-decision/src/strands/range-source.mjs",
+    "packages/web-decision/src/strands/runner.mjs",
+    "packages/web-decision/src/strands/scope.mjs",
+    "packages/web-decision/src/strands/session.mjs",
+    "packages/web-decision/src/strands/source-loader-internal.mjs",
+    "packages/web-decision/src/tamev/contract.mjs",
+    "packages/web-decision/src/tamev/loader.mjs",
+    "packages/web-decision/src/tamev/protocol.mjs",
+    "packages/web-decision/src/tamev/runner.mjs",
+    "packages/web-decision/src/tamev/session.mjs",
+    "packages/web-decision/src/tamev/source.mjs",
+    "packages/web-decision/src/tamev/tokenizer.mjs",
+    "packages/web-decision/src/tamev/typed.mjs",
+    "packages/web-decision/src/tensor-index.js",
+    "packages/web-decision/src/tensor-shard-upload.js",
+    "packages/web-decision/src/tinydecide-preview-entry.js",
+    "packages/web-decision/src/tinydecide-preview-registry.js",
+    "packages/web-decision/src/tinydecide/contract.mjs",
+    "packages/web-decision/src/tinydecide/corrections.js",
+    "packages/web-decision/src/tinydecide/engine.js",
+    "packages/web-decision/src/tinydecide/inputs.mjs",
+    "packages/web-decision/src/tinydecide/loader.mjs",
+    "packages/web-decision/src/tinydecide/session.mjs",
+    "packages/web-decision/src/tinydecide/source.mjs",
+    "packages/web-decision/src/verdict/contract.mjs",
+    "packages/web-decision/src/verdict/loader.mjs",
+    "packages/web-decision/src/verdict/protocol.mjs",
+    "packages/web-decision/src/verdict/runner.mjs",
+    "packages/web-decision/src/verdict/session.mjs",
+    "packages/web-decision/src/verdict/source.mjs",
+    "packages/web-decision/src/verdict/tokenizer.mjs",
+    "packages/web-decision/src/xdecision/contract.mjs",
+    "packages/web-decision/src/xdecision/loader.mjs",
+    "packages/web-decision/test/abortable-gpu-device.test.mjs",
+    "packages/web-decision/test/asset-batch.test.mjs",
+    "packages/web-decision/test/assets.test.mjs",
+    "packages/web-decision/test/bounded-response.test.mjs",
+    "packages/web-decision/test/bundler-notices.test.mjs",
+    "packages/web-decision/test/cache-cancellation.test.mjs",
+    "packages/web-decision/test/clef-loader.test.mjs",
+    "packages/web-decision/test/clef-protocol.test.mjs",
+    "packages/web-decision/test/clef-rows.test.mjs",
+    "packages/web-decision/test/clef-runner.test.mjs",
+    "packages/web-decision/test/clef-session.test.mjs",
+    "packages/web-decision/test/clef-source.test.mjs",
+    "packages/web-decision/test/clef-tokenizer.test.mjs",
+    "packages/web-decision/test/clef-upload.test.mjs",
+    "packages/web-decision/test/crivo.test.mjs",
+    "packages/web-decision/test/d1-omni.test.mjs",
+    "packages/web-decision/test/deberta-device.test.mjs",
+    "packages/web-decision/test/deberta-loader.test.mjs",
+    "packages/web-decision/test/deberta-packed.test.mjs",
+    "packages/web-decision/test/deberta-readback-mode.test.mjs",
+    "packages/web-decision/test/deberta-typed.test.mjs",
+    "packages/web-decision/test/deberta.test.mjs",
+    "packages/web-decision/test/decima.test.mjs",
+    "packages/web-decision/test/decision-cancellation.test.mjs",
+    "packages/web-decision/test/decision-dispose-reentrancy.test.mjs",
+    "packages/web-decision/test/device-loss-cleanup.test.mjs",
+    "packages/web-decision/test/elephant-cancellation.test.mjs",
+    "packages/web-decision/test/elephant-loader-review.test.mjs",
+    "packages/web-decision/test/elephant-protocol-review.test.mjs",
+    "packages/web-decision/test/elephant-reference.test.mjs",
+    "packages/web-decision/test/elephant-variants.test.mjs",
+    "packages/web-decision/test/emscripten-notice.test.mjs",
+    "packages/web-decision/test/ettin.test.mjs",
+    "packages/web-decision/test/fixtures/imajev.mjs",
+    "packages/web-decision/test/gliner-mobile.test.mjs",
+    "packages/web-decision/test/gpu-preflight.test.mjs",
+    "packages/web-decision/test/h2o-adapter.test.mjs",
+    "packages/web-decision/test/h2o-dlight-source.test.mjs",
+    "packages/web-decision/test/h2o-dual-source.test.mjs",
+    "packages/web-decision/test/h2o-loader.test.mjs",
+    "packages/web-decision/test/h2o-packaged-source.test.mjs",
+    "packages/web-decision/test/h2o-plan-abort.test.mjs",
+    "packages/web-decision/test/h2o-session.test.mjs",
+    "packages/web-decision/test/h2o-source.test.mjs",
+    "packages/web-decision/test/h2o-teardown-loader.test.mjs",
+    "packages/web-decision/test/h2o-tokenizer-snapshot.test.mjs",
+    "packages/web-decision/test/imajev-candidate-loader.test.mjs",
+    "packages/web-decision/test/imajev-disposal.test.mjs",
+    "packages/web-decision/test/imajev-loader.test.mjs",
+    "packages/web-decision/test/imajev-session.test.mjs",
+    "packages/web-decision/test/imajev-source.test.mjs",
+    "packages/web-decision/test/imajev-upload.test.mjs",
+    "packages/web-decision/test/kanana-candidates.test.mjs",
+    "packages/web-decision/test/kanana-chat-template.test.mjs",
+    "packages/web-decision/test/kanana-core-modules.mjs",
+    "packages/web-decision/test/kanana-encoded-image.test.mjs",
+    "packages/web-decision/test/kanana-image-ingress.test.mjs",
+    "packages/web-decision/test/kanana-image-processing.test.mjs",
+    "packages/web-decision/test/kanana-magick-image.test.mjs",
+    "packages/web-decision/test/kanana-pnm-image.test.mjs",
+    "packages/web-decision/test/kanana-protocol.test.mjs",
+    "packages/web-decision/test/kanana-scoring.test.mjs",
+    "packages/web-decision/test/kanana-tiff16-image.test.mjs",
+    "packages/web-decision/test/kanana-tokenizer.test.mjs",
+    "packages/web-decision/test/kanana-truncation.test.mjs",
+    "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
+    "packages/web-decision/test/kev-deberta-preview-registry.test.mjs",
+    "packages/web-decision/test/kev-deberta-reflexes-preview-registry.test.mjs",
+    "packages/web-decision/test/kev-gpu.test.mjs",
+    "packages/web-decision/test/kev-loader.test.mjs",
+    "packages/web-decision/test/kev-preview-entry.test.mjs",
+    "packages/web-decision/test/kev-reflexes.test.mjs",
+    "packages/web-decision/test/kev-systemone-render-depth.test.mjs",
+    "packages/web-decision/test/kev-systemone.test.mjs",
+    "packages/web-decision/test/kev.test.mjs",
+    "packages/web-decision/test/kev06-asset-import-loader.mjs",
+    "packages/web-decision/test/kev06-asset-packager.test.mjs",
+    "packages/web-decision/test/kev06-upstream-source.test.mjs",
+    "packages/web-decision/test/kev08-contract.test.mjs",
+    "packages/web-decision/test/kev08-systemone.test.mjs",
+    "packages/web-decision/test/kev08.test.mjs",
+    "packages/web-decision/test/laya.test.mjs",
+    "packages/web-decision/test/load-device-loss.test.mjs",
+    "packages/web-decision/test/mapika-contract.test.mjs",
+    "packages/web-decision/test/mapika-device.test.mjs",
+    "packages/web-decision/test/mapika-q4-contract.test.mjs",
+    "packages/web-decision/test/mapika-q4-device.test.mjs",
+    "packages/web-decision/test/mapika-q4-upload.test.mjs",
+    "packages/web-decision/test/mapika-session.test.mjs",
+    "packages/web-decision/test/mapika-systemone.test.mjs",
+    "packages/web-decision/test/mapika-upload.test.mjs",
+    "packages/web-decision/test/mapika.test.mjs",
+    "packages/web-decision/test/mapika4b-loader.test.mjs",
+    "packages/web-decision/test/mapika4b-runner.test.mjs",
+    "packages/web-decision/test/mapika4b-session.test.mjs",
+    "packages/web-decision/test/mapika4b-source.test.mjs",
+    "packages/web-decision/test/model-memory.test.mjs",
+    "packages/web-decision/test/model-registry.test.mjs",
+    "packages/web-decision/test/model-source.test.mjs",
+    "packages/web-decision/test/nari-adapter.test.mjs",
+    "packages/web-decision/test/nari-checkpoints.test.mjs",
+    "packages/web-decision/test/nari-loader.test.mjs",
+    "packages/web-decision/test/nari-runner.test.mjs",
+    "packages/web-decision/test/nari-runtime.test.mjs",
+    "packages/web-decision/test/nari-scope.test.mjs",
+    "packages/web-decision/test/nari-session.test.mjs",
+    "packages/web-decision/test/nari-source.test.mjs",
+    "packages/web-decision/test/nari-tokenizer.test.mjs",
+    "packages/web-decision/test/nari-upload.test.mjs",
+    "packages/web-decision/test/opendecider-nano-gpu-compat.test.mjs",
+    "packages/web-decision/test/opendecider-nano.test.mjs",
+    "packages/web-decision/test/parallel-model-assets.test.mjs",
+    "packages/web-decision/test/parameter-upload-count.test.mjs",
+    "packages/web-decision/test/pinned-text-loader.test.mjs",
+    "packages/web-decision/test/pplx-codes.test.mjs",
+    "packages/web-decision/test/pplx-loader.test.mjs",
+    "packages/web-decision/test/pplx-runner.test.mjs",
+    "packages/web-decision/test/pplx-session.test.mjs",
+    "packages/web-decision/test/pplx-source.test.mjs",
+    "packages/web-decision/test/pplx-tokenizer.test.mjs",
+    "packages/web-decision/test/pplx-upload.test.mjs",
+    "packages/web-decision/test/preview-entrypoints.test.mjs",
+    "packages/web-decision/test/request-field-sessions.test.mjs",
+    "packages/web-decision/test/request-fields.test.mjs",
+    "packages/web-decision/test/safedecide-loader.test.mjs",
+    "packages/web-decision/test/safedecide-protocol.test.mjs",
+    "packages/web-decision/test/safedecide-runner.test.mjs",
+    "packages/web-decision/test/safedecide-tokenizer.test.mjs",
+    "packages/web-decision/test/shard-prefetch.test.mjs",
+    "packages/web-decision/test/skejja.test.mjs",
+    "packages/web-decision/test/stable-models.test.mjs",
+    "packages/web-decision/test/strands-device-loss.test.mjs",
+    "packages/web-decision/test/strands-fake-tokenizer.mjs",
+    "packages/web-decision/test/strands-gemma4-loader.test.mjs",
+    "packages/web-decision/test/strands-gemma4-manifest.test.mjs",
+    "packages/web-decision/test/strands-gemma4-progress.test.mjs",
+    "packages/web-decision/test/strands-gemma4-protocol.test.mjs",
+    "packages/web-decision/test/strands-gemma4-runner.test.mjs",
+    "packages/web-decision/test/strands-gemma4-session.test.mjs",
+    "packages/web-decision/test/strands-gemma4-upload.test.mjs",
+    "packages/web-decision/test/strands-input-snapshot.test.mjs",
+    "packages/web-decision/test/strands-manifest.test.mjs",
+    "packages/web-decision/test/strands-options.test.mjs",
+    "packages/web-decision/test/strands-range-cache.test.mjs",
+    "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
+    "packages/web-decision/test/strands-sync-observation.test.mjs",
+    "packages/web-decision/test/strands-sync-unsettled.test.mjs",
+    "packages/web-decision/test/strands-unhandled-fixture.mjs",
+    "packages/web-decision/test/stream-helpers.mjs",
+    "packages/web-decision/test/tamev.test.mjs",
+    "packages/web-decision/test/tinydecide.test.mjs",
+    "packages/web-decision/test/verdict.test.mjs",
+    "packages/web-decision/test/xdecision-contract.test.mjs",
+    "scripts/ci/check-example.mjs",
+    "scripts/ci/check-release-types.mjs",
+    "scripts/ci/check-uncovered.mjs",
+    "scripts/ci/check_cognitive_complexity.mjs",
+    "scripts/ci/coverage-groups.mjs",
+    "scripts/ci/coverage-groups.test.mjs",
+    "scripts/ci/test_cognitive_complexity.mjs",
+    "scripts/ci/uncovered-files.mjs",
+    "scripts/fetch-model.test.mjs",
+    "scripts/release/kev-current-source-preview-package-policy.mjs",
+    "scripts/release/kev-current-source-preview-safety.mjs",
+    "tests/browser/firefox-app-data-teardown.mjs",
+    "tests/browser/kev-upstream-provider.vite.config.mjs",
+    "tests/browser/kev06-real-webgpu.spec.mjs",
+    "tests/browser/stable-model-id.spec.mjs",
+    "tests/browser/strands-qwen2-real-webgpu.spec.mjs",
+    "tests/run-kev-upstream-provider.mjs"
+  ],
+  "exceptions": [
+    {
+      "path": "releases/web-decision-0.1.0/build.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/pack.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/prepare-asset-pack.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/prepare-asset-pack.test.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/release-integrity.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/release-integrity.test.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/abort.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/abortable-gpu-device.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/asset-batch.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/assets.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/bounded-response.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/browser-only-ws.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/gpu-preflight.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-gpu.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-loader.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-preview-entry.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-preview-registry.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev-reflexes.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev/system-one.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/kev06/contract.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/load-device-loss.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/model-assets.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/model-source.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/model.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/pinned-manifest.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/request-fields.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/runtime-lifecycle.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/shard-prefetch.js",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/strands/disposal-guard.mjs",
+      "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/build.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/pack.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/prepare-asset-pack.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/prepare-asset-pack.test.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/release-integrity.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/release-integrity.test.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/abort.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/abortable-gpu-device.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/asset-batch.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/assets.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/bounded-response.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/browser-only-ws.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/gpu-preflight.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev-gpu.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev-loader.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev-preview-entry.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev-preview-registry.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev-reflexes.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev/system-one.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/kev06/contract.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/load-device-loss.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/model-assets.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/model-source.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/model.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/pinned-manifest.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/request-fields.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/runtime-lifecycle.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/shard-prefetch.js",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/strands/disposal-guard.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/contract.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/loader.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/protocol.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/runner.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/session.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/source.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/tokenizer.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/source/overlay/packages/web-decision/src/tamev/typed.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.2.0/test/model-contract.test.mjs",
+      "reason": "Immutable historical release 0.2.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/build.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/pack.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/package/dist/index.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/prepare-asset-pack.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/prepare-asset-pack.test.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/release-integrity.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/release-integrity.test.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/abort.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/abortable-gpu-device.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/asset-batch.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/assets.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/bounded-response.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/browser-only-ws.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/gpu-preflight.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev-gpu.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev-loader.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev-preview-entry.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev-preview-registry.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev-reflexes.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev/system-one.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/kev06/contract.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/load-device-loss.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/model-assets.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/model-source.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/model.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/pinned-manifest.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/request-fields.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/runtime-lifecycle.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/shard-prefetch.js",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/strands/disposal-guard.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/contract.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/loader.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/protocol.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/runner.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/session.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/source.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/tokenizer.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/source/overlay/packages/web-decision/src/tamev/typed.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/test/model-contract.test.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/test/playwright.config.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "releases/web-decision-0.3.0/test/tamev-micro-wasm.spec.mjs",
+      "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    }
+  ]
+}

@@ -6,3 +6,6 @@ overrides:
 verifyDepsBeforeRun: error
 minimumReleaseAge: 1440
 minimumReleaseAgeIgnoreMissingTime: false
+allowBuilds:
+  esbuild: false
+  protobufjs: false

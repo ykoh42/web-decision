@@ -35,7 +35,12 @@
     "check:package": "tsx scripts/ci/check-package.ts",
     "verify:package": "pnpm build:package && pnpm check:package",
     "test:example": "node scripts/ci/check-example.mjs",
-    "test:browser:strands-qwen2": "pnpm exec playwright test --config=playwright.config.ts tests/browser/strands-qwen2-real-webgpu.spec.mjs"
+    "test:browser:strands-qwen2": "pnpm exec playwright test --config=playwright.config.ts tests/browser/strands-qwen2-real-webgpu.spec.mjs",
+    "typecheck": "tsc --project tsconfig.strict.json",
+    "test:typescript-policy": "node --import tsx --test scripts/ci/typescript-policy.test.mts",
+    "check:javascript-policy": "node --import tsx scripts/ci/check-typescript-policy.mts",
+    "check:typescript": "pnpm run typecheck && pnpm run test:typescript-policy && pnpm run check:javascript-policy",
+    "check:typescript:complete": "pnpm run typecheck && pnpm run test:typescript-policy && node --import tsx scripts/ci/check-typescript-policy.mts --require-complete"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

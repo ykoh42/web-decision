@@ -11,6 +11,37 @@ permissions:
   contents: read
 
 jobs:
+  typescript:
+    name: TypeScript migration gate (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20.19.0, 22.13.0, 24.0.0]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.18.0
+          run_install: false
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check TypeScript and JavaScript migration policy
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
+            export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          fi
+          pnpm run check:typescript:complete
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 30
