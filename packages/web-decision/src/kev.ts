@@ -252,16 +252,17 @@ export function unpackKevScores(logits: unknown, packed: PackedKevRequest): KevS
   return {
     tokenCount: packed.ids.length,
     answers: packed.groups.map((group) => {
-      const scores = group.indices.map((i) => scoreValues[i]),
+      // Packing creates one valid token index and score per option.
+      const scores = group.indices.map((i) => scoreValues[i]!),
         max = Math.max(...scores);
       const exps = scores.map((score) => Math.exp(score - max));
       const sum = exps.reduce((a, b) => a + b, 0);
       const probabilities = exps.map((value) => value / sum);
       const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
       return {
-        selected: group.options[selectedIndex],
+        selected: group.options[selectedIndex]!,
         selectedIndex,
-        probabilities: group.options.map((option, i) => ({option, probability: probabilities[i], logit: scores[i]}))
+        probabilities: group.options.map((option, i) => ({option, probability: probabilities[i]!, logit: scores[i]!}))
       };
     })
   };

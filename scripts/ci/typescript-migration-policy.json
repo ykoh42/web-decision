@@ -118,7 +118,6 @@
     "packages/web-decision/src/kev-preview-entry.js",
     "packages/web-decision/src/kev-preview-registry.js",
     "packages/web-decision/src/kev-reflexes.js",
-    "packages/web-decision/src/kev.js",
     "packages/web-decision/src/kev/system-one.mjs",
     "packages/web-decision/src/kev06/bundled-assets.js",
     "packages/web-decision/src/kev06/contract.js",
