@@ -26,31 +26,6 @@
   ],
   "findings": [
     {
-      "file": "packages/web-decision/src/deberta/contract.mjs",
-      "identity": "module/function:validateDebertaTensorCache",
-      "score": 29
-    },
-    {
-      "file": "packages/web-decision/src/deberta/model.mjs",
-      "identity": "module/class:ExperimentalDebertaSession/member:MethodDeclaration:releaseCachedMemory",
-      "score": 16
-    },
-    {
-      "file": "packages/web-decision/src/deberta/model.mjs",
-      "identity": "module/class:ExperimentalDebertaSession/member:MethodDeclaration:run",
-      "score": 17
-    },
-    {
-      "file": "packages/web-decision/src/deberta/packed-readback.mjs",
-      "identity": "module/function:runWithPackedReadback",
-      "score": 32
-    },
-    {
-      "file": "packages/web-decision/src/deberta/validate.mjs",
-      "identity": "module/function:validateDebertaTensors",
-      "score": 24
-    },
-    {
       "file": "packages/web-decision/src/tamev/loader.mjs",
       "identity": "module/function:validateTamevLoadOptions",
       "score": 17

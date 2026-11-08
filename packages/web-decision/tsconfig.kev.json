@@ -11,6 +11,7 @@
     "allowJs": true,
     "checkJs": false,
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true
   },
   "files": [
@@ -18,6 +19,10 @@
     "src/kev-loader.ts",
     "src/kev06/upstream-source.mts",
     "src/runtime/tvm-source.d.ts",
+    "src/deberta/contract.mts",
+    "src/deberta/model.mts",
+    "src/deberta/packed-readback.mts",
+    "src/deberta/validate.mts",
     "test/kev-loader.test.mts",
     "test/kev06-upstream-source.test.mts"
   ]
