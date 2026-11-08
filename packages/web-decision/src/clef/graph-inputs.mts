@@ -1,16 +1,17 @@
 // Choice-only packed protocol to the experimental Clef graph's 11 user tensors.
 import {validatePacked} from './protocol.mjs';
+import type {ClefChoiceGraph, ClefQuestion, GraphInput, GraphInputData, GraphInputDType} from './types.mjs';
 
-const mappings = new WeakMap();
-function item(name, dtype, shape, data) {
+const mappings = new WeakMap<ClefChoiceGraph, number[]>();
+function item(name: string, dtype: GraphInputDType, shape: number[], data: GraphInputData): GraphInput {
   return {name, dtype, shape, data};
 }
 
-function collectSpans(ids, questions) {
-  const gather = [],
-    seen = new Map(),
-    spans = [],
-    owners = [],
+function collectSpans(ids: number[], questions: ClefQuestion[]) {
+  const gather: number[] = [],
+    seen = new Map<number, number>(),
+    spans: Array<[number, number]> = [],
+    owners: number[] = [],
     offsets = [0];
   for (const [index, question] of questions.entries()) {
     for (const span of question.option_spans) {
@@ -18,6 +19,7 @@ function collectSpans(ids, questions) {
       owners.push(index);
       for (let pos = span[0]; pos < span[1]; pos++) {
         const id = ids[pos];
+        if (id === undefined) throw Error('Invalid choice option span');
         if (!seen.has(id)) {
           seen.set(id, gather.length);
           gather.push(id);
@@ -29,7 +31,7 @@ function collectSpans(ids, questions) {
   return {gather, seen, spans, owners, offsets};
 }
 
-export function buildChoiceInputs(value) {
+export function buildChoiceInputs(value: unknown): ClefChoiceGraph {
   const packed = structuredClone(value);
   validatePacked(packed);
   const ids = packed.ids,
@@ -56,10 +58,18 @@ export function buildChoiceInputs(value) {
   }
   for (const [index, [start, end]] of spans.entries()) {
     omask.fill(1, index * n + start, index * n + end);
-    owner[index * q + owners[index]] = 1;
-    for (let pos = start; pos < end; pos++) counts[index * k + seen.get(ids[pos])]++;
+    const questionOwner = owners[index];
+    if (questionOwner === undefined) throw Error('Invalid choice option owner');
+    owner[index * q + questionOwner] = 1;
+    for (let pos = start; pos < end; pos++) {
+      const id = ids[pos];
+      const gatherIndex = id === undefined ? undefined : seen.get(id);
+      if (gatherIndex === undefined) throw Error('Invalid choice gather mapping');
+      const countIndex = index * k + gatherIndex;
+      counts[countIndex] = (counts[countIndex] ?? 0) + 1;
+    }
   }
-  const graph = {
+  const graph: ClefChoiceGraph = {
     packed,
     offsets,
     inputs: [
@@ -80,16 +90,11 @@ export function buildChoiceInputs(value) {
   return graph;
 }
 
-export function splitChoiceLogits(graph, logits) {
+export function splitChoiceLogits(graph: ClefChoiceGraph, logits: unknown): Float32Array[] {
   const offsets = mappings.get(graph);
-  if (
-    !offsets ||
-    !Array.isArray(graph.offsets) ||
-    graph.offsets.length !== offsets.length ||
-    !offsets.every((value, i) => graph.offsets[i] === value)
-  )
+  if (!offsets || graph.offsets.length !== offsets.length || !offsets.every((value, i) => graph.offsets[i] === value))
     throw Error('Invalid graph output mapping');
   if (!(logits instanceof Float32Array) || logits.length !== offsets.at(-1) || logits.some((v) => !Number.isFinite(v)))
     throw Error('Invalid graph FP32 output');
-  return offsets.slice(0, -1).map((start, index) => logits.slice(start, offsets[index + 1]));
+  return offsets.slice(0, -1).map((start, index) => logits.slice(start, offsets[index + 1] ?? start));
 }

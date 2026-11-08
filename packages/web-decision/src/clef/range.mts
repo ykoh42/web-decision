@@ -1,8 +1,14 @@
 import {assetUrl, sha256, waitForAbort} from '../assets.js';
 import {cancelResponse, readBoundedResponse} from '../bounded-response.js';
 import {WebDecisionError} from '../kev.js';
+import type {ClefRangePart, ClefTensorEntry} from './types.mjs';
 
-export async function readClefRange(base, entry, part, signal) {
+export async function readClefRange(
+  base: URL,
+  entry: ClefTensorEntry,
+  part: ClefRangePart,
+  signal?: AbortSignal
+): Promise<ArrayBuffer> {
   if (
     !entry ||
     !part ||
@@ -22,8 +28,8 @@ export async function readClefRange(base, entry, part, signal) {
     response = await waitForAbort(
       () =>
         fetch(url, {
-          signal,
           redirect: 'error',
+          ...(signal ? {signal} : {}),
           headers: {
             Range: `bytes=${part.offset}-${part.offset + part.length - 1}`
           }
@@ -42,7 +48,7 @@ export async function readClefRange(base, entry, part, signal) {
       (encoding !== null && encoding.toLowerCase() !== 'identity')
     )
       throw new Error('Invalid Clef range response');
-    const bytes = await readBoundedResponse(response, part.length, {exact: true, signal});
+    const bytes = await readBoundedResponse(response, part.length, {exact: true, ...(signal ? {signal} : {})});
     if ((await waitForAbort(() => sha256(bytes), signal)) !== part.sha256) throw new Error('Clef range hash mismatch');
     signal?.throwIfAborted();
     return bytes;
