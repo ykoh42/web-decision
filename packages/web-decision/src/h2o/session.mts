@@ -19,7 +19,7 @@ type H2oSessionRunner = {
 type H2oSessionOptions = {
   tokenizer: H2oPromptTokenizer | null | undefined;
   plan: {labels: string[]; labelIds: number[]} | null | undefined;
-  addedTokens: string[] | null | undefined;
+  addedTokens: readonly string[] | null | undefined;
   runner: H2oSessionRunner | null | undefined;
 };
 type H2oDecisionOptions = {signal?: AbortSignal | null | undefined; [key: string]: unknown};

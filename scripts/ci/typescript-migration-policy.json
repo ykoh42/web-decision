@@ -3,8 +3,6 @@
   "baselineCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
   "managedJavaScript": [
     "packages/web-decision/src/deberta/loader.mjs",
-    "packages/web-decision/src/h2o/loader.mjs",
-    "packages/web-decision/src/h2o/plan.mjs",
     "packages/web-decision/src/h2o/runner.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",

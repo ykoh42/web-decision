@@ -1,6 +1,83 @@
 // Metadata bridge only. It never opens weight files or runs a model.
 import {WebDecisionError} from '../kev.js';
 
+type H2oCandidateSpec = {
+  graphPath: string;
+  graphBytes: number;
+  graphSha256: string;
+  metadataPath: string;
+  metadataBytes: number;
+  metadataSha256: string;
+  format: string;
+  stageSha256: string;
+  linkSha256: string;
+  graphReportSha256?: string | undefined;
+  conversionCounts: Readonly<Record<string, number>>;
+};
+type H2oStageParameter = {
+  position: unknown;
+  parameterIndex: unknown;
+  shape: unknown;
+  source: unknown;
+  dtype: unknown;
+  values?: unknown;
+  target?: unknown;
+  file?: unknown;
+  bytes?: unknown;
+};
+type H2oOrderedCandidate = {
+  userInputs: unknown;
+  stateInputs: unknown;
+  rotaryInputs: unknown;
+  parameterInputs: H2oStageParameter[];
+};
+type H2oStageRecord = {revision: unknown; orderedCandidate?: H2oOrderedCandidate | null | undefined};
+type H2oManifestFile = {path: string; bytes: number; sha256: string};
+type H2oManifest = {
+  state: unknown;
+  sourceSha256: unknown;
+  headSourceSha256: unknown;
+  productionReady: unknown;
+  graphOrderVerified: unknown;
+  artifacts: unknown[];
+  head: {file: unknown; labels: Iterable<string>; tokenIds: Iterable<number>};
+};
+type H2oCandidateGraph = Record<string, unknown>;
+type H2oCandidateMetadata = {
+  [key: string]: unknown;
+  candidate?: H2oCandidateGraph | null | undefined;
+  baseline?: Record<string, unknown> | null | undefined;
+  sequenceContract?: Record<string, unknown> | null | undefined;
+};
+type H2oCandidateParameter =
+  | {
+      kind: 'file';
+      target: string;
+      shape: number[];
+      dtype: string;
+      path: string;
+      bytes: number;
+      sha256: string;
+    }
+  | {
+      kind: 'rotary';
+      target: string;
+      shape: number[];
+      dtype: string;
+      values: number[];
+    };
+export type H2oCandidatePlan = {
+  revision: string;
+  wasmSha256: string;
+  userInputs: string[];
+  parameters: H2oCandidateParameter[];
+  labels: string[];
+  labelIds: number[];
+  state: 'metadata-only-not-executable';
+  sourceAndWeightsAudited: false;
+};
+export type H2oRangeSpec = {offset: number; length: number; sha256: string; path: string; totalBytes: number};
+
 export const H2O_BASELINE_MODEL_ID = 'experimental-h2o-lightning-4b-q4f16';
 export const H2O_DLIGHT_MODEL_ID = 'experimental-h2o-lightning-4b-q4f16-dlight';
 export const H2O_DUAL_MODEL_ID = 'experimental-h2o-lightning-4b-q4f16-dual';
@@ -16,7 +93,7 @@ const MANIFEST_SHA256 = '27f83988992c9d9fe2febe924848259890bcb4d39e1c57cb225dd8c
 const SOURCE_SHA256 = 'c9b6290d4c0c4338c37ce37425a978027473e4d45b84e038da2369b76ff8a377';
 const HEAD_SHA256 = '319a8a6be2f05f0a2d1d39f66a41295f6fc97472aff71bdf7cc127fb9d013fe9';
 const USER_INPUTS = ['ids', 'positions', 'full_mask', 'valid', 'slot'];
-const candidates = Object.freeze({
+const candidates: Readonly<Record<string, H2oCandidateSpec>> = Object.freeze({
   [H2O_DLIGHT_MODEL_ID]: Object.freeze({
     graphPath: 'model.dlight.pending.wasm',
     graphBytes: 4883626,
@@ -43,65 +120,73 @@ const candidates = Object.freeze({
     conversionCounts: Object.freeze({up: 64, down: 32, fallback: 152})
   })
 });
-const hash = async (bytes, signal) => {
+const hash = async (bytes: Uint8Array, signal: AbortSignal | null | undefined): Promise<string> => {
   signal?.throwIfAborted();
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
   signal?.throwIfAborted();
   return [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, '0')).join('');
 };
-const fail = (message) => {
+const fail = (message: string): never => {
   throw new WebDecisionError('INVALID_ASSET', message);
 };
 
-export function h2oGraphIdentity(model = H2O_BASELINE_MODEL_ID) {
+export function h2oGraphIdentity(model: string = H2O_BASELINE_MODEL_ID): {sha256: string; bytes: number} {
   if (model === H2O_BASELINE_MODEL_ID) return {sha256: WASM_SHA256, bytes: 4850370};
   const candidate = h2oCandidateSpec(model);
   return {sha256: candidate.graphSha256, bytes: candidate.graphBytes};
 }
 
-export function h2oCandidateSpec(model) {
+export function h2oCandidateSpec(model: string): H2oCandidateSpec {
   const candidate = Object.hasOwn(candidates, model) ? candidates[model] : undefined;
   if (!candidate) fail('Unknown H2O model.');
-  return candidate;
+  return candidate!;
 }
 
-export async function verifyWasm(bytes, model = H2O_BASELINE_MODEL_ID, signal) {
+export async function verifyWasm(
+  bytes: unknown,
+  model: string = H2O_BASELINE_MODEL_ID,
+  signal?: AbortSignal | null | undefined
+): Promise<Uint8Array> {
   signal?.throwIfAborted();
   const identity = h2oGraphIdentity(model);
   if (!(bytes instanceof Uint8Array) || bytes.length !== identity.bytes) fail('Unexpected H2O pending WASM.');
-  const owned = Uint8Array.from(bytes);
+  const owned = Uint8Array.from(bytes as Uint8Array);
   if ((await hash(owned, signal)) !== identity.sha256) fail('Unexpected H2O pending WASM.');
   return owned;
 }
 
-export async function prepareCandidatePlan(stageBytes, manifestBytes, signal) {
+export async function prepareCandidatePlan(
+  stageBytes: unknown,
+  manifestBytes: unknown,
+  signal?: AbortSignal | null | undefined
+): Promise<H2oCandidatePlan> {
   return preparePlan(stageBytes, manifestBytes, STAGE_SHA256, signal);
 }
 
-function canonical(value) {
+function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object')
     return Object.fromEntries(
       Object.keys(value)
         .sort()
-        .map((key) => [key, canonical(value[key])])
+        .map((key) => [key, canonical((value as Record<string, unknown>)[key])])
     );
   return value;
 }
 
 /** Candidate graphs share the baseline ABI and carry their own pinned provenance. */
 export async function preparePublicCandidatePlan(
-  metadataBytes,
-  manifestBytes,
-  model = H2O_BASELINE_MODEL_ID,
-  candidateBytes,
-  signal
-) {
+  metadataBytes: unknown,
+  manifestBytes: unknown,
+  model: string = H2O_BASELINE_MODEL_ID,
+  candidateBytes: unknown,
+  signal?: AbortSignal | null | undefined
+): Promise<H2oCandidatePlan> {
   signal?.throwIfAborted();
   const identity = h2oGraphIdentity(model);
   if (!(metadataBytes instanceof Uint8Array) || !(manifestBytes instanceof Uint8Array)) fail('Invalid H2O metadata.');
-  const baseline = Uint8Array.from(metadataBytes),
-    manifest = Uint8Array.from(manifestBytes);
+  const baseline = Uint8Array.from(metadataBytes as Uint8Array),
+    manifest = Uint8Array.from(manifestBytes as Uint8Array);
   const candidate = candidateBytes instanceof Uint8Array ? Uint8Array.from(candidateBytes) : candidateBytes;
   const plan = await preparePlan(baseline, manifest, PUBLIC_METADATA_SHA256, signal);
   signal?.throwIfAborted();
@@ -116,11 +201,11 @@ export async function preparePublicCandidatePlan(
     (await hash(candidate, signal)) !== spec.metadataSha256
   )
     fail('Unexpected H2O candidate metadata.');
-  let value, original;
+  let value!: H2oCandidateMetadata, original!: H2oCandidateMetadata;
   try {
     const decoder = new TextDecoder('utf-8', {fatal: true});
-    value = JSON.parse(decoder.decode(candidate));
-    original = JSON.parse(decoder.decode(baseline));
+    value = JSON.parse(decoder.decode(candidate as Uint8Array)) as H2oCandidateMetadata;
+    original = JSON.parse(decoder.decode(baseline)) as H2oCandidateMetadata;
   } catch {
     fail('Invalid H2O candidate metadata.');
   }
@@ -153,11 +238,16 @@ export async function preparePublicCandidatePlan(
   return {...plan, wasmSha256: identity.sha256};
 }
 
-async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signal) {
+async function preparePlan(
+  stageBytes: unknown,
+  manifestBytes: unknown,
+  expectedStageSha256: string,
+  signal: AbortSignal | null | undefined
+): Promise<H2oCandidatePlan> {
   signal?.throwIfAborted();
   if (!(stageBytes instanceof Uint8Array) || !(manifestBytes instanceof Uint8Array)) fail('Invalid H2O metadata.');
-  stageBytes = Uint8Array.from(stageBytes);
-  manifestBytes = Uint8Array.from(manifestBytes);
+  stageBytes = Uint8Array.from(stageBytes as Uint8Array);
+  manifestBytes = Uint8Array.from(manifestBytes as Uint8Array);
   if (
     !(stageBytes instanceof Uint8Array) ||
     stageBytes.length > 1_000_000 ||
@@ -167,16 +257,16 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
     (await hash(manifestBytes, signal)) !== MANIFEST_SHA256
   )
     fail('Unexpected H2O stage or conversion manifest.');
-  let manifest, stages;
+  let manifest!: H2oManifest, stages!: H2oStageRecord[];
   try {
     const decoder = new TextDecoder('utf-8', {fatal: true});
-    manifest = JSON.parse(decoder.decode(manifestBytes));
+    manifest = JSON.parse(decoder.decode(manifestBytes as Uint8Array)) as H2oManifest;
     stages = decoder
-      .decode(stageBytes)
+      .decode(stageBytes as Uint8Array)
       .split('\n')
       .flatMap((line) => {
         try {
-          return [JSON.parse(line)];
+          return [JSON.parse(line) as H2oStageRecord];
         } catch {
           return [];
         }
@@ -187,7 +277,7 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
   }
   if (
     stages.length !== 1 ||
-    stages[0].revision !== REVISION ||
+    stages[0]!.revision !== REVISION ||
     manifest.state !== 'verified-pending-review' ||
     manifest.sourceSha256 !== SOURCE_SHA256 ||
     manifest.headSourceSha256 !== HEAD_SHA256 ||
@@ -197,7 +287,7 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
     manifest.artifacts.length !== 428
   )
     fail('Unexpected candidate metadata.');
-  const ordered = stages[0].orderedCandidate;
+  const ordered = stages[0]!.orderedCandidate!;
   if (
     JSON.stringify(ordered.userInputs) !== JSON.stringify(USER_INPUTS) ||
     ordered.stateInputs !== 680 ||
@@ -205,26 +295,27 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
     ordered.parameterInputs?.length !== 682
   )
     fail('Unexpected compiled input contract.');
-  const files = new Map();
-  const add = (file) => {
+  const files = new Map<string, H2oManifestFile>();
+  const add = (file: unknown): void => {
     if (
       !file ||
-      typeof file.path !== 'string' ||
-      !/^[A-Za-z0-9_.-]+\.pending$/.test(file.path) ||
-      !Number.isSafeInteger(file.bytes) ||
-      file.bytes <= 0 ||
-      !/^[a-f0-9]{64}$/.test(file.sha256) ||
-      files.has(file.path)
+      typeof (file as H2oManifestFile).path !== 'string' ||
+      !/^[A-Za-z0-9_.-]+\.pending$/.test((file as H2oManifestFile).path) ||
+      !Number.isSafeInteger((file as H2oManifestFile).bytes) ||
+      (file as H2oManifestFile).bytes <= 0 ||
+      !/^[a-f0-9]{64}$/.test((file as H2oManifestFile).sha256) ||
+      files.has((file as H2oManifestFile).path)
     )
       fail('Invalid or duplicate candidate file.');
-    files.set(file.path, file);
+    files.set((file as H2oManifestFile).path, file as H2oManifestFile);
   };
   for (const entry of manifest.artifacts)
-    for (const key of ['file', 'packed', 'scales']) if (entry[key]) add(entry[key]);
+    for (const key of ['file', 'packed', 'scales'])
+      if ((entry as Record<string, unknown>)[key]) add((entry as Record<string, unknown>)[key]);
   add(manifest.head.file);
   if (files.size !== 680) fail('Candidate file count mismatch.');
-  const seen = new Set();
-  const parameters = ordered.parameterInputs.map((entry, i) => {
+  const seen = new Set<string>();
+  const parameters: H2oCandidateParameter[] = ordered.parameterInputs.map((entry, i) => {
     if (
       entry.position !== i + 5 ||
       entry.parameterIndex !== i ||
@@ -244,38 +335,38 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
         fail('Invalid rotary input.');
       return {
         kind: 'rotary',
-        target: entry.target,
-        shape: [...entry.shape],
-        dtype: entry.dtype,
-        values: [...entry.values]
+        target: entry.target as string,
+        shape: [...(entry.shape as number[])],
+        dtype: entry.dtype as string,
+        values: [...(entry.values as number[])]
       };
     }
-    const file = files.get(entry.file);
-    const bytesPer = {float16: 2, float32: 4, uint32: 4}[entry.dtype];
+    const file = files.get(entry.file as string);
+    const bytesPer = {float16: 2, float32: 4, uint32: 4}[entry.dtype as 'float16' | 'float32' | 'uint32'];
     if (
       entry.source !== 'pending-weight' ||
       !file ||
-      seen.has(entry.file) ||
+      seen.has(entry.file as string) ||
       !bytesPer ||
       entry.bytes !== file.bytes ||
-      entry.shape.reduce((a, b) => a * b, bytesPer) !== file.bytes
+      (entry.shape as number[]).reduce((a, b) => a * b, bytesPer) !== file.bytes
     )
       fail('Parameter and file mismatch.');
-    seen.add(entry.file);
+    seen.add(entry.file as string);
     return {
       kind: 'file',
-      target: entry.target,
-      shape: [...entry.shape],
-      dtype: entry.dtype,
-      path: file.path,
-      bytes: file.bytes,
-      sha256: file.sha256
+      target: entry.target as string,
+      shape: [...(entry.shape as number[])],
+      dtype: entry.dtype as string,
+      path: (file as H2oManifestFile).path,
+      bytes: (file as H2oManifestFile).bytes,
+      sha256: (file as H2oManifestFile).sha256
     };
   });
   if (
     seen.size !== 680 ||
-    parameters[680].target !== 'body.rotary_emb.inv_freq' ||
-    parameters[681].target !== 'body.rotary_emb.original_inv_freq'
+    parameters[680]!.target !== 'body.rotary_emb.inv_freq' ||
+    parameters[681]!.target !== 'body.rotary_emb.original_inv_freq'
   )
     fail('Incomplete parameter coverage.');
   return {
@@ -287,15 +378,15 @@ async function preparePlan(stageBytes, manifestBytes, expectedStageSha256, signa
     labelIds: [...manifest.head.tokenIds],
     state: 'metadata-only-not-executable',
     sourceAndWeightsAudited: false
-  };
+  } satisfies H2oCandidatePlan;
 }
 
 // The converter stored whole-file hashes. For a future range loader, accept an
 // independently produced range inventory only after checking contiguous coverage.
 // This validates geometry, not that supplied chunk hashes belong to the file.
-export function validateRangeInventory(file, ranges) {
-  const path = file?.path,
-    totalBytes = file?.bytes;
+export function validateRangeInventory(file: unknown, ranges: unknown): H2oRangeSpec[] {
+  const path = (file as {path?: unknown} | null | undefined)?.path as string,
+    totalBytes = (file as {bytes?: unknown} | null | undefined)?.bytes as number;
   if (
     typeof path !== 'string' ||
     !/^[A-Za-z0-9_.-]+\.pending$/.test(path) ||
@@ -305,8 +396,8 @@ export function validateRangeInventory(file, ranges) {
     fail('Invalid range file.');
   if (!Array.isArray(ranges) || !ranges.length) fail('Missing independent range hashes.');
   let offset = 0;
-  const verified = [];
-  for (const part of ranges) {
+  const verified: H2oRangeSpec[] = [];
+  for (const part of ranges as unknown[]) {
     if (
       !part ||
       typeof part !== 'object' ||
@@ -314,7 +405,7 @@ export function validateRangeInventory(file, ranges) {
       Object.keys(part).sort().join(',') !== 'length,offset,sha256'
     )
       fail('Invalid range inventory.');
-    const {offset: start, length, sha256} = part;
+    const {offset: start, length, sha256} = part as {offset: number; length: number; sha256: string};
     if (
       !Number.isSafeInteger(start) ||
       start !== offset ||

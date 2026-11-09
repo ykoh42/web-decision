@@ -10,7 +10,7 @@ import {H2O_BASELINE_MODEL_ID, h2oGraphIdentity} from './plan.mjs';
 type OpenH2oAssetSourceOptions = {
   assetsUrl?: string | URL;
   inventoryBytes?: Uint8Array;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   model?: string;
 };
 
