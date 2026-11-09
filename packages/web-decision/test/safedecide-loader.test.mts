@@ -57,7 +57,7 @@ const modelConfig = {
 };
 const tokenizerConfig = {max_length: 384, truncation_side: 'right', padding_side: 'right'};
 
-function jsonBytes(value) {
+function jsonBytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value));
 }
 
@@ -116,10 +116,10 @@ test('SafeDecide config binds the 640-token tokenizer, temperatures, and certifi
 });
 
 test('SafeDecide loader creates a WebGPU session only after checking metadata and acquiring a hardware adapter', async () => {
-  const readNames = [];
-  const released = [];
-  const created = [];
-  const files = new Map([
+  const readNames: string[] = [];
+  const released: string[] = [];
+  const created: {bytes: number[]; options: unknown}[] = [];
+  const files = new Map<string, Uint8Array | ArrayBuffer>([
     ['config.json', jsonBytes(modelConfig)],
     ['safedecide_config.json', jsonBytes(decisionConfig)],
     ['tokenizer_config.json', jsonBytes(tokenizerConfig)],
@@ -139,17 +139,22 @@ test('SafeDecide loader creates a WebGPU session only after checking metadata an
     {model: SAFEDECIDE_MODEL},
     {
       fake: true,
-      openSource: async ({spec, base}) => {
+      openSource: async ({spec, base}: {spec: unknown; base: URL}) => {
         assert.equal(spec, SAFEDECIDE_SPEC);
         sourceBase = base.href;
         return {
-          async read(name) {
+          async read(name: string) {
             readNames.push(name);
             return files.get(name);
           }
         };
       },
-      createTokenizer(data, tokenizerFile, checkedModelConfig, maxLength) {
+      createTokenizer(
+        data: unknown,
+        tokenizerFile: unknown,
+        checkedModelConfig: {modelType: string},
+        maxLength: number
+      ) {
         assert.deepEqual(data, {minimal: true});
         assert.equal(checkedModelConfig.modelType, 'modernbert');
         assert.equal(maxLength, 640);
@@ -164,13 +169,13 @@ test('SafeDecide loader creates a WebGPU session only after checking metadata an
         env: {webgpu: {}},
         Tensor: class {},
         InferenceSession: {
-          async create(bytes, options) {
+          async create(bytes: Uint8Array, options: unknown) {
             created.push({bytes: Array.from(bytes), options});
             return fakeSession;
           }
         }
       },
-      createRunner(ort, session, padId) {
+      createRunner(ort: unknown, session: unknown, padId: number) {
         assert.equal(session, fakeSession);
         assert.equal(padId, 0);
         return {
@@ -180,7 +185,7 @@ test('SafeDecide loader creates a WebGPU session only after checking metadata an
           }
         };
       },
-      createLoadedSession(components) {
+      createLoadedSession(components: {config: unknown}) {
         assert.deepEqual(components.config, decisionConfig);
         return loaded;
       }
@@ -211,7 +216,7 @@ test('SafeDecide releases an ONNX session when the graph interface is mismatched
     outputNames: ['logits'],
     async release() {}
   };
-  const files = new Map([
+  const files = new Map<string, Uint8Array | ArrayBuffer>([
     ['config.json', jsonBytes(modelConfig)],
     ['safedecide_config.json', jsonBytes(decisionConfig)],
     ['tokenizer_config.json', jsonBytes(tokenizerConfig)],
@@ -227,7 +232,7 @@ test('SafeDecide releases an ONNX session when the graph interface is mismatched
       {model: SAFEDECIDE_MODEL, assetsUrl: 'https://localhost/assets/'},
       {
         fake: true,
-        openSource: async () => ({read: async (name) => files.get(name)}),
+        openSource: async () => ({read: async (name: string) => files.get(name)}),
         createTokenizer: () => ({special: {padId: 0}}),
         gpuApi: {requestAdapter: async () => ({info: {isFallbackAdapter: false}})},
         ort: {
