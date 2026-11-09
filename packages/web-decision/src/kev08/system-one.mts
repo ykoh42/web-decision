@@ -1,17 +1,39 @@
 import {WebDecisionError} from '../kev.js';
 
+type QuestionFields = Record<string, unknown>;
+type TypedMetadata =
+  | {name: string; type: 'choice'; keys: string[]}
+  | {name: string; type: 'score'; legend: string[]}
+  | {name: string; type: 'noul'};
+interface PreparedQuestion {
+  metadata: TypedMetadata;
+  request: {instructions: string; options: string[]};
+  allowDuplicateOptions?: number;
+}
+interface TypedPrepared {
+  metadata: TypedMetadata[];
+}
+interface TypedAnswer {
+  selectedIndex: number;
+  probabilities: {probability: number}[];
+}
+interface TypedResult {
+  tokenCount: number;
+  answers: TypedAnswer[];
+}
+
 const MODEL_ID = 'kev-0.8b-f16';
 const MAX_OPTIONS = 255;
 
-function invalid(message) {
+function invalid(message: string): never {
   throw new WebDecisionError('INVALID_INPUT', message);
 }
 
-function recordEntries(value, label) {
+function recordEntries(value: unknown, label: string): [string, unknown][] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(`${label} must be an object.`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== null && prototype !== Object.prototype) invalid(`${label} must be a plain object.`);
-  const entries = [];
+  const entries: [string, unknown][] = [];
   for (const key of Reflect.ownKeys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
@@ -21,7 +43,7 @@ function recordEntries(value, label) {
   return entries;
 }
 
-function arrayValues(value, label) {
+function arrayValues(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) invalid(`${label} must be an array.`);
   const values = [];
   for (let index = 0; index < value.length; index++) {
@@ -35,7 +57,7 @@ function arrayValues(value, label) {
   return values;
 }
 
-function render(value, indent = 0, ancestors = new Set()) {
+function render(value: unknown, indent = 0, ancestors = new Set<object>()): string {
   if (value === null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'boolean') return value ? 'True' : 'False';
@@ -67,7 +89,7 @@ function render(value, indent = 0, ancestors = new Set()) {
   return text;
 }
 
-function questionFields(value, name) {
+function questionFields(value: unknown, name: string): QuestionFields {
   const entries = recordEntries(value, `Question ${name}`);
   const fields = Object.fromEntries(entries);
   if (entries.some(([key]) => !['type', 'instructions', 'criteria'].includes(key)))
@@ -77,16 +99,16 @@ function questionFields(value, name) {
   return fields;
 }
 
-function instructions(fields) {
+function instructions(fields: QuestionFields) {
   return Object.hasOwn(fields, 'instructions') ? render(fields.instructions) : '';
 }
 
-function optionText(name, description) {
+function optionText(name: string, description: unknown) {
   if (description === null || description === '') return name;
   return `${name}: ${render(description)}`;
 }
 
-function prepareChoice(name, fields) {
+function prepareChoice(name: string, fields: QuestionFields): PreparedQuestion {
   const criteria = recordEntries(fields.criteria, `Question ${name} criteria`);
   if (criteria.length < 1 || criteria.length > MAX_OPTIONS)
     invalid(`Question ${name} needs 1 to ${MAX_OPTIONS} Choice options.`);
@@ -98,7 +120,7 @@ function prepareChoice(name, fields) {
   };
 }
 
-function prepareScore(name, fields, index) {
+function prepareScore(name: string, fields: QuestionFields, index: number): PreparedQuestion {
   const values = arrayValues(fields.criteria, `Question ${name} criteria`);
   if (values.length < 1 || values.length > MAX_OPTIONS)
     invalid(`Question ${name} needs 1 to ${MAX_OPTIONS} Score levels.`);
@@ -110,7 +132,7 @@ function prepareScore(name, fields, index) {
   };
 }
 
-function prepareNoul(name, fields) {
+function prepareNoul(name: string, fields: QuestionFields): PreparedQuestion {
   const criteria = fields.criteria == null ? [] : recordEntries(fields.criteria, `Question ${name} criteria`);
   const descriptions = Object.fromEntries(criteria);
   const falseDescription = Object.hasOwn(descriptions, 'false') ? descriptions.false : null;
@@ -124,7 +146,7 @@ function prepareNoul(name, fields) {
   };
 }
 
-function prepareQuestion(name, value, index) {
+function prepareQuestion(name: string, value: unknown, index: number): PreparedQuestion {
   const fields = questionFields(value, name);
   if (fields.type === 'choice') return prepareChoice(name, fields);
   if (fields.type === 'score') return prepareScore(name, fields, index);
@@ -132,13 +154,13 @@ function prepareQuestion(name, value, index) {
   invalid(`Question ${name} type must be choice, score, or noul.`);
 }
 
-export function prepareKev08SystemOne(state, questions) {
+export function prepareKev08SystemOne(state: unknown, questions: unknown) {
   const entries = recordEntries(questions, 'Questions');
   if (!entries.length) invalid('Provide at least one named question.');
   const stateText = render(state);
-  const metadata = [];
-  const requestQuestions = [];
-  const allowDuplicateOptionsFor = new Set();
+  const metadata: TypedMetadata[] = [];
+  const requestQuestions: {instructions: string; options: string[]}[] = [];
+  const allowDuplicateOptionsFor = new Set<number>();
   for (const [name, value] of entries) {
     const prepared = prepareQuestion(name, value, requestQuestions.length);
     metadata.push(prepared.metadata);
@@ -157,33 +179,33 @@ export function prepareKev08SystemOne(state, questions) {
   };
 }
 
-function rounded(value) {
+function rounded(value: number) {
   return Number(value.toFixed(4));
 }
 
-function choiceConfidence(probabilities) {
+function choiceConfidence(probabilities: number[]) {
   if (probabilities.length <= 1) return 1;
   const maximum = Math.max(...probabilities);
   return (maximum - 1 / probabilities.length) / (1 - 1 / probabilities.length);
 }
 
-function scoreConfidence(probabilities) {
+function scoreConfidence(probabilities: number[]) {
   if (probabilities.length <= 1) return 1;
   let mode = 0;
   for (let index = 1; index < probabilities.length; index++)
-    if (probabilities[index] > probabilities[mode]) mode = index;
+    if (probabilities[index]! > probabilities[mode]!) mode = index;
   const distance = probabilities.reduce((sum, probability, index) => sum + probability * Math.abs(index - mode), 0);
   return 1 - distance / (probabilities.length - 1);
 }
 
-function typedAnswer(metadata, answer) {
+function typedAnswer(metadata: TypedMetadata, answer: TypedAnswer) {
   const probabilities = answer.probabilities.map(({probability}) => probability);
   if (metadata.type === 'choice') {
     return {
       type: 'choice',
       choice: metadata.keys[answer.selectedIndex],
       confidence: rounded(choiceConfidence(probabilities)),
-      probabilities: Object.fromEntries(metadata.keys.map((key, index) => [key, rounded(probabilities[index])]))
+      probabilities: Object.fromEntries(metadata.keys.map((key, index) => [key, rounded(probabilities[index]!)]))
     };
   }
   if (metadata.type === 'score') {
@@ -197,17 +219,17 @@ function typedAnswer(metadata, answer) {
       confidence: rounded(scoreConfidence(probabilities))
     };
   }
-  return {type: 'noul', noul: rounded(probabilities[1])};
+  return {type: 'noul', noul: rounded(probabilities[1]!)};
 }
 
-export function finishKev08SystemOne(prepared, result) {
+export function finishKev08SystemOne(prepared: TypedPrepared, result: TypedResult) {
   if (!Array.isArray(result?.answers) || result.answers.length !== prepared.metadata.length)
     throw new WebDecisionError('INFERENCE_ERROR', 'Kev 0.8B returned an unexpected typed answer.');
   const answers = Object.fromEntries(
     prepared.metadata.map((metadata, index) => {
       if (!Object.hasOwn(result.answers, index))
         throw new WebDecisionError('INFERENCE_ERROR', 'Kev 0.8B returned an unexpected typed answer.');
-      return [metadata.name, typedAnswer(metadata, result.answers[index])];
+      return [metadata.name, typedAnswer(metadata, result.answers[index]!)];
     })
   );
   return {model: MODEL_ID, tokenCount: result.tokenCount, answers};
