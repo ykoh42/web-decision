@@ -2,19 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {uploadGemma4Shard} from '../src/strands/gemma4-upload.mjs';
 
-function harness(overrides = {}) {
-  const allocations = [],
-    writes = [],
-    syncs = [];
+type UploadOptions = Parameters<typeof uploadGemma4Shard>[0];
+function harness(overrides: Partial<UploadOptions> = {}) {
+  const allocations: {shape: number[]; byteOffset: number; getDataPtr(): number}[] = [],
+    writes: {pointer: unknown; offset: number; bytes: number[]}[] = [],
+    syncs: boolean[] = [];
   const context = {
-    copyRawBytesToBuffer(data, pointer, offset, length) {
+    copyRawBytesToBuffer(data: Uint8Array, pointer: unknown, offset: number, length: number) {
       assert.equal(offset % 4, 0);
       assert.equal(length % 4, 0);
       assert.equal(data.length, length);
       writes.push({pointer, offset, bytes: [...data]});
     }
   };
-  const options = {
+  const options: UploadOptions = {
     bytes: Uint8Array.from([0xaa, 0xbb, 0xcc, 0xdd, 1, 2, 3, 4, 5, 6, 7, 8]),
     records: [
       {name: 'param_2', shape: [], dtype: 'bfloat16', byteOffset: 0, nbytes: 2},
@@ -74,8 +75,12 @@ test('copies an unaligned source offset for float32 and bounds chunk sizes', asy
 });
 
 test('rejects invalid or incomplete metadata before allocating', async () => {
-  const expected = (index, shape = [], dtype = 'bfloat16') => ({index, shape, dtype});
-  const cases = [
+  const expected = (
+    index: number,
+    shape: number[] = [],
+    dtype: UploadOptions['expectedParameters'][number]['dtype'] = 'bfloat16'
+  ) => ({index, shape, dtype});
+  const cases: Partial<UploadOptions>[] = [
     {expectedParameters: [expected(0), expected(1)]},
     {expectedParameters: [expected(0), expected(1), expected(1)]},
     {
@@ -183,11 +188,11 @@ test('aborts before allocation and drains a submitted write before rejecting', a
   assert.equal(before.allocations.length, 0);
   const inFlight = new AbortController();
   let drained = 0;
-  const writes = [];
+  const writes: {pointer: unknown; offset: number; length: number; bytes: number[]}[] = [];
   const during = harness({
     signal: inFlight.signal,
     context: {
-      copyRawBytesToBuffer(data, pointer, offset, length) {
+      copyRawBytesToBuffer(data: Uint8Array, pointer: unknown, offset: number, length: number) {
         writes.push({pointer, offset, length, bytes: [...data]});
         inFlight.abort();
       }
