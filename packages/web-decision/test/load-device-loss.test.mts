@@ -3,8 +3,8 @@ import {test} from 'node:test';
 import {watchLoadDeviceLoss} from '../src/load-device-loss.js';
 
 const deferred = () => {
-  let resolve, reject;
-  const promise = new Promise((ok, fail) => {
+  let resolve!: (value: unknown) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<unknown>((ok, fail) => {
     resolve = ok;
     reject = fail;
   });
@@ -82,12 +82,12 @@ test('watch installation exceptions remove the caller listener and preserve the 
     const signal = controller.signal;
     const add = signal.addEventListener.bind(signal),
       remove = signal.removeEventListener.bind(signal);
-    signal.addEventListener = (...args) => {
+    signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
       adds++;
       add(...args);
       if (stage === 'add-listener') throw reason;
     };
-    signal.removeEventListener = (...args) => {
+    signal.removeEventListener = (...args: Parameters<AbortSignal['removeEventListener']>) => {
       removes++;
       return remove(...args);
     };
@@ -108,7 +108,7 @@ test('watch installation exceptions remove the caller listener and preserve the 
           }
         : {lost: badLost};
     assert.throws(
-      () => watchLoadDeviceLoss(device, signal),
+      () => watchLoadDeviceLoss(device as unknown as Parameters<typeof watchLoadDeviceLoss>[0], signal),
       (error) => error === reason
     );
     assert.equal(adds, 1);
