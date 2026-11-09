@@ -25,13 +25,13 @@ import {createCrivoTokenizer, validateCrivoConfig} from '../src/crivo/tokenizer.
 const special = Object.freeze({cls: 50281, sep: 50282, pad: 50283, opt: 50368});
 
 function fakeTokenizer() {
-  const encoded = [];
+  const encoded: string[] = [];
   return {
     encoded,
     special,
-    encode(text) {
+    encode(text: string) {
       encoded.push(text);
-      return Array.from(text, (character) => character.codePointAt(0) + 10);
+      return Array.from(text, (character) => character.codePointAt(0)! + 10);
     }
   };
 }
@@ -39,8 +39,8 @@ function fakeTokenizer() {
 test('Crivo pins both graph variants and their external file manifests', () => {
   assert.equal(CRIVO_FP32_SPEC.model, 'experimental-crivo-32m-v2-fp32');
   assert.equal(CRIVO_INT8_SPEC.model, 'experimental-crivo-32m-v2-int8');
-  assert.equal(CRIVO_FP32_SPEC.files['onnx/model.onnx'].bytes, 128385184);
-  assert.equal(CRIVO_INT8_SPEC.files['onnx/model_quantized.onnx'].bytes, 32729616);
+  assert.equal(CRIVO_FP32_SPEC.files['onnx/model.onnx']!.bytes, 128385184);
+  assert.equal(CRIVO_INT8_SPEC.files['onnx/model_quantized.onnx']!.bytes, 32729616);
   assert.equal(getCrivoSpec(CRIVO_FP32_SPEC.model), CRIVO_FP32_SPEC);
   assert.equal(getCrivoSpec('unknown'), undefined);
 });
@@ -73,12 +73,12 @@ test('Crivo validates the pinned model and tokenizer configuration', () => {
 test('Crivo tokenizer checks special token IDs and does not add automatic tokens', () => {
   class Tokenizer {
     constructor() {}
-    token_to_id(token) {
-      return {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '[OPT]': 50368}[token];
+    token_to_id(token: string) {
+      return ({'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '[OPT]': 50368} as Record<string, number>)[token];
     }
-    encode(text, options) {
+    encode(text: string, options: unknown) {
       assert.deepEqual(options, {add_special_tokens: false});
-      return {ids: Array.from(text, (character) => character.codePointAt(0) + 10)};
+      return {ids: Array.from(text, (character) => character.codePointAt(0)! + 10)};
     }
   }
   const tokenizer = createCrivoTokenizer(Tokenizer, {model: {type: 'BPE'}}, {});
@@ -87,7 +87,7 @@ test('Crivo tokenizer checks special token IDs and does not add automatic tokens
     () =>
       createCrivoTokenizer(
         class extends Tokenizer {
-          token_to_id(token) {
+          override token_to_id(token: string) {
             return token === '[OPT]' ? 1 : super.token_to_id(token);
           }
         },
@@ -128,13 +128,19 @@ test('Crivo renders sorted JSON and preserves typed option order and task semant
   const result = finishCrivoSystemOne(
     prepared,
     [Float32Array.of(3, 0), Float32Array.of(0, 2), Float32Array.of(0, 0, 0)],
-    CRIVO_FP32_SPEC.model
+    CRIVO_FP32_SPEC.model as Parameters<typeof finishCrivoSystemOne>[2]
   );
   assert.equal(result.model, CRIVO_FP32_SPEC.model);
-  assert.equal(result.answers.intent.choice, 'refund');
-  assert.ok(result.answers.claim.noul > 0.8);
-  assert.ok(Math.abs(result.answers.urgency.score - 1) < 1e-6);
-  assert.equal(Object.hasOwn(result.answers.intent, 'confidence'), false);
+  const intent = result.answers.intent;
+  const claim = result.answers.claim;
+  const urgency = result.answers.urgency;
+  assert.ok(intent?.type === 'choice');
+  assert.ok(claim?.type === 'noul');
+  assert.ok(urgency?.type === 'score');
+  assert.equal(intent.choice, 'refund');
+  assert.ok(claim.noul > 0.8);
+  assert.ok(Math.abs(urgency.score - 1) < 1e-6);
+  assert.equal(Object.hasOwn(intent, 'confidence'), false);
 });
 
 test('Crivo validates typed criteria and structured JSON edge cases before tokenization', () => {
@@ -156,8 +162,10 @@ test('Crivo validates typed criteria and structured JSON edge cases before token
     ]
   );
 
-  const cyclic = {};
+  const cyclic: {self?: unknown} = {};
   cyclic.self = cyclic;
+  // The sparse array exercises rejection of holes.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparseScore = new Array(2);
   const symbolCriteria = {one: null, two: null, [Symbol('extra')]: 'ignored'};
   const invalidQuestions = [
@@ -187,18 +195,38 @@ test('Crivo rejects mismatched question and option output axes', () => {
     },
     fakeTokenizer()
   );
-  assert.throws(() => finishCrivoSystemOne(prepared, [], CRIVO_FP32_SPEC.model), {code: 'INFERENCE_ERROR'});
-  assert.throws(() => finishCrivoSystemOne(prepared, [Float32Array.of(1)], CRIVO_FP32_SPEC.model), {
-    code: 'INFERENCE_ERROR'
-  });
-  assert.throws(() => finishCrivoDecision(prepared, [[Number.POSITIVE_INFINITY]]), {code: 'INFERENCE_ERROR'});
+  assert.throws(
+    () => finishCrivoSystemOne(prepared, [], CRIVO_FP32_SPEC.model as Parameters<typeof finishCrivoSystemOne>[2]),
+    {code: 'INFERENCE_ERROR'}
+  );
+  assert.throws(
+    () =>
+      finishCrivoSystemOne(
+        prepared,
+        [Float32Array.of(1)],
+        CRIVO_FP32_SPEC.model as Parameters<typeof finishCrivoSystemOne>[2]
+      ),
+    {
+      code: 'INFERENCE_ERROR'
+    }
+  );
+  assert.throws(
+    () =>
+      finishCrivoDecision(
+        prepared as unknown as Parameters<typeof finishCrivoDecision>[0],
+        [[Number.POSITIVE_INFINITY]] as unknown as Parameters<typeof finishCrivoDecision>[1]
+      ),
+    {code: 'INFERENCE_ERROR'}
+  );
 });
 
 test('Crivo rejects malformed typed inputs and call options before encoding', () => {
   const tokenizer = fakeTokenizer();
   const question = {type: 'choice', instructions: 'Pick', criteria: {a: null, b: null}};
-  const extraArray = ['a', 'b'];
+  const extraArray = ['a', 'b'] as string[] & {extra?: boolean};
   extraArray.extra = true;
+  // The sparse array exercises rejection of holes.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparseArray = new Array(2);
   const inheritedCriteria = Object.create({prototypeField: true});
   inheritedCriteria.a = null;
@@ -226,7 +254,7 @@ test('Crivo rejects malformed typed inputs and call options before encoding', ()
   ])
     assert.throws(() => prepareCrivoSystemOne('', questions, tokenizer), {code: 'INVALID_INPUT'});
 
-  const extraState = ['valid'];
+  const extraState = ['valid'] as string[] & {extra?: string};
   extraState.extra = 'not JSON';
   const genericCases = [
     {state: 1, questions: [{instructions: 'Pick', options: ['a', 'b']}]},
@@ -237,12 +265,18 @@ test('Crivo rejects malformed typed inputs and call options before encoding', ()
   ];
   for (const request of genericCases)
     assert.throws(() => prepareCrivoDecision(request, tokenizer), {code: 'INVALID_INPUT'});
-  assert.throws(() => prepareCrivoSystemOne('', {q: question}, {}), TypeError);
+  assert.throws(
+    () => prepareCrivoSystemOne('', {q: question}, {} as Parameters<typeof prepareCrivoSystemOne>[2]),
+    TypeError
+  );
   assert.throws(() => prepareCrivoSystemOne(() => 'not JSON', {q: {type: 'noul', instructions: 'Valid?'}}, tokenizer), {
     code: 'INVALID_INPUT'
   });
   assert.throws(() => prepareCrivoSystemOne('', {}, tokenizer), {code: 'INVALID_INPUT'});
-  assert.throws(() => prepareCrivoDecision({state: '', questions: []}, {}), TypeError);
+  assert.throws(
+    () => prepareCrivoDecision({state: '', questions: []}, {} as Parameters<typeof prepareCrivoDecision>[1]),
+    TypeError
+  );
 
   assert.equal(validateCrivoCallOptions(null), undefined);
   assert.equal(validateCrivoCallOptions({}), undefined);
@@ -257,18 +291,18 @@ test('Crivo rejects overlong input without truncating and accepts exact 2,048-to
   const question = {type: 'choice', criteria: {a: null, b: null}};
   const exactState = 'x'.repeat(CRIVO_MAX_SEQUENCE_TOKENS - 7);
   const exact = prepareCrivoSystemOne(exactState, {one: question}, tokenizer);
-  assert.equal(exact.rows[0].inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
+  assert.equal(exact.rows[0]!.inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
   assert.throws(() => prepareCrivoSystemOne(exactState + 'x', {one: question}, tokenizer), {code: 'INVALID_INPUT'});
 });
 
 test('Crivo accepts over-200K text when its encoded row fits the native token limit', async () => {
   const longText = 'x'.repeat(200_001);
-  const encoded = [];
+  const encoded: string[] = [];
   const tokenizer = {
     special,
-    encode(text) {
+    encode(text: string) {
       encoded.push(text);
-      return text.length > 200_000 ? [17] : Array.from(text, (character) => character.codePointAt(0) + 10);
+      return text.length > 200_000 ? [17] : Array.from(text, (character) => character.codePointAt(0)! + 10);
     }
   };
   let runnerCalls = 0;
@@ -278,7 +312,7 @@ test('Crivo accepts over-200K text when its encoded row fits the native token li
     runner: {
       async run(rows) {
         runnerCalls++;
-        assert.ok(rows[0].inputIds.length <= CRIVO_MAX_SEQUENCE_TOKENS);
+        assert.ok(rows[0]!.inputIds.length <= CRIVO_MAX_SEQUENCE_TOKENS);
         return [Float32Array.of(0, 1)];
       },
       async dispose() {}
@@ -311,7 +345,8 @@ test('Crivo rejects a row beyond 2,048 tokens before inference', async () => {
 
   await assert.rejects(
     model.systemOne(overBudgetState, {one: {type: 'choice', criteria: {a: null, b: null}}}),
-    (error) => error.code === 'INVALID_INPUT' && error.message.includes('2048')
+    (error: unknown) =>
+      error instanceof Error && 'code' in error && error.code === 'INVALID_INPUT' && error.message.includes('2048')
   );
   assert.equal(runnerCalls, 0);
   await model.dispose();
@@ -321,7 +356,7 @@ test('Crivo accepts options up to the row-token limit without a fixed option-cou
   const maxOptions = Math.floor((CRIVO_MAX_SEQUENCE_TOKENS - 4) / 2);
   const tokenizer = {
     special,
-    encode(text) {
+    encode(text: string) {
       return text ? [17] : [];
     }
   };
@@ -331,21 +366,23 @@ test('Crivo accepts options up to the row-token limit without a fixed option-cou
   const generic = prepareCrivoDecision({state: '', questions: [{instructions: 'pick', options: labels}]}, tokenizer);
 
   assert.equal(maxOptions, 1022);
-  assert.equal(typed.rows[0].optionPositions.length, maxOptions);
-  assert.equal(typed.rows[0].inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
-  assert.equal(generic.rows[0].optionPositions.length, maxOptions);
-  assert.equal(generic.rows[0].inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
+  assert.equal(typed.rows[0]!.optionPositions.length, maxOptions);
+  assert.equal(typed.rows[0]!.inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
+  assert.equal(generic.rows[0]!.optionPositions.length, maxOptions);
+  assert.equal(generic.rows[0]!.inputIds.length, CRIVO_MAX_SEQUENCE_TOKENS);
 
   const tooManyLabels = [...labels, 'overflow'];
   const tooManyCriteria = Object.fromEntries(tooManyLabels.map((label) => [label, null]));
   assert.throws(
     () =>
       prepareCrivoSystemOne('', {one: {type: 'choice', instructions: 'pick', criteria: tooManyCriteria}}, tokenizer),
-    (error) => error.code === 'INVALID_INPUT' && error.message.includes('2048')
+    (error: unknown) =>
+      error instanceof Error && 'code' in error && error.code === 'INVALID_INPUT' && error.message.includes('2048')
   );
   assert.throws(
     () => prepareCrivoDecision({state: '', questions: [{instructions: 'pick', options: tooManyLabels}]}, tokenizer),
-    (error) => error.code === 'INVALID_INPUT' && error.message.includes('2048')
+    (error: unknown) =>
+      error instanceof Error && 'code' in error && error.code === 'INVALID_INPUT' && error.message.includes('2048')
   );
 });
 
@@ -355,14 +392,14 @@ test('generic Crivo decisions keep their supplied option order', () => {
     {state: 'ticket', questions: [{instructions: 'intent', options: ['later', 'first', 'middle']}]},
     tokenizer
   );
-  assert.deepEqual(prepared.rows[0].labels, ['later', 'first', 'middle']);
+  assert.deepEqual(prepared.rows[0]!.labels, ['later', 'first', 'middle']);
   const result = finishCrivoDecision(prepared, [Float32Array.of(0, 3, 1)]);
-  assert.equal(result.answers[0].selected, 'first');
+  assert.equal(result.answers[0]!.selected, 'first');
 });
 
 test('Crivo rejects accessor option values without reading large option arrays', () => {
   const tokenizer = fakeTokenizer();
-  const options = new Array(300).fill('unused');
+  const options = Array.from({length: 300}, () => 'unused');
   let reads = 0;
   Object.defineProperty(options, '0', {
     get() {
@@ -404,7 +441,7 @@ test('Crivo snapshots a Proxy data descriptor once without invoking a later acce
   );
 
   const prepared = prepareCrivoDecision({state: 'ticket', questions: [{instructions: 'intent', options}]}, tokenizer);
-  assert.deepEqual(prepared.rows[0].labels, ['A', 'B']);
+  assert.deepEqual(prepared.rows[0]!.labels, ['A', 'B']);
   assert.equal(descriptorReads, 1);
   assert.equal(getterReads, 0);
   assert.ok(tokenizer.encoded.includes('A'));
@@ -415,7 +452,7 @@ test('Crivo generic decisions preserve inherited data fields without reading inh
   const question = Object.create({instructions: 'intent', options: ['A', 'B']});
   const request = Object.create({state: 'ticket', questions: [question]});
   const prepared = prepareCrivoDecision(request, tokenizer);
-  assert.deepEqual(prepared.rows[0].labels, ['A', 'B']);
+  assert.deepEqual(prepared.rows[0]!.labels, ['A', 'B']);
 
   let getterReads = 0;
   const accessorQuestion = Object.create({options: ['A', 'B']});
@@ -435,20 +472,24 @@ test('Crivo generic decisions preserve inherited data fields without reading inh
 
 test('Crivo handles more than 256 questions and chunks requests above the aggregate batch budget', async () => {
   class Tensor {
-    constructor(type, data, dims) {
+    declare type: string;
+    declare data: ArrayBufferView;
+    declare dims: number[];
+    declare disposed: boolean;
+    constructor(type: string, data: ArrayBufferView, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
 
     dispose() {}
   }
 
-  const calls = [];
+  const calls: Array<Record<string, Tensor>> = [];
   const runner = createCrivoRunner(
     {Tensor},
     {
-      async run(feeds) {
+      async run(feeds: Record<string, Tensor>) {
         calls.push(feeds);
-        const [batchRows, optionCount] = feeds.opt_mask.dims;
+        const [batchRows, optionCount] = feeds.opt_mask!.dims as [number, number];
         return {
           logits: new Tensor('float32', new Float32Array(batchRows * optionCount), [batchRows, optionCount])
         };
@@ -457,24 +498,24 @@ test('Crivo handles more than 256 questions and chunks requests above the aggreg
     }
   );
   const model = createCrivoSession({model: CRIVO_FP32_SPEC.model, tokenizer: fakeTokenizer(), runner});
-  const createTypedQuestions = (count) =>
+  const createTypedQuestions = (count: number) =>
     Object.fromEntries(
       Array.from({length: count}, (_, index) => [
         `question-${index}`,
         {type: 'choice', instructions: 'pick one', criteria: {a: null, b: null}}
       ])
     );
-  const createGenericQuestions = (count) =>
+  const createGenericQuestions = (count: number) =>
     Array.from({length: count}, () => ({instructions: 'pick one', options: ['a', 'b']}));
-  const assertBatches = (start, expectedRows) => {
+  const assertBatches = (start: number, expectedRows: number) => {
     const batches = calls.slice(start);
     assert.equal(
-      batches.reduce((total, feeds) => total + feeds.input_ids.dims[0], 0),
+      batches.reduce((total, feeds) => total + feeds.input_ids!.dims[0]!, 0),
       expectedRows
     );
     assert.equal(batches.length, Math.ceil(expectedRows / CRIVO_BATCH_SIZE));
     for (const feeds of batches) {
-      const [batchRows, paddedLength] = feeds.input_ids.dims;
+      const [batchRows, paddedLength] = feeds.input_ids!.dims as [number, number];
       assert.ok(batchRows > 0 && batchRows <= CRIVO_BATCH_SIZE);
       assert.ok(paddedLength <= CRIVO_MAX_SEQUENCE_TOKENS);
       assert.ok(batchRows * paddedLength <= CRIVO_BATCH_TOKEN_BUDGET);
@@ -504,7 +545,11 @@ test('Crivo handles more than 256 questions and chunks requests above the aggreg
 
 test('Crivo batches questions by the upstream row and token budgets', async () => {
   class Tensor {
-    constructor(type, data, dims) {
+    declare type: string;
+    declare data: ArrayBufferView;
+    declare dims: number[];
+    declare disposed: boolean;
+    constructor(type: string, data: ArrayBufferView, dims: number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
@@ -514,11 +559,11 @@ test('Crivo batches questions by the upstream row and token budgets', async () =
       this.disposed = true;
     }
   }
-  const calls = [];
+  const calls: Array<Record<string, Tensor>> = [];
   const session = {
-    async run(feeds) {
+    async run(feeds: Record<string, Tensor>) {
       calls.push(feeds);
-      const [batch, options] = feeds.opt_mask.dims;
+      const [batch, options] = feeds.opt_mask!.dims as [number, number];
       return {logits: new Tensor('float32', new Float32Array(batch * options), [batch, options])};
     },
     async release() {}
@@ -532,13 +577,13 @@ test('Crivo batches questions by the upstream row and token budgets', async () =
   const output = await runner.run(rows);
   assert.equal(output.length, CRIVO_BATCH_SIZE + 1);
   assert.deepEqual(
-    calls.map((feeds) => feeds.input_ids.dims[0]),
+    calls.map((feeds) => feeds.input_ids!.dims[0]!),
     [CRIVO_BATCH_SIZE, 1]
   );
-  assert.deepEqual(calls[0].input_ids.dims, [CRIVO_BATCH_SIZE, CRIVO_MAX_SEQUENCE_TOKENS]);
-  assert.equal(calls[0].input_ids.dims[0] * calls[0].input_ids.dims[1], CRIVO_BATCH_TOKEN_BUDGET);
-  assert.deepEqual(calls[0].opt_mask.dims, [CRIVO_BATCH_SIZE, 2]);
-  assert.equal(calls[0].opt_mask.type, 'bool');
+  assert.deepEqual(calls[0]!.input_ids!.dims, [CRIVO_BATCH_SIZE, CRIVO_MAX_SEQUENCE_TOKENS]);
+  assert.equal(calls[0]!.input_ids!.dims[0]! * calls[0]!.input_ids!.dims[1]!, CRIVO_BATCH_TOKEN_BUDGET);
+  assert.deepEqual(calls[0]!.opt_mask!.dims, [CRIVO_BATCH_SIZE, 2]);
+  assert.equal(calls[0]!.opt_mask!.type, 'bool');
   await runner.dispose();
 });
 
@@ -598,19 +643,19 @@ test('Crivo loader selects WebGPU or single-thread WASM and loads only the pinne
     model_max_length: 7999
   };
   const tokenizerJson = {model: {type: 'BPE'}};
-  const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value)).buffer;
+  const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).buffer;
 
   for (const spec of [CRIVO_FP32_SPEC, CRIVO_INT8_SPEC]) {
     const graphBytes = new Uint8Array([1, 2, 3]).buffer;
-    const reads = [];
-    const calls = [];
+    const reads: string[] = [];
+    const calls: Array<{bytes: Uint8Array; options: {executionProviders: string[]; intraOpNumThreads?: number}}> = [];
     let releaseCount = 0;
     const adapter = {info: {isFallbackAdapter: false}};
     const ort = {
       Tensor: class Tensor {},
       env: spec.backend === 'onnxruntime-web-webgpu' ? {webgpu: {}} : {wasm: {}},
       InferenceSession: {
-        async create(bytes, options) {
+        async create(bytes: Uint8Array, options: {executionProviders: string[]; intraOpNumThreads?: number}) {
           calls.push({bytes, options});
           return {
             inputNames: ['input_ids', 'attention_mask', 'opt_positions', 'opt_mask', 'qtype'],
@@ -628,7 +673,7 @@ test('Crivo loader selects WebGPU or single-thread WASM and loads only the pinne
       {
         ort,
         gpuApi: {
-          async requestAdapter(options) {
+          async requestAdapter(options: {forceFallbackAdapter: boolean}) {
             assert.equal(options.forceFallbackAdapter, false);
             return adapter;
           }
@@ -650,13 +695,14 @@ test('Crivo loader selects WebGPU or single-thread WASM and loads only the pinne
       }
     );
     assert.deepEqual(reads.sort(), ['config.json', 'tokenizer.json', 'tokenizer_config.json', spec.graphFile].sort());
-    assert.deepEqual(calls[0].options.executionProviders, [
+    assert.deepEqual(calls[0]!.options.executionProviders, [
       spec.backend === 'onnxruntime-web-webgpu' ? 'webgpu' : 'wasm'
     ]);
-    assert.equal(calls[0].options.intraOpNumThreads, spec.backend === 'onnxruntime-web-wasm' ? 1 : undefined);
-    if (spec.backend === 'onnxruntime-web-webgpu') assert.equal(ort.env.webgpu.adapter, adapter);
-    else assert.equal(ort.env.wasm.numThreads, 1);
-    await loaded.dispose();
+    assert.equal(calls[0]!.options.intraOpNumThreads, spec.backend === 'onnxruntime-web-wasm' ? 1 : undefined);
+    if (spec.backend === 'onnxruntime-web-webgpu')
+      assert.equal((ort.env.webgpu as {adapter?: unknown}).adapter, adapter);
+    else assert.equal((ort.env.wasm as {numThreads?: number}).numThreads, 1);
+    await (loaded as {dispose(): Promise<void>}).dispose();
     assert.equal(releaseCount, 1);
   }
 });
@@ -669,7 +715,9 @@ test('Crivo session queues calls and closes after disposal', async () => {
     tokenizer,
     runner: {
       async run(rows) {
-        return rows.map((row) => (row.type === 'noul' ? Float32Array.of(0, 2) : Float32Array.of(2, 0)));
+        return rows.map((row) =>
+          (row as typeof row & {type?: string}).type === 'noul' ? Float32Array.of(0, 2) : Float32Array.of(2, 0)
+        );
       },
       async dispose() {
         releaseCount++;
@@ -680,8 +728,12 @@ test('Crivo session queues calls and closes after disposal', async () => {
     claim: {type: 'noul', instructions: 'true?'},
     intent: {type: 'choice', instructions: 'choose', criteria: {first: null, second: null}}
   });
-  assert.ok(result.answers.claim.noul > 0.8);
-  assert.equal(result.answers.intent.choice, 'first');
+  const claim = result.answers.claim;
+  const intent = result.answers.intent;
+  assert.ok(claim?.type === 'noul');
+  assert.ok(intent?.type === 'choice');
+  assert.ok(claim.noul > 0.8);
+  assert.equal(intent.choice, 'first');
   await session.dispose();
   assert.equal(releaseCount, 1);
   await assert.rejects(() => session.systemOne('state', {x: {type: 'noul'}}), {code: 'SESSION_CLOSED'});
