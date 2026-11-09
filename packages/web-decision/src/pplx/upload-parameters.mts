@@ -8,16 +8,11 @@ interface FlashUploadCallbacks {
   writeRange(tensor: FlashTensor, offset: number, bytes: Uint8Array): unknown | PromiseLike<unknown>;
 }
 
-const uploadParameterEntriesWithFlashCallbacks = uploadParameterEntries as unknown as (
-  entries: FlashManifestEntry[],
-  callbacks: FlashUploadCallbacks
-) => Promise<unknown[]>;
-
 /** Read, verify and upload the pinned Perplexity graph parameters. */
 export async function uploadFlashParameters(
   manifest: FlashManifest,
   callbacks: FlashUploadCallbacks
 ): Promise<unknown[]> {
   if (!manifest || manifest.state !== 'pplx-q4-joint-assets-pending') throw new Error('Invalid asset manifest');
-  return uploadParameterEntriesWithFlashCallbacks(manifest.entries, callbacks);
+  return uploadParameterEntries(manifest.entries, callbacks);
 }

@@ -230,25 +230,7 @@ function validateMapika4Adapter(adapter: unknown): asserts adapter is Mapika4Gpu
 async function upload(owner: Mapika4Owner, source: Mapika4Source, signal: AbortSignal): Promise<unknown[]> {
   const context = owner.runtime.lib?.webGPUContext;
   if (typeof context?.copyRawBytesToBuffer !== 'function') throw new Error('Pinned TVM upload API unavailable.');
-  return (
-    uploadParameterEntries as unknown as (
-      entries: readonly Mapika4ParameterEntry[],
-      options: {
-        readonly signal?: AbortSignal | null | undefined;
-        readonly createTensor: (entry: Mapika4ParameterEntry) => Mapika4Tensor;
-        readonly readRange: (
-          entry: Mapika4FileEntry,
-          index: number,
-          part: Mapika4RangePart
-        ) => ArrayBuffer | PromiseLike<ArrayBuffer>;
-        readonly writeRange: (
-          tensor: Mapika4Tensor,
-          offset: number,
-          bytes: Uint8Array
-        ) => unknown | PromiseLike<unknown>;
-      }
-    ) => Promise<unknown[]>
-  )(source.entries, {
+  return uploadParameterEntries(source.entries, {
     signal,
     createTensor(entry: Mapika4ParameterEntry) {
       assertUsable(owner);

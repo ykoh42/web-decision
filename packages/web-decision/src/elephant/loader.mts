@@ -92,26 +92,10 @@ interface ElephantRuntimeOwner {
   [key: string]: unknown;
 }
 
-type ElephantIndexedEntry = Awaited<ReturnType<typeof openElephantSource>>['entries'][number];
-type ElephantRangePart = ElephantIndexedEntry['ranges'][number];
-
 interface ElephantUploadEntry {
   readonly shape: number[];
   readonly dtype: string;
 }
-
-interface ElephantParameterUploadOptions {
-  readonly signal: AbortSignal;
-  readonly expectedCount: 684;
-  createTensor(entry: ElephantUploadEntry): ElephantTensor;
-  readRange(entry: ElephantIndexedEntry, index: number, part: ElephantRangePart): Promise<ArrayBuffer>;
-  writeRange(tensor: ElephantUploadTensor, offset: number, bytes: Uint8Array): unknown | PromiseLike<unknown>;
-}
-
-type ElephantParameterUploader = (
-  entries: ElephantIndexedEntry[],
-  options: ElephantParameterUploadOptions
-) => Promise<unknown[]>;
 
 interface ElephantUploadTensor {
   readonly byteOffset: number;
@@ -213,7 +197,7 @@ async function upload(
 ): Promise<unknown[]> {
   const context = owner.runtime.lib?.webGPUContext;
   if (typeof context?.copyRawBytesToBuffer !== 'function') throw new Error('Pinned TVM upload API unavailable.');
-  return (uploadParameterEntries as ElephantParameterUploader)(source.entries, {
+  return uploadParameterEntries(source.entries, {
     signal,
     expectedCount: 684,
     createTensor(entry: ElephantUploadEntry) {
