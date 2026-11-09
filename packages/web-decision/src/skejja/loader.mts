@@ -1,12 +1,64 @@
 import {Tokenizer} from '@huggingface/tokenizers';
+import type {Tokenizer as TokenizerImplementation} from '@huggingface/tokenizers';
 import * as defaultOrt from 'onnxruntime-web/wasm';
+import type {InferenceSession} from 'onnxruntime-web';
 import {parseJson, waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {SKEJJA_INT8_PROFILE, SKEJJA_PROFILES, SKEJJA_REPOSITORY, SKEJJA_REVISION} from './contract.mjs';
+import {
+  SKEJJA_INT8_PROFILE,
+  SKEJJA_INT8DYN_PROFILE,
+  SKEJJA_PROFILES,
+  SKEJJA_REPOSITORY,
+  SKEJJA_REVISION
+} from './contract.mjs';
 import {createSkejjaRunner} from './runner.mjs';
-import {createSkejjaSession} from './session.mjs';
+import {createSkejjaSession, type SkejjaSession} from './session.mjs';
 import {openSkejjaSource} from './source.mjs';
-import {createSkejjaTokenizer} from './tokenizer.mjs';
+import {createSkejjaTokenizer, type SkejjaTokenizer} from './tokenizer.mjs';
+
+type SkejjaProfile = typeof SKEJJA_INT8_PROFILE | typeof SKEJJA_INT8DYN_PROFILE;
+type SkejjaSignal = Pick<AbortSignal, 'throwIfAborted' | 'addEventListener' | 'removeEventListener'> &
+  Partial<Pick<AbortSignal, 'aborted' | 'reason'>>;
+type SkejjaOrt = typeof defaultOrt;
+type SkejjaProgressCallback = (progress: {
+  readonly loadedBytes: number;
+  readonly totalBytes: number;
+  readonly fraction: number;
+}) => void;
+
+interface SkejjaLoadOptionValues {
+  readonly model?: unknown;
+  readonly assetsUrl?: unknown;
+  readonly cache?: unknown;
+  readonly offline?: unknown;
+  readonly signal?: unknown;
+  readonly onProgress?: unknown;
+  readonly maxPrefetchBytes?: unknown;
+  readonly debertaReadback?: unknown;
+}
+
+interface SkejjaCheckedLoadOptions {
+  readonly base: URL;
+  readonly useArchive: boolean;
+  readonly signal: SkejjaSignal | null | undefined;
+  readonly cacheEnabled: boolean;
+  readonly offline: boolean;
+  readonly onProgress: SkejjaProgressCallback | undefined;
+}
+
+interface SkejjaSource {
+  read(name: string): Promise<ArrayBuffer>;
+  release?(names: readonly string[]): void | Promise<void>;
+}
+
+type SkejjaTokenizerConstructor = new (data: object, config: object) => TokenizerImplementation;
+type SkejjaOpenSource = (checked: SkejjaCheckedLoadOptions, profile: SkejjaProfile) => Promise<SkejjaSource>;
+
+interface SkejjaLoadDependencies {
+  readonly ort?: SkejjaOrt;
+  readonly Tokenizer?: SkejjaTokenizerConstructor;
+  readonly openSource?: SkejjaOpenSource;
+}
 
 const LOAD_KEYS = new Set([
   'model',
@@ -18,33 +70,37 @@ const LOAD_KEYS = new Set([
   'maxPrefetchBytes',
   'debertaReadback'
 ]);
-const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
+type WebDecisionErrorCode = ConstructorParameters<typeof WebDecisionError>[0];
 
-function assertLoadOptionsObject(options, profile) {
+const fail = (code: WebDecisionErrorCode, message: string, cause?: unknown): WebDecisionError =>
+  new WebDecisionError(code, message, cause ? {cause} : undefined);
+
+function assertLoadOptionsObject(options: unknown, profile: SkejjaProfile): asserts options is object {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw fail('INVALID_INPUT', `${profile.name} load options are required.`);
 }
 
-function hasSupportedDataProperty(options, key) {
+function hasSupportedDataProperty(options: object, key: string | symbol): boolean | PropertyDescriptor | undefined {
   const descriptor = Object.getOwnPropertyDescriptor(options, key);
   return typeof key === 'string' && LOAD_KEYS.has(key) && descriptor && Object.hasOwn(descriptor, 'value');
 }
 
-function readLoadOptionValues(options, profile) {
+function readLoadOptionValues(options: object, profile: SkejjaProfile): SkejjaLoadOptionValues {
   for (const key of Reflect.ownKeys(options)) {
     if (!hasSupportedDataProperty(options, key))
       throw fail('INVALID_INPUT', `Unsupported ${profile.name} load option.`);
   }
-  return Object.fromEntries(Reflect.ownKeys(options).map((key) => [key, options[key]]));
+  const optionRecord = options as Record<PropertyKey, unknown>;
+  return Object.fromEntries(Reflect.ownKeys(options).map((key) => [key, optionRecord[key]])) as SkejjaLoadOptionValues;
 }
 
-function assertModelAndAssetOptions(values, profile) {
+function assertModelAndAssetOptions(values: SkejjaLoadOptionValues, profile: SkejjaProfile): void {
   if (values.model !== profile.model) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
   if (values.assetsUrl !== undefined && (typeof values.assetsUrl !== 'string' || !values.assetsUrl))
     throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
 }
 
-function assertValidCacheOptions(values, profile) {
+function assertValidCacheOptions(values: SkejjaLoadOptionValues, profile: SkejjaProfile): void {
   if (values.cache !== undefined && typeof values.cache !== 'boolean')
     throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
   if (values.offline !== undefined && typeof values.offline !== 'boolean')
@@ -53,16 +109,17 @@ function assertValidCacheOptions(values, profile) {
     throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
 }
 
-function isValidSignal(signal) {
+function isValidSignal(signal: unknown): signal is SkejjaSignal | null | undefined {
+  const signalLike = signal as SkejjaSignal | null | undefined;
   return (
-    signal == null ||
-    (typeof signal.throwIfAborted === 'function' &&
-      typeof signal.addEventListener === 'function' &&
-      typeof signal.removeEventListener === 'function')
+    signalLike == null ||
+    (typeof signalLike.throwIfAborted === 'function' &&
+      typeof signalLike.addEventListener === 'function' &&
+      typeof signalLike.removeEventListener === 'function')
   );
 }
 
-function assertValidLoadControls(values, profile) {
+function assertValidLoadControls(values: SkejjaLoadOptionValues, profile: SkejjaProfile): void {
   if (values.maxPrefetchBytes !== undefined && values.maxPrefetchBytes !== 0)
     throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
   if (values.debertaReadback !== undefined) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
@@ -71,13 +128,13 @@ function assertValidLoadControls(values, profile) {
   if (!isValidSignal(values.signal)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
 }
 
-function assertValidLoadOptionValues(values, profile) {
+function assertValidLoadOptionValues(values: SkejjaLoadOptionValues, profile: SkejjaProfile): void {
   assertModelAndAssetOptions(values, profile);
   assertValidCacheOptions(values, profile);
   assertValidLoadControls(values, profile);
 }
 
-function resolveAssetsBase(values, profile) {
+function resolveAssetsBase(values: SkejjaLoadOptionValues, profile: SkejjaProfile): {base: URL; useArchive: boolean} {
   const useArchive = values.assetsUrl === undefined;
   if (useArchive) {
     return {
@@ -88,7 +145,7 @@ function resolveAssetsBase(values, profile) {
 
   let base;
   try {
-    base = new URL(values.assetsUrl, globalThis.location?.href);
+    base = new URL(values.assetsUrl as string, globalThis.location?.href);
   } catch (cause) {
     throw fail('INVALID_INPUT', `Invalid ${profile.name} assetsUrl.`, cause);
   }
@@ -98,7 +155,10 @@ function resolveAssetsBase(values, profile) {
   return {base, useArchive};
 }
 
-export function validateSkejjaLoadOptions(options, profile = SKEJJA_INT8_PROFILE) {
+export function validateSkejjaLoadOptions(
+  options: unknown,
+  profile: SkejjaProfile = SKEJJA_INT8_PROFILE
+): SkejjaCheckedLoadOptions {
   assertLoadOptionsObject(options, profile);
   const values = readLoadOptionValues(options, profile);
   assertValidLoadOptionValues(values, profile);
@@ -106,15 +166,18 @@ export function validateSkejjaLoadOptions(options, profile = SKEJJA_INT8_PROFILE
   return {
     base,
     useArchive,
-    signal: values.signal,
+    signal: values.signal as SkejjaSignal | null | undefined,
     cacheEnabled: values.cache !== false,
     offline: values.offline === true,
-    onProgress: values.onProgress
+    onProgress: values.onProgress as SkejjaProgressCallback | undefined
   };
 }
 
-function validateCalibration(calibration, profile) {
-  const value = calibration?.[profile.onnxFile];
+function validateCalibration(calibration: unknown, profile: SkejjaProfile): void {
+  const value = (calibration as Record<string, unknown> | null | undefined)?.[profile.onnxFile] as
+    | {readonly temperature?: unknown; readonly platt_a?: unknown; readonly platt_b?: unknown}
+    | null
+    | undefined;
   if (
     value?.temperature !== profile.temperature ||
     value?.platt_a !== profile.plattA ||
@@ -126,7 +189,7 @@ function validateCalibration(calibration, profile) {
     throw fail('INVALID_ASSET', `${profile.name} calibration does not match the pinned model.`);
 }
 
-function validateSession(session, profile) {
+function validateSession(session: InferenceSession, profile: SkejjaProfile): InferenceSession {
   const inputs = new Set(session?.inputNames ?? []);
   const outputs = new Set(session?.outputNames ?? []);
   if (!['input_ids', 'attention_mask', 'label_slots'].every((name) => inputs.has(name)) || !outputs.has('logits'))
@@ -134,7 +197,13 @@ function validateSession(session, profile) {
   return session;
 }
 
-async function createSession(ort, graphBytes, dataBytes, profile, signal) {
+async function createSession(
+  ort: SkejjaOrt | null | undefined,
+  graphBytes: ArrayBuffer,
+  dataBytes: ArrayBuffer,
+  profile: SkejjaProfile,
+  signal: SkejjaSignal | null | undefined
+): Promise<InferenceSession> {
   if (typeof ort?.InferenceSession?.create !== 'function')
     throw fail('UNSUPPORTED_ENVIRONMENT', 'ONNX Runtime Web is unavailable.');
   const graph = new Uint8Array(graphBytes);
@@ -148,22 +217,26 @@ async function createSession(ort, graphBytes, dataBytes, profile, signal) {
         graphOptimizationLevel: 'all',
         externalData: [{path: profile.dataFile, data}]
       }),
-    signal,
+    signal as AbortSignal | null | undefined,
     (lateSession) => lateSession?.release()
   );
 }
 
 async function loadSkejjaProfile(
-  options,
-  profile,
-  {ort = defaultOrt, Tokenizer: TokenizerClass = Tokenizer, openSource = openSkejjaSource} = {}
-) {
+  options: unknown,
+  profile: SkejjaProfile,
+  {
+    ort = defaultOrt,
+    Tokenizer: TokenizerClass = Tokenizer,
+    openSource = openSkejjaSource as SkejjaOpenSource
+  }: SkejjaLoadDependencies = {}
+): Promise<SkejjaSession> {
   const checked = validateSkejjaLoadOptions(options, profile);
   const {signal} = checked;
-  let session;
+  let session: InferenceSession | null | undefined;
   try {
     const source = await openSource(checked, profile);
-    let tokenizer;
+    let tokenizer: SkejjaTokenizer;
     {
       const [tokenizerBytes, tokenizerConfigBytes, calibrationBytes] = await Promise.all([
         source.read('tokenizer.json'),
@@ -197,13 +270,18 @@ async function loadSkejjaProfile(
   } catch (cause) {
     await Promise.allSettled([session?.release()].filter(Boolean));
     signal?.throwIfAborted();
-    if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
+    if (
+      cause instanceof WebDecisionError ||
+      (cause as {readonly name?: unknown} | null | undefined)?.name === 'AbortError'
+    )
+      throw cause;
     throw fail('MODEL_LOAD_FAILED', `Could not load ${profile.model}.`, cause);
   }
 }
 
-export function loadSkejja(options, dependencies) {
-  const profile = SKEJJA_PROFILES[options?.model];
+export function loadSkejja(options: unknown, dependencies?: SkejjaLoadDependencies): Promise<SkejjaSession> {
+  const profile =
+    SKEJJA_PROFILES[(options as {readonly model?: unknown} | null | undefined)?.model as keyof typeof SKEJJA_PROFILES];
   if (!profile) throw fail('INVALID_INPUT', 'Unsupported Skejja model.');
   return loadSkejjaProfile(options, profile, dependencies);
 }
