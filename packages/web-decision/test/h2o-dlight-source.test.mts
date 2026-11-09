@@ -18,7 +18,7 @@ const root = new URL('../../../', import.meta.url),
   model = new URL('models/h2o-integration-20261030/', root);
 const pub = new URL('experiments/h2o-public-evidence-preparation-20261031/h2o-public-metadata.pending.json', root);
 const candidate = new URL('experiments/h2o-dlight-private-preparation-20261031/outputs/local-20261031-v1/', root);
-const files = {
+const files: Record<string, URL> = {
   'evidence/inventory.json': new URL('h2o-inventory-31d7b5f89e2c41a6/inventory.pending.json', model),
   'h2o-public-metadata.json': pub,
   'h2o-dlight-metadata.json': new URL('h2o-dlight-metadata.json', candidate),
@@ -32,31 +32,31 @@ const files = {
 };
 const artifactInputs = [
   pub,
-  files['manifest.pending.json'],
-  files['h2o-dlight-metadata.json'],
-  files['model.pending.wasm'],
-  files['model.dlight.pending.wasm']
+  files['manifest.pending.json']!,
+  files['h2o-dlight-metadata.json']!,
+  files['model.pending.wasm']!,
+  files['model.dlight.pending.wasm']!
 ];
 const artifactSkip = artifactInputs.every(existsSync) ? false : 'Local H2O graph and metadata evidence not prepared';
 const sourceSkip = Object.values(files).every(existsSync) ? false : 'Local H2O source evidence not prepared';
-const sha = (x) => createHash('sha256').update(x).digest('hex');
+const sha = (x: Uint8Array) => createHash('sha256').update(x).digest('hex');
 const base = 'https://example.invalid/assets/';
-async function withAssets(fn) {
+async function withAssets(fn: (context: {seen: string[]; setMutate: (value: string | null) => void}) => Promise<void>) {
   const original = globalThis.fetch,
-    seen = [];
-  let mutate;
+    seen: string[] = [];
+  let mutate: string | null = null;
   globalThis.fetch = async (url, options) => {
-    const name = new URL(url).pathname.slice('/assets/'.length),
+    const name = new URL(url instanceof Request ? url.url : url).pathname.slice('/assets/'.length),
       path = files[name];
     assert.ok(path, `unexpected asset ${name}`);
     seen.push(name);
     const data = await readFile(path),
-      m = /^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);
+      m = /^bytes=(\d+)-(\d+)$/.exec(new Headers(options?.headers).get('Range') ?? '');
     assert.ok(m);
     const start = Number(m[1]),
       end = Number(m[2]),
       bytes = Uint8Array.from(data.subarray(start, end + 1));
-    if (mutate === name) bytes[0] ^= 1;
+    if (mutate === name) bytes[0] = bytes[0]! ^ 1;
     return new Response(bytes, {
       status: 206,
       headers: {'Content-Range': `bytes ${start}-${end}/${data.length}`, 'Content-Length': String(bytes.length)}
@@ -65,7 +65,7 @@ async function withAssets(fn) {
   try {
     return await fn({
       seen,
-      setMutate: (value) => {
+      setMutate: (value: string | null) => {
         mutate = value;
       }
     });
@@ -81,10 +81,10 @@ test(
     const [metadata, manifest, proof, baseline, graph] = await Promise.all(
       [
         pub,
-        files['manifest.pending.json'],
-        files['h2o-dlight-metadata.json'],
-        files['model.pending.wasm'],
-        files['model.dlight.pending.wasm']
+        files['manifest.pending.json']!,
+        files['h2o-dlight-metadata.json']!,
+        files['model.pending.wasm']!,
+        files['model.dlight.pending.wasm']!
       ].map((path) => readFile(path))
     );
     const a = await preparePublicCandidatePlan(metadata, manifest);
@@ -103,14 +103,14 @@ test(
     await assert.rejects(preparePublicCandidatePlan(metadata, manifest, H2O_DLIGHT_MODEL_ID, metadata), {
       code: 'INVALID_ASSET'
     });
-    const altered = Uint8Array.from(proof);
-    altered[10] ^= 1;
+    const altered = Uint8Array.from(proof!);
+    altered[10] = altered[10]! ^ 1;
     await assert.rejects(preparePublicCandidatePlan(metadata, manifest, H2O_DLIGHT_MODEL_ID, altered), {
       code: 'INVALID_ASSET'
     });
-    const input = Uint8Array.from(graph),
+    const input = Uint8Array.from(graph!),
       pending = verifyWasm(input, H2O_DLIGHT_MODEL_ID);
-    input[0] ^= 1;
+    input[0] = input[0]! ^ 1;
     assert.equal(sha(await pending), DLIGHT_WASM_SHA256);
   }
 );
@@ -126,12 +126,12 @@ test('source picks exact variant paths and rejects modified candidate files', {s
     seen.length = 0;
     const b = await openH2oAssetSource({assetsUrl: base, model: H2O_DLIGHT_MODEL_ID});
     assert.equal(sha(b.wasm), DLIGHT_WASM_SHA256);
-    assert.equal(b.candidateMetadata.length, 178971);
+    assert.equal(b.candidateMetadata!.length, 178971);
     assert.ok(seen.includes('model.dlight.pending.wasm'));
     assert.ok(seen.includes('h2o-dlight-metadata.json'));
     assert.equal(seen.includes('model.pending.wasm'), false);
     const path = 'tensor-0415-retained.pending',
-      spec = {path, totalBytes: 64, ...b.inventory[path][0]};
+      spec = {path, totalBytes: 64, ...b.inventory[path]![0]!};
     assert.equal((await b.readRange(base, spec)).bytes.byteLength, 64);
     setMutate(path);
     await assert.rejects(b.readRange(base, spec), {code: 'INVALID_ASSET'});
@@ -151,13 +151,13 @@ test('verified DLight byte snapshot reaches instantiate despite later source mut
     const factories = createH2oBrowserFactories(
       {
         Tokenizer: class {},
-        instantiate: async (bytes) => {
+        instantiate: async (bytes: Uint8Array) => {
           instantiated = sha(bytes);
           instanceArgs = bytes;
           return {dispose() {}};
         },
         createPolyfillWASI: () => ({})
-      },
+      } as unknown as Parameters<typeof createH2oBrowserFactories>[0],
       H2O_DLIGHT_MODEL_ID
     );
     const originalVerify = factories.verifyWasm;
@@ -181,8 +181,8 @@ test('verified DLight byte snapshot reaches instantiate despite later source mut
       async openSource() {
         return source;
       },
-      async verifyWasm(bytes) {
-        verified = await originalVerify(bytes);
+      async verifyWasm(bytes: Uint8Array) {
+        verified = await originalVerify(bytes, undefined);
         return verified;
       },
       async prepareTokenizer() {
@@ -203,8 +203,11 @@ test('verified DLight byte snapshot reaches instantiate despite later source mut
       },
       makeHasher() {}
     };
-    const result = await loadFakeH2oCandidate({model: H2O_DLIGHT_MODEL_ID, assetsUrl: base}, deps);
-    assert.equal(result.ok, true);
+    const result = await loadFakeH2oCandidate(
+      {model: H2O_DLIGHT_MODEL_ID, assetsUrl: base},
+      deps as unknown as Parameters<typeof loadFakeH2oCandidate>[1]
+    );
+    assert.equal((result as unknown as {ok: boolean}).ok, true);
     assert.equal(instantiated, DLIGHT_WASM_SHA256);
     assert.equal(instanceArgs, verified);
     assert.notEqual(instanceArgs, source.wasm);
