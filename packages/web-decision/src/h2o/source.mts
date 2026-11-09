@@ -12,11 +12,96 @@ import {
 } from './plan.mjs';
 import {createIncrementalSha256, MAX_CHUNK_BYTES, MAX_FILE_BYTES} from './hasher.mjs';
 
-const hash = async (bytes) =>
-  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+type RangeSpec = {path: string; totalBytes: number; offset: number; length: number; sha256: string};
+type RangeChunk = Pick<RangeSpec, 'offset' | 'length' | 'sha256'>;
+type FileDescriptor = {path: string; bytes: number; sha256: string};
+type InventoryFile = FileDescriptor & {chunks: RangeChunk[]};
+type ParsedInventory = {
+  format: string;
+  manifestSha256: string;
+  auditReceiptSha256: string;
+  files: Array<InventoryFile | null | undefined>;
+};
+type FileParameter = {kind: 'file'; path: string; bytes: number; sha256: string};
+type RotaryParameter = {kind: 'rotary'; target: string};
+type H2oPlan = {parameters: Array<FileParameter | RotaryParameter>};
+type PreparePlan = (
+  metadataBytes: Uint8Array,
+  manifestBytes: Uint8Array,
+  model: string,
+  candidateBytes: Uint8Array | undefined,
+  signal: AbortSignal | undefined
+) => Promise<H2oPlan>;
+type IncrementalHasher = {update(bytes: unknown): void; digest(): string | Promise<string>};
+type RangeResponse = {bytes?: unknown} | null | undefined;
+export type H2oHashConstructor = new () => {
+  update(bytes: Uint8Array): unknown;
+  digest(): unknown;
+  clean(): unknown;
+};
+type RangeReader = (
+  base: URL,
+  spec: RangeSpec,
+  options: {cache: false; offline: false; signal: AbortSignal}
+) => Promise<RangeResponse>;
+type H2oSourcePolicy = {
+  manifestSha256: string;
+  stage: FileDescriptor;
+  manifest: FileDescriptor;
+  wasm: FileDescriptor;
+  tokenizer: FileDescriptor;
+  tokenizerConfig: FileDescriptor;
+  tokenizerContract: FileDescriptor;
+  candidateMetadata?: FileDescriptor;
+  weightCount: number;
+  preparePlan: (
+    stage: Uint8Array,
+    manifest: Uint8Array,
+    candidateMetadata: Uint8Array | undefined,
+    signal: AbortSignal | undefined
+  ) => H2oPlan | Promise<H2oPlan>;
+};
+type OpenOptions = {
+  inventoryBytes: unknown;
+  inventorySha256: unknown;
+  auditReceiptSha256: unknown;
+  signal?: AbortSignal | undefined;
+};
+export type H2oOpenedSource = {
+  stage: Uint8Array;
+  manifest: Uint8Array;
+  candidateMetadata?: Uint8Array;
+  wasm: Uint8Array;
+  tokenizer: Uint8Array;
+  tokenizerConfig: Uint8Array;
+  tokenizerContract: Uint8Array;
+  inventory: Record<string, RangeChunk[]>;
+  readRange(
+    requestBase: string | URL,
+    spec: RangeSpec,
+    options?: {cache?: false; offline?: false; signal?: AbortSignal | undefined}
+  ): Promise<{bytes: ArrayBuffer; cachedByHash: false}>;
+  close(): void;
+};
+type H2oModel = string;
+type H2oFactoryOptions = {inventoryBytes?: Uint8Array; HashClass?: H2oHashConstructor; model?: H2oModel};
+type H2oFakeSourceOptions = {
+  fake?: unknown;
+  base: unknown;
+  inventoryBytes: unknown;
+  inventorySha256: unknown;
+  auditReceiptSha256: unknown;
+  signal?: AbortSignal | undefined;
+  policy: H2oSourcePolicy;
+  reader: RangeReader;
+  makeHasher: () => IncrementalHasher;
+};
+
+const hash = async (bytes: Uint8Array) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource))]
     .map((x) => x.toString(16).padStart(2, '0'))
     .join('');
-const bad = (message) => new WebDecisionError('INVALID_ASSET', message);
+const bad = (message: string): WebDecisionError => new WebDecisionError('INVALID_ASSET', message);
 const SHA = /^[a-f0-9]{64}$/;
 const pinned = Object.freeze({
   manifestSha256: '27f83988992c9d9fe2febe924848259890bcb4d39e1c57cb225dd8cb22610e9a',
@@ -52,10 +137,10 @@ const pinned = Object.freeze({
   }
 });
 
-function safeBase(base) {
+function safeBase(base: unknown): URL {
   let value;
   try {
-    value = new URL(base);
+    value = new URL(base as string | URL);
   } catch {
     throw bad('Invalid asset base');
   }
@@ -71,7 +156,7 @@ function safeBase(base) {
   return value;
 }
 
-function verifyRanges(item, expected, align) {
+function verifyRanges(item: InventoryFile | null | undefined, expected: FileDescriptor, align: boolean): InventoryFile {
   if (
     !item ||
     item.path !== expected.path ||
@@ -108,7 +193,13 @@ function verifyRanges(item, expected, align) {
   return {path: item.path, bytes: item.bytes, sha256: item.sha256, chunks};
 }
 
-async function readInventory(inventoryBytes, inventorySha256, auditReceiptSha256, policy, signal) {
+async function readInventory(
+  inventoryBytes: unknown,
+  inventorySha256: unknown,
+  auditReceiptSha256: unknown,
+  policy: H2oSourcePolicy,
+  signal: AbortSignal | undefined
+): Promise<Map<string, InventoryFile>> {
   if (
     !(inventoryBytes instanceof Uint8Array) ||
     inventoryBytes.length > 1_000_000 ||
@@ -125,7 +216,7 @@ async function readInventory(inventoryBytes, inventorySha256, auditReceiptSha256
   if (inventoryHash !== inventorySha256) throw bad('Inventory hash mismatch');
   let inventory;
   try {
-    inventory = parseStrictJson(invBytes);
+    inventory = parseStrictJson(invBytes) as ParsedInventory;
   } catch {
     throw bad('Invalid inventory JSON');
   }
@@ -136,7 +227,7 @@ async function readInventory(inventoryBytes, inventorySha256, auditReceiptSha256
     !Array.isArray(inventory.files)
   )
     throw bad('Inventory evidence mismatch');
-  const declared = new Map();
+  const declared = new Map<string, InventoryFile>();
   for (const file of inventory.files) {
     if (!file || typeof file.path !== 'string' || declared.has(file.path)) throw bad('Duplicate inventory path');
     declared.set(file.path, file);
@@ -145,16 +236,16 @@ async function readInventory(inventoryBytes, inventorySha256, auditReceiptSha256
 }
 
 async function open(
-  baseValue,
-  {inventoryBytes, inventorySha256, auditReceiptSha256, signal},
-  policy,
-  reader,
-  makeHasher
-) {
+  baseValue: unknown,
+  {inventoryBytes, inventorySha256, auditReceiptSha256, signal}: OpenOptions,
+  policy: H2oSourcePolicy,
+  reader: RangeReader,
+  makeHasher: () => IncrementalHasher
+): Promise<H2oOpenedSource> {
   const base = safeBase(baseValue);
   const declared = await readInventory(inventoryBytes, inventorySha256, auditReceiptSha256, policy, signal);
   const controller = new AbortController();
-  const forward = () => controller.abort(signal.reason);
+  const forward = () => controller.abort(signal!.reason);
   signal?.addEventListener('abort', forward, {once: true});
   if (signal?.aborted) forward();
   let closed = false;
@@ -164,7 +255,7 @@ async function open(
     signal?.removeEventListener('abort', forward);
     controller.abort(new DOMException('Asset source closed', 'AbortError'));
   };
-  const read = async (spec) => {
+  const read = async (spec: RangeSpec): Promise<Uint8Array> => {
     controller.signal.throwIfAborted();
     const result = await waitForAbort(
       () => reader(base, spec, {cache: false, offline: false, signal: controller.signal}),
@@ -179,7 +270,7 @@ async function open(
     if (digest !== spec.sha256) throw bad('Range response hash mismatch');
     return bytes;
   };
-  const small = async (descriptor) => {
+  const small = async (descriptor: FileDescriptor): Promise<Uint8Array> => {
     if (descriptor.bytes > MAX_CHUNK_BYTES) throw bad('Small pinned file too large');
     return read({
       path: descriptor.path,
@@ -201,7 +292,7 @@ async function open(
     const weightFiles = plan.parameters.filter((entry) => entry.kind === 'file');
     if (weightFiles.length !== policy.weightCount || declared.size !== policy.weightCount + 1)
       throw bad('Inventory file count mismatch');
-    const allowed = new Map();
+    const allowed = new Map<string, InventoryFile>();
     for (const file of weightFiles) {
       if (allowed.has(file.path)) throw bad('Duplicate ordered weight path');
       allowed.set(file.path, verifyRanges(declared.get(file.path), file, true));
@@ -220,7 +311,7 @@ async function open(
       tokenizerConfig = await small(policy.tokenizerConfig),
       tokenizerContract = await small(policy.tokenizerContract);
     controller.signal.throwIfAborted();
-    const inventoryByPath = Object.create(null);
+    const inventoryByPath: Record<string, RangeChunk[]> = Object.create(null);
     for (const [path, value] of allowed) inventoryByPath[path] = value.chunks.map((part) => ({...part}));
     return {
       stage,
@@ -231,7 +322,14 @@ async function open(
       tokenizerConfig,
       tokenizerContract,
       inventory: inventoryByPath,
-      async readRange(requestBase, spec, options = {}) {
+      async readRange(
+        requestBase: unknown,
+        spec: unknown,
+        options: unknown = {}
+      ): Promise<{
+        bytes: ArrayBuffer;
+        cachedByHash: false;
+      }> {
         if (closed) throw bad('Asset source is closed');
         if (
           !options ||
@@ -265,16 +363,20 @@ async function open(
           Object.keys(spec).sort().join(',') !== 'length,offset,path,sha256,totalBytes'
         )
           throw bad('Invalid range request');
-        const file = allowed.get(spec?.path);
+        const file = allowed.get((spec as RangeSpec | null | undefined)?.path as string);
         const match = file?.chunks.find(
-          (part) => part.offset === spec.offset && part.length === spec.length && part.sha256 === spec.sha256
+          (part) =>
+            part.offset === (spec as RangeSpec).offset &&
+            part.length === (spec as RangeSpec).length &&
+            part.sha256 === (spec as RangeSpec).sha256
         );
-        if (!file || !match || spec.totalBytes !== file.bytes) throw bad('Range is not pinned by inventory');
-        const operationSignal = values.signal;
+        if (!file || !match || (spec as RangeSpec).totalBytes !== file.bytes)
+          throw bad('Range is not pinned by inventory');
+        const operationSignal = values.signal as AbortSignal | null | undefined;
         operationSignal?.throwIfAborted();
         // Forward caller cancellation without mutating the source-wide signal.
         const local = new AbortController();
-        const cancel = (event) => local.abort(event.target.reason);
+        const cancel = (event: Event) => local.abort((event.target as AbortSignal).reason);
         controller.signal.addEventListener('abort', cancel, {once: true});
         operationSignal?.addEventListener('abort', cancel, {once: true});
         if (controller.signal.aborted) local.abort(controller.signal.reason);
@@ -312,14 +414,21 @@ async function open(
 }
 
 /** Separate path-free projection; its pins are unsigned consistency evidence. */
-export function createH2oPublicSourceFactory({inventoryBytes, HashClass, model = H2O_BASELINE_MODEL_ID} = {}) {
+export function createH2oPublicSourceFactory({
+  inventoryBytes,
+  HashClass,
+  model = H2O_BASELINE_MODEL_ID
+}: H2oFactoryOptions = {}): (options: {
+  base: string | URL;
+  signal?: AbortSignal | undefined;
+}) => Promise<H2oOpenedSource> {
   h2oGraphIdentity(model);
   const candidate = model === H2O_BASELINE_MODEL_ID ? undefined : h2oCandidateSpec(model);
-  const policy = {
+  const policy: H2oSourcePolicy = {
     ...pinned,
     weightCount: 680,
     preparePlan: (stage, manifest, candidate, signal) =>
-      preparePublicCandidatePlan(stage, manifest, model, candidate, signal),
+      (preparePublicCandidatePlan as PreparePlan)(stage, manifest, model, candidate, signal),
     stage: {path: 'h2o-public-metadata.json', bytes: 178642, sha256: PUBLIC_METADATA_SHA256},
     ...(candidate
       ? {
@@ -332,7 +441,7 @@ export function createH2oPublicSourceFactory({inventoryBytes, HashClass, model =
         }
       : {})
   };
-  return ({base, signal}) =>
+  return ({base, signal}: {base: string | URL; signal?: AbortSignal | undefined}) =>
     open(
       base,
       {
@@ -342,7 +451,8 @@ export function createH2oPublicSourceFactory({inventoryBytes, HashClass, model =
         signal
       },
       policy,
-      readVerifiedRange,
+      // The existing reader call site uses `cache: false` as its no-cache sentinel.
+      readVerifiedRange as unknown as RangeReader,
       () => createIncrementalSha256(HashClass)
     );
 }
@@ -358,7 +468,7 @@ export function openFakeH2oSource({
   policy,
   reader,
   makeHasher
-}) {
+}: H2oFakeSourceOptions): Promise<H2oOpenedSource> {
   if (fake !== true || typeof reader !== 'function' || typeof makeHasher !== 'function')
     throw new TypeError('Fake source dependencies required');
   return open(base, {inventoryBytes, inventorySha256, auditReceiptSha256, signal}, policy, reader, makeHasher);

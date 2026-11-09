@@ -123,6 +123,8 @@
     "src/strands/source-loader-internal.mts",
     "src/h2o/tokenizer.mts",
     "src/h2o/tokenizer-adapter.mts",
+    "src/h2o/source.mts",
+    "src/h2o/source-entry.mts",
     "src/safedecide/*.mts",
     "src/tamev/contract.mts",
     "src/tamev/loader.mts",

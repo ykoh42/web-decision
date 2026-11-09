@@ -12,8 +12,6 @@
     "packages/web-decision/src/h2o/runner.mjs",
     "packages/web-decision/src/h2o/session.mjs",
     "packages/web-decision/src/h2o/sha256.mjs",
-    "packages/web-decision/src/h2o/source-entry.mjs",
-    "packages/web-decision/src/h2o/source.mjs",
     "packages/web-decision/src/h2o/upload.mjs",
     "packages/web-decision/src/imajev/candidate-loader.mjs",
     "packages/web-decision/src/index.js",
