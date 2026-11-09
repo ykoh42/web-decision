@@ -1,4 +1,30 @@
 import {WebDecisionError, tokenizeKevText} from './kev.js';
+import type {KevTokenizer} from './kev.js';
+
+type Kev08Packing = {
+  allowEmptyInstructions: boolean;
+  allowSingleOption: boolean;
+  allowEmptyOptions: boolean;
+  allowDuplicateOptions: boolean;
+};
+type Kev08PackingOptions = {
+  allowEmptyInstructions?: boolean;
+  allowSingleOption?: boolean;
+  allowEmptyOptions?: boolean;
+  allowDuplicateOptionsFor?: Set<number>;
+};
+type Kev08Question = {instructions?: unknown; options?: unknown};
+type Kev08Limits = {maxInputTokens: number; maxStateTokens: number};
+type Kev08Row = {
+  ids: number[];
+  questionSlot: number;
+  optionSlots: number[];
+  options: string[];
+  allowSingleOption?: boolean;
+  allowEmptyOptions?: boolean;
+  allowDuplicateOptions?: boolean;
+};
+type Kev08Packed = {rows: readonly Kev08Row[]; tokenCount: number};
 
 export const KEV08_MAX_OPTIONS = 255;
 
@@ -11,15 +37,15 @@ export const KEV08_MARKERS = Object.freeze({
   decide: 248062
 });
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+const invalid = (message: string) => new WebDecisionError('INVALID_INPUT', message);
 
-function append(target, values, maxTokens) {
+function append(target: number[], values: readonly number[], maxTokens: number) {
   if (target.length + values.length > maxTokens)
     throw invalid(`A packed question exceeds ${maxTokens} tokens; no truncation was applied.`);
   for (const value of values) target.push(value);
 }
 
-function validateQuestion(question, index, packing) {
+function validateQuestion(question: Kev08Question, index: number, packing: Kev08Packing) {
   const instructions = question?.instructions;
   if (typeof instructions !== 'string' || (!packing.allowEmptyInstructions && !instructions.trim()))
     throw invalid(`Question ${index} needs non-empty instructions.`);
@@ -41,7 +67,14 @@ function validateQuestion(question, index, packing) {
   return {instructions, options};
 }
 
-function packQuestion(tokenizer, state, question, index, maxTokens, packing) {
+function packQuestion(
+  tokenizer: KevTokenizer,
+  state: number[],
+  question: Kev08Question,
+  index: number,
+  maxTokens: number,
+  packing: Kev08Packing
+) {
   const {instructions, options} = validateQuestion(question, index, packing);
   const ids = [...state],
     optionSlots = [],
@@ -62,7 +95,7 @@ function packQuestion(tokenizer, state, question, index, maxTokens, packing) {
   append(ids, [KEV08_MARKERS.decide], maxTokens);
   if (ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= 248320))
     throw new WebDecisionError('INVALID_ASSET', 'Tokenizer produced an unsupported Kev 0.8B token ID.');
-  const row = {ids, questionSlot: ids.length - 1, optionSlots, options};
+  const row: Kev08Row = {ids, questionSlot: ids.length - 1, optionSlots, options};
   if (packing.allowSingleOption) row.allowSingleOption = true;
   if (packing.allowEmptyOptions) row.allowEmptyOptions = true;
   if (packing.allowDuplicateOptions) row.allowDuplicateOptions = true;
@@ -70,7 +103,12 @@ function packQuestion(tokenizer, state, question, index, maxTokens, packing) {
 }
 
 /** Snapshot one state-prefixed, independent row per choice question. */
-export function packKev08Request(tokenizer, request, limits, packingOptions = {}) {
+export function packKev08Request(
+  tokenizer: KevTokenizer,
+  request: {state: unknown; questions: unknown},
+  limits: Kev08Limits,
+  packingOptions: Kev08PackingOptions = {}
+) {
   if (!request || typeof request !== 'object' || Array.isArray(request)) throw invalid('A request object is required.');
   const stateText = request.state;
   if (typeof stateText !== 'string') throw invalid('state must be a string.');
@@ -100,51 +138,54 @@ export function packKev08Request(tokenizer, request, limits, packingOptions = {}
       allowEmptyOptions,
       allowDuplicateOptions: allowDuplicateOptionsFor.has(index)
     };
-    rows.push(packQuestion(tokenizer, state, questions[index], index, limits.maxInputTokens, packing));
+    rows.push(packQuestion(tokenizer, state, questions[index] as Kev08Question, index, limits.maxInputTokens, packing));
   }
   return {rows, tokenCount: rows.reduce((sum, row) => sum + row.ids.length, 0)};
 }
 
-function snapshotScores(row, count) {
+function snapshotScores(row: unknown, count: number) {
   const array = Array.isArray(row);
-  if ((!array && !(ArrayBuffer.isView(row) && !(row instanceof DataView))) || row.length !== count)
+  if (
+    (!array && !(ArrayBuffer.isView(row) && !(row instanceof DataView))) ||
+    (row as {length: number}).length !== count
+  )
     throw new WebDecisionError('INFERENCE_ERROR', 'The Kev 0.8B model returned invalid scores.');
   const logits = [];
   for (let i = 0; i < count; i++) {
-    const value = row[i];
+    const value = (row as ArrayLike<number>)[i];
     if ((array && !Object.hasOwn(row, i)) || !Number.isFinite(value))
       throw new WebDecisionError('INFERENCE_ERROR', 'The Kev 0.8B model returned invalid scores.');
-    logits.push(value);
+    logits.push(value!);
   }
   return logits;
 }
 
 /** The pointer head already includes its pinned inference temperature. */
-export function unpackKev08Scores(rows, packed) {
+export function unpackKev08Scores(rows: unknown, packed: Kev08Packed) {
   if (!Array.isArray(rows) || rows.length !== packed.rows.length)
     throw new WebDecisionError('INFERENCE_ERROR', 'The Kev 0.8B model returned invalid scores.');
-  const scores = [];
+  const scores: number[][] = [];
   for (let i = 0; i < rows.length; i++) {
     if (!Object.hasOwn(rows, i))
       throw new WebDecisionError('INFERENCE_ERROR', 'The Kev 0.8B model returned invalid scores.');
-    scores.push(snapshotScores(rows[i], packed.rows[i].options.length));
+    scores.push(snapshotScores(rows[i], packed.rows[i]!.options.length));
   }
   return {
     tokenCount: packed.tokenCount,
     answers: packed.rows.map(({options}, i) => {
-      const logits = scores[i],
+      const logits = scores[i]!,
         max = Math.max(...logits);
       const exponentials = logits.map((value) => Math.exp(value - max));
       const total = exponentials.reduce((a, b) => a + b, 0);
       const probabilities = exponentials.map((value) => value / total);
       const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
       return {
-        selected: options[selectedIndex],
+        selected: options[selectedIndex]!,
         selectedIndex,
         probabilities: options.map((option, index) => ({
           option,
-          probability: probabilities[index],
-          logit: logits[index]
+          probability: probabilities[index]!,
+          logit: logits[index]!
         }))
       };
     })
