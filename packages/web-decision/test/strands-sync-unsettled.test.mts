@@ -4,45 +4,63 @@ import {Tokenizer} from './strands-fake-tokenizer.mjs';
 import {ExperimentalFusedRunner} from '../src/strands/runner.mjs';
 import {ExperimentalStrandsSession} from '../src/strands/session.mjs';
 
+type FakeScope = {closed: boolean};
+type FakeTensor = {
+  byteOffset: number;
+  value?: unknown;
+  getDataPtr(): number;
+  copyFrom(value: unknown): FakeTensor;
+  toArray(): unknown;
+};
+type FakeFixture = {
+  session: ExperimentalStrandsSession;
+  request: Parameters<ExperimentalStrandsSession['decide']>[0];
+  scopes: FakeScope[];
+  pendingReadbacks: FakeScope[];
+  graphRuns(): number;
+};
+
 // Model an outstanding CPU readback whose sync and fallback sync both reject.
 // This fake does not establish how often the condition occurs on a real GPU.
-function fixture() {
-  let scope,
+function fixture(): FakeFixture {
+  let scope: FakeScope | undefined,
     syncs = 0,
     graphRuns = 0;
-  const scopes = [],
-    pendingReadbacks = [];
+  const scopes: FakeScope[] = [],
+    pendingReadbacks: FakeScope[] = [];
   const runtime = {
     beginScope() {
       scope = {closed: false};
       scopes.push(scope);
     },
     endScope() {
-      scope.closed = true;
+      scope!.closed = true;
     },
     cpu() {
       return 'cpu';
     },
     lib: {webGPUContext: {copyRawBytesToBuffer() {}}},
-    empty(_shape, _dtype, device) {
-      const owner = scope;
+    empty(_shape: number[], _dtype: string, device: unknown) {
+      const owner = scope!;
       return {
         byteOffset: 0,
-        getDataPtr() {
+        getDataPtr(): number {
           return 1;
         },
-        copyFrom(value) {
+        copyFrom(this: FakeTensor, value: unknown): FakeTensor {
           if (device === 'cpu') pendingReadbacks.push(owner);
-          this.value = ArrayBuffer.isView(value) ? Array.from(value) : value.value;
+          this.value = ArrayBuffer.isView(value)
+            ? Array.from(value as unknown as ArrayLike<unknown>)
+            : (value as unknown as {value?: unknown}).value;
           return this;
         },
-        toArray() {
+        toArray(this: FakeTensor): unknown {
           return this.value;
         }
-      };
+      } as FakeTensor;
     },
     dispose() {}
-  };
+  } as unknown as ConstructorParameters<typeof ExperimentalFusedRunner>[0]['runtime'];
   const runner = new ExperimentalFusedRunner({
     runtime,
     gpu: {
@@ -66,7 +84,9 @@ function fixture() {
   });
   return {
     session: new ExperimentalStrandsSession({tokenizer: new Tokenizer(), runner}),
-    request: {state: 's', questions: [{instructions: 'Pick', options: ['red', 'blue']}]},
+    request: {state: 's', questions: [{instructions: 'Pick', options: ['red', 'blue']}]} as unknown as Parameters<
+      ExperimentalStrandsSession['decide']
+    >[0],
     scopes,
     pendingReadbacks,
     graphRuns: () => graphRuns

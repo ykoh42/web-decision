@@ -2,8 +2,37 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {withNariScope} from '../src/nari/scope.mjs';
 
-function fixture() {
-  const events = [],
+type FakeContext = {pendingGPUToCPUCopy?: Promise<unknown> | null};
+type FakeRuntime = {
+  lib: {webGPUContext: FakeContext};
+  beginScope(): void;
+  endScope(): void;
+};
+type FakeGpu = {
+  pushErrorScope(): void;
+  popErrorScope(): Promise<null>;
+};
+type FakeDevice = {sync(): Promise<void>};
+type FakeRunner = {
+  poisoned?: boolean;
+  runtime: FakeRuntime;
+  gpu: FakeGpu;
+  device: FakeDevice;
+  lifecycle: {loss: unknown; disposed: boolean};
+  uncaptured: unknown[];
+  disposalGuard: {blocked: boolean};
+};
+type Fixture = {
+  runner: FakeRunner;
+  runtime: FakeRuntime;
+  gpu: FakeGpu;
+  device: FakeDevice;
+  context: FakeContext;
+  events: string[];
+};
+
+function fixture(): Fixture {
+  const events: string[] = [],
     context = {pendingGPUToCPUCopy: null};
   const runtime = {
     lib: {webGPUContext: context},
@@ -60,21 +89,21 @@ test('missing readback state prevents graph work and poisons future use', async 
 
 test('failed sync waits for its captured readback before releasing the scope', async () => {
   const f = fixture();
-  let resolveReadback,
-    started,
+  let resolveReadback: (() => void) | undefined,
+    started: (() => void) | undefined,
     syncCount = 0,
     finished = false;
-  const entered = new Promise((resolve) => {
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
   f.device.sync = async () => {
     if (++syncCount === 1) {
-      started();
+      started!();
       throw Error('sync failed');
     }
     f.context.pendingGPUToCPUCopy = null;
   };
-  const readback = new Promise((resolve) => {
+  const readback = new Promise<void>((resolve) => {
     resolveReadback = resolve;
   });
   const task = withNariScope(f.runner, 'failed', async (lease) => {
@@ -89,7 +118,7 @@ test('failed sync waits for its captured readback before releasing the scope', a
   await Promise.resolve();
   assert.equal(finished, false);
   assert.equal(f.events.includes('end'), false);
-  resolveReadback();
+  resolveReadback!();
   await assert.rejects(task, {code: 'INFERENCE_ERROR'});
   assert.equal(f.events.includes('end'), true);
   assert.notEqual(f.runner.poisoned, true);
