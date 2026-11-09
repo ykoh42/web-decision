@@ -10,18 +10,18 @@ import {
 import {selectModelFamily} from '../src/model-family.js';
 import {WebDecisionError} from '../src/kev.js';
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((a, b) => {
+function deferred<T = void>() {
+  let resolve!: (value: T) => void, reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((a, b) => {
     resolve = a;
     reject = b;
   });
   return {promise, resolve, reject};
 }
 function fixture() {
-  const lost = deferred(),
-    events = [],
-    uploaded = [];
+  const lost = deferred<unknown>(),
+    events: string[] = [],
+    uploaded: Array<{readRange: (key?: string) => unknown; inventory: {synthetic: boolean}; base: URL}> = [];
   const device = {
     lost: lost.promise,
     destroy() {
@@ -36,17 +36,28 @@ function fixture() {
     tokenizerConfig: Uint8Array.of(5),
     tokenizerContract: Uint8Array.of(6),
     inventory: {synthetic: true},
-    readRange() {
+    readRange(_key?: string): unknown {
       return this.inventory;
     },
     async close() {
       events.push('source-close');
     }
+  } as {
+    stage: Uint8Array;
+    manifest: Uint8Array;
+    wasm: Uint8Array;
+    tokenizer: Uint8Array;
+    tokenizerConfig: Uint8Array;
+    tokenizerContract: Uint8Array;
+    candidateMetadata?: Uint8Array;
+    inventory: {synthetic: boolean};
+    readRange(key?: string): unknown;
+    close(): Promise<void>;
   };
   const adapter = {
     features: new Set(['shader-f16']),
     limits: {...PRELIMINARY_LIMITS},
-    async requestDevice(request) {
+    async requestDevice(request: {requiredLimits: typeof PRELIMINARY_LIMITS}) {
       events.push('device');
       assert.deepEqual(request.requiredLimits, PRELIMINARY_LIMITS);
       return device;
@@ -67,7 +78,7 @@ function fixture() {
   const runner = {name: 'runner'},
     session = {name: 'session'},
     plan = {name: 'plan'};
-  const deps = {
+  const depsBase = {
     fake: true,
     gpu: {
       async requestAdapter() {
@@ -75,57 +86,58 @@ function fixture() {
         return adapter;
       }
     },
-    async openSource({base}) {
+    async openSource({base}: {base: URL}) {
       events.push('source');
       assert.equal(base.href, 'https://example.invalid/assets/');
       return source;
     },
-    async preparePlan(stage, manifest) {
+    async preparePlan(stage: Uint8Array, manifest: Uint8Array) {
       events.push('plan');
       assert.equal(stage[0], 1);
       assert.equal(manifest[0], 2);
       return plan;
     },
-    async verifyWasm(wasm) {
+    async verifyWasm(wasm: Uint8Array) {
       events.push('wasm');
       assert.equal(wasm[0], 3);
       assert.notEqual(wasm, source.wasm);
       return wasm;
     },
-    async prepareTokenizer(tokens, config, contract) {
+    async prepareTokenizer(tokens: Uint8Array, config: Uint8Array, contract: Uint8Array) {
       events.push('tokenizer');
       assert.deepEqual([tokens[0], config[0], contract[0]], [4, 5, 6]);
       return {tokenizer: {}, addedTokens: []};
     },
-    async createRuntime(wasm) {
+    async createRuntime(wasm: Uint8Array) {
       events.push('runtime');
       assert.equal(wasm[0], 3);
       return runtime;
     },
-    initialize(rt, gpu) {
+    initialize(rt: typeof runtime, gpu: typeof device) {
       events.push('initialize');
       assert.equal(rt, runtime);
       assert.equal(gpu, device);
       return owner;
     },
-    async upload(args) {
+    async upload(args: (typeof uploaded)[number]) {
       events.push('upload');
       uploaded.push(args);
       return [];
     },
-    attach(actual, weights) {
+    attach(actual: typeof owner, weights: unknown[]) {
       events.push('attach');
       assert.equal(actual, owner);
       assert.deepEqual(weights, []);
       return runner;
     },
-    async createSession(args) {
+    async createSession(args: {runner: typeof runner}) {
       events.push('session');
       assert.equal(args.runner, runner);
       return session;
     },
     makeHasher() {}
   };
+  const deps: typeof depsBase & {beforeDevice?: () => Promise<void>; expectedModel?: string} = depsBase;
   return {lost, events, uploaded, device, source, adapter, runtime, owner, runner, session, deps};
 }
 const options = {assetsUrl: 'https://example.invalid/assets', cache: false};
@@ -134,18 +146,20 @@ for (const [method, event, later, signalIndex] of [
   ['preparePlan', 'plan', ['wasm', 'tokenizer', 'device'], 3],
   ['verifyWasm', 'wasm', ['tokenizer', 'device'], 1],
   ['prepareTokenizer', 'tokenizer', ['device'], 3]
-]) {
+] as const) {
   test(`abort during ${method} closes the source and observes late rejection`, async () => {
     const f = fixture(),
       started = deferred(),
       pending = deferred(),
       controller = new AbortController(),
       reason = new Error('synthetic cancellation'),
-      unhandled = [];
-    const onUnhandled = (error) => unhandled.push(error);
+      unhandled: unknown[] = [];
+    const onUnhandled = (error: unknown) => unhandled.push(error);
     process.on('unhandledRejection', onUnhandled);
     try {
-      f.deps[method] = (...args) => {
+      (f.deps as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>)[method] = (
+        ...args: unknown[]
+      ) => {
         f.events.push(event);
         assert.equal(args[signalIndex], controller.signal);
         started.resolve();
@@ -170,7 +184,7 @@ for (const [method, event, later, signalIndex] of [
 test('abort during plan skips later work even if the plan resolves late', async () => {
   const f = fixture(),
     started = deferred(),
-    pending = deferred(),
+    pending = deferred<{name: string}>(),
     controller = new AbortController(),
     reason = new Error('synthetic cancellation');
   f.deps.preparePlan = () => {
@@ -181,7 +195,7 @@ test('abort during plan skips later work even if the plan resolves late', async 
   await started.promise;
   controller.abort(reason);
   await assert.rejects(task, (error) => error === reason);
-  pending.resolve({});
+  pending.resolve({} as {name: string});
   await new Promise((resolve) => setImmediate(resolve));
   assert.ok(f.events.includes('source-close'));
   assert.ok(['wasm', 'tokenizer', 'device'].every((name) => !f.events.includes(name)));
@@ -204,9 +218,9 @@ test('fake glue orders checks and passes pinned source and range reader through'
     'session',
     'source-close'
   ]);
-  assert.equal(f.uploaded[0].readRange(), f.source.inventory);
-  assert.equal(f.uploaded[0].inventory, f.source.inventory);
-  assert.equal(f.uploaded[0].base.href, 'https://example.invalid/assets/');
+  assert.equal(f.uploaded[0]!.readRange(), f.source.inventory);
+  assert.equal(f.uploaded[0]!.inventory, f.source.inventory);
+  assert.equal(f.uploaded[0]!.base.href, 'https://example.invalid/assets/');
   assert.equal(f.events.includes('destroy'), false);
 });
 
@@ -216,8 +230,10 @@ test('GPU upload failures during load use the model-load error code', async () =
     f.events.push('upload-failed');
     throw new WebDecisionError('INFERENCE_ERROR', 'GPU lost during weight upload.');
   };
-  await assert.rejects(loadFakeH2oCandidate(options, f.deps), (error) => {
+  await assert.rejects(loadFakeH2oCandidate(options, f.deps), (error: unknown) => {
+    assert.ok(error instanceof WebDecisionError);
     assert.equal(error.code, 'MODEL_LOAD_FAILED');
+    assert.ok(error.cause instanceof WebDecisionError);
     assert.equal(error.cause.code, 'INFERENCE_ERROR');
     return true;
   });
@@ -398,15 +414,15 @@ test('unexpected inherited properties on Object.prototype do not become options'
       isolated.session
     );
   } finally {
-    delete Object.prototype.model;
+    Reflect.deleteProperty(Object.prototype, 'model');
   }
 });
 
 test('range reader keeps source receiver while upload is active', async () => {
   const f = fixture();
-  f.source.readRange = function (key) {
+  f.source.readRange = function (key?: string) {
     assert.equal(this, f.source);
-    return this.inventory[key];
+    return (this.inventory as Record<string, boolean>)[key!];
   };
   f.deps.upload = async ({readRange}) => {
     assert.equal(readRange('synthetic'), true);
@@ -417,7 +433,7 @@ test('range reader keeps source receiver while upload is active', async () => {
 
 test('abort while device request is pending destroys the late device', async () => {
   const f = fixture(),
-    pending = deferred(),
+    pending = deferred<typeof f.device>(),
     controller = new AbortController();
   f.adapter.requestDevice = () => {
     f.events.push('device');
@@ -462,7 +478,7 @@ test('abort after owner exists retains it and closes source', async () => {
 
 test('abort while source opens closes a late source', async () => {
   const f = fixture(),
-    pending = deferred(),
+    pending = deferred<typeof f.source>(),
     controller = new AbortController();
   f.deps.openSource = () => {
     f.events.push('source');
@@ -479,7 +495,7 @@ test('abort while source opens closes a late source', async () => {
 
 test('device loss while runtime factory is pending disposes the late uninitialized runtime', async () => {
   const f = fixture(),
-    pending = deferred();
+    pending = deferred<typeof f.runtime>();
   f.deps.createRuntime = () => {
     f.events.push('runtime');
     return pending.promise;
@@ -508,7 +524,7 @@ test('verification and use observe a snapshot of every small source buffer', asy
   };
   const task = loadFakeH2oCandidate(options, f.deps);
   while (!f.events.includes('plan')) await new Promise((resolve) => setImmediate(resolve));
-  for (const name of ['stage', 'manifest', 'wasm', 'tokenizer', 'tokenizerConfig', 'tokenizerContract'])
+  for (const name of ['stage', 'manifest', 'wasm', 'tokenizer', 'tokenizerConfig', 'tokenizerContract'] as const)
     f.source[name][0] = 99;
   pending.resolve();
   assert.equal(await task, f.session);
@@ -561,7 +577,7 @@ test('real H2O loader rejects model and expected registration mismatch before de
 
 test('real H2O loader resolves empty delimiters before a synthetic inventory fetch', async (t) => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
-    requests = [];
+    requests: string[] = [];
   let adapterRequests = 0,
     deviceRequests = 0;
   Object.defineProperty(globalThis, 'navigator', {
@@ -581,8 +597,12 @@ test('real H2O loader resolves empty delimiters before a synthetic inventory fet
       }
     }
   });
-  t.after(() => (previous ? Object.defineProperty(globalThis, 'navigator', previous) : delete globalThis.navigator));
-  t.mock.method(globalThis, 'fetch', async (url) => {
+  t.after(() =>
+    previous
+      ? Object.defineProperty(globalThis, 'navigator', previous)
+      : Reflect.deleteProperty(globalThis, 'navigator')
+  );
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request) => {
     requests.push(String(url));
     throw Error('synthetic fetch stop');
   });
