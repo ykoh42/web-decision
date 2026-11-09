@@ -4,16 +4,36 @@ import {parseStrictJson} from '../h2o/strict-json.mjs';
 import {WebDecisionError} from '../kev.js';
 import {prepareImajevPlan} from './plan.mjs';
 
+interface ImajevRange {
+  path: string;
+  totalBytes: number;
+  offset: number;
+  length: number;
+  sha256: string;
+}
+type ImajevReader = (
+  base: URL,
+  entry: ImajevRange,
+  options: {cache: false; offline: false; signal: AbortSignal | undefined}
+) => Promise<{bytes: ArrayBuffer}>;
+interface SourceOptions {
+  signal?: AbortSignal | undefined;
+  reader?: ImajevReader | undefined;
+}
+interface OperationOptions {
+  signal?: AbortSignal | undefined;
+}
+
 const IMAJEV_METADATA_BYTES = 695014;
 export const IMAJEV_METADATA_SHA256 = '0741c89f225e04ef1d2b72c88d7b3913dcc006ca5975bfc64ee34386ceea73a1';
 const METADATA_PATH = 'imajev-metadata.json';
 const invalid = () => new WebDecisionError('INVALID_ASSET', 'Invalid Imajev asset or inventory.');
-const digest = async (bytes) =>
+const digest = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
 
-function freeze(value) {
+function freeze<T>(value: T): T {
   if (value && typeof value === 'object') {
     for (const child of Object.values(value)) freeze(child);
     Object.freeze(value);
@@ -21,7 +41,7 @@ function freeze(value) {
   return value;
 }
 
-function assetBase(value) {
+function assetBase(value: string) {
   let base;
   try {
     base = new URL(value);
@@ -40,7 +60,7 @@ function assetBase(value) {
   return base;
 }
 
-async function verifiedBytes(reader, base, entry, signal) {
+async function verifiedBytes(reader: ImajevReader, base: URL, entry: ImajevRange, signal: AbortSignal | undefined) {
   signal?.throwIfAborted();
   const result = await waitForAbort(() => reader(base, entry, {cache: false, offline: false, signal}), signal);
   signal?.throwIfAborted();
@@ -53,7 +73,10 @@ async function verifiedBytes(reader, base, entry, signal) {
 }
 
 /** Open only the locally pinned experimental metadata; hashes do not authenticate a publisher. */
-export async function openImajevSource(baseValue, {signal, reader = readVerifiedRange} = {}) {
+export async function openImajevSource(
+  baseValue: string,
+  {signal, reader = readVerifiedRange as unknown as ImajevReader}: SourceOptions = {}
+) {
   if (typeof reader !== 'function') throw invalid();
   const base = assetBase(baseValue);
   const bytes = await verifiedBytes(
@@ -68,21 +91,26 @@ export async function openImajevSource(baseValue, {signal, reader = readVerified
     },
     signal
   );
-  let metadata, plan;
+  let metadata: unknown, plan: ReturnType<typeof prepareImajevPlan>;
   try {
     metadata = freeze(parseStrictJson(bytes));
-    plan = prepareImajevPlan(metadata);
+    plan = prepareImajevPlan(metadata as Parameters<typeof prepareImajevPlan>[0]);
   } catch {
     throw invalid();
   }
   signal?.throwIfAborted();
   const controller = new AbortController();
-  const forward = () => controller.abort(signal.reason);
+  const forward = () => controller.abort(signal!.reason);
   signal?.addEventListener('abort', forward, {once: true});
   if (signal?.aborted) forward();
   let closed = false;
 
-  async function readRange(path, offset, length, {signal: operationSignal} = {}) {
+  async function readRange(
+    path: string,
+    offset: number,
+    length: number,
+    {signal: operationSignal}: OperationOptions = {}
+  ) {
     if (closed) throw invalid();
     const file = plan.files.get(path);
     const sha256 = file?.chunks.get(`${offset}:${length}`);
@@ -91,20 +119,20 @@ export async function openImajevSource(baseValue, {signal, reader = readVerified
     controller.signal.throwIfAborted();
     const local = new AbortController();
     const cancelSource = () => local.abort(controller.signal.reason);
-    const cancelOperation = () => local.abort(operationSignal.reason);
+    const cancelOperation = () => local.abort(operationSignal!.reason);
     controller.signal.addEventListener('abort', cancelSource, {once: true});
     operationSignal?.addEventListener('abort', cancelOperation, {once: true});
     if (controller.signal.aborted) cancelSource();
     if (operationSignal?.aborted) cancelOperation();
     try {
-      return await verifiedBytes(reader, base, {path, totalBytes: file.bytes, offset, length, sha256}, local.signal);
+      return await verifiedBytes(reader, base, {path, totalBytes: file!.bytes, offset, length, sha256}, local.signal);
     } finally {
       controller.signal.removeEventListener('abort', cancelSource);
       operationSignal?.removeEventListener('abort', cancelOperation);
     }
   }
 
-  async function readAsset(path, options) {
+  async function readAsset(path: string, options?: OperationOptions) {
     if (closed) throw invalid();
     const file = plan.assets.find((entry) => entry.path === path);
     if (!file) throw invalid();
@@ -114,7 +142,7 @@ export async function openImajevSource(baseValue, {signal, reader = readVerified
     options?.signal?.throwIfAborted();
     const local = new AbortController();
     const cancelSource = () => local.abort(controller.signal.reason);
-    const cancelOperation = () => local.abort(options.signal.reason);
+    const cancelOperation = () => local.abort(options!.signal!.reason);
     controller.signal.addEventListener('abort', cancelSource, {once: true});
     options?.signal?.addEventListener('abort', cancelOperation, {once: true});
     if (controller.signal.aborted) cancelSource();
