@@ -41,4 +41,6 @@ export function packElephantRequest(
   config: {readonly addedTokens: string[]; readonly maxBranchTokens: number}
 ): ElephantPackedRequest;
 export function unpackElephantScores(rows: Float32Array[], packed: ElephantPackedRequest): ElephantDecision;
+export const SLOT_LABELS: readonly string[];
+export function blockMask(prefixLength: number, length: number, width: number): {ids: number[]; allowed: boolean[][]};
 export function verifySlots(tokenizer: ElephantSlotTokenizer): number[];

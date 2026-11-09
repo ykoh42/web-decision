@@ -1,5 +1,45 @@
 /** Text-choice protocol for the pinned Elephant-1 checkpoint. */
 // Source and license attribution: ELEPHANT-NOTICE.
+export interface ElephantSlotTokenizer {
+  encode(text: string, options: {readonly add_special_tokens: false}): {readonly ids: number[]};
+  decode(ids: number[], options: {readonly skip_special_tokens: false}): string;
+}
+
+interface ElephantQuestion {
+  readonly instructions: string;
+  readonly options: string[];
+}
+
+export interface ElephantRequest {
+  readonly state: string;
+  readonly questions: ElephantQuestion[];
+}
+
+export interface ElephantPackedRequest {
+  readonly prefixIds: number[];
+  readonly branches: Array<{
+    readonly options: string[];
+    readonly suffix: string;
+    readonly prompt: string;
+    readonly ids: number[];
+    readonly suffixIds: number[];
+  }>;
+  readonly tokenCount: number;
+}
+
+export interface ElephantDecision {
+  readonly tokenCount: number;
+  readonly answers: Array<{
+    readonly selected: string | undefined;
+    readonly selectedIndex: number;
+    readonly probabilities: Array<{
+      readonly option: string;
+      readonly probability: number | undefined;
+      readonly logit: number | undefined;
+    }>;
+  }>;
+}
+
 const SYSTEM =
   'Apply the question to the state. Choose exactly one of the listed options. Respond with only its uppercase letter, with no explanation or reasoning.';
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -40,13 +80,13 @@ export const SLOT_LABELS = Object.freeze([
     .slice(0, 230)
 ]);
 
-function pythonWhitespace(code) {
+function pythonWhitespace(code: number): boolean {
   return (
     (code >= 9 && code <= 13) || (code >= 28 && code <= 32) || (code >= 0x2000 && code <= 0x200a) || SPACE.has(code)
   );
 }
 
-function pythonStrip(value) {
+function pythonStrip(value: string): string {
   let first = 0,
     last = value.length;
   while (first < last && pythonWhitespace(value.charCodeAt(first))) first++;
@@ -54,7 +94,7 @@ function pythonStrip(value) {
   return value.slice(first, last);
 }
 
-function safeText(value, reserved) {
+function safeText(value: unknown, reserved: string[]): string {
   if (typeof value !== 'string') throw new Error('Text must be a string');
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
@@ -68,28 +108,28 @@ function safeText(value, reserved) {
   return value;
 }
 
-function sameIds(a, b) {
+function sameIds(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 /** Verify every upstream slot label is one unique, exactly round-tripping token. */
-export function verifySlots(tokenizer) {
+export function verifySlots(tokenizer: ElephantSlotTokenizer): number[] {
   const ids = SLOT_LABELS.map((label) => {
     const encoded = tokenizer.encode(label, {add_special_tokens: false}).ids;
     if (encoded.length !== 1 || tokenizer.decode(encoded, {skip_special_tokens: false}) !== label)
       throw new Error(`Invalid answer slot ${label}`);
-    return encoded[0];
+    return encoded[0]!;
   });
   if (new Set(ids).size !== ids.length) throw new Error('Answer slots collide');
   return ids;
 }
 
-function suffixFor(question, reserved) {
+function suffixFor(question: ElephantQuestion, reserved: string[]): {options: string[]; suffix: string} {
   if (!question || !Array.isArray(question.options) || question.options.length < 2 || question.options.length > 255)
     throw new Error('Each question needs 2 to 255 options');
   const instructions = pythonStrip(safeText(question.instructions, reserved));
   if (!instructions) throw new Error('Question needs instructions');
-  const options = question.options.map((option) => safeText(option, reserved));
+  const options = question.options.map((option: unknown) => safeText(option, reserved));
   if (options.some((option) => !pythonStrip(option))) throw new Error('Empty option');
   if (new Set(options).size !== options.length) throw new Error('Duplicate option');
   const labels = SLOT_LABELS.slice(0, options.length);
@@ -104,7 +144,11 @@ function suffixFor(question, reserved) {
 /** Reproduce upstream rendering and admit only an independently verifiable token boundary.
  * The original fast tokenizer exposes character offsets; JS does not, so inputs crossing
  * the boundary are rejected rather than inventing a block boundary. */
-export function packElephantRequest(tokenizer, request, config) {
+export function packElephantRequest(
+  tokenizer: ElephantSlotTokenizer,
+  request: ElephantRequest,
+  config: {readonly addedTokens: string[]; readonly maxBranchTokens: number}
+): ElephantPackedRequest {
   if (!request || !Array.isArray(request.questions) || !request.questions.length)
     throw new Error('Provide at least one question');
   if (!Array.isArray(config.addedTokens) || config.addedTokens.some((x) => typeof x !== 'string' || !x))
@@ -129,7 +173,7 @@ export function packElephantRequest(tokenizer, request, config) {
 }
 
 /** Full-attention layer mask, with right-padding keys excluded. Linear layers stay causal. */
-export function blockMask(prefixLength, length, width) {
+export function blockMask(prefixLength: number, length: number, width: number): {ids: number[]; allowed: boolean[][]} {
   if (
     ![prefixLength, length, width].every(Number.isSafeInteger) ||
     prefixLength < 0 ||
@@ -146,7 +190,7 @@ export function blockMask(prefixLength, length, width) {
 }
 
 /** Apply upstream's unit-temperature softmax to exactly the offered options. */
-export function unpackElephantScores(rows, packed) {
+export function unpackElephantScores(rows: Float32Array[], packed: ElephantPackedRequest): ElephantDecision {
   if (!Array.isArray(rows) || rows.length !== packed.branches.length) throw new Error('Invalid score rows');
   return {
     tokenCount: packed.tokenCount,

@@ -14,8 +14,6 @@
     "packages/web-decision/src/deberta/typed.mjs",
     "packages/web-decision/src/decima-base-clean-preview-entry.mjs",
     "packages/web-decision/src/elephant/loader.mjs",
-    "packages/web-decision/src/elephant/protocol.mjs",
-    "packages/web-decision/src/elephant/source.mjs",
     "packages/web-decision/src/gliner-mobile/loader.mjs",
     "packages/web-decision/src/gliner-mobile/protocol.mjs",
     "packages/web-decision/src/gliner-mobile/session.mjs",

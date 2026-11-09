@@ -6,22 +6,88 @@ import {WebDecisionError} from '../kev.js';
 import {readVerifiedRange} from '../strands/range-reader.mjs';
 import {elephantVariant, ELEPHANT_INVENTORY_SHA256, ELEPHANT_MODEL} from './contract.mjs';
 
-const FILES = Object.freeze({
+interface ElephantAssetSpec {
+  readonly bytes: number;
+  readonly sha256: string;
+}
+
+interface ElephantInventory {
+  readonly state?: unknown;
+  readonly parameters?: unknown;
+}
+
+interface ElephantInventoryParameter {
+  readonly position?: unknown;
+  readonly target?: unknown;
+  readonly kind?: unknown;
+  readonly path?: unknown;
+  readonly fileOffset?: unknown;
+  readonly shape?: unknown;
+  readonly dtype?: unknown;
+  readonly bytes?: unknown;
+  readonly ranges?: unknown;
+}
+
+interface ElephantRangePart {
+  readonly offset: number;
+  readonly bytes: number;
+  readonly sha256: string;
+}
+
+interface ElephantIndexedEntry {
+  readonly position: number;
+  readonly target: string;
+  readonly shape: number[];
+  readonly dtype: unknown;
+  readonly bindingKind: 'q4-candidate';
+  readonly outputBytes: number;
+  readonly ranges: ElephantRangePart[];
+  readonly outputPath: string;
+}
+
+interface ElephantSourceOptions {
+  readonly signal?: AbortSignal | null;
+  readonly model?: string;
+}
+
+interface ElephantSource {
+  readonly entries: ElephantIndexedEntry[];
+  readonly wasm: Uint8Array;
+  readonly tokenizer: unknown;
+  readonly tokenizerConfig: unknown;
+  readRange(
+    entry: ElephantIndexedEntry,
+    index: number,
+    part: ElephantRangePart,
+    readSignal?: AbortSignal | null
+  ): Promise<ArrayBuffer>;
+}
+
+const FILES: Readonly<Record<string, ElephantAssetSpec>> = Object.freeze({
   'inventory.json': {bytes: 431398, sha256: ELEPHANT_INVENTORY_SHA256},
   'tokenizer.json': {bytes: 19989339, sha256: 'a5cd9732badce41de57e6efce8302930ded1c1188c5f81feb2bd6c24c4a1941f'},
   'tokenizer_config.json': {bytes: 1505, sha256: '2984c03425a28d242744e234a5003786fd289b3713db79fe0958c65eb59d85b2'}
 });
 const invalid = () => new WebDecisionError('INVALID_ASSET', 'Unexpected Elephant asset inventory.');
 
-export function elephantFiles(model) {
+export function elephantFiles(model: unknown): Record<string, ElephantAssetSpec> {
   const variant = elephantVariant(model);
   if (!variant) throw invalid();
   return {...FILES, 'model.wasm': {bytes: variant.graphBytes, sha256: variant.graphSha256}};
 }
 
-async function readFile(base, name, expected, signal) {
+async function readFile(
+  base: URL,
+  name: string,
+  expected: ElephantAssetSpec,
+  signal: AbortSignal
+): Promise<Uint8Array> {
   try {
-    const response = await waitForAbort(() => fetch(assetUrl(base, name), {signal}), signal, cancelResponse);
+    const response = await waitForAbort(
+      () => fetch(assetUrl(base, name), {signal} as RequestInit),
+      signal,
+      cancelResponse
+    );
     if (response.status !== 200) {
       cancelResponse(response);
       throw new Error(`Unexpected HTTP status ${response.status}`);
@@ -37,15 +103,15 @@ async function readFile(base, name, expected, signal) {
   }
 }
 
-export function indexElephantFiles(inventory) {
+export function indexElephantFiles(inventory: ElephantInventory | null | undefined): ElephantIndexedEntry[] {
   if (
     inventory?.state !== 'local-ranges-pending-review' ||
     !Array.isArray(inventory.parameters) ||
     inventory.parameters.length !== 684
   )
     throw invalid();
-  const names = new Set();
-  return inventory.parameters.map((item, index) => {
+  const names = new Set<string>();
+  return inventory.parameters.map((item: ElephantInventoryParameter, index) => {
     const path = `${String(index).padStart(4, '0')}.bin`;
     if (
       item?.position !== index + 5 ||
@@ -55,43 +121,46 @@ export function indexElephantFiles(inventory) {
       item.path !== path ||
       item.fileOffset !== 0 ||
       !Array.isArray(item.shape) ||
-      item.shape.some((value) => !Number.isSafeInteger(value) || value < 1) ||
+      item.shape.some((value: unknown) => !Number.isSafeInteger(value) || (value as number) < 1) ||
       !Number.isSafeInteger(item.bytes) ||
-      item.bytes < 1 ||
+      (item.bytes as number) < 1 ||
       !Array.isArray(item.ranges)
     )
       throw invalid();
     names.add(item.target);
     return {
-      position: item.position,
+      position: item.position as number,
       target: item.target,
-      shape: item.shape,
+      shape: item.shape as number[],
       dtype: item.dtype,
       bindingKind: 'q4-candidate',
-      outputBytes: item.bytes,
-      ranges: item.ranges,
+      outputBytes: item.bytes as number,
+      ranges: item.ranges as ElephantRangePart[],
       outputPath: path
     };
   });
 }
 
-export async function openElephantSource(base, {signal, model = ELEPHANT_MODEL} = {}) {
+export async function openElephantSource(
+  base: URL,
+  {signal, model = ELEPHANT_MODEL}: ElephantSourceOptions = {}
+): Promise<ElephantSource> {
   const files = elephantFiles(model);
-  const [inventoryBytes, wasm, tokenizerBytes, configBytes] = await readAssetBatch(
+  const [inventoryBytes, wasm, tokenizerBytes, configBytes] = (await readAssetBatch(
     ['inventory.json', 'model.wasm', 'tokenizer.json', 'tokenizer_config.json'],
-    (name, localSignal) => readFile(base, name, files[name], localSignal),
+    (name, localSignal) => readFile(base, name, files[name]!, localSignal),
     signal
-  );
+  )) as [Uint8Array, Uint8Array, Uint8Array, Uint8Array];
   signal?.throwIfAborted();
-  let inventory, tokenizer, tokenizerConfig;
+  let inventory: unknown, tokenizer: unknown, tokenizerConfig: unknown;
   try {
     inventory = parseStrictJson(inventoryBytes);
-    tokenizer = parseStrictJson(tokenizerBytes, {maxBytes: FILES['tokenizer.json'].bytes});
+    tokenizer = parseStrictJson(tokenizerBytes, {maxBytes: FILES['tokenizer.json']!.bytes});
     tokenizerConfig = parseStrictJson(configBytes);
   } catch (cause) {
     throw new WebDecisionError('INVALID_ASSET', 'Invalid Elephant metadata.', {cause});
   }
-  const entries = indexElephantFiles(inventory);
+  const entries = indexElephantFiles(inventory as ElephantInventory | null | undefined);
   signal?.throwIfAborted();
   return {
     entries,
@@ -101,7 +170,13 @@ export async function openElephantSource(base, {signal, model = ELEPHANT_MODEL} 
     async readRange(entry, index, part, readSignal) {
       if (entry.ranges[index] !== part) throw invalid();
       return (
-        await readVerifiedRange(
+        await (
+          readVerifiedRange as (
+            baseUrl: URL,
+            range: {path: string; totalBytes: number; offset: number; length: number; sha256: string},
+            options: {signal?: AbortSignal | null | undefined}
+          ) => Promise<{bytes: ArrayBuffer}>
+        )(
           base,
           {
             path: `weights/${entry.outputPath}`,
