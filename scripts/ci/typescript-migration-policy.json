@@ -72,7 +72,6 @@
     "packages/web-decision/src/strands/range-reader.mjs",
     "packages/web-decision/src/strands/scope.mjs",
     "packages/web-decision/src/tamev/contract.mjs",
-    "packages/web-decision/src/tamev/protocol.mjs",
     "packages/web-decision/src/tamev/runner.mjs",
     "packages/web-decision/src/tamev/session.mjs",
     "packages/web-decision/src/tamev/typed.mjs",

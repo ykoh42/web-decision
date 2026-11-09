@@ -86,6 +86,7 @@
     "src/strands/source-loader-internal.mts",
     "src/safedecide/*.mts",
     "src/tamev/loader.mts",
+    "src/tamev/protocol.mts",
     "src/tamev/source.mts",
     "src/tamev/tokenizer.mts",
     "vite.config.ts",

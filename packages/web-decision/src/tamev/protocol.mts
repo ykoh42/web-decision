@@ -1,35 +1,70 @@
 import {WebDecisionError} from '../kev.js';
 import {TAMEV_MICRO_PROFILE} from './contract.mjs';
+import type {TAMEV_PROFILES} from './contract.mjs';
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+type TamevProfile = (typeof TAMEV_PROFILES)[keyof typeof TAMEV_PROFILES];
+interface TamevTokenRow {
+  readonly ids: readonly number[];
+  readonly truncated: boolean;
+}
+interface TamevTokenizer {
+  encodeContext(text: string): TamevTokenRow;
+  encodeOption(text: string): TamevTokenRow;
+}
+interface RequestCandidate {
+  readonly state?: unknown;
+  readonly questions?: unknown;
+}
+interface QuestionCandidate {
+  readonly instructions: unknown;
+  readonly options: unknown;
+}
+interface PreparedDecision {
+  readonly questions: readonly {readonly options: readonly string[]}[];
+  readonly tokenCount: number;
+  readonly truncated?: boolean | undefined;
+}
+interface DecisionRow {
+  readonly probabilities: readonly number[];
+  readonly logits: readonly number[];
+}
 
-function sum(values) {
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
+
+function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-function firstMaximumIndex(values) {
+function firstMaximumIndex(values: readonly number[]): number {
   let index = 0;
   for (let candidate = 1; candidate < values.length; candidate++) {
-    if (values[candidate] > values[index]) index = candidate;
+    if (values[candidate]! > values[index]!) index = candidate;
   }
   return index;
 }
 
-export function prepareTamevDecision(tokenizer, request, profile = TAMEV_MICRO_PROFILE) {
-  if (typeof request?.state !== 'string' || !Array.isArray(request.questions))
+export function prepareTamevDecision(
+  tokenizer: TamevTokenizer,
+  request: unknown,
+  profile: TamevProfile = TAMEV_MICRO_PROFILE
+) {
+  const candidate = request as RequestCandidate | null | undefined;
+  if (typeof candidate?.state !== 'string' || !Array.isArray(candidate.questions))
     throw invalid(`${profile.name} requires a string state and a question list.`);
-  if (request.questions.length < 1) throw invalid(`${profile.name} needs at least one question.`);
+  if (candidate.questions.length < 1) throw invalid(`${profile.name} needs at least one question.`);
 
-  const questions = request.questions.map((question, index) => {
+  const questions = candidate.questions.map((question: QuestionCandidate, index: number) => {
     if (typeof question.instructions !== 'string' || !Array.isArray(question.options))
       throw invalid(`${profile.name} question ${index} requires instructions and options.`);
     if (question.options.length < 2) throw invalid(`${profile.name} question ${index} needs at least 2 options.`);
-    if (question.options.some((option) => typeof option !== 'string' || !option.trim()))
+    if (question.options.some((option: unknown) => typeof option !== 'string' || !option.trim()))
       throw invalid(`${profile.name} question ${index} has an empty or non-text option.`);
 
-    const contextText = question.instructions ? `${request.state}\n${question.instructions}`.trim() : request.state;
+    const contextText = question.instructions
+      ? `${candidate.state}\n${question.instructions}`.trim()
+      : (candidate.state as string);
     const context = tokenizer.encodeContext(contextText);
-    const options = question.options.map((option) => tokenizer.encodeOption(option));
+    const options = question.options.map((option: string) => tokenizer.encodeOption(option));
     return {
       options: [...question.options],
       contextIds: context.ids,
@@ -46,7 +81,11 @@ export function prepareTamevDecision(tokenizer, request, profile = TAMEV_MICRO_P
   };
 }
 
-export function calibrateTamevProbabilities(probabilities, optionCount, config) {
+export function calibrateTamevProbabilities(
+  probabilities: readonly number[],
+  optionCount: number,
+  config: {readonly calibration_by_k: Readonly<Record<string, number | undefined>>}
+): number[] {
   const delta = config.calibration_by_k[String(optionCount)];
   if (delta === undefined || delta === 1) return [...probabilities];
   const adjusted = probabilities.map((probability) => Math.max(probability, 1e-12) ** delta);
@@ -54,10 +93,10 @@ export function calibrateTamevProbabilities(probabilities, optionCount, config) 
   return adjusted.map((probability) => probability / total);
 }
 
-export function finishTamevDecision(prepared, rows) {
+export function finishTamevDecision(prepared: PreparedDecision, rows: readonly DecisionRow[]) {
   if (rows.length !== prepared.questions.length) throw new TypeError('TAMEV Micro result rows are incomplete.');
   const answers = prepared.questions.map((question, questionIndex) => {
-    const row = rows[questionIndex];
+    const row = rows[questionIndex]!;
     const selectedIndex = firstMaximumIndex(row.probabilities);
     return {
       selected: question.options[selectedIndex],
