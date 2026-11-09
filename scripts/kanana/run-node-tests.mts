@@ -15,7 +15,7 @@ const allTests = (await readdir(testDirectory))
 const coreTests = [
   'test/kanana-protocol.test.mjs',
   'test/kanana-scoring.test.mts',
-  'test/kanana-candidates.test.mjs',
+  'test/kanana-candidates.test.mts',
   'test/kanana-chat-template.test.mts',
   'test/kanana-truncation.test.mts',
   'test/kanana-tokenizer.test.mts',

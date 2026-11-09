@@ -6,3 +6,4 @@ export const tokenizer: typeof import('../src/kanana/tokenizer.js');
 export const imageProcessing: typeof import('../src/kanana/image-processing.js');
 export const encodedImage: typeof import('../src/kanana/encoded-image.js');
 export const truncation: typeof import('../src/kanana/truncation.js');
+export const candidates: typeof import('../src/kanana/candidates.js');

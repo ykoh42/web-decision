@@ -41,7 +41,6 @@
     "packages/web-decision/test/imajev-session.test.mjs",
     "packages/web-decision/test/imajev-source.test.mjs",
     "packages/web-decision/test/imajev-upload.test.mjs",
-    "packages/web-decision/test/kanana-candidates.test.mjs",
     "packages/web-decision/test/kanana-core-modules.mjs",
     "packages/web-decision/test/kanana-image-ingress.test.mjs",
     "packages/web-decision/test/kanana-image-processing.test.mjs",

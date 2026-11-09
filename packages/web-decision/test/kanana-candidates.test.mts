@@ -16,17 +16,17 @@ TOKENS_BY_ID.set(BOS_ID, '<|bos|>');
 
 function charTokenizer() {
   return {
-    encode(text, options = {}) {
+    encode(text: string, options: {add_special_tokens?: boolean} = {}) {
       const ids = [];
       for (let offset = 0; offset < text.length;) {
         const special = SPECIAL_TOKENS.find((token) => text.startsWith(token, offset));
         if (special) {
-          ids.push(SPECIAL_IDS.get(special));
+          ids.push(SPECIAL_IDS.get(special)!);
           offset += special.length;
           continue;
         }
 
-        const codePoint = text.codePointAt(offset);
+        const codePoint = text.codePointAt(offset)!;
         const character = String.fromCodePoint(codePoint);
         ids.push(CHAR_ID_OFFSET + codePoint);
         offset += character.length;
@@ -34,23 +34,23 @@ function charTokenizer() {
       if (options.add_special_tokens !== false) ids.unshift(BOS_ID);
       return {ids};
     },
-    decode(ids) {
+    decode(ids: number[]) {
       return ids.map((id) => TOKENS_BY_ID.get(id) ?? String.fromCodePoint(id - CHAR_ID_OFFSET)).join('');
     }
   };
 }
 
-function preparedQuestions(questions) {
+function preparedQuestions(questions: unknown) {
   return prepareKananaSystemOne({state: 'state', questions});
 }
 
-function singleCandidate(text) {
+function singleCandidate(text: string) {
   return {
     questionEntries: [{id: 'route', candidateKeys: ['route'], candidateTexts: [text]}]
   };
 }
 
-function candidateRequest({state = '', candidate}) {
+function candidateRequest({state = '', candidate}: {state?: string; candidate: unknown}) {
   return prepareKananaSystemOne({
     state,
     questions: {
@@ -71,11 +71,11 @@ function countedTokenizer() {
   let encodeCalls = 0;
   return {
     encodeCalls: () => encodeCalls,
-    encode(...args) {
+    encode(...args: Parameters<ReturnType<typeof charTokenizer>['encode']>) {
       encodeCalls++;
       return tokenizer.encode(...args);
     },
-    decode(...args) {
+    decode(...args: Parameters<ReturnType<typeof charTokenizer>['decode']>) {
       return tokenizer.decode(...args);
     }
   };
@@ -103,21 +103,24 @@ test('prepares each question and candidate in its existing order', () => {
     result.map(({id}) => id),
     ['10', '2']
   );
-  assert.deepEqual(result[0].candidateKeys, ['2', '10']);
-  assert.deepEqual(result[0].candidateTexts, ['2: second', '10: tenth']);
+  assert.deepEqual(result[0]!.candidateKeys, ['2', '10']);
+  assert.deepEqual(result[0]!.candidateTexts, ['2: second', '10: tenth']);
   assert.deepEqual(
-    result[0].candidateDocuments.map(({key, text}) => [key, text]),
+    result[0]!.candidateDocuments.map(({key, text}) => [key, text]),
     [
       ['2', '2: second'],
       ['10', '10: tenth']
     ]
   );
-  assert.deepEqual(result[1].candidateKeys, ['0', '1', '2']);
-  assert.deepEqual(result[1].candidateTexts, ['low', 'middle', 'high']);
-  assert.equal(result[0].candidateDocuments[0].messages[0].content[0].text, KANANA_DOCUMENT_INSTRUCTION);
-  assert.equal(result[0].candidateDocuments[0].inputIds.length, result[0].candidateDocuments[0].tokenCount);
-  assert.equal(result[0].candidateDocuments[0].inputIds[0], BOS_ID);
-  assert.equal(renderKananaChatTemplate(result[0].candidateDocuments[0].messages).includes('2: second'), true);
+  assert.deepEqual(result[1]!.candidateKeys, ['0', '1', '2']);
+  assert.deepEqual(result[1]!.candidateTexts, ['low', 'middle', 'high']);
+  assert.equal(
+    (result[0]!.candidateDocuments[0]!.messages as {content: {text: string}[]}[])[0]!.content[0]!.text,
+    KANANA_DOCUMENT_INSTRUCTION
+  );
+  assert.equal(result[0]!.candidateDocuments[0]!.inputIds.length, result[0]!.candidateDocuments[0]!.tokenCount);
+  assert.equal(result[0]!.candidateDocuments[0]!.inputIds[0], BOS_ID);
+  assert.equal(renderKananaChatTemplate(result[0]!.candidateDocuments[0]!.messages).includes('2: second'), true);
 });
 
 test('truncates query state before considering candidate truncation', () => {
@@ -129,7 +132,7 @@ test('truncates query state before considering candidate truncation', () => {
   const result = truncateKananaQueryWithCandidateFallback(tokenizer, prepared, 'route');
 
   assert.equal(result.truncated, true);
-  assert.ok(result.messages[1].content[1].text.length < state.length);
+  assert.ok((result.messages[1]!.content as {text: string}[])[1]!.text.length < state.length);
   assert.ok(result.prompt.includes(`"candidate":"${candidate}"`));
 });
 
@@ -142,7 +145,7 @@ test('shortens the candidate only after state truncation cannot fit protected qu
 
   assert.equal(result.tokenCount, KANANA_MAX_LENGTH);
   assert.equal(result.truncated, true);
-  assert.equal(result.messages[1].content[1].text, 'short state');
+  assert.equal((result.messages[1]!.content as {text: string}[])[1]!.text, 'short state');
   assert.ok(result.prompt.includes(`Z${'b'.repeat(40)}`));
   assert.ok(result.prompt.includes(`${'b'.repeat(40)}","source":"structured"`));
   assert.ok(!result.prompt.includes(`"candidate":"${candidate}"`));
@@ -179,9 +182,9 @@ test('returns an empty candidate document list without inventing entries', () =>
   });
 
   assert.equal(result.length, 1);
-  assert.deepEqual(result[0].candidateDocuments, []);
-  assert.deepEqual(result[0].candidateKeys, []);
-  assert.deepEqual(result[0].candidateTexts, []);
+  assert.deepEqual(result[0]!.candidateDocuments, []);
+  assert.deepEqual(result[0]!.candidateKeys, []);
+  assert.deepEqual(result[0]!.candidateTexts, []);
 });
 
 test('rejects whitespace-only candidates using Python str.strip whitespace', () => {
@@ -202,8 +205,11 @@ test('preserves Python whitespace around nonempty candidate documents', () => {
   const text = '\u0085\u001c\u2003candidate\u00a0\u3000';
   const result = prepareKananaCandidates(tokenizer, singleCandidate(text));
 
-  assert.equal(result[0].candidateDocuments[0].text, text);
-  assert.equal(result[0].candidateDocuments[0].messages[1].content[0].text, text);
+  assert.equal(result[0]!.candidateDocuments[0]!.text, text);
+  assert.equal(
+    (result[0]!.candidateDocuments[0]!.messages as {content: {text: string}[]}[])[1]!.content[0]!.text,
+    text
+  );
 });
 
 test('accepts a candidate document exactly at max_length and truncates one token over', () => {
@@ -212,21 +218,24 @@ test('accepts a candidate document exactly at max_length and truncates one token
   const exactText = 'a'.repeat(KANANA_MAX_LENGTH - documentOverhead);
   const exact = prepareKananaCandidates(tokenizer, singleCandidate(exactText));
 
-  assert.equal(exact[0].candidateDocuments[0].tokenCount, KANANA_MAX_LENGTH);
-  assert.equal(exact[0].candidateDocuments[0].truncated, false);
-  assert.equal(exact[0].candidateDocuments[0].messages[1].content[0].text, exactText);
+  assert.equal(exact[0]!.candidateDocuments[0]!.tokenCount, KANANA_MAX_LENGTH);
+  assert.equal(exact[0]!.candidateDocuments[0]!.truncated, false);
+  assert.equal(
+    (exact[0]!.candidateDocuments[0]!.messages as {content: {text: string}[]}[])[1]!.content[0]!.text,
+    exactText
+  );
 
   const overText = `${exactText}Z`;
   const over = prepareKananaCandidates(tokenizer, singleCandidate(overText));
-  const document = over[0].candidateDocuments[0];
+  const document = over[0]!.candidateDocuments[0]!;
 
   assert.equal(document.tokenCount, KANANA_MAX_LENGTH);
   assert.equal(document.truncated, true);
-  assert.equal(document.messages[1].content[0].text, exactText);
-  assert.deepEqual(over[0].candidateTexts, [overText]);
+  assert.equal((document.messages as {content: {text: string}[]}[])[1]!.content[0]!.text, exactText);
+  assert.deepEqual(over[0]!.candidateTexts, [overText]);
 });
 
-function documentTokenCount(tokenizer, text) {
+function documentTokenCount(tokenizer: ReturnType<typeof charTokenizer>, text: string) {
   const messages = [
     {role: 'system', content: [{type: 'text', text: KANANA_DOCUMENT_INSTRUCTION}]},
     {role: 'user', content: [{type: 'text', text}]}
@@ -238,9 +247,9 @@ test('uses the configured length without imposing the model default as a lower c
   const tokenizer = charTokenizer();
   const text = 'd'.repeat(25_000);
   const result = prepareKananaCandidates(tokenizer, singleCandidate(text), {maxLength: 30_000});
-  const document = result[0].candidateDocuments[0];
+  const document = result[0]!.candidateDocuments[0]!;
 
-  assert.equal(document.messages[1].content[0].text, text);
+  assert.equal((document.messages as {content: {text: string}[]}[])[1]!.content[0]!.text, text);
   assert.equal(document.truncated, false);
   assert.ok(document.tokenCount > KANANA_MAX_LENGTH);
 });
@@ -276,7 +285,7 @@ test('preserves duplicate token sequences when truncation is enabled', () => {
   const result = prepareKananaCandidates(collisionTokenizer, prepared, {truncateInputs: true});
 
   assert.deepEqual(
-    result[0].candidateDocuments.map(({key, inputIds}) => [key, inputIds]),
+    result[0]!.candidateDocuments.map(({key, inputIds}) => [key, inputIds]),
     [
       ['first', [BOS_ID, 7]],
       ['second', [BOS_ID, 7]]
