@@ -92,6 +92,7 @@
     "src/mapika4b/loader.mts",
     "src/mapika4b/source.mts",
     "src/parameter-upload.mts",
+    "src/opendecider-nano/protocol.mts",
     "src/opendecider-nano/gpu-compat.mts",
     "src/opendecider-nano/tokenizer.mts",
     "src/opendecider-nano/typed.mts",

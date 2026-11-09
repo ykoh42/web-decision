@@ -2,9 +2,17 @@ import {WebDecisionError} from '../kev.js';
 import {OPENDECIDER_NANO_MAX_TOKENS} from './contract.mjs';
 import {OPENDECIDER_NANO_TOKENS} from './tokenizer.mjs';
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+type NanoTokenizer = {encode(text: string): unknown};
+type NanoQuestion = {instructions: string; options: string[]};
+type NanoRequest = {state: unknown; questions: NanoQuestion[]};
+type NanoPacked = {
+  questions: {ids: number[]; markerPositions: number[]; options: string[]; truncated: boolean}[];
+  tokenCount: number;
+};
 
-function assertText(value) {
+const invalid = (message: string) => new WebDecisionError('INVALID_INPUT', message);
+
+function assertText(value: unknown): asserts value is string {
   if (typeof value !== 'string') throw invalid('All request text must be strings.');
   for (let index = 0; index < value.length; index++) {
     const code = value.charCodeAt(index);
@@ -17,7 +25,7 @@ function assertText(value) {
   }
 }
 
-function encode(tokenizer, text) {
+function encode(tokenizer: NanoTokenizer, text: string) {
   assertText(text);
   let ids;
   try {
@@ -31,7 +39,7 @@ function encode(tokenizer, text) {
   return ids;
 }
 
-function validateQuestion(question, index) {
+function validateQuestion(question: NanoQuestion, index: number) {
   if (!question || typeof question.instructions !== 'string' || !question.instructions.trim())
     throw invalid(`Question ${index} needs non-empty instructions.`);
   if (!Array.isArray(question.options) || question.options.length < 2)
@@ -43,7 +51,11 @@ function validateQuestion(question, index) {
 }
 
 /** Build OpenDecider's nano_ids protocol, truncating only the state tail. */
-export function packOpenDeciderNanoRequest(tokenizer, request, maxTokens = OPENDECIDER_NANO_MAX_TOKENS) {
+export function packOpenDeciderNanoRequest(
+  tokenizer: NanoTokenizer,
+  request: NanoRequest,
+  maxTokens = OPENDECIDER_NANO_MAX_TOKENS
+) {
   if (!tokenizer || typeof tokenizer.encode !== 'function')
     throw new WebDecisionError('INVALID_ASSET', 'OpenDecider-nano tokenizer is unavailable.');
   if (!Number.isSafeInteger(maxTokens) || maxTokens !== OPENDECIDER_NANO_MAX_TOKENS)
@@ -89,17 +101,17 @@ export function packOpenDeciderNanoRequest(tokenizer, request, maxTokens = OPEND
 }
 
 /** Preserve option order and turn the option-marker logits into probabilities. */
-export function finishOpenDeciderNanoRequest(packed, rows) {
+export function finishOpenDeciderNanoRequest(packed: NanoPacked, rows: unknown) {
   if (
     !packed ||
     !Array.isArray(packed.questions) ||
     !Array.isArray(rows) ||
     rows.length !== packed.questions.length ||
-    rows.some((row, index) => !(row instanceof Float32Array) || row.length !== packed.questions[index].options.length)
+    rows.some((row, index) => !(row instanceof Float32Array) || row.length !== packed.questions[index]!.options.length)
   )
     throw new WebDecisionError('INFERENCE_ERROR', 'OpenDecider-nano returned invalid option scores.');
   const answers = packed.questions.map(({options}, questionIndex) => {
-    const scores = Array.from(rows[questionIndex]);
+    const scores = Array.from(rows[questionIndex] as Float32Array);
     if (!scores.every(Number.isFinite))
       throw new WebDecisionError('INFERENCE_ERROR', 'OpenDecider-nano returned non-finite scores.');
     const maximum = Math.max(...scores);
@@ -108,9 +120,13 @@ export function finishOpenDeciderNanoRequest(packed, rows) {
     const probabilities = exps.map((value) => value / sum);
     const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
     return {
-      selected: options[selectedIndex],
+      selected: options[selectedIndex]!,
       selectedIndex,
-      probabilities: options.map((option, index) => ({option, probability: probabilities[index], logit: scores[index]}))
+      probabilities: options.map((option, index) => ({
+        option,
+        probability: probabilities[index]!,
+        logit: scores[index]!
+      }))
     };
   });
   return {
@@ -120,7 +136,7 @@ export function finishOpenDeciderNanoRequest(packed, rows) {
   };
 }
 
-export function readOpenDeciderNanoMarkerScores(ids, markerPositions, logits) {
+export function readOpenDeciderNanoMarkerScores(ids: number[], markerPositions: number[], logits: Float32Array) {
   if (
     !Array.isArray(ids) ||
     !Array.isArray(markerPositions) ||
@@ -133,9 +149,9 @@ export function readOpenDeciderNanoMarkerScores(ids, markerPositions, logits) {
         position < 0 ||
         position >= ids.length ||
         ids[position] !== OPENDECIDER_NANO_TOKENS.mask ||
-        (index > 0 && markerPositions[index - 1] >= position)
+        (index > 0 && markerPositions[index - 1]! >= position)
     )
   )
     throw new WebDecisionError('INFERENCE_ERROR', 'OpenDecider-nano returned an invalid marker layout.');
-  return Float32Array.from(markerPositions, (position) => logits[position]);
+  return Float32Array.from(markerPositions, (position) => logits[position]!);
 }

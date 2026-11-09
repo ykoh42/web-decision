@@ -39,7 +39,6 @@
     "packages/web-decision/src/nari/upload-plan.mjs",
     "packages/web-decision/src/nari/upload.mjs",
     "packages/web-decision/src/opendecider-nano/loader.mjs",
-    "packages/web-decision/src/opendecider-nano/protocol.mjs",
     "packages/web-decision/src/opendecider-nano/runner.mjs",
     "packages/web-decision/src/opendecider-nano/session.mjs",
     "packages/web-decision/src/opendecider-nano/source.mjs",
