@@ -2,8 +2,16 @@ import {WebDecisionError} from '../kev.js';
 import {validatePrefetchBytes} from '../shard-prefetch.js';
 import {rejectUnverifiedImajevAssets} from './contract.mjs';
 
+interface ImajevLoadOptions {
+  readonly assetsUrl?: unknown;
+  readonly offline?: unknown;
+  readonly cache?: unknown;
+  readonly maxPrefetchBytes?: unknown;
+  readonly signal?: AbortSignal | undefined;
+}
+
 /** Fail before network, cache, WebGPU or graph initialization; no assets are trusted yet. */
-export async function loadExperimentalImajev(options) {
+export async function loadExperimentalImajev(options: ImajevLoadOptions | null | undefined) {
   if (!options || typeof options.assetsUrl !== 'string' || !options.assetsUrl)
     throw new WebDecisionError('INVALID_INPUT', 'assetsUrl is required.');
   if (options.offline !== undefined && typeof options.offline !== 'boolean')

@@ -28,7 +28,6 @@
     "packages/web-decision/src/h2o/upload.mjs",
     "packages/web-decision/src/imajev/candidate-loader.mjs",
     "packages/web-decision/src/imajev/fixture-session.mjs",
-    "packages/web-decision/src/imajev/loader.mjs",
     "packages/web-decision/src/imajev/plan.mjs",
     "packages/web-decision/src/imajev/protocol.mjs",
     "packages/web-decision/src/imajev/result-processor.mjs",
