@@ -6,15 +6,16 @@ import {loadFakeElephantCandidate, validateElephantOptions} from '../src/elephan
 import {createElephantSession} from '../src/elephant/session.mjs';
 import {ElephantTvmRunner} from '../src/elephant/runner.mjs';
 import {packElephantRequest} from '../src/elephant/protocol.mjs';
+import type {ElephantPackedRequest, ElephantSlotTokenizer} from '../src/elephant/protocol.mjs';
 import {graphInputs} from '../src/elephant/graph-inputs.mjs';
 import {describeModel} from '../src/model-registry.js';
 
-function deferred() {
-  let resolve;
-  const promise = new Promise((done) => {
-    resolve = done;
+function deferred<Value = void>() {
+  let settle!: (value: Value | PromiseLike<Value>) => void;
+  const promise = new Promise<Value>((done) => {
+    settle = done;
   });
-  return {promise, resolve};
+  return {promise, resolve: (value?: Value) => settle(value as Value)};
 }
 
 test('each variant selects its own graph and reports its own branch limit', () => {
@@ -30,14 +31,16 @@ test('each variant selects its own graph and reports its own branch limit', () =
   });
   assert.deepEqual(short['inventory.json'], long['inventory.json']);
   assert.deepEqual(short['tokenizer.json'], long['tokenizer.json']);
-  for (const [model, max, graph] of [
-    [ELEPHANT_MODEL, 128, short],
-    [ELEPHANT_512_MODEL, 512, long]
-  ]) {
+  const variants: Array<[typeof ELEPHANT_MODEL | typeof ELEPHANT_512_MODEL, number, ReturnType<typeof elephantFiles>]> =
+    [
+      [ELEPHANT_MODEL, 128, short],
+      [ELEPHANT_512_MODEL, 512, long]
+    ];
+  for (const [model, max, graph] of variants) {
     const info = describeModel(model);
-    assert.equal(info.checkpoint.graphSha256, graph['model.wasm'].sha256);
+    assert.equal(info.checkpoint.graphSha256, graph['model.wasm']!.sha256);
     assert.equal(
-      info.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max,
+      info.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max,
       max
     );
     assert.equal(
@@ -50,12 +53,18 @@ test('each variant selects its own graph and reports its own branch limit', () =
 });
 
 test('the loader passes the same validated limit to source, runner and session', async () => {
+  type FakeDeps = Parameters<typeof loadFakeElephantCandidate>[1];
   for (const [model, limit] of [
     [ELEPHANT_MODEL, 128],
     [ELEPHANT_512_MODEL, 512]
-  ]) {
-    const seen = [];
-    const owner = {lifecycle: {}, uncaptured: [], disposalGuard: {blocked: false}};
+  ] as const) {
+    const seen: Array<[string, string | number | undefined]> = [];
+    const owner = {
+      lifecycle: {},
+      uncaptured: [],
+      disposalGuard: {blocked: false}
+    } as unknown as ReturnType<FakeDeps['initialize']>;
+    const session = 'session' as unknown as ReturnType<FakeDeps['session']>;
     const result = await loadFakeElephantCandidate(
       {model, assetsUrl: 'https://example.test/'},
       {
@@ -72,26 +81,28 @@ test('the loader passes the same validated limit to source, runner and session',
           }
         },
         async openSource(_base, options) {
-          seen.push(['source', options.model]);
-          return {wasm: {}, tokenizer: {}, tokenizerConfig: {}};
+          seen.push(['source', options!.model]);
+          return {wasm: {}, tokenizer: {}, tokenizerConfig: {}} as unknown as Awaited<
+            ReturnType<FakeDeps['openSource']>
+          >;
         },
         async prepareTokenizer() {
-          return {tokenizer: {}, addedTokens: []};
+          return {tokenizer: {}, addedTokens: []} as unknown as Awaited<ReturnType<FakeDeps['prepareTokenizer']>>;
         },
-        instantiate: async () => ({}),
+        instantiate: async () => ({}) as Parameters<FakeDeps['initialize']>[0],
         initialize: () => owner,
         upload: async () => [],
         runner(args) {
           seen.push(['runner', args.maxBranchTokens]);
-          return {};
+          return {} as ReturnType<FakeDeps['runner']>;
         },
         session(args) {
           seen.push(['session', args.maxBranchTokens]);
-          return 'session';
+          return session;
         }
       }
     );
-    assert.equal(result, 'session');
+    assert.equal(result, session);
     assert.deepEqual(seen, [
       ['source', model],
       ['runner', limit],
@@ -103,61 +114,68 @@ test('the loader passes the same validated limit to source, runner and session',
 test('crossing the two graph assets fails closed before metadata finishes loading', async (t) => {
   const wrong128 = new Uint8Array(5094092),
     wrong512 = new Uint8Array(5093840);
-  let graph;
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    if (new URL(url).pathname.endsWith('/model.wasm')) return new Response(graph);
+  let graph!: Uint8Array;
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL) => {
+    if (new URL(String(url)).pathname.endsWith('/model.wasm')) return new Response(graph as Uint8Array<ArrayBuffer>);
     return new Promise(() => {});
   });
-  for (const [model, wrong] of [
+  const wrongVariants: Array<[typeof ELEPHANT_MODEL | typeof ELEPHANT_512_MODEL, Uint8Array]> = [
     [ELEPHANT_MODEL, wrong128],
     [ELEPHANT_512_MODEL, wrong512]
-  ]) {
+  ];
+  for (const [model, wrong] of wrongVariants) {
     graph = wrong;
     await assert.rejects(openElephantSource(new URL('https://example.test/'), {model}));
   }
-  for (const [model, size] of [
+  const sizedVariants: Array<[typeof ELEPHANT_MODEL | typeof ELEPHANT_512_MODEL, number]> = [
     [ELEPHANT_MODEL, 5093840],
     [ELEPHANT_512_MODEL, 5094092]
-  ]) {
+  ];
+  for (const [model, size] of sizedVariants) {
     graph = new Uint8Array(size);
     await assert.rejects(openElephantSource(new URL('https://example.test/'), {model}), {code: 'INVALID_ASSET'});
   }
 });
 
-const tokenizer = {
-  encode: (text) => ({ids: [...text].filter((char) => '<Qx'.includes(char)).map((char) => char.charCodeAt(0))})
+const tokenizer: ElephantSlotTokenizer = {
+  encode: (text) => ({ids: [...text].filter((char) => '<Qx'.includes(char)).map((char) => char.charCodeAt(0))}),
+  decode: (ids) => String.fromCharCode(...ids)
 };
-const request = () => ({state: '', questions: [{instructions: 'choose', options: ['a', 'b']}]});
-function withLength(length) {
+const request = (): {state: string; questions: Array<{instructions: string; options: string[]}>} => ({
+  state: '',
+  questions: [{instructions: 'choose', options: ['a', 'b']}]
+});
+function withLength(length: number): ReturnType<typeof request> {
   const value = request();
-  const base = packElephantRequest(tokenizer, value, {addedTokens: [], maxBranchTokens: 512}).branches[0].ids.length;
+  const base = packElephantRequest(tokenizer, value, {addedTokens: [], maxBranchTokens: 512}).branches[0]!.ids.length;
   value.state = 'x'.repeat(length - base);
   return value;
 }
 
 test('variant sessions admit their exact boundary and reject the next token before inference', async () => {
-  for (const [limit, next] of [
+  const limits: Array<[number, number]> = [
     [128, 129],
     [512, 513]
-  ]) {
+  ];
+  for (const [limit, next] of limits) {
     let calls = 0;
     const session = createElephantSession({
       tokenizer,
       addedTokens: [],
       maxBranchTokens: limit,
       runner: {
-        async run(packed) {
+        async run(packed: ElephantPackedRequest) {
           calls++;
-          return packed.branches.map(() => [0, 1]);
+          return packed.branches.map(() => new Float32Array([0, 1]));
         },
         async releaseCachedMemory() {},
         async dispose() {}
       }
     });
-    assert.equal((await session.decide(withLength(limit))).answers[0].selected, 'b');
+    assert.equal((await session.decide(withLength(limit))).answers[0]!.selected, 'b');
     await assert.rejects(session.decide(withLength(next)), {code: 'INVALID_INPUT'});
     assert.equal(calls, 1);
-    assert.equal((await session.decide(withLength(limit))).answers[0].selected, 'b');
+    assert.equal((await session.decide(withLength(limit))).answers[0]!.selected, 'b');
     await session.dispose();
   }
 });
@@ -166,19 +184,32 @@ test('graph construction enforces the limit, block attention and final-token ind
   const ids = Array.from({length: 512}, (_, i) => i);
   assert.throws(() => graphInputs(ids, 100));
   const inputs = graphInputs(ids, 100, 512);
-  assert.deepEqual(inputs[2].shape, [1, 1, 512, 512]);
-  assert.equal(inputs[2].data[99 * 512 + 100], 0xfbff);
-  assert.equal(inputs[2].data[100 * 512 + 99], 0);
-  assert.equal(inputs[2].data[100 * 512 + 511], 0);
-  assert.equal(inputs[4].data[0], 511);
+  assert.deepEqual(inputs[2]!.shape, [1, 1, 512, 512]);
+  assert.equal(inputs[2]!.data[99 * 512 + 100], 0xfbff);
+  assert.equal(inputs[2]!.data[100 * 512 + 99], 0);
+  assert.equal(inputs[2]!.data[100 * 512 + 511], 0);
+  assert.equal(inputs[4]!.data[0], 511);
   assert.throws(() => graphInputs([...ids, 512], 100, 512));
 });
 
 function fakeRunner() {
-  const events = [],
-    copies = [],
-    gates = [];
-  const context = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+  type DeferredSignal = ReturnType<typeof deferred<void>>;
+  interface FakeTensor {
+    readonly shape: number[];
+    readonly dtype: string;
+    readonly byteOffset: number;
+    value?: number[];
+    getDataPtr(): number;
+    copyFrom(data: unknown): FakeTensor;
+    toArray(): Float32Array;
+  }
+  const events: string[] = [],
+    copies: Array<number[] | undefined> = [],
+    gates: Array<{started: DeferredSignal; finish: DeferredSignal}> = [];
+  const context: {pendingGPUToCPUCopy: Promise<void> | null; copyRawBytesToBuffer(): void} = {
+    pendingGPUToCPUCopy: null,
+    copyRawBytesToBuffer() {}
+  };
   const device = {
     async sync() {
       const gate = gates.shift();
@@ -197,19 +228,20 @@ function fakeRunner() {
     beginScope() {},
     endScope() {},
     dispose() {},
-    empty(shape, dtype, where) {
-      return {
+    empty(shape: number[], dtype: string, where: unknown) {
+      const tensor: FakeTensor = {
         shape,
         dtype,
         byteOffset: 0,
         getDataPtr: () => 0,
-        copyFrom(data) {
+        copyFrom(data: unknown) {
           if (where === 'cpu') context.pendingGPUToCPUCopy = Promise.resolve();
-          else if (dtype === 'int32') this.value = Array.from(data);
+          else if (dtype === 'int32') this.value = Array.from(data as ArrayLike<number>);
           return this;
         },
         toArray: () => new Float32Array(256)
       };
+      return tensor;
     }
   };
   const runner = new ElephantTvmRunner({
@@ -222,10 +254,12 @@ function fakeRunner() {
         return null;
       }
     },
-    fn(...args) {
+    fn(...args: unknown[]) {
       events.push('graph');
-      copies.push(args[0].value);
-      return {dtype: 'float32', shape: [1, 256]};
+      copies.push((args[0] as {value?: number[]}).value);
+      return {dtype: 'float32', shape: [1, 256]} as unknown as ReturnType<
+        ConstructorParameters<typeof ElephantTvmRunner>[0]['fn']
+      >;
     },
     weights: Array.from({length: 684}, () => ({})),
     lifecycle: {},
@@ -245,17 +279,18 @@ test('all branches validate before GPU work; masks are allocated one at a time a
       {ids: Array(512).fill(1), options: ['a', 'b']},
       {ids: Array(513).fill(1), options: ['a', 'b']}
     ]
-  };
+  } as unknown as ElephantPackedRequest;
   await assert.rejects(f.runner.run(bad), {code: 'INFERENCE_ERROR'});
   assert.deepEqual(f.events, []);
   const original = globalThis.Uint16Array;
   let masks = 0;
-  globalThis.Uint16Array = class extends original {
-    constructor(...args) {
-      super(...args);
+  const InstrumentedUint16Array = class extends original {};
+  globalThis.Uint16Array = new Proxy(InstrumentedUint16Array, {
+    construct(_target, args: unknown[], newTarget) {
       if (args[0] === 512 * 512) masks++;
+      return Reflect.construct(original, args, newTarget);
     }
-  };
+  }) as Uint16ArrayConstructor;
   try {
     const first = Array(512).fill(1),
       second = Array(512).fill(2);
@@ -267,14 +302,14 @@ test('all branches validate before GPU work; masks are allocated one at a time a
         {ids: first, options: ['a', 'b']},
         {ids: second, options: ['c', 'd']}
       ]
-    });
+    } as unknown as ElephantPackedRequest);
     await gate.started.promise;
     assert.equal(masks, 1);
     second[0] = 99;
     gate.finish.resolve();
     assert.equal((await result).length, 2);
     assert.equal(masks, 2);
-    assert.equal(f.copies[1][0], 2);
+    assert.equal(f.copies[1]![0], 2);
     const cancellation = {started: deferred(), finish: deferred()};
     f.gates.push(cancellation);
     const controller = new AbortController();
@@ -285,7 +320,7 @@ test('all branches validate before GPU work; masks are allocated one at a time a
           {ids: first, options: ['a', 'b']},
           {ids: second, options: ['c', 'd']}
         ]
-      },
+      } as unknown as ElephantPackedRequest,
       {signal: controller.signal}
     );
     const rejection = assert.rejects(cancelled, {name: 'AbortError'});
@@ -309,7 +344,7 @@ test('a later oversized branch is rejected before any inference', async () => {
     addedTokens: [],
     maxBranchTokens: 512,
     runner: {
-      async run() {
+      async run(_packed: ElephantPackedRequest) {
         calls++;
         return [];
       },
@@ -330,7 +365,7 @@ test('512-token session cancellation skips later branches and disposal waits for
   f.gates.push(gate);
   const session = createElephantSession({tokenizer, addedTokens: [], runner: f.runner, maxBranchTokens: 512});
   const value = withLength(512);
-  value.questions.push({...value.questions[0], options: ['c', 'd']});
+  value.questions.push({...value.questions[0]!, options: ['c', 'd']});
   const controller = new AbortController();
   const decision = session.decide(value, {signal: controller.signal});
   await gate.started.promise;

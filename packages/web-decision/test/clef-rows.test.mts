@@ -2,22 +2,53 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {selectFakeClefRows} from '../src/clef/rows.mjs';
-const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-function fixture() {
+import type {ClefRangePart, ClefRangeReader, ClefTensorEntry} from '../src/clef/types.js';
+
+interface ClefFixture {
+  readonly layout: number[];
+  readonly columns: number;
+  readonly banks: FakeClefBank[];
+  readonly files: Map<string, Buffer>;
+}
+
+interface FakeClefStream {
+  readonly path: string;
+  readonly shape: number[];
+  readonly dtype: 'uint32' | 'float16';
+  readonly bytes: number;
+  readonly chunks: ClefRangePart[];
+}
+
+interface FakeClefBank {
+  readonly rows: number;
+  readonly packed: FakeClefStream;
+  readonly scales: FakeClefStream;
+}
+
+interface FakeClefOptions {
+  readonly fake: true;
+  readonly layout: number[];
+  readonly columns: number;
+  readonly readRange: ClefRangeReader;
+}
+
+const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+
+function fixture(): ClefFixture {
   const layout = [3, 2, 4, 3],
     columns = 64,
-    files = new Map(),
-    banks = [];
+    files = new Map<string, Buffer>(),
+    banks: FakeClefBank[] = [];
   for (let bank = 0; bank < 4; bank++) {
-    const rows = layout[bank];
-    const make = (kind, width, dtype) => {
+    const rows = layout[bank]!;
+    const make = (kind: string, width: number, dtype: 'uint32' | 'float16'): FakeClefStream => {
       const bytes = Buffer.alloc(rows * width * (dtype === 'uint32' ? 4 : 2));
       if (dtype === 'uint32')
         for (let i = 0; i < bytes.length / 4; i++) bytes.writeUInt32LE((bank * 1000 + i) >>> 0, i * 4);
       else for (let i = 0; i < bytes.length / 2; i++) bytes.writeUInt16LE(0x3800 + bank, i * 2);
       const path = `${bank}-${kind}`;
       files.set(path, bytes);
-      const chunks = [];
+      const chunks: ClefRangePart[] = [];
       for (let offset = 0; offset < bytes.length; offset += 13) {
         const part = bytes.subarray(offset, offset + 13);
         chunks.push({offset, length: part.length, sha256: hash(part)});
@@ -28,21 +59,25 @@ function fixture() {
   }
   return {layout, columns, banks, files};
 }
-const options = (f, readRange) => ({
+const options = (f: ClefFixture, readRange?: ClefRangeReader): FakeClefOptions => ({
   fake: true,
   layout: f.layout,
   columns: f.columns,
-  readRange: readRange ?? ((entry, part) => f.files.get(entry.path).subarray(part.offset, part.offset + part.length))
+  readRange:
+    readRange ??
+    ((entry: ClefTensorEntry, part: ClefRangePart) =>
+      f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length))
 });
 
 test('abort during selected-row hashing returns promptly and handles a late rejection', async (t) => {
   const f = fixture(),
     original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-  let started, rejectHash;
-  const entered = new Promise((resolve) => {
+  let started!: () => void;
+  let rejectHash!: (reason: unknown) => void;
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const pending = new Promise((_, reject) => {
+  const pending = new Promise<ArrayBuffer>((_, reject) => {
     rejectHash = reject;
   });
   Object.defineProperty(globalThis, 'crypto', {
@@ -56,17 +91,24 @@ test('abort during selected-row hashing returns promptly and handles a late reje
       }
     }
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'crypto', original) : delete globalThis.crypto));
+  t.after(() =>
+    original
+      ? Object.defineProperty(globalThis, 'crypto', original)
+      : delete (globalThis as unknown as {crypto?: Crypto}).crypto
+  );
   const controller = new AbortController(),
     reason = Error('selected hash cancelled');
   const operation = selectFakeClefRows([0], f.banks, {...options(f), signal: controller.signal});
   const outcome = operation.then(
     () => 'resolved',
-    (error) => error
+    (error: unknown) => error
   );
   await entered;
   controller.abort(reason);
-  const observed = await Promise.race([outcome, new Promise((resolve) => setTimeout(() => resolve('pending'), 50))]);
+  const observed = await Promise.race([
+    outcome,
+    new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 50))
+  ]);
   rejectHash(Error('late selected hash failure'));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(observed, reason);
@@ -75,11 +117,12 @@ test('abort during selected-row hashing returns promptly and handles a late reje
 test('abort after a selected-row digest settles takes precedence over hash mismatch', async (t) => {
   const f = fixture(),
     original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-  let started, resolveHash;
-  const entered = new Promise((resolve) => {
+  let started!: () => void;
+  let resolveHash!: (value: ArrayBuffer) => void;
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<ArrayBuffer>((resolve) => {
     resolveHash = resolve;
   });
   Object.defineProperty(globalThis, 'crypto', {
@@ -93,14 +136,18 @@ test('abort after a selected-row digest settles takes precedence over hash misma
       }
     }
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'crypto', original) : delete globalThis.crypto));
+  t.after(() =>
+    original
+      ? Object.defineProperty(globalThis, 'crypto', original)
+      : delete (globalThis as unknown as {crypto?: Crypto}).crypto
+  );
   const controller = new AbortController(),
     reason = Error('selected hash cancelled');
   const operation = selectFakeClefRows([0], f.banks, {...options(f), signal: controller.signal});
   await entered;
   resolveHash(new Uint8Array(32).buffer);
   queueMicrotask(() => queueMicrotask(() => controller.abort(reason)));
-  await assert.rejects(operation, (error) => error === reason);
+  await assert.rejects(operation, (error: unknown) => error === reason);
 });
 
 test('selects stable independent rows across bank boundaries and duplicates', async () => {
@@ -116,13 +163,14 @@ test('selects stable independent rows across bank boundaries and duplicates', as
 
 test('only intersecting ranges are read; selected corruption and nonfinite scales are rejected', async () => {
   const f = fixture(),
-    reads = [];
-  const read = (entry, part) => {
+    reads: Array<[string, number]> = [];
+  const read: ClefRangeReader = (entry, part) => {
     reads.push([entry.path, part.offset]);
-    return f.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+    return f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
   };
-  const untouchedPath = f.banks[3].packed.path;
-  f.files.get(untouchedPath)[0] ^= 1;
+  const untouchedPath = f.banks[3]!.packed.path;
+  const untouched = f.files.get(untouchedPath)!;
+  untouched[0] = untouched[0]! ^ 1;
   const result = await selectFakeClefRows([0, 0], f.banks, options(f, read));
   assert.deepEqual([...result.local], [0, 0]);
   assert.deepEqual(reads, [
@@ -134,11 +182,12 @@ test('only intersecting ranges are read; selected corruption and nonfinite scale
   assert.equal(result.packed.length, 8);
   // A range intersecting the chosen row is authenticated in full, including
   // bytes outside that row.
-  f.files.get('0-packed')[35] ^= 1;
+  const packed = f.files.get('0-packed')!;
+  packed[35] = packed[35]! ^ 1;
   await assert.rejects(selectFakeClefRows([0], f.banks, options(f)), /hash mismatch/);
-  f.files.get('0-packed')[35] ^= 1;
-  const scale = f.banks[0].scales,
-    bytes = f.files.get(scale.path);
+  packed[35] = packed[35]! ^ 1;
+  const scale = f.banks[0]!.scales,
+    bytes = f.files.get(scale.path)!;
   bytes.writeUInt16LE(0x7e00, 0);
   for (const part of scale.chunks) part.sha256 = hash(bytes.subarray(part.offset, part.offset + part.length));
   await assert.rejects(selectFakeClefRows([0], f.banks, options(f)), /Nonfinite/);
@@ -146,13 +195,13 @@ test('only intersecting ranges are read; selected corruption and nonfinite scale
 
 test('row-spanning chunks and the final partial chunk cover each selected row exactly', async () => {
   const f = fixture(),
-    reads = [];
+    reads: string[] = [];
   const result = await selectFakeClefRows(
     [2, 3, 11],
     f.banks,
     options(f, (entry, part) => {
       reads.push(`${entry.path}:${part.offset}`);
-      return f.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+      return f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
     })
   );
   assert.deepEqual([...result.rowBanks], [0, 1, 3]);
@@ -171,10 +220,10 @@ test('snapshots bank metadata before callbacks and rejects cancellation', async 
     f.banks,
     options(f, (entry, part) => {
       if (++calls === 1) {
-        f.banks[3] = f.banks[0];
-        f.banks[1].packed.chunks.length = 0;
+        f.banks[3] = f.banks[0]!;
+        f.banks[1]!.packed.chunks.length = 0;
       }
-      return f.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+      return f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
     })
   );
   assert.deepEqual(result.unique, [11, 0]);
@@ -185,7 +234,7 @@ test('snapshots bank metadata before callbacks and rejects cancellation', async 
     selectFakeClefRows([0], g.banks, {
       ...options(g, (entry, part) => {
         controller.abort();
-        return g.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+        return g.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
       }),
       signal: controller.signal
     }),
@@ -197,29 +246,29 @@ test('real 65535/65536 bank boundary selects only its four authenticated ranges'
   const {selectClefRows} = await import('../src/clef/rows.mjs');
   const limit = 4 * 1024 * 1024,
     zeros = Buffer.alloc(limit),
-    digest = new Map();
-  const lengthHash = (length) => {
+    digest = new Map<number, string>();
+  const lengthHash = (length: number): string => {
     if (!digest.has(length)) digest.set(length, hash(zeros.subarray(0, length)));
-    return digest.get(length);
+    return digest.get(length)!;
   };
   const layout = [65536, 65536, 65536, 51712];
-  const stream = (bank, rows, width, dtype) => {
+  const stream = (bank: number, rows: number, width: number, dtype: 'uint32' | 'float16'): FakeClefStream => {
     const bytes = rows * width * (dtype === 'uint32' ? 4 : 2),
-      chunks = [];
+      chunks: ClefRangePart[] = [];
     for (let offset = 0; offset < bytes; offset += limit) {
       const length = Math.min(limit, bytes - offset);
       chunks.push({offset, length, sha256: lengthHash(length)});
     }
     return {path: `${bank}-${dtype}`, shape: [rows, width], dtype, bytes, chunks};
   };
-  const banks = layout.map((rows, bank) => ({
+  const banks: FakeClefBank[] = layout.map((rows, bank) => ({
     rows,
     packed: stream(bank, rows, 512, 'uint32'),
     scales: stream(bank, rows, 128, 'float16')
   }));
-  const reads = [];
+  const reads: Array<[string, number]> = [];
   const result = await selectClefRows([65535, 65536, 65535], banks, {
-    readRange(entry, part) {
+    readRange(entry: ClefTensorEntry, part: ClefRangePart) {
       reads.push([entry.path, part.offset]);
       return zeros.subarray(0, part.length);
     }
@@ -237,15 +286,15 @@ test('real 65535/65536 bank boundary selects only its four authenticated ranges'
 test('range callbacks cannot replace the trusted descriptor or later chunk metadata', async () => {
   for (const asynchronous of [false, true]) {
     const f = fixture();
-    const read = async (entry, part) => {
-      const original = f.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+    const read = async (entry: ClefTensorEntry, part: ClefRangePart): Promise<Buffer> => {
+      const original = f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
       const altered = Buffer.from(original);
-      altered[0] ^= 0xff;
+      altered[0] = altered[0]! ^ 0xff;
       if (asynchronous) await Promise.resolve();
       part.sha256 = hash(altered);
       part.offset = 0;
       part.length = altered.length;
-      entry.chunks[0].sha256 = part.sha256;
+      entry.chunks[0]!.sha256 = part.sha256;
       return altered;
     };
     await assert.rejects(selectFakeClefRows([0], f.banks, options(f, read)), /hash mismatch/);
@@ -255,7 +304,7 @@ test('range callbacks cannot replace the trusted descriptor or later chunk metad
     [0],
     f.banks,
     options(f, (entry, part) => {
-      const bytes = f.files.get(entry.path).subarray(part.offset, part.offset + part.length);
+      const bytes = f.files.get(entry.path)!.subarray(part.offset, part.offset + part.length);
       part.offset = 99;
       part.length = 1;
       entry.chunks.length = 0;

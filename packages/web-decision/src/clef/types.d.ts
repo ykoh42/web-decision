@@ -90,7 +90,11 @@ export interface SelectedClefRows {
 }
 
 export interface ClefRangeReader {
-  (entry: ClefTensorEntry, part: ClefRangePart, signal?: AbortSignal | undefined): Promise<ArrayBuffer | Uint8Array>;
+  (
+    entry: ClefTensorEntry,
+    part: ClefRangePart,
+    signal?: AbortSignal | undefined
+  ): ArrayBuffer | Uint8Array | PromiseLike<ArrayBuffer | Uint8Array>;
 }
 
 export interface ClefRowSelectOptions {

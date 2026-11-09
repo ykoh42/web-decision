@@ -2,21 +2,38 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {processPrefetchedShards, validatePrefetchBytes} from '../src/shard-prefetch.js';
 
-const deferred = () => {
-  let resolve, reject;
-  const promise = new Promise((ok, fail) => {
-    resolve = ok;
-    reject = fail;
+interface Deferred<Value> {
+  readonly promise: Promise<Value>;
+  resolve(value?: Value): void;
+  reject(reason?: unknown): void;
+}
+
+function deferred<Value = unknown>(): Deferred<Value> {
+  let fulfill!: (value: Value | PromiseLike<Value>) => void;
+  let fail!: (reason?: unknown) => void;
+  const promise = new Promise<Value>((resolve, reject) => {
+    fulfill = resolve;
+    fail = reject;
   });
-  return {promise, resolve, reject};
-};
-const tick = () => new Promise((resolve) => setImmediate(resolve));
-async function within(promise, ms = 100) {
-  let timer;
+  return {
+    promise,
+    resolve(value?: Value) {
+      fulfill(value as Value);
+    },
+    reject(reason?: unknown) {
+      fail(reason);
+    }
+  };
+}
+
+const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+async function within<Value>(promise: PromiseLike<Value>, ms = 100): Promise<Value | 'still pending'> {
+  let timer!: ReturnType<typeof setTimeout>;
   try {
     return await Promise.race([
       promise,
-      new Promise((resolve) => {
+      new Promise<'still pending'>((resolve) => {
         timer = setTimeout(() => resolve('still pending'), ms);
       })
     ]);
@@ -40,9 +57,9 @@ test('bounds read-ahead by the next shard size and preserves upload order', asyn
     {name: 'b', nbytes: 31},
     {name: 'c', nbytes: 40}
   ];
-  const reads = [],
-    uploads = [],
-    gates = new Map(),
+  const reads: string[] = [],
+    uploads: Array<[string, unknown]> = [],
+    gates = new Map<string, Deferred<unknown>>(),
     firstUpload = deferred();
   const task = processPrefetchedShards(
     records,
@@ -62,10 +79,10 @@ test('bounds read-ahead by the next shard size and preserves upload order', asyn
   try {
     await tick();
     assert.deepEqual(reads, ['a', 'b']);
-    gates.get('b').resolve('B');
+    gates.get('b')!.resolve('B');
     await tick();
     assert.deepEqual(uploads, []);
-    gates.get('a').resolve('A');
+    gates.get('a')!.resolve('A');
     await tick();
     assert.deepEqual(uploads, [['a', 'A']]);
     assert.deepEqual(reads, ['a', 'b']);
@@ -76,7 +93,7 @@ test('bounds read-ahead by the next shard size and preserves upload order', asyn
       ['b', 'B']
     ]);
     assert.deepEqual(reads, ['a', 'b', 'c']);
-    gates.get('c').resolve('C');
+    gates.get('c')!.resolve('C');
     await task;
     assert.deepEqual(uploads, [
       ['a', 'A'],
@@ -90,7 +107,7 @@ test('bounds read-ahead by the next shard size and preserves upload order', asyn
 });
 
 test('zero budget does not read a future shard during the current upload', async () => {
-  const reads = [],
+  const reads: number[] = [],
     firstUpload = deferred(),
     started = deferred();
   const task = processPrefetchedShards(
@@ -123,7 +140,7 @@ test('a later shard failure aborts a stalled earlier read and returns its error'
   const first = deferred(),
     started = deferred(),
     failure = Error('later shard failed'),
-    signals = [];
+    signals: AbortSignal[] = [];
   const task = processPrefetchedShards(
     [{nbytes: 10}, {nbytes: 10}],
     async (_, signal, index) => {
@@ -336,12 +353,12 @@ test('caller cancellation stops waiting for uncooperative reads and preserves th
   const controller = new AbortController(),
     reason = Error('caller cancelled'),
     gates = [deferred(), deferred()],
-    signals = [];
+    signals: AbortSignal[] = [];
   const task = processPrefetchedShards(
     [{nbytes: 10}, {nbytes: 10}],
     async (_, signal, index) => {
       signals.push(signal);
-      return gates[index].promise;
+      return gates[index]!.promise;
     },
     async () => {
       throw Error('Unexpected upload');
@@ -369,7 +386,7 @@ test('caller cancellation stops waiting for uncooperative reads and preserves th
 test('upload failure cancels the read-ahead and retains the upload error', async () => {
   const failure = Error('upload failed'),
     pending = deferred(),
-    signals = [];
+    signals: AbortSignal[] = [];
   const task = processPrefetchedShards(
     [{nbytes: 10}, {nbytes: 10}],
     async (_, signal, index) => {
@@ -428,7 +445,7 @@ test('cancellation during an upload aborts read-ahead but waits for the upload t
     pending = deferred(),
     started = deferred(),
     release = deferred(),
-    signals = [];
+    signals: AbortSignal[] = [];
   const task = processPrefetchedShards(
     [{nbytes: 10}, {nbytes: 10}],
     async (_, signal, index) => {
