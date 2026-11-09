@@ -96,7 +96,6 @@
     "packages/web-decision/test/ettin.test.mjs",
     "packages/web-decision/test/fixtures/imajev.mjs",
     "packages/web-decision/test/gliner-mobile.test.mjs",
-    "packages/web-decision/test/gpu-preflight.test.mjs",
     "packages/web-decision/test/h2o-adapter.test.mjs",
     "packages/web-decision/test/h2o-dlight-source.test.mjs",
     "packages/web-decision/test/h2o-dual-source.test.mjs",

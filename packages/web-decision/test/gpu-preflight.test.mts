@@ -14,15 +14,16 @@ test('rejects a real adapter without shader-f16 before creating a device', async
     }
   };
   const gpu = {
-    requestAdapter(options) {
+    requestAdapter(options: unknown) {
       calls++;
       assert.deepEqual(options, {powerPreference: 'high-performance'});
       return adapter;
     }
   };
   await assert.rejects(
-    requestF16Adapter(gpu),
-    (error) => error.code === 'UNSUPPORTED_ENVIRONMENT' && /shader-f16/.test(error.message)
+    requestF16Adapter(gpu as unknown as GPU),
+    (error: {code: string; message: string}) =>
+      error.code === 'UNSUPPORTED_ENVIRONMENT' && /shader-f16/.test(error.message)
   );
   assert.equal(calls, 1);
   assert.equal(deviceCalls, 0);
@@ -35,14 +36,14 @@ test('accepts a supported adapter without creating a device', async () => {
       throw Error('device requested too early');
     }
   };
-  await requestF16Adapter({requestAdapter: async () => adapter});
+  await requestF16Adapter({requestAdapter: async () => adapter} as unknown as GPU);
 });
 
 test('both model loaders obtain a fresh adapter before requesting a device', async () => {
   for (const [detect, limits] of [
     [detectKevGPUDevice, KEV_REQUIRED_LIMITS],
     [detectDebertaGPUDevice, DEBERTA_REQUIRED_LIMITS]
-  ]) {
+  ] as const) {
     const device = {},
       first = {
         features: new Set(['shader-f16']),
@@ -53,16 +54,17 @@ test('both model loaders obtain a fresh adapter before requesting a device', asy
     const fresh = {features: new Set(['shader-f16']), limits, requestDevice: async () => device};
     let calls = 0;
     const gpu = {requestAdapter: async () => (++calls === 1 ? first : fresh)};
-    await requestF16Adapter(gpu);
-    assert.equal((await detect(gpu)).device, device);
+    await requestF16Adapter(gpu as unknown as GPU);
+    assert.equal((await detect(gpu as unknown as GPU))!.device, device);
     assert.equal(calls, 2);
   }
 });
 
 test('maps missing and rejected adapters to model initialization errors', async () => {
   await assert.rejects(
-    requestF16Adapter({requestAdapter: async () => null}),
-    (e) => e.code === 'MODEL_LOAD_FAILED' && /No compatible/.test(e.cause?.message)
+    requestF16Adapter({requestAdapter: async () => null} as unknown as GPU),
+    (e: {code: string; cause?: {message: string}}) =>
+      e.code === 'MODEL_LOAD_FAILED' && /No compatible/.test(e.cause?.message as string)
   );
   const failure = Error('adapter failed');
   await assert.rejects(
@@ -70,8 +72,8 @@ test('maps missing and rejected adapters to model initialization errors', async 
       requestAdapter: async () => {
         throw failure;
       }
-    }),
-    (e) => e.code === 'MODEL_LOAD_FAILED' && e.cause === failure
+    } as unknown as GPU),
+    (e: {code: string; cause?: unknown}) => e.code === 'MODEL_LOAD_FAILED' && e.cause === failure
   );
 });
 
@@ -85,12 +87,12 @@ test('honors cancellation before and during a non-abortable adapter request', as
         requestAdapter() {
           throw Error('must not start');
         }
-      },
+      } as unknown as GPU,
       already.signal
     ),
     (e) => e === reason
   );
-  let rejectLate;
+  let rejectLate!: (reason?: unknown) => void;
   const controller = new AbortController();
   const request = requestF16Adapter(
     {
@@ -98,7 +100,7 @@ test('honors cancellation before and during a non-abortable adapter request', as
         new Promise((_, reject) => {
           rejectLate = reject;
         })
-    },
+    } as unknown as GPU,
     controller.signal
   );
   controller.abort(reason);
