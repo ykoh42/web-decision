@@ -3,21 +3,94 @@ import {waitForAbort} from '../abort.js';
 import {bytesFor, aligned} from '../nari/upload-plan.mjs';
 import {withNariScope} from '../nari/scope.mjs';
 
-const sha = async (bytes) =>
+interface ImajevChunk {
+  offset: number;
+  bytes: number;
+  sha256: string;
+}
+interface ImajevRowBase {
+  dtype: string;
+  shape: number[];
+}
+interface ImajevFileRow extends ImajevRowBase {
+  path: string;
+  offset: number;
+  bytes: number;
+  chunks: ImajevChunk[];
+  rangeSha256: string;
+  sha256?: never;
+  bytesHex?: never;
+}
+interface ImajevRotaryRow extends ImajevRowBase {
+  path?: undefined;
+  sha256: string;
+  bytesHex: string;
+}
+type ImajevRow = ImajevFileRow | ImajevRotaryRow;
+interface UploadOwner {
+  phase: string;
+  lost: unknown;
+  blocked: unknown;
+  uncaptured: unknown[];
+  hold(): {release(): unknown};
+  retain(): unknown;
+}
+interface ImajevTensor {
+  getDataPtr(): unknown;
+  byteOffset: number;
+}
+interface ImajevRuntimeOwner extends UploadOwner {
+  runtime: {
+    lib?: {
+      webGPUContext?: {
+        copyRawBytesToBuffer(bytes: Uint8Array, pointer: unknown, offset: number, length: number): unknown;
+        gpuBufferFromPtr(pointer: unknown): {size: number};
+      };
+    };
+    empty(shape: number[], dtype: string, device: unknown): ImajevTensor;
+  };
+  device: unknown;
+  resources: ImajevTensor[];
+}
+type ReadRange = (
+  path: string,
+  offset: number,
+  length: number,
+  options: {signal: AbortSignal | undefined}
+) => Promise<unknown>;
+interface Hasher {
+  update(bytes: Uint8Array): unknown;
+  digest(): string;
+}
+interface UploadParams<T> {
+  owner: UploadOwner;
+  rows: ImajevRow[];
+  readRange: ReadRange;
+  makeHasher(): Hasher;
+  allocate(row: ImajevRow, needed: number): {tensor: T; capacityBytes: number};
+  writeAndSettle(tensor: T, offset: number, bytes: Uint8Array): Promise<unknown>;
+  signal?: AbortSignal | undefined;
+}
+interface UploadSource {
+  plan: {bindings: ImajevRow[]};
+  readRange: ReadRange;
+}
+
+const sha = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
-const invalid = () => {
+const invalid: () => never = () => {
   throw Error('Invalid Imajev upload.');
 };
-const unhex = (value) => Uint8Array.from(value.match(/../g), (byte) => Number.parseInt(byte, 16));
+const unhex = (value: string) => Uint8Array.from(value.match(/../g)!, (byte) => Number.parseInt(byte, 16));
 
-function checkOwner(owner, signal) {
+function checkOwner(owner: UploadOwner, signal: AbortSignal | undefined) {
   signal?.throwIfAborted();
   if (owner.phase !== 'uploading' || owner.lost || owner.blocked || owner.uncaptured.length) invalid();
 }
 
-function rowChunks(row, size) {
+function rowChunks(row: ImajevFileRow, size: number) {
   if (!Array.isArray(row.chunks) || !row.chunks.length || row.bytes !== size) invalid();
   let position = row.offset;
   for (const chunk of row.chunks) {
@@ -39,7 +112,13 @@ function rowChunks(row, size) {
   return row.chunks;
 }
 
-async function readChunk(row, chunk, size, readRange, signal) {
+async function readChunk(
+  row: ImajevRow,
+  chunk: ImajevChunk,
+  size: number,
+  readRange: ReadRange,
+  signal: AbortSignal | undefined
+) {
   let bytes;
   if (row.path) {
     const value = await readRange(row.path, chunk.offset, chunk.bytes, {signal});
@@ -57,7 +136,15 @@ async function readChunk(row, chunk, size, readRange, signal) {
   return bytes;
 }
 
-async function writeRow({owner, row, readRange, makeHasher, allocate, writeAndSettle, signal}) {
+async function writeRow<T>({
+  owner,
+  row,
+  readRange,
+  makeHasher,
+  allocate,
+  writeAndSettle,
+  signal
+}: Omit<UploadParams<T>, 'rows'> & {row: ImajevRow}) {
   checkOwner(owner, signal);
   const size = bytesFor(row);
   const allocation = allocate(row, aligned(size));
@@ -69,7 +156,7 @@ async function writeRow({owner, row, readRange, makeHasher, allocate, writeAndSe
     invalid();
   const hasher = makeHasher();
   if (!hasher || typeof hasher.update !== 'function' || typeof hasher.digest !== 'function') invalid();
-  const chunks = row.path ? rowChunks(row, size) : [{offset: 0, bytes: size, sha256: row.sha256}];
+  const chunks = row.path ? rowChunks(row, size) : [{offset: 0, bytes: size, sha256: row.sha256!}];
   for (const chunk of chunks) {
     checkOwner(owner, signal);
     const bytes = await readChunk(row, chunk, size, readRange, signal);
@@ -88,7 +175,15 @@ async function writeRow({owner, row, readRange, makeHasher, allocate, writeAndSe
 }
 
 /** Upload a previously validated snapshot. The injected I/O also supports isolated fake tests. */
-export async function uploadImajevRows({owner, rows, readRange, makeHasher, allocate, writeAndSettle, signal}) {
+export async function uploadImajevRows<T>({
+  owner,
+  rows,
+  readRange,
+  makeHasher,
+  allocate,
+  writeAndSettle,
+  signal
+}: UploadParams<T>) {
   if (
     !owner ||
     owner.phase !== 'prepared' ||
@@ -104,7 +199,7 @@ export async function uploadImajevRows({owner, rows, readRange, makeHasher, allo
   )
     invalid();
   const snapshot = structuredClone(rows),
-    weights = [];
+    weights: T[] = [];
   try {
     signal?.throwIfAborted();
     const lease = owner.hold();
@@ -129,7 +224,14 @@ export async function uploadImajevRows({owner, rows, readRange, makeHasher, allo
 }
 
 /** Allocate with TVM and wait for each submitted WebGPU write before advancing. */
-export function uploadImajevFromSource(owner, source, {HashClass, signal} = {}) {
+export function uploadImajevFromSource(
+  owner: ImajevRuntimeOwner,
+  source: UploadSource,
+  {
+    HashClass,
+    signal
+  }: {HashClass?: Parameters<typeof createIncrementalSha256>[0]; signal?: AbortSignal | undefined} = {}
+) {
   if (!source?.plan || source.plan.bindings?.length !== 1082 || typeof source.readRange !== 'function') invalid();
   const context = owner.runtime.lib?.webGPUContext;
   if (typeof context?.copyRawBytesToBuffer !== 'function' || typeof context?.gpuBufferFromPtr !== 'function') invalid();
@@ -149,10 +251,14 @@ export function uploadImajevFromSource(owner, source, {HashClass, signal} = {}) 
       return {tensor, capacityBytes: buffer.size - tensor.byteOffset};
     },
     async writeAndSettle(tensor, offset, bytes) {
-      await withNariScope(owner, 'Imajev parameter upload failed.', async (lease) => {
-        context.copyRawBytesToBuffer(bytes, tensor.getDataPtr(), tensor.byteOffset + offset, bytes.byteLength);
-        await lease.syncWithoutReadback();
-      });
+      await withNariScope(
+        owner,
+        'Imajev parameter upload failed.',
+        async (lease: {syncWithoutReadback(): Promise<unknown>}) => {
+          context.copyRawBytesToBuffer(bytes, tensor.getDataPtr(), tensor.byteOffset + offset, bytes.byteLength);
+          await lease.syncWithoutReadback();
+        }
+      );
     }
   });
 }
