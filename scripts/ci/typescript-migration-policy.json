@@ -47,7 +47,6 @@
     "packages/web-decision/src/mapika/loader.js",
     "packages/web-decision/src/mapika/session.js",
     "packages/web-decision/src/mapika/system-one.mjs",
-    "packages/web-decision/src/mapika/upload.js",
     "packages/web-decision/src/mapika4b/loader.mjs",
     "packages/web-decision/src/mapika4b/source.mjs",
     "packages/web-decision/src/model-registry.js",
