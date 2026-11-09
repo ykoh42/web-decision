@@ -2,7 +2,7 @@
   "extends": "./tsconfig.kanana-runtime.json",
   "compilerOptions": {
     "rootDir": ".",
-    "noEmit": false,
+    "noEmit": true,
     "allowJs": true,
     "checkJs": false,
     "sourceMap": true,

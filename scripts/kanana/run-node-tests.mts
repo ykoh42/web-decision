@@ -55,7 +55,15 @@ try {
   const emittedTests = join(outputDirectory, 'core-tests');
   execFileSync(
     process.execPath,
-    [compiler, '--project', join(packageRoot, 'tsconfig.kanana-tests.json'), '--outDir', emittedTests],
+    [
+      compiler,
+      '--project',
+      join(packageRoot, 'tsconfig.kanana-tests.json'),
+      '--noEmit',
+      'false',
+      '--outDir',
+      emittedTests
+    ],
     {
       cwd: packageRoot,
       stdio: 'inherit'
