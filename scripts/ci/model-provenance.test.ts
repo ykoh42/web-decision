@@ -106,6 +106,7 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
   const evidenceFiles = new Map([
     ['recipe.json', Buffer.from('{"recipe":"pinned"}\n')],
     ['config.json', Buffer.from('{"conversion":"fixed"}\n')],
+    ['toolchain.json', Buffer.from('{"tools":"pinned"}\n')],
     ['rights.md', Buffer.from('Rights reviewed for redistribution.\n')],
     ['approval.md', Buffer.from('Approval record.\n')]
   ]);
@@ -139,7 +140,8 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
       revision: 'c'.repeat(40),
       recipe: reference('recipe.json'),
       config: reference('config.json'),
-      outputSha256: artifactLockSha256
+      toolchain: reference('toolchain.json'),
+      artifactLockSha256
     },
     rights: [
       {
@@ -192,6 +194,24 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
   });
   assert.deepEqual(checked.modelIds, ['kev-0.6b-q4f16']);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
+
+  await rm(join(docsRoot, 'toolchain.json'));
+  await assert.rejects(
+    validateModelProvenance({
+      packageRoot,
+      workspaceRoot: temporaryRoot,
+      modelSpec: approvedSpec,
+      artifactLock,
+      artifactLockBytes,
+      manifestBytes,
+      expectedManifestSha256: sha256(manifestBytes),
+      expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+      allowTestFixture: false,
+      requireCommitted: false
+    }),
+    /ENOENT/u
+  );
+  await writeFile(join(docsRoot, 'toolchain.json'), requiredEvidence(evidenceFiles.get('toolchain.json')));
 
   const unresolvedSpec = structuredClone(approvedSpec);
   const unresolvedModel = unresolvedSpec.models[0];

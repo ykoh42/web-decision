@@ -160,7 +160,7 @@ async function validateConversionEvidence(
     typeof conversion.revision === 'string' && IMMUTABLE_REVISION_PATTERN.test(conversion.revision),
     `Conversion revision for ${modelId} must be immutable.`
   );
-  for (const field of ['recipe', 'config']) {
+  for (const field of ['recipe', 'config', 'toolchain']) {
     const reference = conversion[field];
     safeRelativePath(isRecord(reference) ? reference.path : undefined, `Conversion ${field} path for ${modelId}`);
     await validateCommittedEvidenceReference(
@@ -171,8 +171,8 @@ async function validateConversionEvidence(
     );
   }
   failUnless(
-    typeof conversion.outputSha256 === 'string' && SHA256_PATTERN.test(conversion.outputSha256),
-    `Conversion output SHA-256 for ${modelId} is invalid.`
+    typeof conversion.artifactLockSha256 === 'string' && SHA256_PATTERN.test(conversion.artifactLockSha256),
+    `Conversion artifact-lock SHA-256 for ${modelId} is invalid.`
   );
 }
 
@@ -387,9 +387,9 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     const conversion = evidenceValue.conversion;
     failUnless(isRecord(conversion), `Approved model ${entry.modelId} has no conversion evidence.`);
     assert.equal(
-      conversion.outputSha256,
+      conversion.artifactLockSha256,
       artifactLockSha256,
-      `Approved conversion output differs from the artifact lock for ${entry.modelId}.`
+      `Approved conversion artifact-lock digest differs for ${entry.modelId}.`
     );
   }
 
