@@ -9,7 +9,19 @@ import {createFixtureImajevSession} from '../src/imajev/fixture-session.mjs';
 import {fixture as imajevFixture} from './fixtures/imajev.mjs';
 import {Tokenizer as StrandsTokenizer} from './strands-fake-tokenizer.mjs';
 
-const families = [
+type SessionConstructor =
+  | typeof DecisionModel
+  | typeof ExperimentalMapikaSession
+  | typeof ExperimentalKev08Session
+  | typeof ExperimentalDebertaSession
+  | typeof ExperimentalStrandsSession;
+type TestSession = {
+  tokenizer: {encode(text: string): {ids: number[]}};
+  decide(request: unknown, options?: {signal?: AbortSignal}): Promise<unknown>;
+  dispose(): Promise<void>;
+};
+
+const families: SessionConstructor[] = [
   DecisionModel,
   ExperimentalMapikaSession,
   ExperimentalKev08Session,
@@ -18,8 +30,8 @@ const families = [
 ];
 const request = () => ({state: 'state', questions: [{instructions: 'choose', options: ['a', 'b']}]});
 
-function sessionFor(Session) {
-  const events = [],
+function sessionFor(Session: SessionConstructor): {session: TestSession; events: string[]} {
+  const events: string[] = [],
     lifecycle = {disposed: false, loss: null};
   const runtime = {
     endScope() {
@@ -34,8 +46,8 @@ function sessionFor(Session) {
     Session === ExperimentalStrandsSession
       ? new StrandsTokenizer()
       : {
-          encode(text) {
-            return {ids: Array.from(text, (c) => c.codePointAt(0) + 200)};
+          encode(text: string) {
+            return {ids: Array.from(text, (c) => c.codePointAt(0)! + 200)};
           }
         };
   const runner = {
@@ -70,7 +82,7 @@ function sessionFor(Session) {
       events.push('run');
       return 'unexpected';
     }
-  });
+  }) as unknown as TestSession;
   return {session, events};
 }
 
@@ -81,7 +93,7 @@ for (const Session of families) {
       : 'disposal from a request getter prevents work from being queued'
   }`, async () => {
     const {session, events} = sessionFor(Session);
-    let closing;
+    let closing: Promise<void> | undefined;
     let getterCalls = 0;
     const input = request();
     Object.defineProperty(input, 'state', {
@@ -106,9 +118,9 @@ for (const Session of families) {
 
   test(`${Session.name}: disposal during tokenization prevents work from being queued`, async () => {
     const {session, events} = sessionFor(Session);
-    let closing;
+    let closing: Promise<void> | undefined;
     const encode = session.tokenizer.encode.bind(session.tokenizer);
-    session.tokenizer.encode = (...args) => {
+    session.tokenizer.encode = (...args: Parameters<TestSession['tokenizer']['encode']>) => {
       closing ??= session.dispose();
       return encode(...args);
     };
@@ -134,8 +146,8 @@ for (const Session of families) {
     const {session, events} = sessionFor(Session);
     const signal = new AbortController().signal,
       add = signal.addEventListener.bind(signal);
-    let closing;
-    signal.addEventListener = (...args) => {
+    let closing: Promise<void> | undefined;
+    signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
       closing = session.dispose();
       return add(...args);
     };
@@ -149,8 +161,8 @@ for (const Session of families) {
     const first = session.decide(request());
     const signal = new AbortController().signal,
       add = signal.addEventListener.bind(signal);
-    let closing;
-    signal.addEventListener = (...args) => {
+    let closing: Promise<void> | undefined;
+    signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
       closing = session.dispose();
       return add(...args);
     };
@@ -164,7 +176,7 @@ for (const Session of families) {
 
 test('ImajevSession: disposal from a request getter prevents work from being queued', async () => {
   const f = imajevFixture(createFixtureImajevSession);
-  let closing;
+  let closing: Promise<void> | undefined;
   Object.defineProperty(f.request, 'state', {
     get() {
       closing = f.model.dispose();
@@ -178,10 +190,10 @@ test('ImajevSession: disposal from a request getter prevents work from being que
 
 test('ImajevSession: disposal during preparation prevents work from being queued', async () => {
   const f = imajevFixture(createFixtureImajevSession);
-  let closing;
-  const processor = f.model.processor;
+  let closing: Promise<void> | undefined;
+  const processor = f.model.processor!;
   f.model.processor = {
-    prepare(request) {
+    prepare(request: unknown) {
       const prepared = processor.prepare(request);
       closing = f.model.dispose();
       return prepared;
@@ -209,8 +221,8 @@ test('ImajevSession: disposal during abort listener registration prevents infere
   const f = imajevFixture(createFixtureImajevSession);
   const signal = new AbortController().signal,
     add = signal.addEventListener.bind(signal);
-  let closing;
-  signal.addEventListener = (...args) => {
+  let closing: Promise<void> | undefined;
+  signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
     closing = f.model.dispose();
     return add(...args);
   };
@@ -224,8 +236,8 @@ test('ImajevSession: an accepted decision finishes before reentrant disposal', a
   const first = f.model.decide(f.request);
   const signal = new AbortController().signal,
     add = signal.addEventListener.bind(signal);
-  let closing;
-  signal.addEventListener = (...args) => {
+  let closing: Promise<void> | undefined;
+  signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
     closing = f.model.dispose();
     return add(...args);
   };

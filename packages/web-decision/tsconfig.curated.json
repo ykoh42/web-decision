@@ -29,6 +29,8 @@
     "test/build-normalization.test.mts",
     "test/bundler-notices.test.mts",
     "test/decision-cancellation.test.mts",
+    "test/decision-dispose-reentrancy.test.mts",
+    "test/device-loss-cleanup.test.mts",
     "test/elephant-reference.test.mts",
     "test/gpu-preflight.test.mts",
     "test/h2o-dual-source.test.mts",

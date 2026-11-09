@@ -7,8 +7,6 @@
     "packages/web-decision/test/crivo.test.mjs",
     "packages/web-decision/test/d1-omni.test.mjs",
     "packages/web-decision/test/decima.test.mjs",
-    "packages/web-decision/test/decision-dispose-reentrancy.test.mjs",
-    "packages/web-decision/test/device-loss-cleanup.test.mjs",
     "packages/web-decision/test/elephant-cancellation.test.mjs",
     "packages/web-decision/test/elephant-loader-review.test.mjs",
     "packages/web-decision/test/elephant-variants.test.mjs",

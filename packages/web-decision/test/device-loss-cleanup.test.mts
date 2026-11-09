@@ -3,14 +3,29 @@ import assert from 'node:assert/strict';
 import {DecisionModel} from '../src/model.js';
 import {ExperimentalDebertaSession} from '../src/deberta/model.mjs';
 import {trackRuntime} from '../src/runtime-lifecycle.js';
+import type {DecisionResult} from '../src/curated/types.js';
 
 const request = {state: 'state', questions: [{instructions: 'choose', options: ['a', 'b']}]};
-const tokenizer = {encode: (text) => ({ids: Array.from(text, (c) => c.codePointAt(0) + 200)})};
+const tokenizer = {encode: (text: string) => ({ids: Array.from(text, (c: string) => c.codePointAt(0)! + 200)})};
 
-function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = false} = {}) {
-  const state = {loss: null, disposed: false},
-    events = [],
-    uncaptured = [];
+type TestLifecycle = {loss: unknown; disposed: boolean; lossSignal?: AbortSignal};
+type FixtureOptions = {
+  pop?: (lifecycle: TestLifecycle, uncaptured: string[]) => unknown;
+  sync?: () => unknown;
+  end?: () => unknown;
+  trackDeviceLoss?: boolean;
+};
+type TestModel = {
+  decide(request: unknown, options?: {signal?: AbortSignal}): Promise<DecisionResult>;
+  releaseCachedMemory(): Promise<void>;
+  dispose(): Promise<void>;
+};
+type ModelFixture = {model: TestModel; lifecycle: TestLifecycle; events: string[]};
+
+function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = false}: FixtureOptions = {}) {
+  const state: TestLifecycle = {loss: null, disposed: false},
+    events: string[] = [],
+    uncaptured: string[] = [];
   const runtime = {
     beginScope() {
       events.push('begin');
@@ -29,13 +44,13 @@ function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = fal
     getGlobalFunc() {
       return () => events.push('clear');
     },
-    empty(shape) {
+    empty(shape: number[]) {
       return {
         copyFrom() {
           return this;
         },
         toRawBytes() {
-          return new Uint8Array(shape[1] * 2);
+          return new Uint8Array(shape[1]! * 2);
         }
       };
     }
@@ -46,9 +61,9 @@ function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = fal
       return sync();
     }
   };
-  let resolveLost;
+  let resolveLost!: (value: unknown) => void;
   const gpu = {
-    lost: new Promise((resolve) => {
+    lost: new Promise<unknown>((resolve) => {
       resolveLost = resolve;
     }),
     pushErrorScope() {
@@ -59,26 +74,26 @@ function kevSession({pop, sync = () => {}, end = () => {}, trackDeviceLoss = fal
       return pop?.(lifecycle, uncaptured) ?? null;
     }
   };
-  const lifecycle = trackDeviceLoss ? trackRuntime(runtime, gpu) : state;
+  const lifecycle: TestLifecycle = trackDeviceLoss ? trackRuntime(runtime, gpu) : state;
   if (trackDeviceLoss) gpu.lost.then(() => runtime.dispose());
   const model = new DecisionModel(
-    runtime,
-    device,
-    gpu,
-    () => ({}),
-    [],
-    tokenizer,
-    {maxStateTokens: 384, maxInputTokens: 1024},
+    runtime as unknown as ConstructorParameters<typeof DecisionModel>[0],
+    device as unknown as ConstructorParameters<typeof DecisionModel>[1],
+    gpu as unknown as ConstructorParameters<typeof DecisionModel>[2],
+    () => ({}) as ReturnType<ConstructorParameters<typeof DecisionModel>[3]>,
+    [] as ConstructorParameters<typeof DecisionModel>[4],
+    tokenizer as unknown as ConstructorParameters<typeof DecisionModel>[5],
+    {maxStateTokens: 384, maxInputTokens: 1024} as ConstructorParameters<typeof DecisionModel>[6],
     uncaptured,
-    lifecycle
-  );
+    lifecycle as ConstructorParameters<typeof DecisionModel>[8]
+  ) as unknown as TestModel;
   return {model, lifecycle, events, lose: resolveLost};
 }
 
-function debertaSession({pop, sync = () => {}, end = () => {}} = {}) {
-  const lifecycle = {loss: null, disposed: false},
-    events = [],
-    uncaptured = [];
+function debertaSession({pop, sync = () => {}, end = () => {}}: FixtureOptions = {}): ModelFixture {
+  const lifecycle: TestLifecycle = {loss: null, disposed: false},
+    events: string[] = [],
+    uncaptured: string[] = [];
   const runtime = {
     beginScope() {
       events.push('begin');
@@ -97,13 +112,13 @@ function debertaSession({pop, sync = () => {}, end = () => {}} = {}) {
     getGlobalFunc() {
       return () => events.push('clear');
     },
-    empty(shape) {
+    empty(shape: number[]) {
       return {
         copyFrom() {
           return this;
         },
         toRawBytes() {
-          return new Uint8Array(shape[1] * 2);
+          return new Uint8Array(shape[1]! * 2);
         }
       };
     }
@@ -134,7 +149,7 @@ function debertaSession({pop, sync = () => {}, end = () => {}} = {}) {
     tokenizer,
     uncaptured,
     lifecycle
-  });
+  } as unknown as ConstructorParameters<typeof ExperimentalDebertaSession>[0]) as unknown as TestModel;
   return {model, lifecycle, events};
 }
 
@@ -146,7 +161,9 @@ test('Kev 0.6B decision rejects when the device is lost during GPU scope cleanup
   });
   await assert.rejects(
     fixture.model.decide(request),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+      /lost/.test((error as {cause?: {message?: string} | null}).cause?.message as string)
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'dispose']);
@@ -160,7 +177,9 @@ test('Kev 0.6B memory release rejects when runtime disposal occurs during GPU sc
   });
   await assert.rejects(
     fixture.model.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+      /lost/.test((error as {cause?: {message?: string} | null}).cause?.message as string)
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'clear', 'sync', 'pop']);
@@ -169,16 +188,16 @@ test('Kev 0.6B memory release rejects when runtime disposal occurs during GPU sc
 test('Kev inference succeeds while the tracked device-loss signal remains active', async () => {
   const fixture = kevSession({trackDeviceLoss: true});
   const result = await fixture.model.decide(request);
-  assert.equal(result.answers[0].selected, 'a');
-  assert.equal(fixture.lifecycle.lossSignal.aborted, false);
+  assert.equal(result.answers[0]!.selected, 'a');
+  assert.equal(fixture.lifecycle.lossSignal!.aborted, false);
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'end', 'end', 'dispose']);
 });
 
-for (const action of ['decide', 'releaseCachedMemory']) {
+for (const action of ['decide', 'releaseCachedMemory'] as const) {
   test(`Kev ${action} rejects promptly when device loss interrupts a pending sync`, {timeout: 1000}, async () => {
-    let startSync;
-    const syncStarted = new Promise((resolve) => {
+    let startSync!: () => void;
+    const syncStarted = new Promise<void>((resolve) => {
         startSync = resolve;
       }),
       fixture = kevSession({
@@ -193,10 +212,12 @@ for (const action of ['decide', 'releaseCachedMemory']) {
     fixture.lose({reason: 'unknown', message: 'test device loss'});
     await assert.rejects(
       operation,
-      (error) =>
-        error.code === 'INFERENCE_ERROR' && error.cause instanceof Error && /device was lost/i.test(error.cause.message)
+      (error: unknown) =>
+        (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+        (error as {cause?: unknown}).cause instanceof Error &&
+        /device was lost/i.test((error as {cause: Error}).cause.message)
     );
-    assert.equal(fixture.lifecycle.lossSignal.aborted, true);
+    assert.equal(fixture.lifecycle.lossSignal!.aborted, true);
     await fixture.model.dispose();
     assert.deepEqual(
       fixture.events,
@@ -206,8 +227,8 @@ for (const action of ['decide', 'releaseCachedMemory']) {
 }
 
 test('Kev decision rejects promptly when device loss interrupts error-scope cleanup', {timeout: 1000}, async () => {
-  let startPop;
-  const popStarted = new Promise((resolve) => {
+  let startPop!: () => void;
+  const popStarted = new Promise<void>((resolve) => {
       startPop = resolve;
     }),
     fixture = kevSession({
@@ -222,8 +243,10 @@ test('Kev decision rejects promptly when device loss interrupts error-scope clea
   fixture.lose({reason: 'unknown', message: 'test device loss'});
   await assert.rejects(
     decision,
-    (error) =>
-      error.code === 'INFERENCE_ERROR' && error.cause instanceof Error && /device was lost/i.test(error.cause.message)
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+      (error as {cause?: unknown}).cause instanceof Error &&
+      /device was lost/i.test((error as {cause: Error}).cause.message)
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'sync', 'pop', 'dispose']);
@@ -237,7 +260,9 @@ test('DeBERTa decision rejects when the device is lost during GPU scope cleanup'
   });
   await assert.rejects(
     fixture.model.decide(request),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+      /lost/.test((error as {cause?: {message?: string} | null}).cause?.message as string)
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'begin', 'sync', 'end', 'pop', 'end', 'dispose']);
@@ -251,7 +276,9 @@ test('DeBERTa memory release rejects when the device is lost during GPU scope cl
   });
   await assert.rejects(
     fixture.model.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+      /lost/.test((error as {cause?: {message?: string} | null}).cause?.message as string)
   );
   await fixture.model.dispose();
   assert.deepEqual(fixture.events, ['begin', 'push', 'clear', 'sync', 'pop', 'end', 'dispose']);
@@ -260,8 +287,8 @@ test('DeBERTa memory release rejects when the device is lost during GPU scope cl
 for (const [family, make] of [
   ['Kev 0.6B', kevSession],
   ['DeBERTa', debertaSession]
-]) {
-  for (const action of ['decide', 'releaseCachedMemory']) {
+] as const satisfies readonly (readonly [string, (options?: FixtureOptions) => ModelFixture])[]) {
+  for (const action of ['decide', 'releaseCachedMemory'] as const) {
     test(`${family} ${action} keeps an earlier operation error over cleanup loss and validation error`, async () => {
       const original = Error('original sync failure'),
         validation = Error('later validation failure');
@@ -269,13 +296,17 @@ for (const [family, make] of [
         sync: () => {
           throw original;
         },
-        pop: (lifecycle) => {
+        pop: (lifecycle: TestLifecycle) => {
           lifecycle.loss = {reason: 'fake-loss'};
           return validation;
         }
       });
       const result = action === 'decide' ? fixture.model.decide(request) : fixture.model.releaseCachedMemory();
-      await assert.rejects(result, (error) => error.code === 'INFERENCE_ERROR' && error.cause === original);
+      await assert.rejects(
+        result,
+        (error: unknown) =>
+          (error as {code?: unknown}).code === 'INFERENCE_ERROR' && (error as {cause?: unknown}).cause === original
+      );
       await fixture.model.dispose();
     });
     test(`${family} ${action} preserves a falsy original failure over a later validation error`, async () => {
@@ -284,7 +315,7 @@ for (const [family, make] of [
           sync: () => {
             throw reason;
           },
-          pop: (lifecycle) => {
+          pop: (lifecycle: TestLifecycle) => {
             lifecycle.loss = {reason: 'fake-loss'};
             return Error('later validation failure');
           }
@@ -292,14 +323,17 @@ for (const [family, make] of [
         const result = action === 'decide' ? fixture.model.decide(request) : fixture.model.releaseCachedMemory();
         await assert.rejects(
           result,
-          (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, reason)
+          (error: unknown) =>
+            (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+            Object.hasOwn(error as object, 'cause') &&
+            Object.is((error as {cause?: unknown}).cause, reason)
         );
         await fixture.model.dispose();
       }
     });
     test(`${family} ${action} preserves an uncaptured error that appears with cleanup loss`, async () => {
       const fixture = make({
-        pop: (lifecycle, uncaptured) => {
+        pop: (lifecycle: TestLifecycle, uncaptured: string[]) => {
           lifecycle.loss = {reason: 'fake-loss'};
           uncaptured.push('earlier uncaptured GPU error');
         }
@@ -308,13 +342,13 @@ for (const [family, make] of [
       await assert.rejects(
         result,
         (error) =>
-          error.code === 'INFERENCE_ERROR' &&
-          error.message === 'earlier uncaptured GPU error' &&
-          error.cause === undefined
+          (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+          (error as {message?: unknown}).message === 'earlier uncaptured GPU error' &&
+          (error as {cause?: unknown}).cause === undefined
       );
       await fixture.model.dispose();
     });
-    for (const phase of ['sync', 'pop', 'end']) {
+    for (const phase of ['sync', 'pop', 'end'] as const) {
       test(`${family} ${action} rejects falsy ${phase} failures without losing their cause`, async () => {
         for (const reason of [undefined, null, false, 0, '']) {
           let failed = false;
@@ -328,8 +362,10 @@ for (const [family, make] of [
           const result = action === 'decide' ? fixture.model.decide(request) : fixture.model.releaseCachedMemory();
           await assert.rejects(
             result,
-            (error) =>
-              error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, reason)
+            (error: unknown) =>
+              (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+              Object.hasOwn(error as object, 'cause') &&
+              Object.is((error as {cause?: unknown}).cause, reason)
           );
           await fixture.model.dispose();
         }
@@ -355,7 +391,8 @@ test('DeBERTa retains an earlier inference failure when closing the inner scope 
   });
   await assert.rejects(
     fixture.model.decide(request),
-    (error) => error.code === 'INFERENCE_ERROR' && error.cause === original
+    (error: unknown) =>
+      (error as {code?: unknown}).code === 'INFERENCE_ERROR' && (error as {cause?: unknown}).cause === original
   );
   await fixture.model.dispose();
 });
@@ -376,7 +413,10 @@ test('DeBERTa retains a falsy inference failure when closing the inner scope als
     });
     await assert.rejects(
       fixture.model.decide(request),
-      (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, reason)
+      (error: unknown) =>
+        (error as {code?: unknown}).code === 'INFERENCE_ERROR' &&
+        Object.hasOwn(error as object, 'cause') &&
+        Object.is((error as {cause?: unknown}).cause, reason)
     );
     await fixture.model.dispose();
   }
@@ -385,15 +425,15 @@ test('DeBERTa retains a falsy inference failure when closing the inner scope als
 for (const [family, make] of [
   ['Kev 0.6B', kevSession],
   ['DeBERTa', debertaSession]
-]) {
+] as const satisfies readonly (readonly [string, (options?: FixtureOptions) => ModelFixture])[]) {
   test(`${family} cancellation and dispose wait for a late falsy inference failure`, async () => {
-    let start,
-      resume,
+    let start!: () => void,
+      resume!: () => void,
       syncCount = 0;
-    const started = new Promise((resolve) => {
+    const started = new Promise<void>((resolve) => {
       start = resolve;
     });
-    const gate = new Promise((resolve) => {
+    const gate = new Promise<void>((resolve) => {
       resume = resolve;
     });
     const fixture = make({
@@ -413,13 +453,13 @@ for (const [family, make] of [
     const next = fixture.model.decide(request),
       closing = fixture.model.dispose();
     controller.abort(reason);
-    await assert.rejects(first, (error) => error === reason);
+    await assert.rejects(first, (error: unknown) => error === reason);
     assert.equal(syncCount, 1);
     assert.equal(fixture.events.includes('dispose'), false);
     resume();
-    assert.equal((await next).answers[0].selected, 'a');
+    assert.equal((await next).answers[0]!.selected, 'a');
     await closing;
     assert.equal(syncCount, 2);
-    assert.equal(fixture.events.filter((event) => event === 'dispose').length, 1);
+    assert.equal(fixture.events.filter((event: string) => event === 'dispose').length, 1);
   });
 }
