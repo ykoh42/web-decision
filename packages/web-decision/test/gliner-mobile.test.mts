@@ -26,10 +26,10 @@ const special = Object.freeze({
 function protocolTokenizer() {
   return {
     special,
-    encode(text) {
-      return Array.from(text, (character) => character.codePointAt(0) + 100);
+    encode(text: string) {
+      return Array.from(text, (character) => character.codePointAt(0)! + 100);
     },
-    encodeState(text) {
+    encodeState(text: string) {
       const normalized = /[.!?]$/u.test(text.trim()) ? text.trim() : `${text.trim()}.`;
       return (normalized.match(/\S+/gu) ?? []).map((_, index) => 200 + index);
     }
@@ -68,8 +68,14 @@ function modelConfig() {
 }
 
 class Tensor {
-  constructor(type, data, dims) {
-    Object.assign(this, {type, data, dims, disposed: false});
+  type: string;
+  data: BigInt64Array | Float32Array;
+  dims: number[];
+  disposed = false;
+  constructor(type: string, data: BigInt64Array | Float32Array, dims: number[]) {
+    this.type = type;
+    this.data = data;
+    this.dims = dims;
   }
 
   dispose() {
@@ -80,8 +86,8 @@ class Tensor {
 class TestTokenizer {
   constructor() {}
 
-  token_to_id(token) {
-    return special[token];
+  token_to_id(token: string) {
+    return (special as Record<string, number>)[token];
   }
 
   encode() {
@@ -90,11 +96,11 @@ class TestTokenizer {
 }
 
 function loaderDependencies() {
-  const reads = [];
+  const reads: string[] = [];
   const released = {count: 0};
-  const runCalls = [];
-  const tensors = [];
-  const files = {
+  const runCalls: Array<{feeds: Record<string, Tensor>; outputNames: string[]}> = [];
+  const tensors: Tensor[] = [];
+  const files: Record<string, unknown> = {
     'config.json': modelConfig(),
     'special_tokens_map.json': {pad_token: {content: '[PAD]'}},
     'tokenizer_config.json': {
@@ -106,25 +112,32 @@ function loaderDependencies() {
   };
   const ort = {
     Tensor: class extends Tensor {
-      constructor(...args) {
+      constructor(...args: ConstructorParameters<typeof Tensor>) {
         super(...args);
         tensors.push(this);
       }
     },
     env: {webgpu: {}},
     InferenceSession: {
-      async create(graph, options) {
+      async create(
+        graph: Uint8Array,
+        options: {
+          executionProviders: string[];
+          graphOptimizationLevel: string;
+          externalData: Array<{path: string; data: Uint8Array}>;
+        }
+      ) {
         assert.deepEqual(Array.from(graph), [1, 2, 3]);
         assert.deepEqual(options.executionProviders, ['webgpu']);
         assert.equal(options.graphOptimizationLevel, 'all');
-        assert.equal(options.externalData[0].path, 'model_q4f16.onnx_data');
-        assert.deepEqual(Array.from(options.externalData[0].data), [4, 5, 6]);
+        assert.equal(options.externalData[0]!.path, 'model_q4f16.onnx_data');
+        assert.deepEqual(Array.from(options.externalData[0]!.data), [4, 5, 6]);
         return {
           inputNames: ['input_ids', 'attention_mask', 'marker_positions'],
           outputNames: ['logits'],
-          async run(feeds, outputNames) {
+          async run(feeds: Record<string, Tensor>, outputNames: string[]) {
             runCalls.push({feeds, outputNames});
-            const markers = feeds.marker_positions.dims[1];
+            const markers = feeds.marker_positions!.dims[1]!;
             return {
               logits: new ort.Tensor(
                 'float32',
@@ -150,9 +163,9 @@ function loaderDependencies() {
     dependencies: {
       ort,
       Tokenizer: TestTokenizer,
-      async openSource() {
+      async openSource(_options: {base: URL}) {
         return {
-          async read(name) {
+          async read(name: string) {
             reads.push(name);
             if (name === 'onnx/model_q4f16.onnx') return Uint8Array.of(1, 2, 3).buffer;
             if (name === 'onnx/model_q4f16.onnx_data') return Uint8Array.of(4, 5, 6).buffer;
@@ -163,7 +176,7 @@ function loaderDependencies() {
         };
       },
       gpuApi: {
-        async requestAdapter(options) {
+        async requestAdapter(options: {powerPreference: 'high-performance'; forceFallbackAdapter: false}) {
           assert.deepEqual(options, {powerPreference: 'high-performance', forceFallbackAdapter: false});
           return {info: {isFallbackAdapter: false}, isFallbackAdapter: false};
         }
@@ -199,26 +212,30 @@ test('GLiNER Mobile builds one packed schema and preserves typed Choice, Score, 
     protocolTokenizer()
   );
   assert.equal(prepared.questions.length, 3);
-  assert.equal(prepared.questions[0].markerOffset, 0);
-  assert.equal(prepared.questions[1].markerOffset, 2);
-  assert.equal(prepared.questions[2].markerOffset, 5);
+  assert.equal(prepared.questions[0]!.markerOffset, 0);
+  assert.equal(prepared.questions[1]!.markerOffset, 2);
+  assert.equal(prepared.questions[2]!.markerOffset, 5);
   assert.equal(prepared.markerPositions.length, 7);
   assert.ok(prepared.inputIds.includes(special['[SEP_STRUCT]']));
-  assert.equal(prepared.inputIds.at(-1) > 200, true);
+  assert.equal(prepared.inputIds.at(-1)! > 200, true);
 
   const result = finishGlinerMobileSystemOne(prepared, [0, 2, 0, Math.log(2), 0, Math.log(3), 0]);
   assert.equal(result.model, GLINER_MOBILE_MODEL);
-  assert.equal(result.answers.route.choice, 'support');
-  assert.ok(
-    Math.abs(result.answers.route.probabilities.billing + result.answers.route.probabilities.support - 1) < 1e-12
-  );
-  assert.equal(result.answers.urgency.score, 1);
-  assert.equal(result.answers.urgency.expected, 1);
-  assert.equal(result.answers.urgency.legend['2'], 'high');
-  assert.ok(Math.abs(result.answers.repeated.noul - 0.75) < 1e-12);
-  assert.ok(Math.abs(result.answers.repeated.probabilities.true - 0.75) < 1e-12);
-  assert.ok(Math.abs(result.answers.repeated.probabilities.false - 0.25) < 1e-12);
-  assert.equal(result.answers.repeated.confidence, result.answers.repeated.noul);
+  const route = result.answers.route;
+  const urgency = result.answers.urgency;
+  const repeated = result.answers.repeated;
+  assert.ok(route?.type === 'choice');
+  assert.ok(urgency?.type === 'score');
+  assert.ok(repeated?.type === 'noul');
+  assert.equal(route.choice, 'support');
+  assert.ok(Math.abs(route.probabilities.billing! + route.probabilities.support! - 1) < 1e-12);
+  assert.equal(urgency.score, 1);
+  assert.equal(urgency.expected, 1);
+  assert.equal(urgency.legend['2'], 'high');
+  assert.ok(Math.abs(repeated.noul - 0.75) < 1e-12);
+  assert.ok(Math.abs(repeated.probabilities.true - 0.75) < 1e-12);
+  assert.ok(Math.abs(repeated.probabilities.false - 0.25) < 1e-12);
+  assert.equal(repeated.confidence, repeated.noul);
 });
 
 test('GLiNER Mobile truncates state to the shared context and rejects schemas that exceed it', () => {
@@ -266,8 +283,8 @@ test('GLiNER Mobile applies the 512-token schema limit to long Choice and Noul d
   const baseTokenizer = protocolTokenizer();
   const tokenizer = {
     ...baseTokenizer,
-    encode(text) {
-      if (text.includes(description)) return new Array(GLINER_MAX_TOKENS + 1).fill(17);
+    encode(text: string) {
+      if (text.includes(description)) return Array.from({length: GLINER_MAX_TOKENS + 1}, () => 17);
       return baseTokenizer.encode(text);
     }
   };
@@ -290,7 +307,11 @@ test('GLiNER Mobile applies the 512-token schema limit to long Choice and Noul d
 
     await assert.rejects(
       model.systemOne('', {pick: {type, instructions: 'Choose.', criteria}}),
-      (error) => error.code === 'INVALID_INPUT' && error.message.includes('512-token context')
+      (error: unknown) =>
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'INVALID_INPUT' &&
+        error.message.includes('512-token context')
     );
     assert.equal(inferenceCalls, 0);
     await model.dispose();
@@ -299,6 +320,8 @@ test('GLiNER Mobile applies the 512-token schema limit to long Choice and Noul d
 
 test('GLiNER Mobile rejects invalid array shapes, over-limit labels, and reserved protocol tokens', () => {
   const tokenizer = protocolTokenizer();
+  // The test intentionally needs a hole in this array.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparse = new Array(2);
   sparse[1] = 'two';
   assert.throws(
@@ -344,13 +367,17 @@ test('GLiNER Mobile rejects invalid array shapes, over-limit labels, and reserve
   );
   assert.throws(
     () => prepareGlinerMobileSystemOne('', tooManyQuestions, tokenizer),
-    (error) => error.code === 'INVALID_INPUT' && error.message.includes('512-token context')
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'INVALID_INPUT' &&
+      error.message.includes('512-token context')
   );
   for (const [state, question] of [
     ['literal [L] marker', {instructions: 'Choose.', criteria: ['one', 'two']}],
     ['', {instructions: 'Choose [SEP_TEXT].', criteria: ['one', 'two']}],
     ['', {instructions: 'Choose.', criteria: ['[L]', 'two']}]
-  ]) {
+  ] as const) {
     assert.throws(() => prepareGlinerMobileSystemOne(state, {pick: {type: 'choice', ...question}}, tokenizer), {
       code: 'INVALID_INPUT'
     });
@@ -358,7 +385,7 @@ test('GLiNER Mobile rejects invalid array shapes, over-limit labels, and reserve
 });
 
 test('GLiNER Mobile generic decide preserves option order and returns per-option logits', async () => {
-  const runCalls = [];
+  const runCalls: Array<{inputIds: number[]; markerPositions: number[]}> = [];
   const model = createGlinerMobileSession({
     tokenizer: protocolTokenizer(),
     runner: {
@@ -373,14 +400,14 @@ test('GLiNER Mobile generic decide preserves option order and returns per-option
     state: 'Customer requests a refund.',
     questions: [{instructions: 'Choose the queue.', options: ['billing', 'support']}]
   });
-  assert.equal(result.answers[0].selected, 'support');
-  assert.equal(result.answers[0].selectedIndex, 1);
+  assert.equal(result.answers[0]!.selected, 'support');
+  assert.equal(result.answers[0]!.selectedIndex, 1);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0]!.probabilities.map(({option}) => option),
     ['billing', 'support']
   );
   assert.deepEqual(
-    result.answers[0].probabilities.map(({logit}) => logit),
+    result.answers[0]!.probabilities.map(({logit}) => logit),
     [0, 2]
   );
   assert.equal(runCalls.length, 1);
@@ -396,9 +423,12 @@ test('GLiNER Mobile loads by ID or mirror with hardware WebGPU and typed inferen
       sourceBase = options.base.href;
       return openSource(options);
     };
-    const options = {model: GLINER_MOBILE_MODEL, cache: false};
+    const options: {model: string; cache: boolean; assetsUrl?: string} = {model: GLINER_MOBILE_MODEL, cache: false};
     if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
-    const model = await loadGlinerMobileModel(options, fixture.dependencies);
+    const model = await loadGlinerMobileModel(
+      options,
+      fixture.dependencies as unknown as NonNullable<Parameters<typeof loadGlinerMobileModel>[1]>
+    );
     assert.equal(
       sourceBase,
       assetsUrl ?? `https://huggingface.co/${GLINER_MOBILE_SPEC.repository}/resolve/${GLINER_MOBILE_SPEC.revision}/`
@@ -406,11 +436,13 @@ test('GLiNER Mobile loads by ID or mirror with hardware WebGPU and typed inferen
     const result = await model.systemOne('A case.', {
       pick: {type: 'choice', instructions: 'Choose.', criteria: ['one', 'two']}
     });
-    assert.equal(result.answers.pick.choice, 'two');
+    const pick = result.answers.pick;
+    assert.ok(pick?.type === 'choice');
+    assert.equal(pick.choice, 'two');
     assert.deepEqual(fixture.reads.sort(), Object.keys(GLINER_MOBILE_FILES).sort());
-    assert.equal(fixture.runCalls[0].outputNames[0], 'logits');
-    assert.equal(fixture.runCalls[0].feeds.input_ids.dims[0], 1);
-    assert.equal(fixture.runCalls[0].feeds.marker_positions.dims[1], 2);
+    assert.equal(fixture.runCalls[0]!.outputNames[0], 'logits');
+    assert.equal(fixture.runCalls[0]!.feeds.input_ids!.dims[0], 1);
+    assert.equal(fixture.runCalls[0]!.feeds.marker_positions!.dims[1]!, 2);
     assert.ok(fixture.tensors.every((tensor) => tensor.disposed));
     await model.dispose();
     assert.equal(fixture.released.count, 1);
@@ -465,8 +497,8 @@ test('GLiNER Mobile tokenizer verifies pinned special tokens and vocabulary boun
     () =>
       createGlinerMobileTokenizer(
         class extends TestTokenizer {
-          token_to_id(token) {
-            return token === '[L]' ? 128011 : special[token];
+          override token_to_id(token: string) {
+            return token === '[L]' ? 128011 : (special as Record<string, number>)[token];
           }
         },
         {model: {type: 'Unigram'}},
@@ -479,18 +511,18 @@ test('GLiNER Mobile tokenizer verifies pinned special tokens and vocabulary boun
 });
 
 test('GLiNER Mobile runner validates output dimensions and disposes feeds and outputs', async () => {
-  const tensors = [];
+  const tensors: Tensor[] = [];
   class TrackedTensor extends Tensor {
-    constructor(...args) {
+    constructor(...args: ConstructorParameters<typeof Tensor>) {
       super(...args);
       tensors.push(this);
     }
   }
   const session = {
-    async run(feeds) {
-      assert.equal(feeds.input_ids.type, 'int64');
-      assert.equal(feeds.input_ids.dims[0], 1);
-      assert.equal(feeds.marker_positions.dims[1], 2);
+    async run(feeds: Record<string, Tensor>) {
+      assert.equal(feeds.input_ids!.type, 'int64');
+      assert.equal(feeds.input_ids!.dims[0], 1);
+      assert.equal(feeds.marker_positions!.dims[1]!, 2);
       return {logits: new TrackedTensor('float32', Float32Array.of(1, 2), [1, 2])};
     },
     async release() {}
