@@ -47,7 +47,6 @@
     "packages/web-decision/src/request-fields.mjs",
     "packages/web-decision/src/skejja/protocol.mjs",
     "packages/web-decision/src/skejja/source.mjs",
-    "packages/web-decision/src/strands/choice.mjs",
     "packages/web-decision/src/strands/loader-core.mjs",
     "packages/web-decision/src/strands/manifest.mjs",
     "packages/web-decision/src/strands/protocol.mjs",
