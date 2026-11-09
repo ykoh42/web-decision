@@ -9,10 +9,11 @@ import {
   waitForAbort
 } from '../src/assets.js';
 import {responseFromReader} from './stream-helpers.mjs';
+import type {AssetCache} from '../src/assets.js';
 
 function deferred() {
-  let resolve;
-  const promise = new Promise((done) => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
     resolve = done;
   });
   return {promise, resolve};
@@ -42,11 +43,11 @@ test('the abort listener is removed on success, failure and cancellation', async
     const originalAdd = signal.addEventListener.bind(signal),
       originalRemove = signal.removeEventListener.bind(signal);
     let listeners = 0;
-    signal.addEventListener = (...args) => {
+    signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
       listeners++;
       return originalAdd(...args);
     };
-    signal.removeEventListener = (...args) => {
+    signal.removeEventListener = (...args: Parameters<AbortSignal['removeEventListener']>) => {
       listeners--;
       return originalRemove(...args);
     };
@@ -79,11 +80,11 @@ test('a late cache write may finish after cancellation and stays verifiable', as
     reason = Error('cancel write');
   const data = new TextEncoder().encode('valid data'),
     hash = await sha256(data),
-    entries = new Map();
+    entries = new Map<string, Response>();
   const manifest = {files: {'file.bin': {bytes: data.length, sha256: hash}}};
-  const cache = {
-    match: async (key) => entries.get(String(key))?.clone(),
-    put: async (key, response) => {
+  const cache: AssetCache = {
+    match: async (key: string) => entries.get(String(key))?.clone(),
+    put: async (key: string, response: Response) => {
       started.resolve();
       await release.promise;
       entries.set(String(key), response.clone());
@@ -121,11 +122,11 @@ test('a late cache write may finish after cancellation and stays verifiable', as
 test('a cancelled manifest write cannot overtake a later cooperating update', async () => {
   const started = deferred(),
     release = deferred(),
-    commits = [],
-    calls = [];
+    commits: string[] = [],
+    calls: string[] = [];
   const cache = {
-    put: async (_url, response) => {
-      const value = await response.json();
+    put: async (_url: string, response: Response) => {
+      const value = (await response.json()) as {version: string};
       if (value.version === 'old') {
         started.resolve();
         await release.promise;
@@ -135,7 +136,7 @@ test('a cancelled manifest write cannot overtake a later cooperating update', as
   };
   let tail = Promise.resolve();
   const locks = {
-    request: (name, options, operation) => {
+    request: (name: string, options: LockOptions, operation: () => Promise<void>) => {
       calls.push(name);
       const task = tail.then(() => {
         options.signal?.throwIfAborted();
@@ -148,11 +149,11 @@ test('a cancelled manifest write cannot overtake a later cooperating update', as
   const controller = new AbortController(),
     reason = Error('stop old update');
   const old = commitCachedManifest(
-    cache,
+    cache as unknown as AssetCache,
     'https://example.test/model/manifest.json',
     {version: 'old'},
     controller.signal,
-    locks
+    locks as unknown as LockManager
   );
   const oldResult = old.then(
     () => 'resolved',
@@ -162,11 +163,11 @@ test('a cancelled manifest write cannot overtake a later cooperating update', as
   controller.abort(reason);
   assert.equal(await oldResult, reason);
   const newer = commitCachedManifest(
-    cache,
+    cache as unknown as AssetCache,
     'https://example.test/model/manifest.json',
     {version: 'new'},
     undefined,
-    locks
+    locks as unknown as LockManager
   );
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(commits, []);
@@ -189,7 +190,7 @@ test('without Web Locks a cancelled caller waits for the manifest write to finis
     }
   };
   const task = commitCachedManifest(
-    cache,
+    cache as unknown as AssetCache,
     'https://example.test/model/manifest.json',
     {version: 'old'},
     controller.signal,
@@ -226,7 +227,7 @@ test('a stalled cache lookup does not delay a cancelled model-file read', async 
   };
   const manifest = {files: {'file.bin': {bytes: 1, sha256: '0'.repeat(64)}}};
   const read = readVerifiedAsset(new URL('https://example.test/model/'), manifest, 'file.bin', {
-    cache,
+    cache: cache as unknown as AssetCache,
     signal: controller.signal,
     offline: true
   });
@@ -263,7 +264,7 @@ test('a stalled cached response body stops delaying cancellation', async () => {
   };
   const manifest = {files: {'file.bin': {bytes: 1, sha256: '0'.repeat(64)}}};
   const read = readVerifiedAsset(new URL('https://example.test/model/'), manifest, 'file.bin', {
-    cache,
+    cache: cache as unknown as AssetCache,
     signal: controller.signal,
     offline: true
   });
@@ -293,7 +294,7 @@ test('a stalled verified-asset cache write stops delaying cancellation', async (
     reason = Error('cancel write');
   const data = new TextEncoder().encode('valid model asset');
   const manifest = {files: {'file.bin': {bytes: data.length, sha256: await sha256(data)}}};
-  const cache = {
+  const cache: AssetCache = {
     match: async () => undefined,
     put: async () => {
       started.resolve();
@@ -303,7 +304,7 @@ test('a stalled verified-asset cache write stops delaying cancellation', async (
   };
   t.mock.method(globalThis, 'fetch', async () => new Response(data));
   const read = readVerifiedAsset(new URL('https://example.test/model/'), manifest, 'file.bin', {
-    cache,
+    cache: cache as unknown as AssetCache,
     signal: controller.signal
   });
   const observed = read.then(
@@ -334,7 +335,7 @@ test('a stalled offline manifest body stops delaying cancellation', async () => 
     await release.promise;
     throw Error('late manifest failure');
   });
-  const read = readManifestResponse(response, controller.signal);
+  const read = readManifestResponse(response as unknown as Pick<Response, 'body'>, controller.signal);
   const observed = read.then(
     () => 'resolved',
     (error) => error
@@ -385,7 +386,7 @@ test('a stalled cache open stops delaying cancellation', async () => {
     release.resolve();
     await observed;
     if (old) Object.defineProperty(globalThis, 'caches', old);
-    else delete globalThis.caches;
+    else delete (globalThis as Omit<typeof globalThis, 'caches'> & {caches?: CacheStorage}).caches;
   }
   await new Promise((resolve) => setImmediate(resolve));
 });

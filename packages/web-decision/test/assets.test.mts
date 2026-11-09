@@ -3,16 +3,19 @@ import assert from 'node:assert/strict';
 import {assetUrl, readManifestResponse, readVerifiedAsset, sha256} from '../src/assets.js';
 import {MAX_ASSET_BYTES, MAX_VERIFIED_ASSET_BYTES} from '../src/bounded-response.js';
 import {responseFromReader} from './stream-helpers.mjs';
+import type {AssetCache} from '../src/assets.js';
 
-function memoryCache() {
-  const entries = new Map();
+type TestCache = AssetCache & {entries: Map<string, Response>; delete(key: string): Promise<boolean>};
+
+function memoryCache(): TestCache {
+  const entries = new Map<string, Response>();
   return {
     entries,
-    match: async (key) => entries.get(String(key))?.clone(),
-    put: async (key, value) => {
+    match: async (key: string) => entries.get(String(key))?.clone(),
+    put: async (key: string, value: Response) => {
       entries.set(String(key), value.clone());
     },
-    delete: async (key) => entries.delete(String(key))
+    delete: async (key: string) => entries.delete(String(key))
   };
 }
 
@@ -62,7 +65,7 @@ test('corrupted cached assets are replaced and verified before use', async (t) =
   const hash = await sha256(good);
   const manifest = {files: {'file.bin': {bytes: good.byteLength, sha256: hash}}};
   let saved = false;
-  const cache = {
+  const cache: AssetCache = {
     match: async () => new Response('wrong'),
     put: async () => {
       saved = true;
@@ -136,15 +139,15 @@ test('offline assets never fetch and still reject same-length corruption', async
   });
   await readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {cache});
   const [key] = cache.entries.keys();
-  cache.entries.set(key, new Response('corrEct'));
+  cache.entries.set(key!, new Response('corrEct'));
   fetched = 0;
   await assert.rejects(
     readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {cache, offline: true}),
     {code: 'ASSET_LOAD_FAILED'}
   );
-  assert.equal(cache.entries.has(key), true);
+  assert.equal(cache.entries.has(key!), true);
   assert.equal(fetched, 0);
-  cache.entries.set(key, new Response(good));
+  cache.entries.set(key!, new Response(good));
   const value = await readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {
     cache,
     offline: true
@@ -167,11 +170,11 @@ test('preserves cancellation when a model file fetch is aborted', async (t) => {
 });
 
 test('stops waiting on a fetch wrapper that ignores abort and consumes its late rejection', async (t) => {
-  let rejectFetch, started;
-  const pending = new Promise((_, reject) => {
+  let rejectFetch!: (reason?: unknown) => void, started!: () => void;
+  const pending = new Promise<Response>((_, reject) => {
     rejectFetch = reject;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -184,17 +187,17 @@ test('stops waiting on a fetch wrapper that ignores abort and consumes its late 
   const load = readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {signal: controller.signal});
   await seen;
   controller.abort(reason);
-  await assert.rejects(load, (error) => error === reason);
+  await assert.rejects(load, (error: unknown) => error === reason);
   rejectFetch(new Error('late fetch failure'));
   await new Promise((resolve) => setImmediate(resolve));
 });
 
 test('stops waiting on a noncooperative response body without writing it to cache', async (t) => {
-  let resolveBody, started;
-  const body = new Promise((resolve) => {
+  let resolveBody!: (value: ArrayBuffer) => void, started!: () => void;
+  const body = new Promise<ArrayBuffer>((resolve) => {
     resolveBody = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const good = new TextEncoder().encode('correct'),
@@ -203,17 +206,20 @@ test('stops waiting on a noncooperative response body without writing it to cach
   const controller = new AbortController(),
     reason = new Error('stop reading');
   let writes = 0;
-  const cache = {
+  const cache: AssetCache = {
     match: async () => undefined,
     put: async () => {
       writes++;
     }
   };
-  t.mock.method(globalThis, 'fetch', async () =>
-    responseFromReader(() => {
-      started();
-      return body.then((value) => ({done: false, value: new Uint8Array(value)}));
-    })
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      responseFromReader(() => {
+        started();
+        return body.then((value) => ({done: false, value: new Uint8Array(value)}));
+      }) as unknown as Response
   );
   const load = readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {
     cache,
@@ -221,7 +227,7 @@ test('stops waiting on a noncooperative response body without writing it to cach
   });
   await seen;
   controller.abort(reason);
-  await assert.rejects(load, (error) => error === reason);
+  await assert.rejects(load, (error: unknown) => error === reason);
   resolveBody(good.buffer);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(writes, 0);
@@ -233,7 +239,9 @@ test('preserves cancellation while the manifest response body is being read', as
     controller.abort();
     throw new DOMException('Aborted', 'AbortError');
   });
-  await assert.rejects(readManifestResponse(response, controller.signal), {name: 'AbortError'});
+  await assert.rejects(readManifestResponse(response as unknown as Pick<Response, 'body'>, controller.signal), {
+    name: 'AbortError'
+  });
 });
 
 test('reports malformed manifest JSON as an invalid asset', async () => {
@@ -247,16 +255,17 @@ test('keeps cached versions at one URL independent across an interrupted update'
     next = new TextEncoder().encode('new asset');
   const oldManifest = {files: {'file.bin': {bytes: old.length, sha256: await sha256(old)}}};
   const newManifest = {files: {'file.bin': {bytes: next.length, sha256: await sha256(next)}}};
-  const entries = new Map();
-  const cache = {
-    match: async (key) => entries.get(String(key))?.clone(),
-    put: async (key, value) => {
+  const entries = new Map<string, Response>();
+  const cache: TestCache = {
+    entries,
+    match: async (key: string) => entries.get(String(key))?.clone(),
+    put: async (key: string, value: Response) => {
       entries.set(String(key), value.clone());
     },
-    delete: async (key) => entries.delete(String(key))
+    delete: async (key: string) => entries.delete(String(key))
   };
   let contents = old,
-    cacheStatus = [];
+    cacheStatus: boolean[] = [];
   t.mock.method(globalThis, 'fetch', async () => new Response(contents));
   await readVerifiedAsset(base, oldManifest, 'file.bin', {cache, onCacheStatus: (value) => cacheStatus.push(value)});
   contents = next;
@@ -274,13 +283,14 @@ test('a new manifest with the same hash but a wrong size cannot delete the old c
   const digest = await sha256(data);
   const valid = {files: {'file.bin': {bytes: data.length, sha256: digest}}};
   const invalid = {files: {'file.bin': {bytes: data.length + 1, sha256: digest}}};
-  const entries = new Map();
-  const cache = {
-    match: async (key) => entries.get(String(key))?.clone(),
-    put: async (key, value) => {
+  const entries = new Map<string, Response>();
+  const cache: TestCache = {
+    entries,
+    match: async (key: string) => entries.get(String(key))?.clone(),
+    put: async (key: string, value: Response) => {
       entries.set(String(key), value.clone());
     },
-    delete: async (key) => entries.delete(String(key))
+    delete: async (key: string) => entries.delete(String(key))
   };
   t.mock.method(globalThis, 'fetch', async () => new Response(data));
   await readVerifiedAsset(base, valid, 'file.bin', {cache});
@@ -293,13 +303,14 @@ test('reads and migrates a verified legacy entry without deleting it', async () 
   const base = new URL('https://example.test/m/');
   const data = new TextEncoder().encode('old asset');
   const manifest = {files: {'file.bin': {bytes: data.length, sha256: await sha256(data)}}};
-  const entries = new Map([['https://example.test/m/file.bin', new Response(data)]]);
-  const cache = {
-    match: async (key) => entries.get(String(key))?.clone(),
-    put: async (key, value) => {
+  const entries = new Map<string, Response>([['https://example.test/m/file.bin', new Response(data)]]);
+  const cache: TestCache = {
+    entries,
+    match: async (key: string) => entries.get(String(key))?.clone(),
+    put: async (key: string, value: Response) => {
       entries.set(String(key), value.clone());
     },
-    delete: async (key) => entries.delete(String(key))
+    delete: async (key: string) => entries.delete(String(key))
   };
   const value = await readVerifiedAsset(base, manifest, 'file.bin', {cache, offline: true});
   assert.equal(new TextDecoder().decode(value), 'old asset');
@@ -310,14 +321,14 @@ test('reads and migrates a verified legacy entry without deleting it', async () 
 test('reports failed cache writes without breaking an online read', async (t) => {
   const data = new TextEncoder().encode('asset');
   const manifest = {files: {'file.bin': {bytes: data.length, sha256: await sha256(data)}}};
-  const cache = {
+  const cache: AssetCache = {
     match: async () => undefined,
     put: async () => {
       throw Error('quota');
     }
   };
   t.mock.method(globalThis, 'fetch', async () => new Response(data));
-  let stored;
+  let stored: boolean | undefined;
   const value = await readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin', {
     cache,
     onCacheStatus: (status) => {
@@ -330,15 +341,21 @@ test('reports failed cache writes without breaking an online read', async (t) =>
 
 test('reports a failed response body as an asset load error and preserves its cause', async (t) => {
   const failure = new Error('connection closed');
-  t.mock.method(globalThis, 'fetch', async () =>
-    responseFromReader(async () => {
-      throw failure;
-    })
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      responseFromReader(async () => {
+        throw failure;
+      }) as unknown as Response
   );
   const manifest = {files: {'file.bin': {bytes: 0, sha256: '0'.repeat(64)}}};
   await assert.rejects(
     readVerifiedAsset(new URL('https://example.test/m/'), manifest, 'file.bin'),
-    (error) => error.code === 'ASSET_LOAD_FAILED' && error.cause === failure
+    (error: unknown) => {
+      const candidate = error as {code?: unknown; cause?: unknown};
+      return candidate.code === 'ASSET_LOAD_FAILED' && candidate.cause === failure;
+    }
   );
 });
 
@@ -346,12 +363,12 @@ test('reuses verified identical content across model directories on the same ori
   const data = new TextEncoder().encode('shared model shard');
   const digest = await sha256(data),
     cache = memoryCache(),
-    fetched = [],
-    stored = [],
-    progress = [];
+    fetched: string[] = [],
+    stored: boolean[] = [],
+    progress: number[] = [];
   const first = {files: {'weights/a.bin': {bytes: data.length, sha256: digest}}};
   const second = {files: {'weights/b.bin': {bytes: data.length, sha256: digest}}};
-  t.mock.method(globalThis, 'fetch', async (url) => {
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL) => {
     fetched.push(String(url));
     return new Response(data);
   });
@@ -398,7 +415,7 @@ test('migrates a preview.12 hashed URL entry and shares it without deleting the 
   const cache = memoryCache();
   cache.entries.set(legacyKey.href, new Response(data));
   let requests = 0,
-    cached;
+    cached: boolean | undefined;
   t.mock.method(globalThis, 'fetch', async () => {
     requests++;
     throw Error('Unexpected request');
@@ -433,7 +450,7 @@ test('a failed legacy migration does not prevent an offline read from the old UR
   cache.put = async () => {
     throw Error('quota');
   };
-  let cached;
+  let cached: boolean | undefined;
   t.mock.method(globalThis, 'fetch', async () => {
     throw Error('Unexpected request');
   });
@@ -465,7 +482,7 @@ test('does not use a corrupted shared entry and repairs it online', async (t) =>
   });
   await readVerifiedAsset(new URL('https://example.test/a/'), manifest, 'file.bin', {cache});
   const [key] = cache.entries.keys();
-  cache.entries.set(key, new Response('corrEct'));
+  cache.entries.set(key!, new Response('corrEct'));
   await assert.rejects(
     readVerifiedAsset(new URL('https://example.test/b/'), manifest, 'file.bin', {cache, offline: true}),
     {code: 'ASSET_LOAD_FAILED'}
@@ -489,12 +506,12 @@ test('an offline reader cannot delete a concurrently repaired shared entry', asy
   t.mock.method(globalThis, 'fetch', async () => new Response(data));
   await readVerifiedAsset(base, manifest, 'file.bin', {cache});
   const [key] = cache.entries.keys();
-  cache.entries.set(key, new Response('corrEct'));
-  let releaseRead, startRead;
-  const readStarted = new Promise((resolve) => {
+  cache.entries.set(key!, new Response('corrEct'));
+  let releaseRead!: () => void, startRead!: () => void;
+  const readStarted = new Promise<void>((resolve) => {
     startRead = resolve;
   });
-  const gate = new Promise((resolve) => {
+  const gate = new Promise<void>((resolve) => {
     releaseRead = resolve;
   });
   const originalMatch = cache.match;
@@ -502,7 +519,7 @@ test('an offline reader cannot delete a concurrently repaired shared entry', asy
   cache.match = async (requested) => {
     if (!delayed && String(requested) === key) {
       delayed = true;
-      const stale = cache.entries.get(key).clone();
+      const stale = cache.entries.get(key!)!.clone();
       let delivered = false;
       return responseFromReader(async () => {
         if (delivered) return {done: true};
@@ -510,14 +527,14 @@ test('an offline reader cannot delete a concurrently repaired shared entry', asy
         await gate;
         delivered = true;
         return {done: false, value: new Uint8Array(await stale.arrayBuffer())};
-      });
+      }) as unknown as Response;
     }
     return originalMatch(requested);
   };
   const staleRead = readVerifiedAsset(base, manifest, 'file.bin', {cache, offline: true});
   await readStarted;
   // Another request successfully replaces the corrupted item before this read finishes.
-  cache.entries.set(key, new Response(data));
+  cache.entries.set(key!, new Response(data));
   releaseRead();
   await assert.rejects(staleRead, {code: 'ASSET_LOAD_FAILED'});
   assert.equal(

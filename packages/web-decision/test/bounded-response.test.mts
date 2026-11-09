@@ -5,10 +5,12 @@ import {MAX_ASSET_BYTES, MAX_MANIFEST_BYTES, readBoundedResponse, ResponseSizeEr
 import {prepareModelSource} from '../src/model-source.js';
 import {readPinnedManifest} from '../src/pinned-manifest.js';
 import {responseFromReader} from './stream-helpers.mjs';
+import type {AssetCache, AssetFileManifest} from '../src/assets.js';
+import type {TestContext} from 'node:test';
 
 const base = new URL('https://example.test/model/');
-const bytes = (text) => new TextEncoder().encode(text);
-const manifest = async (text) => ({
+const bytes = (text: string) => new TextEncoder().encode(text);
+const manifest = async (text: string): Promise<AssetFileManifest> => ({
   files: {'file.bin': {bytes: bytes(text).length, sha256: await sha256(bytes(text))}}
 });
 
@@ -76,8 +78,8 @@ test('oversized cached data is cancelled, then repaired online', async (t) => {
         cancelled++;
       }
     });
-  const cache = {
-    match: async () => oversized(),
+  const cache: AssetCache = {
+    match: async () => oversized() as unknown as Response,
     put: async () => {
       writes++;
     }
@@ -100,18 +102,18 @@ test('oversized manifest streams are rejected and cancelled', async () => {
       cancelled++;
     }
   });
-  await assert.rejects(readManifestResponse(response), {code: 'INVALID_ASSET'});
+  await assert.rejects(readManifestResponse(response as unknown as Pick<Response, 'body'>), {code: 'INVALID_ASSET'});
   assert.equal(cancelled, 1);
 });
 
 test('late fetch responses are cancelled after the caller aborts', async (t) => {
-  let resolveFetch,
-    started,
+  let resolveFetch!: (response: Response) => void,
+    started!: () => void,
     cancelled = 0;
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<Response>((resolve) => {
     resolveFetch = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -129,21 +131,21 @@ test('late fetch responses are cancelled after the caller aborts', async (t) => 
       cancel: () => {
         cancelled++;
       }
-    })
+    }) as unknown as Response
   );
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(cancelled, 1);
 });
 
 test('a response delivered just before abort is cancelled before reading', async (t) => {
-  let resolveFetch,
-    started,
+  let resolveFetch!: (response: Response) => void,
+    started!: () => void,
     cancelled = 0,
     reads = 0;
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<Response>((resolve) => {
     resolveFetch = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -165,7 +167,7 @@ test('a response delivered just before abort is cancelled before reading', async
           cancelled++;
         }
       }
-    )
+    ) as unknown as Response
   );
   queueMicrotask(() => controller.abort(reason));
   await assert.rejects(load, (cause) => cause === reason);
@@ -174,13 +176,13 @@ test('a response delivered just before abort is cancelled before reading', async
 });
 
 test('a failing asset response delivered just before abort preserves the caller reason', async (t) => {
-  let resolveFetch,
-    started,
+  let resolveFetch!: (response: Response) => void,
+    started!: () => void,
     cancelled = 0;
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<Response>((resolve) => {
     resolveFetch = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -198,30 +200,34 @@ test('a failing asset response delivered just before abort preserves the caller 
       cancel: () => {
         cancelled++;
       }
-    })
+    }) as unknown as Response
   );
   queueMicrotask(() => controller.abort(reason));
   await assert.rejects(load, (cause) => cause === reason);
   assert.equal(cancelled, 1);
 });
 
-function mockGpu(t) {
+function mockGpu(t: TestContext) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: {gpu: {requestAdapter: async () => ({features: new Set(['shader-f16'])})}}
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'navigator', original) : delete globalThis.navigator));
+  t.after(() =>
+    original
+      ? Object.defineProperty(globalThis, 'navigator', original)
+      : delete (globalThis as Omit<typeof globalThis, 'navigator'> & {navigator?: Navigator}).navigator
+  );
 }
 
 test('a failing manifest response delivered just before abort preserves the caller reason', async (t) => {
-  let resolveFetch,
-    started,
+  let resolveFetch!: (response: Response) => void,
+    started!: () => void,
     cancelled = 0;
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<Response>((resolve) => {
     resolveFetch = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -243,7 +249,7 @@ test('a failing manifest response delivered just before abort preserves the call
       cancel: () => {
         cancelled++;
       }
-    })
+    }) as unknown as Response
   );
   queueMicrotask(() => controller.abort(reason));
   await assert.rejects(load, (cause) => cause === reason);
@@ -251,11 +257,11 @@ test('a failing manifest response delivered just before abort preserves the call
 });
 
 test('an offline manifest cache miss delivered just before abort preserves the caller reason', async (t) => {
-  let resolveMatch, started;
-  const pending = new Promise((resolve) => {
+  let resolveMatch!: (response: Response | null) => void, started!: () => void;
+  const pending = new Promise<Response | null>((resolve) => {
     resolveMatch = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -275,7 +281,7 @@ test('an offline manifest cache miss delivered just before abort preserves the c
   });
   t.after(() => {
     if (originalCaches) Object.defineProperty(globalThis, 'caches', originalCaches);
-    else delete globalThis.caches;
+    else delete (globalThis as Omit<typeof globalThis, 'caches'> & {caches?: CacheStorage}).caches;
   });
   const load = prepareModelSource(
     {assetsUrl: base.href, offline: true, signal: controller.signal},
@@ -288,11 +294,11 @@ test('an offline manifest cache miss delivered just before abort preserves the c
 });
 
 test('asset hash mismatch completed just before abort preserves the caller reason', async (t) => {
-  let resolveDigest, started;
-  const pending = new Promise((resolve) => {
+  let resolveDigest!: (digest: ArrayBuffer) => void, started!: () => void;
+  const pending = new Promise<ArrayBuffer>((resolve) => {
     resolveDigest = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -311,18 +317,18 @@ test('asset hash mismatch completed just before abort preserves the caller reaso
 });
 
 test('a pinned manifest hash completed just before abort cannot succeed', async (t) => {
-  let resolveDigest, started;
-  const pending = new Promise((resolve) => {
+  let resolveDigest!: (digest: ArrayBuffer) => void, started!: () => void;
+  const pending = new Promise<ArrayBuffer>((resolve) => {
     resolveDigest = resolve;
   });
-  const seen = new Promise((resolve) => {
+  const seen = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
     reason = Error('stop after manifest hash');
   const source = '{"model":"x"}',
     expected = await sha256(bytes(`${source}\n`));
-  const digest = Uint8Array.from(expected.match(/../g), (part) => Number.parseInt(part, 16));
+  const digest = Uint8Array.from(expected.match(/../g)!, (part) => Number.parseInt(part, 16));
   t.mock.method(crypto.subtle, 'digest', () => {
     started();
     return pending;
