@@ -59,6 +59,7 @@
     "src/kev-preview-entry.ts",
     "src/mapika/upload.ts",
     "src/stable-models.ts",
+    "src/skejja-preview-registry.mts",
     "src/mapika4b/tokenizer.mts",
     "src/mapika4b/runner.mts",
     "src/mapika4b/session.mts",

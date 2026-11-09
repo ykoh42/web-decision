@@ -4,7 +4,7 @@ import {SKEJJA_INT8DYN_PROFILE, SKEJJA_INT8_PROFILE, SKEJJA_REPOSITORY, SKEJJA_R
 const MODEL_IDS = Object.freeze([SKEJJA_INT8_PROFILE.model, SKEJJA_INT8DYN_PROFILE.model]);
 const modelCard = `https://huggingface.co/${SKEJJA_REPOSITORY}/tree/${SKEJJA_REVISION}`;
 
-function freeze(value) {
+function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) freeze(child);
     Object.freeze(value);
@@ -12,14 +12,19 @@ function freeze(value) {
   return value;
 }
 
-function describe(profile) {
+function describe(profile: {
+  readonly model: string;
+  readonly onnxFile: string;
+  readonly files: Readonly<Record<string, {readonly sha256: string}>>;
+  readonly temperature: number;
+}) {
   return freeze({
     model: profile.model,
     precision: 'int8',
     checkpoint: {
       repository: SKEJJA_REPOSITORY,
       revision: SKEJJA_REVISION,
-      graphSha256: profile.files[profile.onnxFile].sha256
+      graphSha256: profile.files[profile.onnxFile]!.sha256
     },
     assets: {
       integrity: 'pinned-files',
@@ -80,7 +85,7 @@ function describe(profile) {
   });
 }
 
-const DESCRIPTIONS = new Map([
+const DESCRIPTIONS: ReadonlyMap<unknown, ReturnType<typeof describe>> = new Map([
   [SKEJJA_INT8_PROFILE.model, describe(SKEJJA_INT8_PROFILE)],
   [SKEJJA_INT8DYN_PROFILE.model, describe(SKEJJA_INT8DYN_PROFILE)]
 ]);
@@ -89,11 +94,11 @@ export function listSkejjaModels() {
   return MODEL_IDS;
 }
 
-export function isSkejjaModel(value) {
+export function isSkejjaModel(value: unknown): boolean {
   return DESCRIPTIONS.has(value);
 }
 
-export function describeSkejjaModel(model) {
+export function describeSkejjaModel(model: unknown) {
   const description = DESCRIPTIONS.get(model);
   if (!description) throw new WebDecisionError('INVALID_INPUT', 'Unsupported Skejja decision model.');
   return description;
