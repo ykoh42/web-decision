@@ -3,17 +3,17 @@ import test from 'node:test';
 import {createGemma4Session} from '../src/strands/gemma4-e2b-session.mjs';
 
 function fixture() {
-  const rows = [];
+  const rows: {type: string; options: string[]}[] = [];
   const tokenizer = {
-    encode(text) {
-      return {ids: Array.from(text, (character) => character.codePointAt(0))};
+    encode(text: string) {
+      return {ids: Array.from(text, (character) => character.codePointAt(0)!)};
     },
-    decode(ids) {
+    decode(ids: number[]) {
       return String.fromCodePoint(...ids);
     }
   };
   const runner = {
-    async run(row) {
+    async run(row: {type: string; options: string[]}) {
       rows.push(row);
       const logits = new Float32Array(row.options.length);
       logits[logits.length - 1] = 1;
@@ -52,11 +52,11 @@ test('Gemma 4 generic choice accepts 260 options and returns logits in caller or
     questions: [{instructions: 'Choose one.', options}]
   });
 
-  assert.equal(rows[0].options.length, 260);
+  assert.equal(rows[0]!.options.length, 260);
   assert.equal(result.answers[0].selected, options.at(-1));
   assert.equal(result.answers[0].selectedIndex, 259);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0].probabilities.map(({option}: {option: string}) => option),
     options
   );
   assert.equal(result.answers[0].probabilities.at(-1).logit, 1);
