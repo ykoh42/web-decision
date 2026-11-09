@@ -4,10 +4,21 @@ import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from 'node:test';
 import {uploadImajevRows} from '../src/imajev/upload.mjs';
 
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+type UploadArgs = Parameters<typeof uploadImajevRows<Uint8Array>>[0];
+type UploadRow = UploadArgs['rows'][number];
+type FileUploadRow = Extract<UploadRow, {path: string}>;
+type UploadChunk = FileUploadRow['chunks'][number];
+type Fixture = {
+  owner: UploadArgs['owner'] & {retained: boolean; released: boolean};
+  args: UploadArgs;
+  events: string[];
+  tensors: Uint8Array[];
+};
+
+const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const bytes = Uint8Array.from({length: 20}, (_, i) => i + 1);
-const chunk = (offset) => ({offset, bytes: 4, sha256: digest(bytes.subarray(offset, offset + 4))});
-const row = (offset) => ({
+const chunk = (offset: number): UploadChunk => ({offset, bytes: 4, sha256: digest(bytes.subarray(offset, offset + 4))});
+const row = (offset: number): FileUploadRow => ({
   path: 'shared.bin',
   offset,
   bytes: 8,
@@ -24,10 +35,10 @@ const rotary = {
   sha256: digest(rotaryBytes)
 };
 
-function fixture() {
-  const events = [],
-    tensors = [];
-  const owner = {
+function fixture(): Fixture {
+  const events: string[] = [],
+    tensors: Uint8Array[] = [];
+  const owner: Fixture['owner'] = {
     phase: 'prepared',
     lost: false,
     blocked: false,
@@ -48,7 +59,7 @@ function fixture() {
       events.push('retain');
     }
   };
-  const args = {
+  const args: UploadArgs = {
     owner,
     rows: [row(4), row(12), rotary],
     async readRange(path, offset, length) {
@@ -89,7 +100,7 @@ test('corruption or undersized allocation retains the owner and does not release
   for (const mode of ['corrupt', 'capacity']) {
     const f = fixture();
     if (mode === 'corrupt') f.args.readRange = async () => new Uint8Array(4);
-    else f.args.allocate = () => ({tensor: {}, capacityBytes: 0});
+    else f.args.allocate = () => ({tensor: {} as Uint8Array, capacityBytes: 0});
     await assert.rejects(uploadImajevRows(f.args));
     assert.equal(f.owner.phase, 'failed');
     assert.equal(f.owner.retained, true);
@@ -100,11 +111,11 @@ test('corruption or undersized allocation retains the owner and does not release
 test('abort during a submitted write waits for settlement before retaining resources', async () => {
   const f = fixture(),
     controller = new AbortController();
-  let resolveWrite, started;
-  const pendingWrite = new Promise((resolve) => {
+  let resolveWrite!: () => void, started!: () => void;
+  const pendingWrite = new Promise<void>((resolve) => {
     resolveWrite = resolve;
   });
-  const entered = new Promise((resolve) => {
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
   f.args.signal = controller.signal;
@@ -125,8 +136,8 @@ test('abort during a submitted write waits for settlement before retaining resou
 
 test('abort during chunk hash retains owner and observes late failure without submitting a write', async (t) => {
   const f = fixture();
-  let entered, rejectHash;
-  const started = new Promise((resolve) => {
+  let entered!: () => void, rejectHash!: (reason?: unknown) => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   t.mock.method(crypto.subtle, 'digest', () => {
@@ -155,22 +166,22 @@ test('abort during chunk hash retains owner and observes late failure without su
 
 test('snapshots the binding list before asynchronous reads', async () => {
   const f = fixture();
-  let resume, started;
-  const wait = new Promise((resolve) => {
+  let resume!: () => void, started!: () => void;
+  const wait = new Promise<void>((resolve) => {
     resume = resolve;
   });
-  const entered = new Promise((resolve) => {
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
   const read = f.args.readRange;
-  f.args.readRange = async (...args) => {
+  f.args.readRange = async (...args: Parameters<UploadArgs['readRange']>) => {
     started();
     await wait;
     return read(...args);
   };
   const result = uploadImajevRows(f.args);
   await entered;
-  f.args.rows[1].offset = 0;
+  (f.args.rows[1] as FileUploadRow).offset = 0;
   resume();
   assert.deepEqual(await result, [bytes.slice(4, 12), bytes.slice(12, 20), rotaryBytes]);
 });

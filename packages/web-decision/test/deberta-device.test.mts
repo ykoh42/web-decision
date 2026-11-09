@@ -3,8 +3,35 @@ import assert from 'node:assert/strict';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import {DEBERTA_REQUIRED_LIMITS, detectDebertaGPUDevice} from '../src/deberta/device.mjs';
 
-function adapter({limits = DEBERTA_REQUIRED_LIMITS, features = ['shader-f16', 'subgroups'], failure} = {}) {
-  const result = {calls: 0, descriptor: undefined, device: {label: 'device'}};
+type FakeDevice = {label?: string; destroy?: () => void};
+type FakeAdapter = {
+  limits: Readonly<Record<string, number | undefined>>;
+  features: Set<string>;
+  info: {vendor: string};
+  requestDevice(descriptor: GPUDeviceDescriptor): Promise<FakeDevice>;
+};
+type AdapterFixture = {
+  calls: number;
+  descriptor: GPUDeviceDescriptor | undefined;
+  device: FakeDevice;
+  value: FakeAdapter;
+};
+type AdapterOptions = {
+  limits?: Readonly<Record<string, number | undefined>>;
+  features?: string[];
+  failure?: Error;
+};
+
+function adapter({
+  limits = DEBERTA_REQUIRED_LIMITS,
+  features = ['shader-f16', 'subgroups'],
+  failure
+}: AdapterOptions = {}) {
+  const result = {
+    calls: 0,
+    descriptor: undefined as GPUDeviceDescriptor | undefined,
+    device: {label: 'device'} as FakeDevice
+  } as {calls: number; descriptor: GPUDeviceDescriptor | undefined; device: FakeDevice; value?: FakeAdapter};
   result.value = {
     limits,
     features: new Set(features),
@@ -16,12 +43,12 @@ function adapter({limits = DEBERTA_REQUIRED_LIMITS, features = ['shader-f16', 's
       return result.device;
     }
   };
-  return result;
+  return result as AdapterFixture;
 }
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((accept, deny) => {
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((accept, deny) => {
     resolve = accept;
     reject = deny;
   });
@@ -29,40 +56,48 @@ function deferred() {
 }
 test('requests the pinned model limits without optional subgroups', async () => {
   const a = adapter(),
-    options = [],
+    options: (GPURequestAdapterOptions | undefined)[] = [],
     result = await detectDebertaGPUDevice({
-      requestAdapter: async (value) => {
+      requestAdapter: async (value: GPURequestAdapterOptions | undefined) => {
         options.push(value);
-        return a.value;
+        return a.value as unknown as GPUAdapter;
       }
-    });
-  assert.equal(result.device, a.device);
+    } as unknown as GPU);
+  assert.equal(result!.device, a.device);
   assert.deepEqual(options, [{powerPreference: 'high-performance'}]);
-  assert.deepEqual(a.descriptor.requiredLimits, DEBERTA_REQUIRED_LIMITS);
-  assert.deepEqual(a.descriptor.requiredFeatures, ['shader-f16']);
+  assert.deepEqual(a.descriptor!.requiredLimits, DEBERTA_REQUIRED_LIMITS);
+  assert.deepEqual(a.descriptor!.requiredFeatures, ['shader-f16']);
 });
 test('never requests a device when shader-f16 is absent', async () => {
   const a = adapter({features: []});
-  const result = await detectDebertaGPUDevice({requestAdapter: async () => a.value});
-  assert.equal(result.adapter, a.value);
-  assert.equal(result.device, undefined);
+  const result = await detectDebertaGPUDevice({
+    requestAdapter: async () => a.value as unknown as GPUAdapter
+  } as unknown as GPU);
+  assert.equal(result!.adapter, a.value);
+  assert.equal(result!.device, undefined);
   assert.equal(a.calls, 0);
 });
 test('rejects every insufficient or invalid required limit before device creation', async () => {
   for (const [name, value] of Object.entries(DEBERTA_REQUIRED_LIMITS)) {
     for (const bad of [value - 1, NaN, undefined]) {
       const a = adapter({limits: {...DEBERTA_REQUIRED_LIMITS, [name]: bad}});
-      await assert.rejects(detectDebertaGPUDevice({requestAdapter: async () => a.value}), new RegExp(name));
+      await assert.rejects(
+        detectDebertaGPUDevice({requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU),
+        new RegExp(name)
+      );
       assert.equal(a.calls, 0);
     }
   }
 });
 test('handles an unavailable adapter and preserves device-request failures', async () => {
   assert.equal(await detectDebertaGPUDevice(null), undefined);
-  await assert.rejects(detectDebertaGPUDevice({requestAdapter: async () => null}), /No compatible/);
+  await assert.rejects(detectDebertaGPUDevice({requestAdapter: async () => null} as unknown as GPU), /No compatible/);
   const failure = Error('device denied'),
     a = adapter({failure});
-  await assert.rejects(detectDebertaGPUDevice({requestAdapter: async () => a.value}), (error) => error === failure);
+  await assert.rejects(
+    detectDebertaGPUDevice({requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU),
+    (error) => error === failure
+  );
 });
 
 test('adapter info failure destroys the acquired device once and preserves the error', async () => {
@@ -79,7 +114,10 @@ test('adapter info failure destroys the acquired device once and preserves the e
         throw failure;
       }
     });
-    await assert.rejects(detectDebertaGPUDevice({requestAdapter: async () => a.value}), (error) => error === failure);
+    await assert.rejects(
+      detectDebertaGPUDevice({requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU),
+      (error) => error === failure
+    );
     assert.equal(destroys, 1);
   }
 });
@@ -89,7 +127,10 @@ test('rejects an already cancelled request without requesting an adapter', async
     reason = Error('cancelled');
   controller.abort(reason);
   await assert.rejects(
-    detectDebertaGPUDevice({requestAdapter: () => assert.fail('adapter must not be requested')}, controller.signal),
+    detectDebertaGPUDevice(
+      {requestAdapter: () => assert.fail('adapter must not be requested')} as unknown as GPU,
+      controller.signal
+    ),
     (error) => error === reason
   );
 });
@@ -97,9 +138,12 @@ test('rejects an already cancelled request without requesting an adapter', async
 test('cancellation while waiting for an adapter prevents a late device request', async () => {
   const controller = new AbortController(),
     reason = Error('cancelled'),
-    pending = deferred(),
+    pending = deferred<FakeAdapter>(),
     a = adapter(),
-    request = detectDebertaGPUDevice({requestAdapter: () => pending.promise}, controller.signal);
+    request = detectDebertaGPUDevice(
+      {requestAdapter: () => pending.promise as unknown as Promise<GPUAdapter | null>} as unknown as GPU,
+      controller.signal
+    );
   controller.abort(reason);
   await assert.rejects(request, (error) => error === reason);
   pending.resolve(a.value);
@@ -107,8 +151,11 @@ test('cancellation while waiting for an adapter prevents a late device request',
   assert.equal(a.calls, 0);
 
   const another = new AbortController(),
-    late = deferred(),
-    rejected = detectDebertaGPUDevice({requestAdapter: () => late.promise}, another.signal);
+    late = deferred<FakeAdapter>(),
+    rejected = detectDebertaGPUDevice(
+      {requestAdapter: () => late.promise as unknown as Promise<GPUAdapter | null>} as unknown as GPU,
+      another.signal
+    );
   another.abort(reason);
   await assert.rejects(rejected, (error) => error === reason);
   late.reject(Error('late adapter failure'));
@@ -118,7 +165,7 @@ test('cancellation while waiting for an adapter prevents a late device request',
 test('cancellation destroys a device that arrives late and consumes late failures', async () => {
   const controller = new AbortController(),
     reason = Error('cancelled'),
-    pending = deferred(),
+    pending = deferred<FakeDevice>(),
     a = adapter(),
     device = {
       destroyCalls: 0,
@@ -127,7 +174,10 @@ test('cancellation destroys a device that arrives late and consumes late failure
       }
     };
   a.value.requestDevice = () => pending.promise;
-  const request = detectDebertaGPUDevice({requestAdapter: async () => a.value}, controller.signal);
+  const request = detectDebertaGPUDevice(
+    {requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU,
+    controller.signal
+  );
   await nextTurn();
   controller.abort(reason);
   await assert.rejects(request, (error) => error === reason);
@@ -136,9 +186,12 @@ test('cancellation destroys a device that arrives late and consumes late failure
   assert.equal(device.destroyCalls, 1);
 
   const another = new AbortController(),
-    late = deferred();
+    late = deferred<FakeDevice>();
   a.value.requestDevice = () => late.promise;
-  const rejected = detectDebertaGPUDevice({requestAdapter: async () => a.value}, another.signal);
+  const rejected = detectDebertaGPUDevice(
+    {requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU,
+    another.signal
+  );
   await nextTurn();
   another.abort(reason);
   await assert.rejects(rejected, (error) => error === reason);
@@ -168,7 +221,7 @@ test('cancellation at the device handoff destroys it once and preserves the reas
         if (deviceRequested && ++checksAfterRequest === 2) controller.abort(reason);
         native.throwIfAborted();
       }
-    };
+    } as unknown as AbortSignal;
     a.value.requestDevice = async () => {
       deviceRequested = true;
       return {
@@ -179,7 +232,7 @@ test('cancellation at the device handoff destroys it once and preserves the reas
       };
     };
     await assert.rejects(
-      detectDebertaGPUDevice({requestAdapter: async () => a.value}, signal),
+      detectDebertaGPUDevice({requestAdapter: async () => a.value as unknown as GPUAdapter} as unknown as GPU, signal),
       (error) => error === reason
     );
     assert.equal(checksAfterRequest, 2);
