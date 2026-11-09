@@ -12,7 +12,6 @@
     "packages/web-decision/src/imajev/candidate-loader.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",
-    "packages/web-decision/src/kev08/session.js",
     "packages/web-decision/src/mapika/session.js",
     "packages/web-decision/src/mapika/system-one.mjs",
     "packages/web-decision/src/model-registry.js",
