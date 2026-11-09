@@ -32,6 +32,8 @@
     "test/decision-dispose-reentrancy.test.mts",
     "test/device-loss-cleanup.test.mts",
     "test/d1-omni.test.mts",
+    "test/decima.test.mts",
+    "test/ettin.test.mts",
     "test/elephant-reference.test.mts",
     "test/gpu-preflight.test.mts",
     "test/h2o-dual-source.test.mts",

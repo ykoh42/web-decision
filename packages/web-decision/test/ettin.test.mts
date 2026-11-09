@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import test from 'node:test';
+import type {ModelProgress} from '../src/curated/types.js';
 import {
   ETTIN_FILES,
   ETTIN_MARKER_IDS,
@@ -16,27 +17,47 @@ import {
   prepareEttinDecision,
   prepareEttinSystemOne
 } from '../src/ettin/protocol.mjs';
+import type {EttinRunnerResult, EttinSystemOneAnswer, PackedEttinQuestion} from '../src/ettin/protocol.mjs';
 import {createEttinRunner} from '../src/ettin/runner.mjs';
+import type {EttinOrt} from '../src/ettin/runner.mjs';
 import {createEttinSession} from '../src/ettin/session.mjs';
 import {openEttinSource} from '../src/ettin/source.mjs';
 import {createEttinTokenizer} from '../src/ettin/tokenizer.mjs';
 
-const markerMap = new Map([
+type EttinLoadDependencies = NonNullable<Parameters<typeof loadEttin>[1]>;
+type EttinTensorRecord = {type: string; data: ArrayBufferView; dims: number[]};
+interface EttinFeed {
+  readonly input_ids: EttinTensorRecord;
+  readonly option_pos: EttinTensorRecord;
+  readonly option_mask: EttinTensorRecord;
+  readonly [name: string]: EttinTensorRecord;
+}
+type EttinOutput = Record<string, EttinTensorRecord>;
+type EttinRowOptions = {choice?: number[]; noul?: number[]; score?: number[]};
+type EttinLoaderOverrides = {config?: unknown; inputNames?: string[]; outputNames?: string[]};
+type EttinSessionOptions = {
+  readonly executionProviders: readonly string[];
+  readonly intraOpNumThreads: number;
+  readonly interOpNumThreads: number;
+  readonly graphOptimizationLevel: string;
+};
+
+const markerMap = new Map<string, number>([
   ['[DECISION]', ETTIN_MARKER_IDS.decision],
   ['[STATE]', ETTIN_MARKER_IDS.state],
   ['[QUESTION]', ETTIN_MARKER_IDS.question],
-  ...ETTIN_MARKER_IDS.options.map((id, index) => [`[OPT_${index}]`, id])
+  ...ETTIN_MARKER_IDS.options.map((id, index): [string, number] => [`[OPT_${index}]`, id])
 ]);
 
 class FakeTokenizer {
   constructor() {}
 
-  token_to_id(token) {
+  token_to_id(token: string) {
     return markerMap.get(token);
   }
 
-  encode(text) {
-    return {ids: Array.from(text, (character) => character.codePointAt(0) + 100)};
+  encode(text: string) {
+    return {ids: Array.from(text, (character) => character.codePointAt(0)! + 100)};
   }
 }
 
@@ -44,7 +65,7 @@ function tokenizer() {
   return createEttinTokenizer(FakeTokenizer, {model: {type: 'BPE'}}, {backend: 'tokenizers'});
 }
 
-function row({choice = [1, 2], noul = [0, 1], score = [0, 1, 2, 3, 4, 5, 6]} = {}) {
+function row({choice = [1, 2], noul = [0, 1], score = [0, 1, 2, 3, 4, 5, 6]}: EttinRowOptions = {}): EttinRunnerResult {
   return {
     choiceLogits: [...choice, ...Array(10 - choice.length).fill(-3.4028234663852886e38)],
     noulLogits: noul,
@@ -52,7 +73,7 @@ function row({choice = [1, 2], noul = [0, 1], score = [0, 1, 2, 3, 4, 5, 6]} = {
   };
 }
 
-function makeLoaderDependencies({config, inputNames, outputNames} = {}) {
+function makeLoaderDependencies({config, inputNames, outputNames}: EttinLoaderOverrides = {}) {
   const configValue = config ?? {
     base_model: 'jhu-clsp/ettin-encoder-68m',
     max_len: 2048,
@@ -64,13 +85,13 @@ function makeLoaderDependencies({config, inputNames, outputNames} = {}) {
     onnx_inputs: ['input_ids', 'attention_mask', 'decision_pos', 'option_pos', 'option_mask', 'score_n'],
     onnx_outputs: ['choice_logits', 'noul_logits', 'score_logits']
   };
-  const values = {
+  const values: Record<string, unknown> = {
     'config.json': configValue,
     'manifest.json': {
       version: 'epoch2-int8',
       modelFile: 'model_int8.onnx',
-      sizeBytes: ETTIN_FILES['model_int8.onnx'].bytes,
-      sha256: ETTIN_FILES['model_int8.onnx'].sha256,
+      sizeBytes: ETTIN_FILES['model_int8.onnx']!.bytes,
+      sha256: ETTIN_FILES['model_int8.onnx']!.sha256,
       maxOptions: 10,
       maxScoreLevels: 7,
       maxSequenceLength: 2048
@@ -79,16 +100,16 @@ function makeLoaderDependencies({config, inputNames, outputNames} = {}) {
     'tokenizer_config.json': {backend: 'tokenizers'},
     'model_int8.onnx': new Uint8Array([1, 2, 3]).buffer
   };
-  const reads = [];
+  const reads: string[] = [];
   const released = {count: 0};
   const ort = {
     Tensor: class Tensor {
-      constructor(type, data, dims) {
+      constructor(type: string, data: ArrayBufferView, dims: number[]) {
         Object.assign(this, {type, data, dims});
       }
     },
     InferenceSession: {
-      async create(graph, options) {
+      async create(graph: Uint8Array, options: EttinSessionOptions) {
         assert.deepEqual(Array.from(graph), [1, 2, 3]);
         assert.deepEqual(options.executionProviders, ['wasm']);
         assert.equal(options.intraOpNumThreads, 1);
@@ -103,7 +124,7 @@ function makeLoaderDependencies({config, inputNames, outputNames} = {}) {
             'score_n'
           ],
           outputNames: outputNames ?? ['choice_logits', 'noul_logits', 'score_logits'],
-          async run() {
+          async run(): Promise<EttinOutput> {
             return {
               choice_logits: {type: 'float32', dims: [1, 10], data: Float32Array.from([0, 2, ...Array(8).fill(-10)])},
               noul_logits: {type: 'float32', dims: [1, 2], data: Float32Array.from([0, 1])},
@@ -121,19 +142,19 @@ function makeLoaderDependencies({config, inputNames, outputNames} = {}) {
     reads,
     released,
     dependencies: {
-      ort,
+      ort: ort as unknown as EttinLoadDependencies['ort'],
       Tokenizer: FakeTokenizer,
       async openSource() {
         return {
-          async read(name) {
+          async read(name: string) {
             reads.push(name);
             const value = values[name];
-            if (name === 'model_int8.onnx') return value;
+            if (name === 'model_int8.onnx') return value as ArrayBuffer;
             return new TextEncoder().encode(JSON.stringify(value)).buffer;
           }
         };
       }
-    }
+    } as unknown as EttinLoadDependencies
   };
 }
 
@@ -164,14 +185,14 @@ test('Decider Ettin tokenizer requires the trained BPE markers at their pinned I
   const encoder = tokenizer();
   assert.deepEqual(
     encoder.encode('hello'),
-    Array.from('hello', (character) => character.codePointAt(0) + 100)
+    Array.from('hello', (character) => character.codePointAt(0)! + 100)
   );
   assert.throws(() => createEttinTokenizer(FakeTokenizer, {model: {type: 'WordPiece'}}, {backend: 'tokenizers'}), {
     code: 'INVALID_ASSET'
   });
   class WrongMarkerTokenizer extends FakeTokenizer {
-    token_to_id(token) {
-      return markerMap.get(token) + (token === '[OPT_2]' ? 1 : 0);
+    override token_to_id(token: string) {
+      return markerMap.get(token)! + (token === '[OPT_2]' ? 1 : 0);
     }
   }
   assert.throws(() => createEttinTokenizer(WrongMarkerTokenizer, {model: {type: 'BPE'}}, {backend: 'tokenizers'}), {
@@ -184,7 +205,7 @@ test('Decider Ettin generic choices preserve marker positions, option order, and
     state: 'A',
     questions: [{instructions: 'Q', options: ['one', 'two']}]
   });
-  const question = prepared.questions[0];
+  const question = prepared.questions[0]!;
   assert.deepEqual(question.inputIds, [50368, 50369, 165, 50370, 181, 50371, 211, 210, 201, 50372, 216, 219, 211]);
   assert.deepEqual(question.optionPositions, [5, 9, 0, 0, 0, 0, 0, 0, 0, 0]);
   assert.deepEqual(question.optionMask, [true, true, false, false, false, false, false, false, false, false]);
@@ -192,13 +213,13 @@ test('Decider Ettin generic choices preserve marker positions, option order, and
   assert.equal(question.tokenCount, 13);
 
   const result = finishEttinDecision(prepared, [row({choice: [0, 2]})]);
-  assert.equal(result.answers[0].selected, 'two');
-  assert.equal(result.answers[0].selectedIndex, 1);
+  assert.equal(result.answers[0]!.selected, 'two');
+  assert.equal(result.answers[0]!.selectedIndex, 1);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0]!.probabilities.map(({option}) => option),
     ['one', 'two']
   );
-  assert.ok(Math.abs(result.answers[0].probabilities.reduce((sum, item) => sum + item.probability, 0) - 1) < 1e-4);
+  assert.ok(Math.abs(result.answers[0]!.probabilities.reduce((sum, item) => sum + item.probability, 0) - 1) < 1e-4);
 });
 
 test('Decider Ettin truncates only state and question tokens to the exact sequence cap', () => {
@@ -206,7 +227,7 @@ test('Decider Ettin truncates only state and question tokens to the exact sequen
     state: 's'.repeat(3000),
     questions: [{instructions: 'q', options: ['a', 'b']}]
   });
-  const question = prepared.questions[0];
+  const question = prepared.questions[0]!;
   assert.equal(question.tokenCount, 2048);
   assert.equal(question.truncated, true);
   assert.equal(question.inputIds.length, 2048);
@@ -227,9 +248,9 @@ test('Decider Ettin accepts text above 200,000 characters and applies the native
     questions: [{instructions: 'q', options: ['a', 'b']}]
   });
 
-  assert.equal(prepared.questions[0].tokenCount, 2048);
-  assert.equal(prepared.questions[0].inputIds.length, 2048);
-  assert.equal(prepared.questions[0].truncated, true);
+  assert.equal(prepared.questions[0]!.tokenCount, 2048);
+  assert.equal(prepared.questions[0]!.inputIds.length, 2048);
+  assert.equal(prepared.questions[0]!.truncated, true);
 });
 
 test('Decider Ettin accepts more than 256 questions and runs one batch-one row per question', async () => {
@@ -282,7 +303,7 @@ test('Decider Ettin accepts more than 256 questions and runs one batch-one row p
 });
 
 test('Decider Ettin enforces the exact option-token row boundary before inference', async () => {
-  const calls = [];
+  const calls: number[] = [];
   const model = createEttinSession({
     runner: {
       async run(question) {
@@ -314,7 +335,7 @@ test('Decider Ettin enforces the exact option-token row boundary before inferenc
 
 test('Decider Ettin rejects invalid generic choice bounds and overlong option content', () => {
   const encoder = tokenizer();
-  const request = (options) => ({state: 'state', questions: [{instructions: 'question', options}]});
+  const request = (options: unknown) => ({state: 'state', questions: [{instructions: 'question', options}]});
   assert.throws(() => prepareEttinDecision(encoder, request(['one'])), {code: 'INVALID_INPUT'});
   assert.throws(() => prepareEttinDecision(encoder, request(Array.from({length: 11}, (_, index) => `o${index}`))), {
     code: 'INVALID_INPUT'
@@ -339,12 +360,12 @@ test('Decider Ettin typed inputs preserve Choice, Noul, and ordered Score semant
     prepared.questions.map(({type}) => type),
     ['choice', 'noul', 'score']
   );
-  assert.deepEqual(prepared.questions[0].labels, ['billing', 'support']);
-  assert.equal(prepared.questions[0].optionCount, 2);
-  assert.deepEqual(prepared.questions[1].optionMask, Array(10).fill(false));
-  assert.equal(prepared.questions[1].scoreCount, 0);
-  assert.equal(prepared.questions[2].scoreCount, 3);
-  assert.equal(prepared.questions[2].inputIds.includes(ETTIN_MARKER_IDS.options[0]), false);
+  assert.deepEqual(prepared.questions[0]!.labels, ['billing', 'support']);
+  assert.equal(prepared.questions[0]!.optionCount, 2);
+  assert.deepEqual(prepared.questions[1]!.optionMask, Array(10).fill(false));
+  assert.equal(prepared.questions[1]!.scoreCount, 0);
+  assert.equal(prepared.questions[2]!.scoreCount, 3);
+  assert.equal(prepared.questions[2]!.inputIds.includes(ETTIN_MARKER_IDS.options[0]!), false);
 
   const result = finishEttinSystemOne(
     prepared,
@@ -352,11 +373,15 @@ test('Decider Ettin typed inputs preserve Choice, Noul, and ordered Score semant
     ETTIN_MODEL
   );
   assert.equal(result.model, ETTIN_MODEL);
-  assert.equal(result.answers.route.choice, 'support');
-  assert.ok(result.answers.truth.noul > 0.95);
-  assert.equal(result.answers.impact.score, 2);
-  assert.ok(result.answers.impact.expected > 1.5);
-  assert.deepEqual(result.answers.impact.legend, {0: 'low', 1: 'medium', 2: 'high'});
+  assert.equal((result.answers.route! as Extract<EttinSystemOneAnswer, {type: 'choice'}>).choice, 'support');
+  assert.ok((result.answers.truth! as Extract<EttinSystemOneAnswer, {type: 'noul'}>).noul > 0.95);
+  assert.equal((result.answers.impact! as Extract<EttinSystemOneAnswer, {type: 'score'}>).score, 2);
+  assert.ok((result.answers.impact! as Extract<EttinSystemOneAnswer, {type: 'score'}>).expected > 1.5);
+  assert.deepEqual((result.answers.impact! as Extract<EttinSystemOneAnswer, {type: 'score'}>).legend, {
+    0: 'low',
+    1: 'medium',
+    2: 'high'
+  });
 });
 
 test('Decider Ettin typed API rejects unsupported Noul criteria and invalid choice or score limits', () => {
@@ -403,14 +428,14 @@ test('Decider Ettin typed API rejects unsupported Noul criteria and invalid choi
 
 test('Decider Ettin runner builds the graph feeds and validates its three heads', async () => {
   class Tensor {
-    constructor(type, data, dims) {
+    constructor(type: string, data: ArrayBufferView, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
   }
-  let feed;
+  let feed: EttinFeed | undefined;
   let releases = 0;
   const session = {
-    async run(value) {
+    async run(value: EttinFeed): Promise<EttinOutput> {
       feed = value;
       return {
         choice_logits: {type: 'float32', dims: [1, 10], data: Float32Array.from([0, 1, ...Array(8).fill(-1e30)])},
@@ -422,17 +447,20 @@ test('Decider Ettin runner builds the graph feeds and validates its three heads'
       releases++;
     }
   };
-  const runner = createEttinRunner({Tensor}, session);
+  const runner = createEttinRunner(
+    {Tensor} as unknown as EttinOrt,
+    session as unknown as Parameters<typeof createEttinRunner>[1]
+  );
   const question = prepareEttinDecision(tokenizer(), {
     state: 'A',
     questions: [{instructions: 'Q', options: ['one', 'two']}]
-  }).questions[0];
+  }).questions[0]!;
   const result = await runner.run(question);
   assert.equal(result.choiceLogits[1], 1);
-  assert.deepEqual(feed.input_ids.dims, [1, 13]);
-  assert.deepEqual(feed.option_pos.dims, [1, 10]);
-  assert.equal(feed.option_mask.type, 'bool');
-  assert.deepEqual(Array.from(feed.option_mask.data), [1, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(feed!.input_ids.dims, [1, 13]);
+  assert.deepEqual(feed!.option_pos.dims, [1, 10]);
+  assert.equal(feed!.option_mask.type, 'bool');
+  assert.deepEqual(Array.from(feed!.option_mask.data as Uint8Array), [1, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
   await runner.dispose();
   await runner.dispose();
   assert.equal(releases, 1);
@@ -440,10 +468,10 @@ test('Decider Ettin runner builds the graph feeds and validates its three heads'
 });
 
 test('Decider Ettin session queues calls, exposes the typed heads, and closes cleanly', async () => {
-  const calls = [];
+  const calls: Array<PackedEttinQuestion['type']> = [];
   let disposed = 0;
   const runner = {
-    async run(question) {
+    async run(question: PackedEttinQuestion) {
       calls.push(question.type);
       return row({
         choice: question.optionCount === 2 ? [0, 1] : [0, 1],
@@ -462,10 +490,10 @@ test('Decider Ettin session queues calls, exposes the typed heads, and closes cl
     truth: {type: 'noul', instructions: 'Is it true?'},
     score: {type: 'score', instructions: 'Rate.', criteria: ['low', 'high']}
   });
-  assert.equal(generic.answers[0].selected, 'b');
-  assert.equal(typed.answers.choice.choice, 'b');
-  assert.ok(typed.answers.truth.noul > 0.8);
-  assert.equal(typed.answers.score.type, 'score');
+  assert.equal(generic.answers[0]!.selected, 'b');
+  assert.equal((typed.answers.choice! as Extract<EttinSystemOneAnswer, {type: 'choice'}>).choice, 'b');
+  assert.ok((typed.answers.truth! as Extract<EttinSystemOneAnswer, {type: 'noul'}>).noul > 0.8);
+  assert.equal((typed.answers.score! as Extract<EttinSystemOneAnswer, {type: 'score'}>).type, 'score');
   assert.deepEqual(calls, ['choice', 'choice', 'noul', 'score']);
   await model.releaseCachedMemory();
   await model.dispose();
@@ -502,7 +530,7 @@ test('Decider Ettin load options default to the pinned source and support a trus
 test('Decider Ettin asset source verifies a file and reports loaded bytes', async (context) => {
   const bytes = new Uint8Array([1, 2, 3]);
   const previousFetch = globalThis.fetch;
-  const requests = [];
+  const requests: string[] = [];
   globalThis.fetch = async (url) => {
     requests.push(String(url));
     return new Response(bytes);
@@ -531,7 +559,7 @@ test('Decider Ettin source reports progress for a verified read', async (context
   context.after(() => {
     globalThis.fetch = previousFetch;
   });
-  const progress = [];
+  const progress: ModelProgress[] = [];
   const source = await openEttinSource(
     {
       base: new URL('https://assets.example.test/ettin/'),
@@ -557,7 +585,7 @@ test('Decider Ettin loader verifies model metadata and returns a working WASM se
     harness.dependencies
   );
   const result = await model.decide({state: 'state', questions: [{instructions: 'Pick one.', options: ['a', 'b']}]});
-  assert.equal(result.answers[0].selected, 'b');
+  assert.equal(result.answers[0]!.selected, 'b');
   assert.deepEqual(harness.reads.sort(), [
     'config.json',
     'manifest.json',
