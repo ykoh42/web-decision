@@ -68,6 +68,7 @@ interface Gemma4UploadContext {
 
 interface Gemma4Tensor {
   readonly byteOffset: number;
+  readonly shape: number[];
   copyFrom(value: unknown): Gemma4Tensor;
   getDataPtr(): unknown;
   toArray(): unknown;

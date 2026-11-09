@@ -51,7 +51,6 @@
     "packages/web-decision/src/skejja/session.mjs",
     "packages/web-decision/src/skejja/source.mjs",
     "packages/web-decision/src/strands/choice.mjs",
-    "packages/web-decision/src/strands/gemma4-upload.mjs",
     "packages/web-decision/src/strands/loader-core.mjs",
     "packages/web-decision/src/strands/manifest.mjs",
     "packages/web-decision/src/strands/protocol.mjs",
