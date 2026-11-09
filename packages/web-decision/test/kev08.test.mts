@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {KEV08_MARKERS, packKev08Request, unpackKev08Scores} from '../src/kev08.js';
 import {ExperimentalKev08Session, validateKev08Row} from '../src/kev08/session.js';
+import type {KevTokenizer} from '../src/kev.js';
+
+type Kev08SessionOptions = ConstructorParameters<typeof ExperimentalKev08Session>[0];
+type Kev08Row = ReturnType<typeof validateKev08Row>;
 
 const tokenizer = {
-  encode(text) {
-    return {ids: Array.from(text, (char) => char.codePointAt(0) + 200)};
+  encode(text: string) {
+    return {ids: Array.from(text, (char) => char.codePointAt(0)! + 200)};
   }
-};
+} as unknown as KevTokenizer;
 const limits = {maxInputTokens: 1024, maxStateTokens: 512};
-const request = () => ({
+const request = (): {state: string; questions: Array<{instructions: string; options: string[]}>} => ({
   state: 'shared state',
   questions: [
     {instructions: 'first?', options: ['red', 'blue']},
@@ -17,7 +21,7 @@ const request = () => ({
   ]
 });
 
-function withInheritedEntry(array, index) {
+function withInheritedEntry<Value>(array: Value[], index: number): Value[] {
   const copy = [...array],
     prototype = Object.create(Array.prototype);
   Object.defineProperty(prototype, index, {value: copy[index], writable: true, configurable: true});
@@ -36,22 +40,22 @@ test('packs each question as an independent row sharing only the state', () => {
     assert.equal(row.ids[row.questionSlot], KEV08_MARKERS.decide);
     for (const slot of row.optionSlots) assert.equal(row.ids[slot], KEV08_MARKERS.close);
   }
-  assert.equal(packed.tokenCount, packed.rows[0].ids.length + packed.rows[1].ids.length);
+  assert.equal(packed.tokenCount, packed.rows[0]!.ids.length + packed.rows[1]!.ids.length);
   const secondWithoutFirst = packKev08Request(tokenizer, {...input, questions: [input.questions[1]]}, limits);
   assert.deepEqual(packed.rows[1], secondWithoutFirst.rows[0]);
-  input.questions[1].options[0] = 'changed';
-  assert.equal(packed.rows[1].options[0], 'yes');
+  input.questions[1]!.options[0] = 'changed';
+  assert.equal(packed.rows[1]!.options[0], 'yes');
 });
 
 test('uses already calibrated pointer logits without applying a second temperature', () => {
   const packed = packKev08Request(tokenizer, request(), limits);
   const result = unpackKev08Scores([new Float32Array([1, 2]), [0, 0]], packed);
-  assert.equal(result.answers[0].selected, 'blue');
-  assert.equal(result.answers[0].probabilities[1].logit, 2);
-  assert.ok(Math.abs(result.answers[0].probabilities[1].probability - 1 / (1 + Math.exp(-1))) < 1e-12);
-  assert.equal(result.answers[1].selected, 'yes');
+  assert.equal(result.answers[0]!.selected, 'blue');
+  assert.equal(result.answers[0]!.probabilities[1]!.logit, 2);
+  assert.ok(Math.abs(result.answers[0]!.probabilities[1]!.probability - 1 / (1 + Math.exp(-1))) < 1e-12);
+  assert.equal(result.answers[1]!.selected, 'yes');
   assert.deepEqual(
-    result.answers[1].probabilities.map((entry) => entry.probability),
+    result.answers[1]!.probabilities.map((entry) => entry.probability),
     [0.5, 0.5]
   );
   assert.equal(result.tokenCount, packed.tokenCount);
@@ -70,7 +74,9 @@ test('rejects duplicate, token-colliding, overlong or malformed inputs', () => {
     assert.throws(() => packKev08Request(tokenizer, value, limits), {code: 'INVALID_INPUT'});
   assert.throws(() => packKev08Request(tokenizer, request(), {...limits, maxStateTokens: 3}), {code: 'INVALID_INPUT'});
   assert.throws(() => packKev08Request(tokenizer, request(), {...limits, maxInputTokens: 5}), {code: 'INVALID_INPUT'});
-  const broken = {encode: (text) => (text === 'shared state' ? {ids: [248320]} : tokenizer.encode(text))};
+  const broken = {
+    encode: (text: string) => (text === 'shared state' ? {ids: [248320]} : tokenizer.encode(text))
+  } as unknown as KevTokenizer;
   assert.throws(() => packKev08Request(broken, request(), limits), {code: 'INVALID_ASSET'});
 });
 
@@ -87,63 +93,66 @@ test('requires own entries for questions and choices', () => {
   input.questions = withInheritedEntry(input.questions, 1);
   assert.throws(() => packKev08Request(tokenizer, input, limits), {code: 'INVALID_INPUT'});
   const next = request();
-  next.questions[0].options = withInheritedEntry(next.questions[0].options, 1);
+  next.questions[0]!.options = withInheritedEntry(next.questions[0]!.options, 1);
   assert.throws(() => packKev08Request(tokenizer, next, limits), {code: 'INVALID_INPUT'});
 });
 
 test('snapshots indexed questions and choices even with custom iterators', () => {
   const input = request();
-  input.questions[0].options[Symbol.iterator] = function* () {
+  input.questions[0]!.options[Symbol.iterator] = function* (): Generator<string, undefined, unknown> {
     yield 'changed';
     yield 'other';
   };
-  input.questions[Symbol.iterator] = function* () {};
+  input.questions[Symbol.iterator] = function* (): Generator<(typeof input.questions)[number], undefined, unknown> {};
   const packed = packKev08Request(tokenizer, input, limits);
   assert.equal(packed.rows.length, 2);
-  assert.deepEqual(packed.rows[0].options, ['red', 'blue']);
+  assert.deepEqual(packed.rows[0]!.options, ['red', 'blue']);
 });
 
 for (const [field, index] of [
   ['ids', 1],
   ['optionSlots', 0],
   ['options', 1]
-]) {
+] as const) {
   test(`rejects sparse ${field} before graph invocation`, () => {
-    const row = packKev08Request(tokenizer, request(), limits).rows[0];
+    const row = packKev08Request(tokenizer, request(), limits).rows[0]!;
     delete row[field][index];
     assert.throws(() => validateKev08Row(row, limits.maxInputTokens), {code: 'INVALID_INPUT'});
   });
   test(`rejects inherited ${field} entries before graph invocation`, () => {
-    const row = packKev08Request(tokenizer, request(), limits).rows[0];
-    row[field] = withInheritedEntry(row[field], index);
+    const row = packKev08Request(tokenizer, request(), limits).rows[0]!;
+    (row as unknown as Record<string, number[] | string[]>)[field] = withInheritedEntry<number | string>(
+      row[field] as (number | string)[],
+      index
+    ) as number[] | string[];
     assert.throws(() => validateKev08Row(row, limits.maxInputTokens), {code: 'INVALID_INPUT'});
   });
 }
 
 test('does not begin a GPU scope for sparse gather positions', async () => {
   const packed = packKev08Request(tokenizer, request(), limits);
-  delete packed.rows[0].optionSlots[0];
+  delete packed.rows[0]!.optionSlots[0];
   let scopesStarted = 0;
   const session = new ExperimentalKev08Session({
     runtime: {beginScope: () => scopesStarted++},
     limits,
     lifecycle: {loss: null, disposed: false},
     uncaptured: []
-  });
+  } as unknown as Kev08SessionOptions);
   await assert.rejects(session.run(packed), {code: 'INVALID_INPUT'});
   assert.equal(scopesStarted, 0);
 });
 
 test('validates every row before starting the first GPU scope', async () => {
   const packed = packKev08Request(tokenizer, request(), limits);
-  delete packed.rows[1].optionSlots[0];
+  delete packed.rows[1]!.optionSlots[0];
   let scopesStarted = 0;
   const session = new ExperimentalKev08Session({
     runtime: {beginScope: () => scopesStarted++},
     limits,
     lifecycle: {loss: null, disposed: false},
     uncaptured: []
-  });
+  } as unknown as Kev08SessionOptions);
   await assert.rejects(session.run(packed), {code: 'INVALID_INPUT'});
   assert.equal(scopesStarted, 0);
 });
@@ -151,16 +160,16 @@ test('validates every row before starting the first GPU scope', async () => {
 test('uses the validated row snapshots even if raw inputs change or supply custom iterators', async () => {
   const packed = packKev08Request(tokenizer, request(), limits);
   const expected = packed.rows.map((row) => ({ids: [...row.ids], slots: [...row.optionSlots]}));
-  packed.rows[0].ids[Symbol.iterator] = function* () {
+  packed.rows[0]!.ids[Symbol.iterator] = function* (): Generator<number, undefined, unknown> {
     yield 248320;
   };
-  packed.rows[0].optionSlots[Symbol.iterator] = function* () {
+  packed.rows[0]!.optionSlots[Symbol.iterator] = function* (): Generator<number, undefined, unknown> {
     yield -1;
     yield 2147483647;
   };
-  let release, notify;
-  const gate = new Promise((resolve) => (release = resolve));
-  const started = new Promise((resolve) => (notify = resolve));
+  let release!: () => void, notify!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const started = new Promise<void>((resolve) => (notify = resolve));
   let syncs = 0;
   const device = {
     async sync() {
@@ -170,19 +179,30 @@ test('uses the validated row snapshots even if raw inputs change or supply custo
       }
     }
   };
+  interface TensorMock {
+    byteOffset: number;
+    values?: unknown[];
+    getDataPtr(): TensorMock;
+    copyFrom(value: unknown): TensorMock;
+    toArray(): unknown;
+  }
   const runtime = {
     beginScope() {},
     endScope() {},
     cpu: () => 'cpu',
     lib: {webGPUContext: {copyRawBytesToBuffer() {}}},
-    empty() {
+    empty(): TensorMock {
       return {
         byteOffset: 0,
         getDataPtr() {
           return this;
         },
-        copyFrom(value) {
-          this.values = Array.from(ArrayBuffer.isView(value) ? value : value.values);
+        copyFrom(value: unknown) {
+          this.values = Array.from(
+            ArrayBuffer.isView(value)
+              ? (value as unknown as Iterable<unknown>)
+              : (value as {values: Iterable<unknown>}).values
+          );
           return this;
         },
         toArray() {
@@ -191,7 +211,7 @@ test('uses the validated row snapshots even if raw inputs change or supply custo
       };
     }
   };
-  const received = [];
+  const received: Array<{ids: unknown; slots: unknown}> = [];
   const session = new ExperimentalKev08Session({
     runtime,
     device,
@@ -201,23 +221,23 @@ test('uses the validated row snapshots even if raw inputs change or supply custo
         return null;
       }
     },
-    fn(ids, _positions, _mask, _valid, _question, choices) {
-      received.push({ids: ids.values, slots: choices.values});
+    fn(ids: unknown, _positions: unknown, _mask: unknown, _valid: unknown, _question: unknown, choices: unknown) {
+      received.push({ids: (ids as TensorMock).values, slots: (choices as TensorMock).values});
       return {values: [0, 1]};
     },
     weights: [],
     limits,
     lifecycle: {loss: null, disposed: false},
     uncaptured: []
-  });
+  } as unknown as Kev08SessionOptions);
   const task = session.run(packed);
   await started;
-  packed.rows[1].ids[1] = 248320;
-  packed.rows[1].options[1] = 'changed';
+  packed.rows[1]!.ids[1] = 248320;
+  packed.rows[1]!.options[1] = 'changed';
   release();
   const result = await task;
   assert.deepEqual(received, expected);
-  assert.equal(result.answers[1].selected, 'no');
+  assert.equal(result.answers[1]!.selected, 'no');
 });
 
 test('rejects sparse questions before beginning any GPU work', async () => {
@@ -236,7 +256,7 @@ test('rejects sparse questions before beginning any GPU work', async () => {
     limits,
     lifecycle: {loss: null, disposed: false},
     uncaptured: []
-  });
+  } as unknown as Kev08SessionOptions);
   await assert.rejects(session.decide({state: '', questions}), {code: 'INVALID_INPUT'});
   assert.equal(scopesStarted, 0);
 });
@@ -264,7 +284,7 @@ test('rejects sparse output rows and scores instead of returning NaN', () => {
     [1, 2],
     [3, 4]
   ];
-  delete rows[1][1];
+  delete rows[1]![1];
   assert.throws(() => unpackKev08Scores(rows, packed), {code: 'INFERENCE_ERROR'});
   const missingRow = [
     [1, 2],
@@ -275,31 +295,31 @@ test('rejects sparse output rows and scores instead of returning NaN', () => {
 });
 
 test('validates all gather positions and token IDs before GPU execution', () => {
-  const row = packKev08Request(tokenizer, request(), limits).rows[0];
+  const row = packKev08Request(tokenizer, request(), limits).rows[0]!;
   assert.doesNotThrow(() => validateKev08Row(row, limits.maxInputTokens));
   for (const mutate of [
-    (value) => {
+    (value: Kev08Row) => {
       value.questionSlot = value.ids.length;
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.questionSlot = 0;
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.optionSlots[0] = -1;
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.optionSlots[0] = value.questionSlot;
     },
-    (value) => {
-      value.optionSlots[1] = value.optionSlots[0];
+    (value: Kev08Row) => {
+      value.optionSlots[1] = value.optionSlots[0]!;
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.optionSlots.reverse();
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.ids[0] = 248320;
     },
-    (value) => {
+    (value: Kev08Row) => {
       value.optionSlots.pop();
     }
   ]) {

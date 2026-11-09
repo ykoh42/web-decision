@@ -7,11 +7,46 @@ import {
   requiredKevAttentionBytes
 } from '../src/kev-gpu.js';
 import {DecisionModel} from '../src/model.js';
-function mockAdapter({limits = KEV_REQUIRED_LIMITS, features = ['shader-f16', 'subgroups'], failure} = {}) {
+interface TestLimits {
+  maxBufferSize: number;
+  maxStorageBufferBindingSize: number;
+  maxComputeWorkgroupStorageSize: number;
+  maxStorageBuffersPerShaderStage: number;
+  maxComputeInvocationsPerWorkgroup: number;
+  maxComputeWorkgroupSizeX: number;
+  maxComputeWorkgroupSizeY: number;
+  maxComputeWorkgroupSizeZ: number;
+  maxComputeWorkgroupsPerDimension: number;
+}
+interface TestDevice {
+  kind?: string;
+  destroy?: () => void;
+}
+interface TestDeviceDescriptor {
+  requiredLimits: TestLimits;
+  requiredFeatures: string[];
+}
+interface TestAdapter {
+  limits: TestLimits;
+  features: Set<string>;
+  info: {vendor: string};
+  requestDevice(options: TestDeviceDescriptor): Promise<TestDevice>;
+}
+interface TestAdapterOptions {
+  limits?: TestLimits;
+  features?: string[];
+  failure?: unknown;
+}
+
+function mockAdapter({
+  limits = KEV_REQUIRED_LIMITS,
+  features = ['shader-f16', 'subgroups'],
+  failure
+}: TestAdapterOptions = {}) {
   let calls = 0,
-    request;
-  const device = {kind: 'device'},
-    adapter = {
+    request: TestDeviceDescriptor | undefined;
+  const device: TestDevice = {kind: 'device'},
+    adapter: TestAdapter = {
       limits,
       features: new Set(features),
       info: {vendor: 'test'},
@@ -35,17 +70,17 @@ function mockAdapter({limits = KEV_REQUIRED_LIMITS, features = ['shader-f16', 's
 }
 test('accepts an adapter with the audited limits and does not require optional subgroups', async () => {
   const x = mockAdapter(),
-    requests = [];
+    requests: Array<GPURequestAdapterOptions | undefined> = [];
   const result = await detectKevGPUDevice({
-    requestAdapter: async (options) => {
+    requestAdapter: async (options: GPURequestAdapterOptions | undefined) => {
       requests.push(options);
       return x.adapter;
     }
-  });
-  assert.equal(result.device, x.device);
+  } as unknown as GPU);
+  assert.equal(result!.device, x.device);
   assert.deepEqual(requests, [{powerPreference: 'high-performance'}]);
-  assert.deepEqual(x.request.requiredLimits, KEV_REQUIRED_LIMITS);
-  assert.deepEqual(x.request.requiredFeatures, ['shader-f16']);
+  assert.deepEqual(x.request!.requiredLimits, KEV_REQUIRED_LIMITS);
+  assert.deepEqual(x.request!.requiredFeatures, ['shader-f16']);
 });
 test('requests larger adapter buffer limits while keeping fixed compute requirements', async () => {
   const limits = {
@@ -54,52 +89,55 @@ test('requests larger adapter buffer limits while keeping fixed compute requirem
       maxStorageBufferBindingSize: KEV_REQUIRED_LIMITS.maxStorageBufferBindingSize * 2
     },
     x = mockAdapter({limits});
-  const result = await detectKevGPUDevice({requestAdapter: async () => x.adapter});
+  const result = await detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU);
 
-  assert.equal(result.device, x.device);
-  assert.deepEqual(x.request.requiredLimits, limits);
-  assert.deepEqual(x.request.requiredFeatures, ['shader-f16']);
+  assert.equal(result!.device, x.device);
+  assert.deepEqual(x.request!.requiredLimits, limits);
+  assert.deepEqual(x.request!.requiredFeatures, ['shader-f16']);
   assert.equal(
-    x.request.requiredLimits.maxComputeWorkgroupStorageSize,
+    x.request!.requiredLimits.maxComputeWorkgroupStorageSize,
     KEV_REQUIRED_LIMITS.maxComputeWorkgroupStorageSize
   );
   assert.equal(
-    x.request.requiredLimits.maxStorageBuffersPerShaderStage,
+    x.request!.requiredLimits.maxStorageBuffersPerShaderStage,
     KEV_REQUIRED_LIMITS.maxStorageBuffersPerShaderStage
   );
   assert.equal(
-    x.request.requiredLimits.maxComputeInvocationsPerWorkgroup,
+    x.request!.requiredLimits.maxComputeInvocationsPerWorkgroup,
     KEV_REQUIRED_LIMITS.maxComputeInvocationsPerWorkgroup
   );
-  assert.equal(x.request.requiredLimits.maxComputeWorkgroupSizeX, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeX);
-  assert.equal(x.request.requiredLimits.maxComputeWorkgroupSizeY, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeY);
-  assert.equal(x.request.requiredLimits.maxComputeWorkgroupSizeZ, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeZ);
+  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeX, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeX);
+  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeY, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeY);
+  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeZ, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeZ);
   assert.equal(
-    x.request.requiredLimits.maxComputeWorkgroupsPerDimension,
+    x.request!.requiredLimits.maxComputeWorkgroupsPerDimension,
     KEV_REQUIRED_LIMITS.maxComputeWorkgroupsPerDimension
   );
 });
 test('reports missing f16 without creating a device', async () => {
   const x = mockAdapter({features: []});
-  const result = await detectKevGPUDevice({requestAdapter: async () => x.adapter});
-  assert.equal(result.adapter, x.adapter);
-  assert.equal(result.device, undefined);
+  const result = await detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU);
+  assert.equal(result!.adapter, x.adapter);
+  assert.equal(result!.device, undefined);
   assert.equal(x.calls, 0);
 });
 test('rejects an insufficient limit before creating a device', async () => {
   const x = mockAdapter({limits: {...KEV_REQUIRED_LIMITS, maxStorageBuffersPerShaderStage: 7}});
   await assert.rejects(
-    detectKevGPUDevice({requestAdapter: async () => x.adapter}),
+    detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU),
     /maxStorageBuffersPerShaderStage requires 8/
   );
   assert.equal(x.calls, 0);
 });
 test('handles unavailable adapter and preserves requestDevice errors', async () => {
   assert.equal(await detectKevGPUDevice(null), undefined);
-  await assert.rejects(detectKevGPUDevice({requestAdapter: async () => null}), /No compatible/);
+  await assert.rejects(detectKevGPUDevice({requestAdapter: async () => null} as unknown as GPU), /No compatible/);
   const failure = Error('device denied'),
     x = mockAdapter({failure});
-  await assert.rejects(detectKevGPUDevice({requestAdapter: async () => x.adapter}), (e) => e === failure);
+  await assert.rejects(
+    detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU),
+    (e) => e === failure
+  );
 });
 
 test('calculates the exact FP16 attention buffer at the native sequence boundary', () => {
@@ -135,25 +173,28 @@ test('checks device capacity before starting the TVM graph', async () => {
       beginScope() {
         runtimeCalls++;
       }
-    },
-    {},
+    } as unknown as ConstructorParameters<typeof DecisionModel>[0],
+    {} as ConstructorParameters<typeof DecisionModel>[1],
     {
       limits: {
         maxBufferSize: 2_147_483_644,
         maxStorageBufferBindingSize: 2_147_483_644
       }
-    },
+    } as unknown as ConstructorParameters<typeof DecisionModel>[2],
     () => {
       graphCalls++;
     },
-    [],
-    {},
-    {},
-    [],
-    {loss: false, disposed: false}
+    [] as ConstructorParameters<typeof DecisionModel>[4],
+    {} as ConstructorParameters<typeof DecisionModel>[5],
+    {} as ConstructorParameters<typeof DecisionModel>[6],
+    [] as ConstructorParameters<typeof DecisionModel>[7],
+    {loss: false, disposed: false} as unknown as ConstructorParameters<typeof DecisionModel>[8]
   );
 
-  await assert.rejects(model.run({ids: new Array(8192)}), {code: 'DEVICE_RESOURCE_LIMIT'});
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep the native sparse-array boundary fixture intact.
+  await assert.rejects(model.run({ids: new Array(8192)} as unknown as Parameters<typeof model.run>[0]), {
+    code: 'DEVICE_RESOURCE_LIMIT'
+  });
   assert.equal(runtimeCalls, 0);
   assert.equal(graphCalls, 0);
 });
@@ -169,7 +210,7 @@ test('pre-aborted requests preserve the reason without requesting an adapter', a
         requestAdapter() {
           called = true;
         }
-      },
+      } as unknown as GPU,
       controller.signal
     ),
     (e) => e === reason
@@ -181,14 +222,14 @@ test('pre-aborted requests preserve the reason without requesting an adapter', a
 test('pending adapter cancellation returns immediately and observes late rejection', {timeout: 1000}, async () => {
   const controller = new AbortController(),
     reason = Error('cancel adapter');
-  let rejectAdapter;
+  let rejectAdapter!: (reason?: unknown) => void;
   const request = detectKevGPUDevice(
     {
       requestAdapter: () =>
-        new Promise((_, reject) => {
+        new Promise<TestAdapter>((_, reject) => {
           rejectAdapter = reject;
         })
-    },
+    } as unknown as GPU,
     controller.signal
   );
   controller.abort(reason);
@@ -200,14 +241,14 @@ test('pending adapter cancellation returns immediately and observes late rejecti
 test('pending device cancellation returns immediately and destroys the late device once', {timeout: 1000}, async () => {
   const controller = new AbortController(),
     reason = Error('cancel device');
-  let resolveDevice,
+  let resolveDevice!: (device: TestDevice) => void,
     destroyCount = 0;
   const x = mockAdapter();
   x.adapter.requestDevice = () =>
-    new Promise((resolve) => {
+    new Promise<TestDevice>((resolve) => {
       resolveDevice = resolve;
     });
-  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter}, controller.signal);
+  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU, controller.signal);
   while (!resolveDevice) await new Promise((resolve) => setImmediate(resolve));
   controller.abort(reason);
   await assert.rejects(request, (e) => e === reason);
@@ -223,13 +264,13 @@ test('pending device cancellation returns immediately and destroys the late devi
 test('pending device cancellation observes a later rejection', {timeout: 1000}, async () => {
   const controller = new AbortController(),
     reason = Error('cancel device');
-  let rejectDevice;
+  let rejectDevice!: (reason?: unknown) => void;
   const x = mockAdapter();
   x.adapter.requestDevice = () =>
-    new Promise((_, reject) => {
+    new Promise<TestDevice>((_, reject) => {
       rejectDevice = reject;
     });
-  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter}, controller.signal);
+  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU, controller.signal);
   while (!rejectDevice) await new Promise((resolve) => setImmediate(resolve));
   controller.abort(reason);
   await assert.rejects(request, (e) => e === reason);
@@ -240,15 +281,15 @@ test('pending device cancellation observes a later rejection', {timeout: 1000}, 
 test('an adapter arriving after cancellation is not used to request a device', {timeout: 1000}, async () => {
   const controller = new AbortController(),
     reason = Error('cancel adapter');
-  let resolveAdapter;
+  let resolveAdapter!: (adapter: TestAdapter) => void;
   const x = mockAdapter();
   const request = detectKevGPUDevice(
     {
       requestAdapter: () =>
-        new Promise((resolve) => {
+        new Promise<TestAdapter>((resolve) => {
           resolveAdapter = resolve;
         })
-    },
+    } as unknown as GPU,
     controller.signal
   );
   controller.abort(reason);
@@ -261,14 +302,14 @@ test('an adapter arriving after cancellation is not used to request a device', {
 test('a late device destroy failure stays observed after cancellation', {timeout: 1000}, async () => {
   const controller = new AbortController(),
     reason = Error('cancel device');
-  let resolveDevice,
+  let resolveDevice!: (device: TestDevice) => void,
     destroyCount = 0;
   const x = mockAdapter();
   x.adapter.requestDevice = () =>
-    new Promise((resolve) => {
+    new Promise<TestDevice>((resolve) => {
       resolveDevice = resolve;
     });
-  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter}, controller.signal);
+  const request = detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU, controller.signal);
   while (!resolveDevice) await new Promise((resolve) => setImmediate(resolve));
   controller.abort(reason);
   await assert.rejects(request, (e) => e === reason);
@@ -297,7 +338,7 @@ test('cancellation between device helper completion and detector continuation de
     return Promise.resolve(device);
   };
   await assert.rejects(
-    detectKevGPUDevice({requestAdapter: async () => x.adapter}, controller.signal),
+    detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU, controller.signal),
     (e) => e === reason
   );
   assert.equal(destroyCount, 1);
@@ -317,6 +358,9 @@ test('device ownership is released if constructing the result fails', async () =
       throw failure;
     }
   });
-  await assert.rejects(detectKevGPUDevice({requestAdapter: async () => x.adapter}), (e) => e === failure);
+  await assert.rejects(
+    detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU),
+    (e) => e === failure
+  );
   assert.equal(destroyCount, 1);
 });
