@@ -226,7 +226,7 @@ export function loadImajevCandidate(
     upload: (owner, source, context) =>
       uploadImajevFromSource(owner, source, {
         ...context,
-        HashClass: Hash as unknown as NonNullable<Parameters<typeof uploadImajevFromSource>[2]>['HashClass']
+        HashClass: Hash
       }),
     session: (value) => new ImajevSession(value)
   });

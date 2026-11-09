@@ -7,7 +7,6 @@
     "packages/web-decision/src/h2o/owner.mjs",
     "packages/web-decision/src/h2o/plan.mjs",
     "packages/web-decision/src/h2o/runner.mjs",
-    "packages/web-decision/src/h2o/sha256.mjs",
     "packages/web-decision/src/h2o/upload.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",
@@ -131,6 +130,10 @@
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
   ],
   "exceptions": [
+    {
+      "path": "packages/web-decision/src/vendor/fast-sha256/sha256.mjs",
+      "reason": "Upstream vendored from fast-sha256 1.3.0; original public domain implementation with its UMD wrapper adapted to ESM."
+    },
     {
       "path": "releases/web-decision-0.1.0/build.mjs",
       "reason": "Immutable historical release 0.1.0; preserve the published JavaScript snapshot."
