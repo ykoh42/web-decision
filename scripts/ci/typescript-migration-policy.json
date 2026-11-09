@@ -124,7 +124,6 @@
     "packages/web-decision/test/elephant-cancellation.test.mjs",
     "packages/web-decision/test/elephant-loader-review.test.mjs",
     "packages/web-decision/test/elephant-protocol-review.test.mjs",
-    "packages/web-decision/test/elephant-reference.test.mjs",
     "packages/web-decision/test/elephant-variants.test.mjs",
     "packages/web-decision/test/ettin.test.mjs",
     "packages/web-decision/test/fixtures/imajev.mjs",
