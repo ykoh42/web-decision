@@ -172,7 +172,6 @@
     "packages/web-decision/test/kev-systemone.test.mjs",
     "packages/web-decision/test/kev.test.mjs",
     "packages/web-decision/test/kev06-asset-import-loader.mjs",
-    "packages/web-decision/test/kev08-contract.test.mjs",
     "packages/web-decision/test/kev08-systemone.test.mjs",
     "packages/web-decision/test/kev08.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
