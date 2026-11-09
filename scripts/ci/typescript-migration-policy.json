@@ -39,7 +39,6 @@
     "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
     "packages/web-decision/test/tamev.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",
-    "scripts/ci/check_cognitive_complexity.mjs",
     "tests/browser/kev06-real-webgpu.spec.mjs",
     "tests/browser/stable-model-id.spec.mjs",
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"

@@ -2,10 +2,228 @@
 // Ratchet SonarJS cognitive complexity across tracked JavaScript and TypeScript.
 
 import {spawnSync} from 'node:child_process';
+import type {SpawnSyncOptionsWithBufferEncoding, SpawnSyncReturns} from 'node:child_process';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import fs from 'node:fs';
+
+interface ParserNode {
+  readonly kind: number;
+  readonly parent?: ParserNode;
+  readonly end: number;
+  readonly text?: string;
+  readonly name?: ParserNode;
+  readonly body?: ParserNode;
+  readonly initializer?: ParserNode;
+  readonly propertyName?: ParserNode;
+  readonly elements?: readonly ParserBindingElement[];
+  readonly expression?: ParserNode;
+  readonly right?: ParserNode;
+  readonly left?: ParserNode;
+  readonly operatorToken?: ParserNode;
+  readonly arguments?: readonly ParserNode[];
+  getStart(sourceFile?: ParserSourceFile): number;
+  forEachChild(callback: (child: ParserNode) => void): unknown;
+}
+
+interface ParserBindingElement extends ParserNode {
+  readonly name: ParserNode;
+}
+
+interface ParserFunctionLike extends ParserNode {
+  readonly parameters: readonly ParserNode[];
+  readonly name?: ParserNode;
+  readonly body?: ParserNode;
+}
+
+interface ParserCallLike extends ParserNode {
+  readonly expression: ParserNode;
+  readonly arguments?: readonly ParserNode[];
+}
+
+interface ParserSourceFile extends ParserNode {
+  readonly parseDiagnostics?: readonly {readonly messageText: string | ParserDiagnosticChain}[];
+}
+
+interface ParserDiagnosticChain {
+  readonly messageText: string;
+  readonly next?: readonly ParserDiagnosticChain[];
+}
+
+interface ParserScanner {
+  scan(): number;
+  getTokenText(): string;
+  getTokenPos(): number;
+}
+
+interface ParserSyntaxKind {
+  readonly SingleLineCommentTrivia: number;
+  readonly MultiLineCommentTrivia: number;
+  readonly EndOfFileToken: number;
+  readonly EqualsToken: number;
+  readonly [name: string]: number | string;
+}
+
+interface SonarTypeScriptParser {
+  readonly ScriptTarget: {readonly Latest: number};
+  readonly LanguageVariant: {readonly Standard: number};
+  readonly ScriptKind: {readonly TSX: number; readonly JSX: number};
+  readonly SyntaxKind: ParserSyntaxKind;
+  readonly version: string;
+  createScanner(languageVersion: number, skipTrivia: boolean, languageVariant: number, text: string): ParserScanner;
+  createSourceFile(
+    fileName: string,
+    sourceText: string,
+    languageVersion: number,
+    setParentNodes?: boolean,
+    scriptKind?: number
+  ): ParserSourceFile;
+  flattenDiagnosticMessageText(message: string | ParserDiagnosticChain, newLine: string, indent?: number): string;
+  isFunctionLike(node: ParserNode): boolean;
+  isIdentifier(node: ParserNode): node is ParserNode & {readonly text: string};
+  isPrivateIdentifier(node: ParserNode): node is ParserNode & {readonly text: string};
+  isStringLiteralLike(node: ParserNode): node is ParserNode & {readonly text: string};
+  isNumericLiteral(node: ParserNode): node is ParserNode & {readonly text: string};
+  isComputedPropertyName(node: ParserNode): node is ParserNode & {readonly expression: ParserNode};
+  isObjectBindingPattern(node: ParserNode): node is ParserNode & {readonly elements: readonly ParserBindingElement[]};
+  isArrayBindingPattern(node: ParserNode): node is ParserNode & {readonly elements: readonly ParserBindingElement[]};
+  isFunctionDeclaration(node: ParserNode): boolean;
+  isFunctionExpression(node: ParserNode): boolean;
+  isArrowFunction(node: ParserNode): boolean;
+  isMethodDeclaration(node: ParserNode): boolean;
+  isGetAccessorDeclaration(node: ParserNode): boolean;
+  isSetAccessorDeclaration(node: ParserNode): boolean;
+  isConstructorDeclaration(node: ParserNode): boolean;
+  isVariableDeclaration(
+    node: ParserNode
+  ): node is ParserNode & {readonly name: ParserNode; readonly initializer?: ParserNode};
+  isPropertyAssignment(
+    node: ParserNode
+  ): node is ParserNode & {readonly name: ParserNode; readonly initializer: ParserNode};
+  isBinaryExpression(
+    node: ParserNode
+  ): node is ParserNode & {readonly left: ParserNode; readonly right: ParserNode; readonly operatorToken: ParserNode};
+  isExportAssignment(node: ParserNode): node is ParserNode & {readonly expression: ParserNode};
+  isCallExpression(node: ParserNode): node is ParserCallLike & {readonly arguments: readonly ParserNode[]};
+  isNewExpression(node: ParserNode): node is ParserCallLike;
+  isStatement(node: ParserNode): boolean;
+  isClassDeclaration(node: ParserNode): boolean;
+  isClassExpression(node: ParserNode): boolean;
+}
+
+export interface GeneratedExclusion {
+  readonly path: string;
+  readonly reason: string;
+}
+
+export interface ComplexityFinding {
+  readonly file: string;
+  readonly identity: string;
+  readonly score: number;
+}
+
+export interface ToolVersions {
+  readonly oxlint: string;
+  readonly sonarjs: string;
+  readonly typescriptParser: string;
+}
+
+export interface ComplexityBaseline {
+  readonly schemaVersion: 1;
+  readonly threshold: 15;
+  readonly versions: ToolVersions;
+  readonly generatedExclusions: readonly GeneratedExclusion[];
+  readonly findings: readonly ComplexityFinding[];
+}
+
+export interface OxlintDiagnostic {
+  readonly message: string;
+  readonly filename: string;
+  readonly labels?: readonly {
+    readonly span?: {
+      readonly offset?: number;
+      readonly line?: number;
+      readonly column?: number;
+    };
+  }[];
+}
+
+export interface ComplexitySuppression {
+  readonly offset: number;
+  readonly directive: string;
+}
+
+interface InternalOxlintDiagnostic extends OxlintDiagnostic {
+  readonly code: string;
+}
+
+interface OxlintReport {
+  readonly number_of_files: number;
+  readonly diagnostics: readonly InternalOxlintDiagnostic[];
+}
+
+interface UnvalidatedBaseline {
+  readonly schemaVersion?: unknown;
+  readonly threshold?: unknown;
+  readonly versions?: {
+    readonly oxlint?: unknown;
+    readonly sonarjs?: unknown;
+    readonly typescriptParser?: unknown;
+  } | null;
+  readonly generatedExclusions?: unknown;
+  readonly findings?: unknown;
+}
+
+interface PackageManifest {
+  readonly devDependencies?: {
+    readonly oxlint?: string;
+    readonly 'eslint-plugin-sonarjs'?: string;
+  };
+}
+
+interface PnpmLockSnapshot {
+  readonly dependencies?: {
+    readonly typescript?: string;
+  };
+}
+
+interface PnpmLockValue {
+  readonly snapshots?: Readonly<Record<string, PnpmLockSnapshot>>;
+}
+
+interface ValidatedBaseline extends ComplexityBaseline {
+  readonly scores: Map<string, number>;
+}
+
+interface SuppressionDirective {
+  readonly rules: string[];
+  readonly broad: boolean;
+}
+
+interface TreeEntry {
+  readonly mode: string;
+  readonly type: string;
+  readonly oid: string;
+}
+
+interface SourceBlobEntry {
+  readonly path: string;
+  readonly oid: string;
+}
+
+interface YamlParseError {
+  readonly message: string;
+}
+
+interface YamlDocument {
+  readonly errors: readonly YamlParseError[];
+  toJSON(): unknown;
+}
+
+interface YamlParser {
+  parseAllDocuments(source: string): YamlDocument[];
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BASELINE_PATH = 'sonarjs-cognitive-complexity-baseline.json';
@@ -18,7 +236,7 @@ const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx',
 
 // These tracked files are generated artifacts, not maintainable source. Every
 // release source overlay and vendored TypeScript source file remains in scope.
-export const GENERATED_EXCLUSIONS = Object.freeze([
+export const GENERATED_EXCLUSIONS: readonly GeneratedExclusion[] = Object.freeze([
   {
     path: 'releases/web-decision-0.3.0/package/dist/index.js',
     reason:
@@ -33,17 +251,18 @@ export const GENERATED_EXCLUSIONS = Object.freeze([
 
 const require = createRequire(import.meta.url);
 const sonarPluginEntry = require.resolve('eslint-plugin-sonarjs');
-const ts = createRequire(sonarPluginEntry)('typescript');
-const yaml = createRequire(sonarPluginEntry)('yaml');
+// Keep the parser loaded by the pinned SonarJS plugin; this facade covers only the compiler API used here.
+const ts = createRequire(sonarPluginEntry)('typescript') as SonarTypeScriptParser;
+const yaml = createRequire(sonarPluginEntry)('yaml') as YamlParser;
 
 export {ROOT};
 export const TYPESCRIPT_PARSER_VERSION = ts.version;
 
-function fail(message) {
+function fail(message: string): never {
   throw new Error(message);
 }
 
-function normalizedTrackedPath(name) {
+function normalizedTrackedPath(name: string): string {
   if (
     typeof name !== 'string' ||
     name.length === 0 ||
@@ -57,7 +276,10 @@ function normalizedTrackedPath(name) {
   return name;
 }
 
-export function selectTrackedSources(trackedNames, exclusions = GENERATED_EXCLUSIONS) {
+export function selectTrackedSources(
+  trackedNames: readonly string[],
+  exclusions: readonly GeneratedExclusion[] = GENERATED_EXCLUSIONS
+): string[] {
   const names = trackedNames.map(normalizedTrackedPath);
   if (new Set(names).size !== names.length) fail('Duplicate tracked paths were reported by git.');
 
@@ -78,7 +300,7 @@ export function selectTrackedSources(trackedNames, exclusions = GENERATED_EXCLUS
   return selected.sort();
 }
 
-function git(args, options = {}) {
+function git(args: readonly string[], options: SpawnSyncOptionsWithBufferEncoding = {}): SpawnSyncReturns<Buffer> {
   const result = spawnSync('git', args, {
     cwd: ROOT,
     encoding: 'buffer',
@@ -89,7 +311,7 @@ function git(args, options = {}) {
   return result;
 }
 
-export function sourceNamesInWorkingTree(root = ROOT) {
+export function sourceNamesInWorkingTree(root = ROOT): string[] {
   const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
     cwd: root,
     encoding: 'buffer',
@@ -103,11 +325,11 @@ export function sourceNamesInWorkingTree(root = ROOT) {
     .filter((name) => name.length > 0);
 }
 
-function workingTreeSources() {
+function workingTreeSources(): string[] {
   return selectTrackedSources(sourceNamesInWorkingTree());
 }
 
-function verifySourceFile(relativePath) {
+function verifySourceFile(relativePath: string): string {
   const absolutePath = path.join(ROOT, ...relativePath.split('/'));
   const stats = fs.lstatSync(absolutePath);
   if (!stats.isFile() || stats.isSymbolicLink()) {
@@ -116,12 +338,12 @@ function verifySourceFile(relativePath) {
   return fs.readFileSync(absolutePath, 'utf8');
 }
 
-function suppressionDirective(comment) {
+function suppressionDirective(comment: string): SuppressionDirective | null {
   const match = /\b(?:eslint|oxlint)-disable(?:-next-line|-line)?\b/i.exec(comment);
   if (!match) return null;
   const tail = comment
     .slice(match.index + match[0].length)
-    .split(/\s+--\s+/u, 1)[0]
+    .split(/\s+--\s+/u, 1)[0]!
     .trim();
   const rules = tail
     .split(/[,\s]+/u)
@@ -130,10 +352,10 @@ function suppressionDirective(comment) {
   return {rules, broad: rules.length === 0 || rules.includes('*')};
 }
 
-export function findComplexitySuppressions(source) {
+export function findComplexitySuppressions(source: string): ComplexitySuppression[] {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source);
-  const violations = [];
-  let token;
+  const violations: ComplexitySuppression[] = [];
+  let token: number;
   do {
     token = scanner.scan();
     if (token !== ts.SyntaxKind.SingleLineCommentTrivia && token !== ts.SyntaxKind.MultiLineCommentTrivia) {
@@ -159,18 +381,19 @@ export function findComplexitySuppressions(source) {
   return violations;
 }
 
-function sourceFileFor(source, fileName) {
+function sourceFileFor(source: string, fileName: string): ParserSourceFile {
   const kind = /\.[cm]?tsx?$/u.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.JSX;
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
   if (sourceFile.parseDiagnostics?.length) {
     const diagnostic = sourceFile.parseDiagnostics[0];
+    if (!diagnostic) fail(`TypeScript ${ts.version} could not safely parse ${fileName}.`);
     const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ');
     fail(`TypeScript ${ts.version} could not safely parse ${fileName}: ${message}`);
   }
   return sourceFile;
 }
 
-function utf8ByteOffsetToUtf16(source, byteOffset) {
+function utf8ByteOffsetToUtf16(source: string, byteOffset: number): number {
   const buffer = Buffer.from(source, 'utf8');
   if (!Number.isInteger(byteOffset) || byteOffset < 0 || byteOffset > buffer.length) {
     fail(`Oxlint returned an invalid UTF-8 byte offset: ${byteOffset}`);
@@ -182,15 +405,15 @@ function utf8ByteOffsetToUtf16(source, byteOffset) {
   return prefix.length;
 }
 
-function propertyNameText(name) {
+function propertyNameText(name: ParserNode | undefined): string {
   if (!name) return '';
   if (ts.isIdentifier(name) || ts.isPrivateIdentifier(name)) return name.text;
   if (ts.isStringLiteralLike(name) || ts.isNumericLiteral(name)) return name.text;
   if (ts.isComputedPropertyName(name)) return `[${canonicalNode(name.expression)}]`;
-  return ts.SyntaxKind[name.kind] ?? 'unknown';
+  return (ts.SyntaxKind[name.kind] ?? 'unknown') as string;
 }
 
-function bindingNameText(name) {
+function bindingNameText(name: ParserNode): string {
   if (ts.isIdentifier(name)) return name.text;
   if (ts.isObjectBindingPattern(name)) {
     return `{${name.elements.map((entry) => propertyNameText(entry.propertyName ?? entry.name)).join(',')}}`;
@@ -201,21 +424,21 @@ function bindingNameText(name) {
   return canonicalNode(name);
 }
 
-function canonicalNode(node, replacedNode = null) {
+function canonicalNode(node: ParserNode, replacedNode: ParserNode | null = null): string {
   if (node === replacedNode) return '<function>';
   if (ts.isFunctionLike(node)) return '<nested-function>';
-  let value = ts.SyntaxKind[node.kind] ?? String(node.kind);
+  let value = (ts.SyntaxKind[node.kind] ?? String(node.kind)) as string;
   if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) value += `:${node.text}`;
   else if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) value += `:${node.text}`;
   else if (node.operatorToken) value += `:op-${ts.SyntaxKind[node.operatorToken.kind]}`;
-  const children = [];
+  const children: string[] = [];
   node.forEachChild((child) => {
     children.push(canonicalNode(child, replacedNode));
   });
   return children.length ? `${value}(${children.join(';')})` : value;
 }
 
-function isFunctionLike(node) {
+function isFunctionLike(node: ParserNode): node is ParserFunctionLike {
   return (
     ts.isFunctionDeclaration(node) ||
     ts.isFunctionExpression(node) ||
@@ -227,19 +450,19 @@ function isFunctionLike(node) {
   );
 }
 
-function parentFunction(node) {
+function parentFunction(node: ParserNode): ParserFunctionLike | null {
   let current = node.parent;
   while (current && !isFunctionLike(current)) current = current.parent;
   return current ?? null;
 }
 
-function nearestStatement(node) {
+function nearestStatement(node: ParserNode): ParserNode {
   let current = node.parent;
   while (current && !ts.isStatement(current)) current = current.parent;
   return current ?? node;
 }
 
-function nearestCall(node) {
+function nearestCall(node: ParserNode): ParserCallLike | null {
   let current = node.parent;
   while (current && !ts.isCallExpression(current) && !ts.isNewExpression(current)) {
     if (isFunctionLike(current)) return null;
@@ -248,7 +471,7 @@ function nearestCall(node) {
   return current ?? null;
 }
 
-function functionLocalName(node) {
+function functionLocalName(node: ParserFunctionLike): string {
   if (ts.isConstructorDeclaration(node)) return 'member:constructor';
   if (node.name) {
     if (ts.isMethodDeclaration(node) || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
@@ -257,7 +480,7 @@ function functionLocalName(node) {
     return `function:${propertyNameText(node.name)}`;
   }
 
-  const parent = node.parent;
+  const parent = node.parent!;
   if (ts.isVariableDeclaration(parent) && parent.initializer === node) {
     return `binding:${bindingNameText(parent.name)}`;
   }
@@ -284,17 +507,17 @@ function functionLocalName(node) {
   return `anonymous:${ts.SyntaxKind[node.kind]}:${canonicalNode(statement, node)}`;
 }
 
-function classOwnerName(node) {
+function classOwnerName(node: ParserNode): string {
   if (node.name) return propertyNameText(node.name);
-  const parent = node.parent;
+  const parent = node.parent!;
   if (ts.isVariableDeclaration(parent)) return bindingNameText(parent.name);
   if (ts.isPropertyAssignment(parent)) return propertyNameText(parent.name);
   if (ts.isBinaryExpression(parent) && parent.right === node) return canonicalNode(parent.left);
   return 'anonymous';
 }
 
-function nonFunctionOwnerSegments(node) {
-  const segments = [];
+function nonFunctionOwnerSegments(node: ParserNode): string[] {
+  const segments: string[] = [];
   let current = node.parent;
   while (current && !isFunctionLike(current)) {
     if (ts.isClassDeclaration(current) || ts.isClassExpression(current)) {
@@ -309,7 +532,7 @@ function nonFunctionOwnerSegments(node) {
   return segments;
 }
 
-function functionIdentity(node) {
+function functionIdentity(node: ParserFunctionLike): string {
   const parent = parentFunction(node);
   const outer = parent ? functionIdentity(parent) : 'module';
   const local = functionLocalName(node);
@@ -324,9 +547,9 @@ function functionIdentity(node) {
   return segments.join('/');
 }
 
-function functionAtOffset(sourceFile, offset) {
-  const candidates = [];
-  const visit = (node) => {
+function functionAtOffset(sourceFile: ParserSourceFile, offset: number): ParserFunctionLike | null {
+  const candidates: ParserFunctionLike[] = [];
+  const visit = (node: ParserNode): void => {
     if (isFunctionLike(node) && node.body) {
       const bodyStart = node.body.getStart(sourceFile);
       if (bodyStart <= offset && offset < node.body.end) candidates.push(node);
@@ -335,8 +558,8 @@ function functionAtOffset(sourceFile, offset) {
   };
   visit(sourceFile);
   if (candidates.length === 0) {
-    const anyContaining = [];
-    const visitAny = (node) => {
+    const anyContaining: ParserFunctionLike[] = [];
+    const visitAny = (node: ParserNode): void => {
       if (isFunctionLike(node) && node.getStart(sourceFile) <= offset && offset < node.end) {
         anyContaining.push(node);
       }
@@ -347,10 +570,10 @@ function functionAtOffset(sourceFile, offset) {
   }
   if (candidates.length === 0) return null;
   candidates.sort((left, right) => left.end - left.getStart(sourceFile) - (right.end - right.getStart(sourceFile)));
-  return candidates[0];
+  return candidates[0]!;
 }
 
-export function diagnosticIdentity(diagnostic, source, fileName) {
+export function diagnosticIdentity(diagnostic: OxlintDiagnostic, source: string, fileName: string): ComplexityFinding {
   const scoreMatch = /from (\d+) to the (\d+) allowed/u.exec(diagnostic.message);
   if (!scoreMatch || Number(scoreMatch[2]) !== THRESHOLD) {
     fail(`Cannot parse SonarJS complexity diagnostic: ${diagnostic.message}`);
@@ -361,7 +584,7 @@ export function diagnosticIdentity(diagnostic, source, fileName) {
   }
   const span = diagnostic.labels?.[0]?.span;
   if (!span || !Number.isInteger(span.offset)) fail('Oxlint diagnostic is missing a byte offset.');
-  const offset = utf8ByteOffsetToUtf16(source, span.offset);
+  const offset = utf8ByteOffsetToUtf16(source, span.offset as number);
   const sourceFile = sourceFileFor(source, fileName);
   const node = functionAtOffset(sourceFile, offset);
   if (!node) {
@@ -374,7 +597,27 @@ export function diagnosticIdentity(diagnostic, source, fileName) {
   };
 }
 
-export function runOxlint(files) {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function parseOxlintDiagnostics(stdout: string, batchLength: number): OxlintDiagnostic[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (error) {
+    fail(`Oxlint returned malformed JSON: ${errorMessage(error)}`);
+  }
+  const report = parsed as OxlintReport;
+  if (report.number_of_files !== batchLength || !Array.isArray(report.diagnostics)) {
+    fail(`Oxlint scanned ${report.number_of_files} of ${batchLength} selected files.`);
+  }
+  // Oxlint is the pinned local tool; preserve its diagnostic objects after checking the report envelope.
+  const diagnostics = report.diagnostics as InternalOxlintDiagnostic[];
+  return diagnostics.filter((item) => item.code === RULE_CODE);
+}
+
+export function runOxlint(files: readonly string[]): OxlintDiagnostic[] {
   const oxlintPackage = require.resolve('oxlint/package.json');
   const oxlintEntry = path.join(path.dirname(oxlintPackage), 'bin', 'oxlint');
   const cacheDirectory = path.join(ROOT, 'node_modules', '.cache');
@@ -388,7 +631,7 @@ export function runOxlint(files) {
     }),
     {flag: 'wx'}
   );
-  const all = [];
+  const all: OxlintDiagnostic[] = [];
   try {
     for (let start = 0; start < files.length; start += OXLINT_BATCH_SIZE) {
       const batch = files.slice(start, start + OXLINT_BATCH_SIZE);
@@ -415,16 +658,7 @@ export function runOxlint(files) {
       if (result.status !== 0) {
         fail(`Oxlint failed while scanning tracked sources:\n${result.stderr || result.stdout}`);
       }
-      let report;
-      try {
-        report = JSON.parse(result.stdout);
-      } catch (error) {
-        fail(`Oxlint returned malformed JSON: ${error.message}`);
-      }
-      if (report.number_of_files !== batch.length || !Array.isArray(report.diagnostics)) {
-        fail(`Oxlint scanned ${report.number_of_files} of ${batch.length} selected files.`);
-      }
-      all.push(...report.diagnostics.filter((item) => item.code === RULE_CODE));
+      all.push(...parseOxlintDiagnostics(result.stdout, batch.length));
     }
   } finally {
     fs.rmSync(configPath, {force: true});
@@ -432,11 +666,14 @@ export function runOxlint(files) {
   return all;
 }
 
-function findingKey(entry) {
+function findingKey(entry: ComplexityFinding): string {
   return `${entry.file}\0${entry.identity}`;
 }
 
-export function validateFindings(findings, label = 'Complexity findings') {
+export function validateFindings(
+  findings: readonly ComplexityFinding[],
+  label = 'Complexity findings'
+): Map<string, number> {
   const keys = new Set();
   for (const finding of findings) {
     const file = normalizedTrackedPath(finding.file);
@@ -454,7 +691,8 @@ export function validateFindings(findings, label = 'Complexity findings') {
   return new Map(findings.map((finding) => [findingKey(finding), finding.score]));
 }
 
-function validateBaseline(input, label) {
+function validateBaseline(inputValue: unknown, label: string): ValidatedBaseline {
+  const input = inputValue as UnvalidatedBaseline;
   if (
     !input ||
     input.schemaVersion !== 1 ||
@@ -468,22 +706,30 @@ function validateBaseline(input, label) {
   ) {
     fail(`${label} has an invalid schema or threshold.`);
   }
+  const generatedExclusions = input.generatedExclusions as GeneratedExclusion[];
+  const findings = input.findings as ComplexityFinding[];
   const expectedExclusions = JSON.stringify(GENERATED_EXCLUSIONS);
-  if (JSON.stringify(input.generatedExclusions) !== expectedExclusions) {
+  if (JSON.stringify(generatedExclusions) !== expectedExclusions) {
     fail(`${label} generated exclusions differ from the checked-in list.`);
   }
-  const scores = validateFindings(input.findings, label);
-  return {...input, scores};
+  const scores = validateFindings(findings, label);
+  return {...(input as ComplexityBaseline), scores};
 }
 
-function versionsFromManifest(packageJson, lockText, label, expectedParserVersion = null) {
-  const oxlintVersion = packageJson.devDependencies?.oxlint;
-  const sonarVersion = packageJson.devDependencies?.['eslint-plugin-sonarjs'];
+function versionsFromManifest(
+  packageJson: unknown,
+  lockText: string,
+  label: string,
+  expectedParserVersion: string | null = null
+): ToolVersions {
+  const manifest = packageJson as PackageManifest;
+  const oxlintVersion = manifest.devDependencies?.oxlint;
+  const sonarVersion = manifest.devDependencies?.['eslint-plugin-sonarjs'];
   if (!oxlintVersion || !sonarVersion) fail('Pinned Oxlint/SonarJS versions are missing from package.json.');
   const documents = yaml.parseAllDocuments(lockText);
   const locks = documents.map((document) => {
-    if (document.errors.length) fail(`Cannot parse ${label} pnpm lockfile: ${document.errors[0].message}`);
-    return document.toJSON();
+    if (document.errors.length) fail(`Cannot parse ${label} pnpm lockfile: ${document.errors[0]!.message}`);
+    return document.toJSON() as PnpmLockValue | undefined;
   });
   const pluginPrefix = `eslint-plugin-sonarjs@${sonarVersion}`;
   const parserVersions = new Set(
@@ -496,16 +742,19 @@ function versionsFromManifest(packageJson, lockText, label, expectedParserVersio
   if (parserVersions.size !== 1 || (expectedParserVersion && !parserVersions.has(expectedParserVersion))) {
     fail(`Pinned TypeScript parser version does not match ${label} pnpm lockfile.`);
   }
-  return {oxlint: oxlintVersion, sonarjs: sonarVersion, typescriptParser: [...parserVersions][0]};
+  const typescriptParser = [...parserVersions][0];
+  if (typeof typescriptParser !== 'string')
+    fail(`Pinned TypeScript parser version is invalid in ${label} pnpm lockfile.`);
+  return {oxlint: oxlintVersion, sonarjs: sonarVersion, typescriptParser};
 }
 
-function versionsFromPackage() {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+function versionsFromPackage(): ToolVersions {
+  const packageJson: unknown = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   const lockText = fs.readFileSync(path.join(ROOT, 'pnpm-lock.yaml'), 'utf8');
   return versionsFromManifest(packageJson, lockText, 'current', ts.version);
 }
 
-function versionsAtCommit(commit) {
+function versionsAtCommit(commit: string): ToolVersions {
   const packageResult = git(['show', `${commit}:package.json`]);
   const lockResult = git(['show', `${commit}:pnpm-lock.yaml`]);
   if (packageResult.status !== 0 || lockResult.status !== 0) {
@@ -515,7 +764,7 @@ function versionsAtCommit(commit) {
   return versionsFromManifest(packageJson, lockResult.stdout.toString('utf8'), `trusted ${commit}`);
 }
 
-function compareVersions(left, right) {
+function compareVersions(left: string, right: string): number {
   const leftParts = left.split('.').map(Number);
   const rightParts = right.split('.').map(Number);
   if (
@@ -526,25 +775,25 @@ function compareVersions(left, right) {
     fail(`Unsupported pinned tool version format: ${left} / ${right}`);
   }
   for (let index = 0; index < 3; index += 1) {
-    if (leftParts[index] !== rightParts[index]) return Math.sign(leftParts[index] - rightParts[index]);
+    if (leftParts[index]! !== rightParts[index]!) return Math.sign(leftParts[index]! - rightParts[index]!);
   }
   return 0;
 }
 
-function ensureNoToolDowngrades(candidate, trusted) {
-  for (const name of ['oxlint', 'sonarjs', 'typescriptParser']) {
+function ensureNoToolDowngrades(candidate: ToolVersions, trusted: ToolVersions): void {
+  for (const name of ['oxlint', 'sonarjs', 'typescriptParser'] as const) {
     if (compareVersions(candidate[name], trusted[name]) < 0) {
       fail(`Cognitive complexity tool downgrade is not allowed: ${name} ${trusted[name]} -> ${candidate[name]}.`);
     }
   }
 }
 
-function sameToolVersions(left, right) {
-  return ['oxlint', 'sonarjs', 'typescriptParser'].every((name) => left[name] === right[name]);
+function sameToolVersions(left: ToolVersions, right: ToolVersions): boolean {
+  return (['oxlint', 'sonarjs', 'typescriptParser'] as const).every((name) => left[name] === right[name]);
 }
 
-export function actualBaseline(findings) {
-  const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+export function actualBaseline(findings: readonly ComplexityFinding[]): ComplexityBaseline {
+  const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
   const sorted = [...findings].sort((left, right) => {
     const fileOrder = compareText(left.file, right.file);
     return fileOrder || compareText(left.identity, right.identity);
@@ -558,15 +807,17 @@ export function actualBaseline(findings) {
   };
 }
 
-function loadJsonBytes(buffer, source) {
+function loadJsonBytes(buffer: Buffer, source: string): unknown {
+  let value: unknown;
   try {
-    return JSON.parse(buffer.toString('utf8'));
+    value = JSON.parse(buffer.toString('utf8'));
   } catch (error) {
-    fail(`Cannot parse ${source}: ${error.message}`);
+    fail(`Cannot parse ${source}: ${errorMessage(error)}`);
   }
+  return value;
 }
 
-function trustedBaseline(baseSha) {
+function trustedBaseline(baseSha: string): {readonly sha: string; readonly baseline: ValidatedBaseline | null} {
   if (!/^[0-9a-f]{40}$/u.test(baseSha)) fail('Missing or invalid trusted base SHA.');
   const exists = git(['cat-file', '-e', `${baseSha}^{commit}`]);
   if (exists.status !== 0) fail(`Trusted base commit is unavailable: ${baseSha}`);
@@ -585,7 +836,7 @@ function trustedBaseline(baseSha) {
   return {sha: baseSha, baseline: null};
 }
 
-function compareToTrusted(candidate, trusted) {
+function compareToTrusted(candidate: ValidatedBaseline, trusted: ValidatedBaseline | null): void {
   if (!trusted) return;
   const current = candidate.scores;
   for (const [key, score] of current) {
@@ -601,15 +852,16 @@ function compareToTrusted(candidate, trusted) {
   }
 }
 
-function sourceTreeAtCommit(commit) {
+function sourceTreeAtCommit(commit: string): SourceBlobEntry[] {
   const result = git(['ls-tree', '-r', '-z', '--full-tree', commit]);
   if (result.status !== 0) fail(`Cannot list tracked sources at trusted base ${commit}.`);
-  const entries = new Map();
+  const entries = new Map<string, TreeEntry>();
   for (const record of result.stdout.toString('utf8').split('\0')) {
     if (!record) continue;
     const tab = record.indexOf('\t');
     if (tab < 0) fail('git ls-tree returned an invalid record.');
     const [mode, type, oid] = record.slice(0, tab).split(' ');
+    if (!mode || !type || !oid) fail('git ls-tree returned an invalid record.');
     const name = normalizedTrackedPath(record.slice(tab + 1));
     entries.set(name, {mode, type, oid});
   }
@@ -620,16 +872,20 @@ function sourceTreeAtCommit(commit) {
       fail(`Trusted source is not a regular file: ${name}`);
     }
   }
-  return names.map((name) => ({path: name, oid: entries.get(name).oid}));
+  return names.map((name) => {
+    const entry = entries.get(name);
+    if (!entry) fail(`Trusted source is missing from the Git tree: ${name}`);
+    return {path: name, oid: entry.oid};
+  });
 }
 
-function readBlobs(entries) {
+function readBlobs(entries: readonly SourceBlobEntry[]): Map<string, Buffer> {
   if (entries.length === 0) fail('No tracked sources exist at the trusted base.');
   const output = git(['cat-file', '--batch'], {
     input: Buffer.from(entries.map(({oid}) => oid).join('\n') + '\n', 'utf8')
   });
   if (output.status !== 0) fail(`Cannot read trusted source blobs: ${output.stderr.toString('utf8')}`);
-  const blobs = new Map();
+  const blobs = new Map<string, Buffer>();
   let cursor = 0;
   for (const entry of entries) {
     const headerEnd = output.stdout.indexOf(0x0a, cursor);
@@ -651,7 +907,7 @@ function readBlobs(entries) {
   return blobs;
 }
 
-export function collectFindings(files, sourcePrefix = '') {
+export function collectFindings(files: readonly string[], sourcePrefix = ''): ComplexityFinding[] {
   const lintFiles = files.map((file) => (sourcePrefix ? `${sourcePrefix}/${file}` : file));
   const diagnostics = runOxlint(lintFiles);
   const lintToSource = new Map(lintFiles.map((lintFile, index) => [lintFile, files[index]]));
@@ -666,7 +922,7 @@ export function collectFindings(files, sourcePrefix = '') {
   return findings;
 }
 
-export function scanTrustedCommit(commit) {
+export function scanTrustedCommit(commit: string): ComplexityFinding[] {
   const entries = sourceTreeAtCommit(commit);
   const blobs = readBlobs(entries);
   const cacheDirectory = path.join(ROOT, 'node_modules', '.cache');
@@ -677,7 +933,7 @@ export function scanTrustedCommit(commit) {
     for (const {path: relativePath} of entries) {
       const destination = path.join(temporaryRoot, ...relativePath.split('/'));
       fs.mkdirSync(path.dirname(destination), {recursive: true});
-      fs.writeFileSync(destination, blobs.get(relativePath));
+      fs.writeFileSync(destination, blobs.get(relativePath)!);
     }
     const baseFiles = entries.map(({path: name}) => name);
     for (const file of baseFiles) {
@@ -691,7 +947,10 @@ export function scanTrustedCommit(commit) {
   }
 }
 
-export function compareFindingsToTrusted(currentFindings, trustedFindings) {
+export function compareFindingsToTrusted(
+  currentFindings: readonly ComplexityFinding[],
+  trustedFindings: readonly ComplexityFinding[]
+): void {
   const current = validateFindings(currentFindings, 'Current SonarJS findings');
   const trusted = validateFindings(trustedFindings, 'Trusted SonarJS findings');
   for (const [key, score] of current) {
@@ -703,7 +962,7 @@ export function compareFindingsToTrusted(currentFindings, trustedFindings) {
   }
 }
 
-function verifyCurrentMatchesBaseline(current, reviewed) {
+function verifyCurrentMatchesBaseline(current: ComplexityBaseline, reviewed: ValidatedBaseline): void {
   const reviewedSnapshot = {
     schemaVersion: reviewed.schemaVersion,
     threshold: reviewed.threshold,
@@ -727,7 +986,11 @@ function verifyCurrentMatchesBaseline(current, reviewed) {
   fail('Reviewed cognitive complexity baseline does not match the current scan.');
 }
 
-function verifyAgainstTrustedBase(baseSha, reviewed, findings) {
+function verifyAgainstTrustedBase(
+  baseSha: string,
+  reviewed: ValidatedBaseline,
+  findings: readonly ComplexityFinding[]
+): void {
   const trusted = trustedBaseline(baseSha);
   const previousVersions = trusted.baseline?.versions ?? versionsAtCommit(trusted.sha);
   ensureNoToolDowngrades(reviewed.versions, previousVersions);
@@ -744,18 +1007,22 @@ function verifyAgainstTrustedBase(baseSha, reviewed, findings) {
   compareFindingsToTrusted(findings, scanTrustedCommit(trusted.sha));
 }
 
-function checkSuppressions(files) {
+function checkSuppressions(files: readonly string[]): void {
   for (const file of files) {
     const source = verifySourceFile(file);
     const violations = findComplexitySuppressions(source);
     if (violations.length) {
-      const line = source.slice(0, violations[0].offset).split('\n').length;
-      fail(`${file}:${line} uses a cognitive complexity suppression: ${violations[0].directive}`);
+      const violation = violations[0]!;
+      const line = source.slice(0, violation.offset).split('\n').length;
+      fail(`${file}:${line} uses a cognitive complexity suppression: ${violation.directive}`);
     }
   }
 }
 
-export function checkBaseline(candidateInput, trustedInput = null) {
+export function checkBaseline(
+  candidateInput: ComplexityBaseline,
+  trustedInput: ComplexityBaseline | null = null
+): true {
   const candidate = validateBaseline(candidateInput, 'Candidate baseline');
   const packageVersions = versionsFromPackage();
   if (
@@ -773,7 +1040,7 @@ export function checkBaseline(candidateInput, trustedInput = null) {
   return true;
 }
 
-function main() {
+function main(): void {
   const files = workingTreeSources();
   for (const file of files) verifySourceFile(file);
   checkSuppressions(files);
@@ -797,7 +1064,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     main();
   } catch (error) {
-    process.stderr.write(`${error.message}\n`);
+    process.stderr.write(`${errorMessage(error)}\n`);
     process.exitCode = 1;
   }
 }
