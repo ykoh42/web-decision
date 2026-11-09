@@ -20,15 +20,37 @@ const packed = {
   ]
 };
 const defer = () => {
-  let resolve;
-  const promise = new Promise((done) => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
     resolve = done;
   });
   return {promise, resolve};
 };
-function fixture({select, readback = Promise.resolve(), sync, lifecycle = {}, fn} = {}) {
-  const events = [],
-    ctx = {pendingGPUToCPUCopy: null, gpuBufferFromPtr: () => ({size: 2 ** 20}), copyRawBytesToBuffer() {}};
+type Selection = {unique: number[]; local: Int32Array; rowBanks: Int32Array; packed: Uint32Array; scales: Uint16Array};
+type Selector = (
+  ids: Int32Array,
+  banks: readonly unknown[],
+  options: {readRange: (...args: unknown[]) => Promise<unknown>}
+) => Promise<Selection | void>;
+function fixture({
+  select,
+  readback = Promise.resolve(),
+  sync,
+  lifecycle = {},
+  fn
+}: {
+  select?: Selector;
+  readback?: Promise<void>;
+  sync?: () => void | Promise<void>;
+  lifecycle?: {loss?: unknown};
+  fn?: (...args: unknown[]) => unknown;
+} = {}) {
+  const events: string[] = [],
+    ctx = {
+      pendingGPUToCPUCopy: null as Promise<void> | null,
+      gpuBufferFromPtr: () => ({size: 2 ** 20}),
+      copyRawBytesToBuffer() {}
+    };
   const runtime = {
     lib: {webGPUContext: ctx},
     cpu: () => 'cpu',
@@ -41,7 +63,7 @@ function fixture({select, readback = Promise.resolve(), sync, lifecycle = {}, fn
     dispose() {
       events.push('dispose');
     },
-    empty(shape, dtype, where) {
+    empty(shape: number[], dtype: string, where: string) {
       return {
         shape,
         dtype,
@@ -65,7 +87,7 @@ function fixture({select, readback = Promise.resolve(), sync, lifecycle = {}, fn
   };
   const selector =
     select ||
-    (async (ids) => {
+    (async (ids: Int32Array) => {
       const unique = [...new Set(ids)];
       return {
         unique,
@@ -93,13 +115,13 @@ function fixture({select, readback = Promise.resolve(), sync, lifecycle = {}, fn
     teardownTimeoutMs: 100,
     fn:
       fn ||
-      ((...args) => {
+      ((...args: unknown[]) => {
         events.push(`graph:${args.length}`);
         return {dtype: 'float32', shape: [2]};
       }),
     weights: Array.from({length: 797}, () => ({})),
     source: {inputBanks: [], outputBanks: [], readRange() {}}
-  });
+  } as unknown as ConstructorParameters<typeof ClefTvmRunner>[0]);
   return {runner, events, ctx, lifecycle};
 }
 
@@ -202,7 +224,7 @@ test('device loss during a range read stops the scan before another range', asyn
 });
 
 test('input and output tables are selected independently with their own IDs', async () => {
-  const calls = [];
+  const calls: {ids: number[]; banks: readonly unknown[]}[] = [];
   const current = fixture({
     select: async (ids, banks) => {
       calls.push({ids: Array.from(ids), banks});
@@ -224,8 +246,8 @@ test('input and output tables are selected independently with their own IDs', as
       [11, 65537]
     ]
   );
-  assert.equal(calls[0].banks, current.runner.source.inputBanks);
-  assert.equal(calls[1].banks, current.runner.source.outputBanks);
-  assert.notEqual(calls[0].banks, calls[1].banks);
+  assert.equal(calls[0]!.banks, current.runner.source.inputBanks);
+  assert.equal(calls[1]!.banks, current.runner.source.outputBanks);
+  assert.notEqual(calls[0]!.banks, calls[1]!.banks);
   await current.runner.dispose();
 });

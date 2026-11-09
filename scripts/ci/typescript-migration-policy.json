@@ -4,7 +4,6 @@
   "managedJavaScript": [
     "packages/web-decision/test/clef-loader.test.mjs",
     "packages/web-decision/test/clef-rows.test.mjs",
-    "packages/web-decision/test/clef-runner.test.mjs",
     "packages/web-decision/test/crivo.test.mjs",
     "packages/web-decision/test/d1-omni.test.mjs",
     "packages/web-decision/test/decima.test.mjs",
