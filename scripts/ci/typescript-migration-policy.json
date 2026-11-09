@@ -196,7 +196,6 @@
     "packages/web-decision/test/nari-upload.test.mjs",
     "packages/web-decision/test/opendecider-nano.test.mjs",
     "packages/web-decision/test/parallel-model-assets.test.mjs",
-    "packages/web-decision/test/parameter-upload-count.test.mjs",
     "packages/web-decision/test/pinned-text-loader.test.mjs",
     "packages/web-decision/test/pplx-loader.test.mjs",
     "packages/web-decision/test/pplx-runner.test.mjs",
