@@ -75,7 +75,6 @@
     "packages/web-decision/src/tamev/protocol.mjs",
     "packages/web-decision/src/tamev/runner.mjs",
     "packages/web-decision/src/tamev/session.mjs",
-    "packages/web-decision/src/tamev/tokenizer.mjs",
     "packages/web-decision/src/tamev/typed.mjs",
     "packages/web-decision/src/tinydecide/inputs.mjs",
     "packages/web-decision/src/tinydecide/loader.mjs",
