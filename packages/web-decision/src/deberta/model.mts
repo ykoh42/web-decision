@@ -53,8 +53,8 @@ const validateDecisionFieldsForModel = validateDecisionFields as ValidateDecisio
 const waitForAbortOperation = waitForAbort as WaitForAbort;
 const packDebertaRequestForModel: DebertaPacker = packDebertaRequest;
 const unpackDebertaScoresForModel: DebertaUnpacker = unpackDebertaScores;
-const prepareDebertaSystemOneForModel = prepareDebertaSystemOne as PrepareSystemOne;
-const finishDebertaSystemOneForModel = finishDebertaSystemOne as FinishSystemOne;
+const prepareDebertaSystemOneForModel: PrepareSystemOne = prepareDebertaSystemOne;
+const finishDebertaSystemOneForModel: FinishSystemOne = finishDebertaSystemOne;
 
 function closedError(): WebDecisionError {
   return new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');

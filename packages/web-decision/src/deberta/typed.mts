@@ -1,15 +1,33 @@
 import {WebDecisionError} from '../kev.js';
+import type {DebertaSystemOneAnswer, DebertaSystemOneResult} from '../deberta-single-preview.js';
+
+interface TypedQuestion {
+  readonly name: string;
+  readonly type: 'choice' | 'score' | 'noul';
+  readonly options: readonly string[];
+}
+interface TypedPrepared {
+  readonly metadata: readonly TypedQuestion[];
+}
+interface TypedAnswer {
+  readonly selectedIndex: number;
+  readonly probabilities: readonly {readonly probability: number}[];
+}
+interface TypedResult {
+  readonly tokenCount: number;
+  readonly answers: readonly TypedAnswer[];
+}
 
 const MODEL_ID = 'open-jev-deberta-v3-large-q4f16';
-const invalid = (message) => {
+const invalid: (message: string) => never = (message) => {
   throw new WebDecisionError('INVALID_INPUT', message);
 };
 
-function entries(value, label) {
+function entries(value: unknown, label: string): [string, unknown][] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(`${label} must be an object.`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) invalid(`${label} must be a plain object.`);
-  const result = [];
+  const result: [string, unknown][] = [];
   for (const key of Reflect.ownKeys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
@@ -19,7 +37,7 @@ function entries(value, label) {
   return result;
 }
 
-function values(value, label) {
+function values(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) invalid(`${label} must be an array.`);
   const result = [];
   for (let index = 0; index < value.length; index++) {
@@ -33,38 +51,38 @@ function values(value, label) {
   return result;
 }
 
-function questionFields(question, name) {
+function questionFields(question: unknown, name: string) {
   const fields = Object.fromEntries(entries(question, `Question ${name}`));
   if (Object.keys(fields).some((key) => !['type', 'instructions', 'options'].includes(key)))
     invalid(`Question ${name} has an unsupported field.`);
   if (typeof fields.instructions !== 'string' || !fields.instructions.trim())
     invalid(`Question ${name} needs non-empty instructions.`);
-  return fields;
+  return fields as {type?: unknown; instructions: string; options?: unknown};
 }
 
-function typedOptions(value, name, type) {
+function typedOptions(value: unknown, name: string, type: 'choice' | 'score'): string[] {
   const options = values(value, `Question ${name} options`);
   const minimum = 2;
   const maximum = type === 'score' ? 10 : 255;
   if (options.length < minimum || options.length > maximum)
     invalid(`Question ${name} needs ${minimum} to ${maximum} ${type === 'score' ? 'levels' : 'options'}.`);
-  const seen = new Set();
+  const seen = new Set<string>();
   for (const option of options) {
     if (typeof option !== 'string' || !option.trim() || seen.has(option))
       invalid(`Question ${name} has an empty or duplicate option.`);
     seen.add(option);
   }
-  return options;
+  return options as string[];
 }
 
 /** Prepare the pinned Open-Jev typed protocol without changing its option text or order. */
-export function prepareDebertaSystemOne(state, questions) {
+export function prepareDebertaSystemOne(state: unknown, questions: unknown) {
   if (typeof state !== 'string') invalid('DeBERTa state must be a string.');
   const questionEntries = entries(questions, 'Questions');
   if (questionEntries.length < 1) invalid('Provide at least one named question.');
 
-  const metadata = [];
-  const requestQuestions = [];
+  const metadata: TypedQuestion[] = [];
+  const requestQuestions: {instructions: string; options: string[]}[] = [];
   for (const [name, question] of questionEntries) {
     if (!name.trim()) invalid('Question names cannot be empty.');
     const fields = questionFields(question, name);
@@ -83,15 +101,15 @@ export function prepareDebertaSystemOne(state, questions) {
   return {request: {state, questions: requestQuestions}, metadata};
 }
 
-function finishAnswer(question, answer) {
+function finishAnswer(question: TypedQuestion, answer: TypedAnswer): DebertaSystemOneAnswer {
   const probabilities = answer.probabilities.map(({probability}) => probability);
   const confidence = Math.max(...probabilities);
   if (question.type === 'choice') {
     return {
       type: 'choice',
-      choice: question.options[answer.selectedIndex],
+      choice: question.options[answer.selectedIndex]!,
       confidence,
-      probabilities: Object.fromEntries(question.options.map((option, index) => [option, probabilities[index]]))
+      probabilities: Object.fromEntries(question.options.map((option, index) => [option, probabilities[index]!]))
     };
   }
   if (question.type === 'score') {
@@ -107,15 +125,15 @@ function finishAnswer(question, answer) {
   }
   return {
     type: 'noul',
-    noul: probabilities[1],
-    probabilities: {false: probabilities[0], true: probabilities[1]},
+    noul: probabilities[1]!,
+    probabilities: {false: probabilities[0]!, true: probabilities[1]!},
     confidence
   };
 }
 
-export function finishDebertaSystemOne(prepared, result) {
+export function finishDebertaSystemOne(prepared: TypedPrepared, result: TypedResult): DebertaSystemOneResult {
   const answers = Object.fromEntries(
-    prepared.metadata.map((question, index) => [question.name, finishAnswer(question, result.answers[index])])
+    prepared.metadata.map((question, index) => [question.name, finishAnswer(question, result.answers[index]!)])
   );
   return {model: MODEL_ID, tokenCount: result.tokenCount, answers};
 }
