@@ -2,17 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {WebDecisionError} from '../src/kev.js';
 import {
-  installOpenDeciderNanoGpuCompatibility as installOpenDeciderNanoGpuCompatibilityUntyped,
-  rewriteOpenDeciderNanoShader as rewriteOpenDeciderNanoShaderUntyped
+  installOpenDeciderNanoGpuCompatibility,
+  rewriteOpenDeciderNanoShader
 } from '../src/opendecider-nano/gpu-compat.mjs';
 
 type ShaderInfo = Readonly<Record<string, unknown>>;
-type RewriteResult = Readonly<{
-  code: string;
-  changed: boolean;
-  arrayCount: number;
-  storeCount: number;
-}>;
 type ShaderModule = Readonly<{
   kind: 'sync' | 'async';
   info: ShaderInfo;
@@ -23,22 +17,6 @@ type RuntimeContext = {
   createShaderAsync(info: ShaderInfo, code: string): Promise<ShaderModule>;
   deviceAllocDataSpace(nbytes: number): number;
 };
-type CompatibilityReport = Readonly<{
-  shaderModules: number;
-  i8ArrayDeclarations: number;
-  boolStores: number;
-  expandedStorageAllocations: number;
-}>;
-type Compatibility = Readonly<{
-  report: CompatibilityReport;
-  restore(): void;
-}>;
-type RewriteShader = (code: string) => RewriteResult;
-type InstallCompatibility = (context: RuntimeContext) => Compatibility;
-
-const rewriteOpenDeciderNanoShader: RewriteShader = rewriteOpenDeciderNanoShaderUntyped;
-const installOpenDeciderNanoGpuCompatibility: InstallCompatibility = installOpenDeciderNanoGpuCompatibilityUntyped;
-
 const contextPrototype: RuntimeContext = {
   createShader(info, code) {
     return {kind: 'sync', info, code};

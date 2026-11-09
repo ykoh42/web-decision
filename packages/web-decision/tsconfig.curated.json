@@ -26,7 +26,10 @@
     "test/kev06-contract.test.mts",
     "test/model-assets.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
+    "test/opendecider-nano-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",
+    "src/opendecider-nano/gpu-compat.mts",
+    "src/opendecider-nano/tokenizer.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]

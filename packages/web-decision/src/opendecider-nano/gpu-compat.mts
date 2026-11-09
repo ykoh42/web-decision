@@ -4,13 +4,37 @@ const TVM_POOL_PAGE_BYTES = 4096;
 const BOOL_I32_PAGE_BYTES = TVM_POOL_PAGE_BYTES * 2;
 const I8_ARRAY = /\barray\s*<\s*i8\s*>/g;
 const BOOL_STORE = /(\]\s*=\s*)bool\(([^;]*?)\);/g;
-const stripComments = (code) => code.replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g, '');
+const stripComments = (code: string): string => code.replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g, '');
 
-function compatibilityError(message, cause) {
+interface RewriteResult {
+  readonly code: string;
+  readonly changed: boolean;
+  readonly arrayCount: number;
+  readonly storeCount: number;
+}
+
+interface MutableCompatibilityReport {
+  shaderModules: number;
+  i8ArrayDeclarations: number;
+  boolStores: number;
+  expandedStorageAllocations: number;
+}
+
+interface CompatibilityReport extends Readonly<MutableCompatibilityReport> {}
+
+interface Compatibility {
+  readonly report: CompatibilityReport;
+  restore(): void;
+}
+
+type RuntimeMethod = (this: unknown, ...args: unknown[]) => unknown;
+type MethodWrapper = (original: RuntimeMethod) => RuntimeMethod;
+
+function compatibilityError(message: string, cause?: unknown): WebDecisionError {
   return new WebDecisionError('UNSUPPORTED_ENVIRONMENT', message, cause ? {cause} : undefined);
 }
 
-export function rewriteOpenDeciderNanoShader(code) {
+export function rewriteOpenDeciderNanoShader(code: unknown): RewriteResult {
   if (typeof code !== 'string') throw new TypeError('A WebGPU shader source string is required.');
   const uncommented = stripComments(code);
   if (!/\bi8\b/.test(uncommented)) return {code, changed: false, arrayCount: 0, storeCount: 0};
@@ -22,21 +46,22 @@ export function rewriteOpenDeciderNanoShader(code) {
 
   const rewrittenArrays = code.replace(I8_ARRAY, 'array<i32>');
   let storeCount = 0;
-  const rewritten = rewrittenArrays.replace(BOOL_STORE, (_, target, value) => {
+  const rewritten = rewrittenArrays.replace(BOOL_STORE, (_match: string, target: string, value: string) => {
     storeCount++;
     return `${target}i32(bool(${value}));`;
   });
   return {code: rewritten, changed: true, arrayCount: arrays.length, storeCount};
 }
 
-function installMethod(target, name, wrap) {
+function installMethod(target: object, name: string, wrap: MethodWrapper): () => void {
+  const methodTarget = target as Record<string, unknown>;
   const previous = Object.getOwnPropertyDescriptor(target, name);
   if (previous && !previous.configurable)
     throw compatibilityError(`Cannot install OpenDecider-nano TVM compatibility for ${name}.`);
-  const original = target[name];
+  const original = methodTarget[name];
   if (typeof original !== 'function')
     throw compatibilityError(`OpenDecider-nano requires the pinned TVM ${name} method.`);
-  const replacement = wrap(original);
+  const replacement = wrap(original as RuntimeMethod);
   try {
     Object.defineProperty(target, name, {
       configurable: true,
@@ -48,14 +73,14 @@ function installMethod(target, name, wrap) {
     throw compatibilityError(`Cannot install OpenDecider-nano TVM compatibility for ${name}.`, cause);
   }
   return () => {
-    if (target[name] !== replacement) return;
+    if (methodTarget[name] !== replacement) return;
     if (previous) Object.defineProperty(target, name, previous);
-    else delete target[name];
+    else delete methodTarget[name];
   };
 }
 
-function wrapShader(report, original) {
-  return function (info, code, ...args) {
+function wrapShader(report: MutableCompatibilityReport, original: RuntimeMethod): RuntimeMethod {
+  return function (this: unknown, info: unknown, code: unknown, ...args: unknown[]) {
     if (typeof code !== 'string') return original.call(this, info, code, ...args);
     const result = rewriteOpenDeciderNanoShader(code);
     if (!result.changed) return original.call(this, info, code, ...args);
@@ -67,21 +92,31 @@ function wrapShader(report, original) {
 }
 
 /** Keep the compatibility changes on the pinned TVM runtime context only. */
-export function installOpenDeciderNanoGpuCompatibility(context) {
+export function installOpenDeciderNanoGpuCompatibility(context: unknown): Compatibility {
   if (!context || typeof context !== 'object')
     throw compatibilityError('OpenDecider-nano needs the pinned TVM WebGPU context.');
-  const report = {shaderModules: 0, i8ArrayDeclarations: 0, boolStores: 0, expandedStorageAllocations: 0};
-  const restores = [];
+  const runtimeContext = context as object;
+  const report: MutableCompatibilityReport = {
+    shaderModules: 0,
+    i8ArrayDeclarations: 0,
+    boolStores: 0,
+    expandedStorageAllocations: 0
+  };
+  const restores: Array<() => void> = [];
   try {
-    restores.push(installMethod(context, 'createShader', (original) => wrapShader(report, original)));
-    restores.push(installMethod(context, 'createShaderAsync', (original) => wrapShader(report, original)));
+    restores.push(installMethod(runtimeContext, 'createShader', (original) => wrapShader(report, original)));
+    restores.push(installMethod(runtimeContext, 'createShaderAsync', (original) => wrapShader(report, original)));
     restores.push(
       installMethod(
-        context,
+        runtimeContext,
         'deviceAllocDataSpace',
         (original) =>
-          function (nbytes, ...args) {
-            if (Number.isSafeInteger(nbytes) && nbytes >= TVM_POOL_PAGE_BYTES && nbytes < BOOL_I32_PAGE_BYTES) {
+          function (this: unknown, nbytes: unknown, ...args: unknown[]) {
+            if (
+              Number.isSafeInteger(nbytes as number) &&
+              (nbytes as number) >= TVM_POOL_PAGE_BYTES &&
+              (nbytes as number) < BOOL_I32_PAGE_BYTES
+            ) {
               report.expandedStorageAllocations++;
               return original.call(this, BOOL_I32_PAGE_BYTES, ...args);
             }
