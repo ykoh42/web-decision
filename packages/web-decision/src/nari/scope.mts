@@ -1,17 +1,42 @@
 import {WebDecisionError} from '../kev.js';
 import {checkGpuDevice} from '../gpu-session-utils.js';
 
+interface NariScopeRunner {
+  poisoned?: boolean | undefined;
+  readonly disposalGuard?: {readonly blocked?: unknown} | null | undefined;
+  readonly runtime: {
+    readonly lib?: {readonly webGPUContext?: unknown} | null | undefined;
+    beginScope(): unknown;
+    endScope(): unknown;
+  };
+  readonly device: {sync(): unknown};
+  readonly gpu: {
+    pushErrorScope(filter: 'out-of-memory' | 'validation'): unknown;
+    popErrorScope(): unknown;
+  };
+  readonly lifecycle: {readonly loss: unknown; readonly disposed: unknown};
+  readonly uncaptured: readonly unknown[];
+}
+
+export interface NariReadbackLease {
+  prepareReadback(): void;
+  captureReadback(): void;
+  sync(): Promise<void>;
+  nextReadback(): void;
+  syncWithoutReadback(): Promise<void>;
+}
+
 // A failed drain cannot safely free WASM destinations or the owning runtime.
 // Keep them alive until this JavaScript realm is discarded.
-const quarantine = new Set();
-const noFailure = Symbol('no failure');
+const quarantine = new Set<{readonly runner: NariScopeRunner; readonly lease: ReadbackLease | undefined}>();
+const noFailure: unique symbol = Symbol('no failure');
 
-export function assertUsable(runner) {
-  if (runner.poisoned || runner.disposalGuard?.blocked)
+export function assertUsable(runner: unknown): void {
+  if ((runner as NariScopeRunner).poisoned || (runner as NariScopeRunner).disposalGuard?.blocked)
     throw new WebDecisionError('INFERENCE_ERROR', 'The Nari session has unresolved GPU work.');
 }
 
-function poison(runner, lease) {
+function poison(runner: NariScopeRunner, lease: ReadbackLease | undefined): void {
   runner.poisoned = true;
   observeUnexpected(lease?.context);
   observeUnexpected(lease?.currentContext());
@@ -20,16 +45,22 @@ function poison(runner, lease) {
 
 // Attaching a rejection handler does not certify that a readback is safe or
 // settled; it only prevents an unobserved native Promise rejection.
-function observeUnexpected(context) {
+function observeUnexpected(context: unknown): void {
   try {
-    const descriptor = context && Object.getOwnPropertyDescriptor(context, 'pendingGPUToCPUCopy');
+    const descriptor = (context && Object.getOwnPropertyDescriptor(context as object, 'pendingGPUToCPUCopy')) as
+      | {readonly value?: unknown}
+      | null
+      | undefined;
     if (descriptor && Object.hasOwn(descriptor, 'value') && descriptor.value instanceof Promise)
-      Promise.prototype.then.call(descriptor.value, undefined, () => {});
+      Promise.prototype.then.call(descriptor.value as Promise<unknown>, undefined, () => {});
   } catch {}
 }
 
-function pendingField(context) {
-  const descriptor = context && Object.getOwnPropertyDescriptor(context, 'pendingGPUToCPUCopy');
+function pendingField(context: unknown): unknown {
+  const descriptor = (context && Object.getOwnPropertyDescriptor(context as object, 'pendingGPUToCPUCopy')) as
+    | {readonly value?: unknown; readonly writable?: boolean}
+    | null
+    | undefined;
   if (!descriptor || !Object.hasOwn(descriptor, 'value') || !descriptor.writable) {
     observeUnexpected(context);
     throw Error('Unrecognized TVM readback state');
@@ -38,7 +69,16 @@ function pendingField(context) {
 }
 
 class ReadbackLease {
-  constructor(runner) {
+  declare runner: NariScopeRunner;
+  declare context: unknown;
+  declare unknown: boolean;
+  declare prepared: boolean;
+  declare settled: boolean;
+  declare succeeded: boolean;
+  declare readback: Promise<unknown> | null | undefined;
+  declare observed: Promise<void> | null | undefined;
+
+  constructor(runner: NariScopeRunner) {
     this.runner = runner;
     this.context = runner.runtime?.lib?.webGPUContext;
     this.unknown = false;
@@ -46,17 +86,17 @@ class ReadbackLease {
     this.settled = false;
     this.succeeded = false;
   }
-  currentContext() {
+  currentContext(): unknown {
     return this.runner.runtime?.lib?.webGPUContext;
   }
-  assertEmpty() {
+  assertEmpty(): void {
     if (this.currentContext() !== this.context || pendingField(this.context) !== null) {
       observeUnexpected(this.context);
       observeUnexpected(this.currentContext());
       throw Error('Unexpected pending TVM readback');
     }
   }
-  assertInitial() {
+  assertInitial(): void {
     try {
       this.assertEmpty();
     } catch (error) {
@@ -66,7 +106,7 @@ class ReadbackLease {
       throw error;
     }
   }
-  prepareReadback() {
+  prepareReadback(): void {
     try {
       this.assertEmpty();
       if (this.prepared) throw Error('Readback already prepared');
@@ -76,11 +116,11 @@ class ReadbackLease {
       throw error;
     }
   }
-  captureReadback() {
+  captureReadback(): void {
     try {
       if (this.currentContext() !== this.context || this.readback || !this.prepared)
         throw Error('Readback context changed');
-      this.readback = pendingField(this.context);
+      this.readback = pendingField(this.context) as Promise<unknown>;
       if (!(this.readback instanceof Promise)) throw Error('Missing TVM readback promise');
       this.observed = this.readback.then(
         () => {
@@ -98,7 +138,7 @@ class ReadbackLease {
       throw error;
     }
   }
-  async sync() {
+  async sync(): Promise<void> {
     if (this.currentContext() !== this.context || pendingField(this.context) !== this.readback || !this.readback) {
       observeUnexpected(this.context);
       observeUnexpected(this.currentContext());
@@ -119,7 +159,7 @@ class ReadbackLease {
     }
   }
   // Only after the preceding readback has fully settled may the second start.
-  nextReadback() {
+  nextReadback(): void {
     try {
       if (!this.prepared || !this.readback || !this.settled || !this.succeeded)
         throw Error('First readback is not complete');
@@ -134,7 +174,7 @@ class ReadbackLease {
       throw error;
     }
   }
-  async syncWithoutReadback() {
+  async syncWithoutReadback(): Promise<void> {
     try {
       this.assertEmpty();
     } catch (error) {
@@ -149,7 +189,7 @@ class ReadbackLease {
       throw error;
     }
   }
-  async recover(open) {
+  async recover(open: boolean): Promise<void> {
     // The captured promise includes the WASM write. A sync rejection alone
     // does not establish that this promise has settled.
     if (this.observed && !this.settled) await this.observed;
@@ -170,65 +210,80 @@ class ReadbackLease {
   }
 }
 
-function closeRuntimeScope(runner, lease, open, failure) {
+function closeRuntimeScope(
+  runner: NariScopeRunner,
+  lease: ReadbackLease,
+  open: boolean,
+  failure: typeof noFailure
+): typeof noFailure {
   if (!open || runner.lifecycle.disposed) return failure;
   try {
     runner.runtime.endScope();
   } catch (cause) {
     poison(runner, lease);
-    if (failure === noFailure) failure = cause;
+    if (failure === noFailure) failure = cause as typeof noFailure;
   }
   return failure;
 }
 
-async function closeScopes(runner, lease, count, open, failure) {
+async function closeScopes(
+  runner: NariScopeRunner,
+  lease: ReadbackLease,
+  count: number,
+  open: boolean,
+  failure: typeof noFailure
+): Promise<typeof noFailure> {
   while (count-- > 0) {
     try {
       const error = await runner.gpu.popErrorScope();
-      if (error && failure === noFailure) failure = error;
+      if (error && failure === noFailure) failure = error as typeof noFailure;
     } catch (cause) {
       poison(runner, lease);
-      if (failure === noFailure) failure = cause;
+      if (failure === noFailure) failure = cause as typeof noFailure;
     }
   }
   return closeRuntimeScope(runner, lease, open, failure);
 }
 
-function assertCompleted(runner, message, failure) {
-  if (failure !== noFailure) throw new WebDecisionError('INFERENCE_ERROR', message, {cause: failure});
-  if (runner.uncaptured.length) throw new WebDecisionError('INFERENCE_ERROR', runner.uncaptured[0]);
+function assertCompleted(runner: NariScopeRunner, message: string, failure: typeof noFailure): void {
+  if (failure !== noFailure) throw new WebDecisionError('INFERENCE_ERROR', message, {cause: failure as unknown});
+  if (runner.uncaptured.length) throw new WebDecisionError('INFERENCE_ERROR', runner.uncaptured[0] as string);
   if (runner.lifecycle.loss || runner.lifecycle.disposed)
     throw new WebDecisionError('INFERENCE_ERROR', message, {cause: new Error('The GPU device was lost.')});
 }
 
 /** Nari owns sequential readbacks in the pinned TVM runtime. */
-export async function withNariScope(runner, message, operation) {
+export async function withNariScope<Value>(
+  runner: unknown,
+  message: string,
+  operation: (lease: NariReadbackLease) => Value | PromiseLike<Value>
+): Promise<Awaited<Value>> {
   assertUsable(runner);
-  let failure = noFailure,
-    result,
+  let failure: typeof noFailure = noFailure,
+    result!: Awaited<Value>,
     open = false,
     gpuScopes = 0;
-  const lease = new ReadbackLease(runner);
+  const lease = new ReadbackLease(runner as NariScopeRunner);
   try {
-    checkGpuDevice(runner);
+    checkGpuDevice(runner as NariScopeRunner);
     lease.assertInitial();
-    runner.runtime.beginScope();
+    (runner as NariScopeRunner).runtime.beginScope();
     open = true;
-    runner.gpu.pushErrorScope('out-of-memory');
+    (runner as NariScopeRunner).gpu.pushErrorScope('out-of-memory');
     gpuScopes++;
-    runner.gpu.pushErrorScope('validation');
+    (runner as NariScopeRunner).gpu.pushErrorScope('validation');
     gpuScopes++;
     result = await operation(lease);
-    checkGpuDevice(runner);
+    checkGpuDevice(runner as NariScopeRunner);
   } catch (cause) {
-    failure = cause;
+    failure = cause as typeof noFailure;
     await lease.recover(open);
   }
   if (lease.unknown) {
-    poison(runner, lease);
+    poison(runner as NariScopeRunner, lease);
     throw new WebDecisionError('INFERENCE_ERROR', message, {cause: failure === noFailure ? undefined : failure});
   }
-  failure = await closeScopes(runner, lease, gpuScopes, open, failure);
-  assertCompleted(runner, message, failure);
+  failure = await closeScopes(runner as NariScopeRunner, lease, gpuScopes, open, failure);
+  assertCompleted(runner as NariScopeRunner, message, failure);
   return result;
 }

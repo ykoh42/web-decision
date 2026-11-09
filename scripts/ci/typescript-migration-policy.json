@@ -9,8 +9,6 @@
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",
     "packages/web-decision/src/model-registry.js",
-    "packages/web-decision/src/nari/runner.mjs",
-    "packages/web-decision/src/nari/scope.mjs",
     "packages/web-decision/src/pinned-text-loader.js",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",
