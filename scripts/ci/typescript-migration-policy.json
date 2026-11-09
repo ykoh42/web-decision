@@ -61,8 +61,6 @@
     "packages/web-decision/src/kev08/loader.js",
     "packages/web-decision/src/kev08/session.js",
     "packages/web-decision/src/kev08/system-one.mjs",
-    "packages/web-decision/src/laya/loader.mjs",
-    "packages/web-decision/src/laya/runner.mjs",
     "packages/web-decision/src/mapika.js",
     "packages/web-decision/src/mapika/loader.js",
     "packages/web-decision/src/mapika/session.js",
