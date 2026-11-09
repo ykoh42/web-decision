@@ -24,12 +24,16 @@
     "test/build-normalization.test.mts",
     "test/bundler-notices.test.mts",
     "test/kev06-contract.test.mts",
+    "test/mapika4b-tokenizer.test.mts",
     "test/model-assets.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",
+    "test/strands-preflight.test.mts",
+    "src/mapika4b/tokenizer.mts",
     "src/opendecider-nano/gpu-compat.mts",
     "src/opendecider-nano/tokenizer.mts",
+    "src/strands/preflight.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]
