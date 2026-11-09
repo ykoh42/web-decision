@@ -3,23 +3,26 @@ import assert from 'node:assert/strict';
 import {packKev08Request} from '../src/kev08.js';
 import {prepareKev08SystemOne, finishKev08SystemOne} from '../src/kev08/system-one.mjs';
 import {ExperimentalKev08Session, validateKev08Row} from '../src/kev08/session.js';
+import type {KevTokenizer} from '../src/kev.js';
 
-function createTokenizer() {
+type Kev08SessionArguments = ConstructorParameters<typeof ExperimentalKev08Session>[0];
+
+function createTokenizer(): KevTokenizer {
   return {
-    encode(text) {
-      return {ids: Array.from(text, (character) => character.codePointAt(0) + 200)};
+    encode(text: string) {
+      return {ids: Array.from(text, (character) => character.codePointAt(0)! + 200)};
     }
-  };
+  } as unknown as KevTokenizer;
 }
 
-const limits = {maxInputTokens: 8192, maxStateTokens: 4096};
+const limits: Parameters<typeof packKev08Request>[2] = {maxInputTokens: 8192, maxStateTokens: 4096};
 
-function prepare(state, questions) {
+function prepare(state: unknown, questions: unknown) {
   return prepareKev08SystemOne(state, questions);
 }
 
 function sessionFixture() {
-  const events = [];
+  const events: string[] = [];
   const lifecycle = {loss: null, disposed: false};
   const session = new ExperimentalKev08Session({
     runtime: {
@@ -30,10 +33,10 @@ function sessionFixture() {
         events.push('dispose');
         lifecycle.disposed = true;
       }
-    },
-    device: {},
-    gpu: {},
-    fn: null,
+    } as unknown as Kev08SessionArguments['runtime'],
+    device: {} as unknown as Kev08SessionArguments['device'],
+    gpu: {} as unknown as Kev08SessionArguments['gpu'],
+    fn: null as unknown as Kev08SessionArguments['fn'],
     weights: [],
     tokenizer: createTokenizer(),
     limits,
@@ -123,11 +126,11 @@ test('supports upstream one-option Choice and Score plus duplicate Score levels'
   });
   const {rows} = packKev08Request(createTokenizer(), prepared.request, limits, prepared.packing);
 
-  assert.equal(rows[0].options.length, 1);
-  assert.equal(rows[1].options.length, 2);
-  assert.deepEqual(rows[1].options, ['same', 'same']);
-  assert.doesNotThrow(() => validateKev08Row(rows[0], limits.maxInputTokens));
-  assert.doesNotThrow(() => validateKev08Row(rows[1], limits.maxInputTokens));
+  assert.equal(rows[0]!.options.length, 1);
+  assert.equal(rows[1]!.options.length, 2);
+  assert.deepEqual(rows[1]!.options, ['same', 'same']);
+  assert.doesNotThrow(() => validateKev08Row(rows[0]!, limits.maxInputTokens));
+  assert.doesNotThrow(() => validateKev08Row(rows[1]!, limits.maxInputTokens));
   assert.throws(() => packKev08Request(createTokenizer(), prepared.request, limits), {code: 'INVALID_INPUT'});
 });
 
@@ -136,15 +139,15 @@ test('respects the 1–255 typed option and level limits without truncating', ()
     choice: {type: 'choice', criteria: {only: null}},
     score: {type: 'score', criteria: ['one']}
   });
-  assert.equal(one.request.questions[0].options.length, 1);
-  assert.equal(one.request.questions[1].options.length, 1);
+  assert.equal(one.request.questions[0]!.options.length, 1);
+  assert.equal(one.request.questions[1]!.options.length, 1);
 
   const maximum = prepare('state', {
     choice: {type: 'choice', criteria: Object.fromEntries(Array.from({length: 255}, (_, i) => [`c${i}`, null]))},
     score: {type: 'score', criteria: Array.from({length: 255}, (_, i) => `level ${i}`)}
   });
-  assert.equal(maximum.request.questions[0].options.length, 255);
-  assert.equal(maximum.request.questions[1].options.length, 255);
+  assert.equal(maximum.request.questions[0]!.options.length, 255);
+  assert.equal(maximum.request.questions[1]!.options.length, 255);
 
   for (const count of [0, 256]) {
     assert.throws(
@@ -171,6 +174,7 @@ test('rejects accessors, sparse arrays, invalid schemas, cycles, and non-finite 
   });
   assert.throws(() => prepare('state', {bad: getter}), {code: 'INVALID_INPUT'});
 
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep the sparse-array test fixture intact.
   const sparse = new Array(2);
   assert.throws(() => prepare('state', {score: {type: 'score', criteria: sparse}}), {code: 'INVALID_INPUT'});
   assert.throws(() => prepare('state', {choice: {type: 'choice', criteria: []}}), {code: 'INVALID_INPUT'});
@@ -178,7 +182,7 @@ test('rejects accessors, sparse arrays, invalid schemas, cycles, and non-finite 
   assert.throws(() => prepare('state', {bad: {type: 'noul', criteria: []}}), {code: 'INVALID_INPUT'});
   assert.throws(() => prepare('state', {bad: {type: 'other'}}), {code: 'INVALID_INPUT'});
 
-  const cycle = {};
+  const cycle: {self?: unknown} = {};
   cycle.self = cycle;
   assert.throws(() => prepare(cycle, {pick: {type: 'choice', criteria: {yes: null, no: null}}}), {
     code: 'INVALID_INPUT'
@@ -188,12 +192,12 @@ test('rejects accessors, sparse arrays, invalid schemas, cycles, and non-finite 
 
 test('systemOne snapshots typed requests, skips queued work on abort, and disposal waits for active work', async () => {
   const {session, events} = sessionFixture();
-  let signalStarted;
-  const started = new Promise((resolve) => {
+  let signalStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
     signalStarted = resolve;
   });
-  let release;
-  const gate = new Promise((resolve) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   let calls = 0;
@@ -214,9 +218,12 @@ test('systemOne snapshots typed requests, skips queued work on abort, and dispos
           ]
         }
       ]
-    };
+    } as unknown as Awaited<ReturnType<typeof session.run>>;
   };
-  const questions = {
+  const questions: {
+    first: {type: string; criteria: {yes: unknown}};
+    second: {type: string};
+  } = {
     first: {type: 'choice', criteria: {yes: null}},
     second: {type: 'noul'}
   };
