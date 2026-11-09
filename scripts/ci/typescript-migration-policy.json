@@ -40,7 +40,6 @@
     "packages/web-decision/test/mapika-session.test.mjs",
     "packages/web-decision/test/mapika-systemone.test.mjs",
     "packages/web-decision/test/mapika4b-loader.test.mjs",
-    "packages/web-decision/test/model-memory.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/model-source.test.mjs",
     "packages/web-decision/test/nari-loader.test.mjs",
