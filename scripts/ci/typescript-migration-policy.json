@@ -91,7 +91,6 @@
     "packages/web-decision/src/skejja/source.mjs",
     "packages/web-decision/src/stable-models.js",
     "packages/web-decision/src/strands/choice.mjs",
-    "packages/web-decision/src/strands/fused-upload.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-loader.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-runner.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-session.mjs",

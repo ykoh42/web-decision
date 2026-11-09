@@ -1,17 +1,68 @@
-import {readVerifiedRange} from './range-reader.mjs';
+import {readVerifiedRange as readVerifiedRangeRuntime} from './range-reader.mjs';
+import type {AssetCache} from '../assets.js';
+
+interface FusedRangeSpec {
+  readonly path: string;
+  readonly totalBytes: number;
+  readonly offset: number;
+  readonly length: number;
+  readonly sha256: string;
+}
+
+interface FusedRangeReadResult {
+  readonly bytes: ArrayBuffer;
+  readonly cachedByHash: boolean;
+}
+
+interface FusedRecordChunk {
+  readonly offset: number;
+  readonly bytes: number;
+  readonly sha256: string;
+}
+
+interface FusedRecord {
+  readonly sourcePath: string;
+  readonly sourceOffset: number;
+  readonly sourceFileBytes: number;
+  readonly bytes: number;
+  readonly chunks: readonly FusedRecordChunk[];
+}
+
+interface FusedUploadContext {
+  copyRawBytesToBuffer(data: Uint8Array, pointer: unknown, byteOffset: number, byteLength: number): void;
+}
+
+interface FusedReadRangeOptions {
+  readonly cache?: AssetCache | null | undefined;
+  readonly signal?: AbortSignal | null | undefined;
+  readonly offline?: boolean | undefined;
+}
+
+interface FusedUploadOptions {
+  readonly signal?: AbortSignal | null | undefined;
+  readonly readRange?: ReadRange | undefined;
+}
+
+type MaybePromise<Value> = Value | PromiseLike<Value>;
+
+type ReadRange = (base: URL, spec: FusedRangeSpec, options: FusedReadRangeOptions) => PromiseLike<FusedRangeReadResult>;
+
+type GpuWrite = (work: () => MaybePromise<unknown>) => MaybePromise<unknown>;
+
+const defaultReadRange: ReadRange = readVerifiedRangeRuntime;
 
 /** Upload one source-file region with a verified, bounded range per chunk. */
 export async function uploadFusedRecord(
-  base,
-  record,
-  context,
-  pointer,
-  byteOffset,
-  sync,
-  check,
-  withWrite = async (work) => work(),
-  {signal, readRange = readVerifiedRange} = {}
-) {
+  base: URL,
+  record: FusedRecord,
+  context: FusedUploadContext,
+  pointer: unknown,
+  byteOffset: number,
+  sync: () => MaybePromise<unknown>,
+  check: () => void,
+  withWrite: GpuWrite = async (work) => work(),
+  {signal, readRange = defaultReadRange}: FusedUploadOptions = {}
+): Promise<void> {
   if (
     ![record?.sourceOffset, record?.sourceFileBytes, record?.bytes, byteOffset].every(Number.isSafeInteger) ||
     record.sourceOffset < 0 ||
