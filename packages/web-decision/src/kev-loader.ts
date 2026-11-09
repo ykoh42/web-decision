@@ -1,5 +1,5 @@
 import {Tokenizer} from '@huggingface/tokenizers';
-import {createPolyfillWASI, instantiate} from './runtime/tvm.js';
+import {createPolyfillWASI, instantiate} from './runtime/tvm.generated.mjs';
 import type {DLDevice, Instance, PackedFunc, Tensor} from './runtime/tvm.js';
 import {detectKevGPUDevice} from './kev-gpu.js';
 import {
