@@ -349,7 +349,7 @@ test('an unexpected rejected readback is observed without treating it as safe', 
   for (const mode of ['preexisting', 'graph', 'replacement', 'nonwritable']) {
     execFileSync(
       process.execPath,
-      ['--import', 'tsx', fileURLToPath(new URL('./strands-unhandled-fixture.mjs', import.meta.url)), mode],
+      ['--import', 'tsx', fileURLToPath(new URL('./strands-unhandled-fixture.mts', import.meta.url)), mode],
       {
         env: {PATH: '/usr/bin:/bin', LANG: 'C'},
         timeout: 2000,

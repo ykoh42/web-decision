@@ -2,13 +2,13 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {withStrandsScope} from '../src/strands/scope.mjs';
 
 const mode = process.argv[2] || 'preexisting';
-let rejectUnexpected,
-  resolveOriginal,
-  unhandled = false;
+let rejectUnexpected!: (reason?: unknown) => void;
+let resolveOriginal!: () => void;
+let unhandled = false;
 const unexpected = new Promise((_resolve, reject) => {
   rejectUnexpected = reject;
 });
-const original = new Promise((resolve) => {
+const original = new Promise<void>((resolve) => {
   resolveOriginal = resolve;
 });
 const context = {pendingGPUToCPUCopy: mode === 'preexisting' ? unexpected : null};
@@ -48,4 +48,4 @@ try {
 } catch {}
 if (mode !== 'replacement') rejectUnexpected(Error('unexpected pending readback'));
 await delay(30);
-if (!runner.poisoned || unhandled) process.exitCode = 1;
+if (!(runner as typeof runner & {poisoned?: unknown}).poisoned || unhandled) process.exitCode = 1;

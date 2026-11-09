@@ -59,7 +59,6 @@
     "packages/web-decision/test/strands-input-snapshot.test.mjs",
     "packages/web-decision/test/strands-range-cache.test.mjs",
     "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
-    "packages/web-decision/test/strands-unhandled-fixture.mjs",
     "packages/web-decision/test/tamev.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",
     "scripts/ci/check_cognitive_complexity.mjs",
