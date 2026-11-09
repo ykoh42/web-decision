@@ -5,13 +5,15 @@ import {describeModel, isDecisionModel, listDecisionModels} from './kev-preview-
 
 export {WebDecisionError, describeModel, isDecisionModel, listDecisionModels};
 
+type PreviewOptions = Parameters<typeof loadKev06DecisionModel>[0] & {debertaReadback?: unknown};
+
 /** Load the only model in this preview build. */
-export async function loadDecisionModel(options) {
+export async function loadDecisionModel(options?: PreviewOptions | null) {
   const modelName = options?.model === undefined ? 'kev-0.6b-q4f16' : options.model;
   const description = describeModel(modelName);
   if (options?.debertaReadback !== undefined)
     throw new WebDecisionError('INVALID_INPUT', 'debertaReadback is only supported by the DeBERTa model.');
-  const model = await loadKev06DecisionModel(options, description);
+  const model = await loadKev06DecisionModel(options as PreviewOptions, description);
   Object.defineProperty(model, 'description', {value: description});
   return model;
 }

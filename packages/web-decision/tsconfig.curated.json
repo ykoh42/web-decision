@@ -55,6 +55,7 @@
     "test/strands-range-source.test.mts",
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
+    "src/kev-preview-entry.ts",
     "src/mapika/upload.ts",
     "src/stable-models.ts",
     "src/mapika4b/tokenizer.mts",
