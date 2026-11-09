@@ -72,7 +72,6 @@
     "packages/web-decision/test/bounded-response.test.mjs",
     "packages/web-decision/test/cache-cancellation.test.mjs",
     "packages/web-decision/test/clef-loader.test.mjs",
-    "packages/web-decision/test/clef-protocol.test.mjs",
     "packages/web-decision/test/clef-rows.test.mjs",
     "packages/web-decision/test/clef-runner.test.mjs",
     "packages/web-decision/test/clef-session.test.mjs",

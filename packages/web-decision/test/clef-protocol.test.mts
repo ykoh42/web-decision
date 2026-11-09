@@ -4,23 +4,23 @@ import {packChoiceRequest, unpackChoiceScores, validatePacked} from '../src/clef
 import {buildChoiceInputs} from '../src/clef/graph-inputs.mjs';
 import {approximateSoftmax} from '../src/clef/softmax.mjs';
 
-const tokenizer = {encode: (text) => ({ids: Array.from({length: Math.ceil(text.length / 16)}, () => 1)})};
-const request = (options) => ({state: 'state', questions: [{instructions: 'choose', options}]});
+const tokenizer = {encode: (text: string) => ({ids: Array.from({length: Math.ceil(text.length / 16)}, () => 1)})};
+const request = (options: string[]) => ({state: 'state', questions: [{instructions: 'choose', options}]});
 
 test('lexical option ID order preserves input answer order and original-order ties', () => {
   const options = Array.from({length: 11}, (_, i) => `option ${i}`);
   const packed = packChoiceRequest(tokenizer, request(options), [2]);
-  assert.deepEqual(packed.questions[0].option_ids.slice(0, 4), ['0', '1', '10', '2']);
+  assert.deepEqual(packed.questions[0]!.option_ids.slice(0, 4), ['0', '1', '10', '2']);
   const scores = new Float32Array(11);
   scores[2] = scores[3] = 5;
-  const answer = unpackChoiceScores(packed, [scores], approximateSoftmax([scores])).answers[0];
+  const answer = unpackChoiceScores(packed, [scores], approximateSoftmax([scores])).answers[0]!;
   assert.equal(answer.selectedIndex, 2);
   assert.deepEqual(
     answer.probabilities.map((item) => item.option),
     options
   );
-  assert.equal(answer.probabilities[10].logit, 5);
-  assert.equal(answer.probabilities[2].logit, 5);
+  assert.equal(answer.probabilities[10]!.logit, 5);
+  assert.equal(answer.probabilities[2]!.logit, 5);
 });
 
 test('4 and 512 tokens and nonoverlapping option spans pass; 513 and invalid shapes fail', () => {
@@ -43,22 +43,22 @@ test('4 and 512 tokens and nonoverlapping option spans pass; 513 and invalid sha
   };
   validatePacked(packed);
   const graph = buildChoiceInputs(packed);
-  assert.deepEqual([...graph.inputs[4].data], [1]);
-  assert.deepEqual([...graph.inputs[1].data], [0, 1, 2, 3]);
-  assert.deepEqual([...graph.inputs[7].data], [0, 1, 0, 0, 0, 0, 1, 0]);
+  assert.deepEqual([...graph.inputs[4]!.data], [1]);
+  assert.deepEqual([...graph.inputs[1]!.data], [0, 1, 2, 3]);
+  assert.deepEqual([...graph.inputs[7]!.data], [0, 1, 0, 0, 0, 0, 1, 0]);
   const long = structuredClone(packed);
   long.ids = Array(512).fill(1);
   validatePacked(long);
-  assert.equal(buildChoiceInputs(long).inputs[2].data.length, 512 * 512);
+  assert.equal(buildChoiceInputs(long).inputs[2]!.data.length, 512 * 512);
   long.ids.push(1);
   assert.throws(() => validatePacked(long));
   const overlap = structuredClone(packed);
-  overlap.questions[0].option_spans[1] = [1, 2];
+  overlap.questions[0]!.option_spans[1] = [1, 2];
   assert.throws(() => validatePacked(overlap));
 });
 
 test('the text packer accepts exactly 512 tokens and rejects 513', () => {
-  const characterTokenizer = {encode: (text) => ({ids: Array(text.length).fill(1)})};
+  const characterTokenizer = {encode: (text: string) => ({ids: Array(text.length).fill(1)})};
   const base = packChoiceRequest(
     characterTokenizer,
     {state: '', questions: [{instructions: 'q', options: ['a', 'b']}]},
