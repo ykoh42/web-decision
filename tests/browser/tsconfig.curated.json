@@ -25,6 +25,7 @@
     "harness.ts",
     "curated-harness.spec.ts",
     "kev06-default-source-real-webgpu.spec.ts",
+    "kev06-expanded-inference.ts",
     "kev06-release-evidence.ts",
     "kev06-release-evidence.test.ts"
   ]

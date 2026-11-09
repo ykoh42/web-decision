@@ -22,6 +22,19 @@ import {
   collectReleaseEvidenceInputs,
   verifyReleaseArtifacts
 } from './verify-release-evidence.ts';
+import {
+  createExpandedInferenceEvidence,
+  loadExpandedInferenceFixture,
+  type ExpandedInferenceFixture,
+  type ExpandedInferenceObservation,
+  type TypedReferenceRun,
+  type TypedReferenceAnswer
+} from '../../tests/browser/kev06-expanded-inference.ts';
+import type {
+  KevSystemOneAnswer,
+  KevSystemOneQuestion,
+  KevSystemOneResult
+} from '../../packages/web-decision/src/index.d.ts';
 
 type AnyRecord = Record<string, any>;
 
@@ -141,12 +154,15 @@ async function makeFixture(): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), 'web-decision-release-evidence-'));
   const descriptors = [makeDescriptor('kev-0.6b-q4f16', 'a')];
   const {packageRoot, sourceRoot} = await putPackageTree(root, descriptors);
+  const representativeFixturePath = join(root, POLICY.expandedInference.fixturePath);
+  await mkdir(dirname(representativeFixturePath), {recursive: true});
+  await copyFile(join(WORKSPACE_ROOT, POLICY.expandedInference.fixturePath), representativeFixturePath);
   const archivePath = join(root, 'web-decision-9.8.7.tgz');
   execFileSync(TAR, ['-czf', archivePath, '-C', root, 'package']);
   return {root, descriptors, packageRoot, sourceRoot, archivePath};
 }
 
-function makeRecord({model, browser, archive, catalogSha256, manifest}: AnyRecord): AnyRecord {
+function makeRecord({model, browser, archive, catalogSha256, manifest, expandedInference}: AnyRecord): AnyRecord {
   const asset = validateArtifactManifest(model, manifest);
   const output = {
     selected: BASELINE_EXPECTED_OUTPUT.selected,
@@ -155,7 +171,7 @@ function makeRecord({model, browser, archive, catalogSha256, manifest}: AnyRecor
     probabilities: [...BASELINE_EXPECTED_OUTPUT.probabilities]
   };
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     testKind: 'real-model-webgpu',
     catalogSha256,
     model: {
@@ -245,7 +261,8 @@ function makeRecord({model, browser, archive, catalogSha256, manifest}: AnyRecor
       },
       reference: BASELINE_REFERENCE,
       upstreamReference: {matched: true, ...UPSTREAM_REFERENCE}
-    }
+    },
+    expandedInference
   };
 }
 
@@ -256,6 +273,8 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
     sourcePackageRoot: fixture.sourceRoot
   });
   const {archive, models, manifests, catalogSha256} = inputs;
+  const expandedPolicy = validatePolicy(POLICY).expandedInference;
+  const expanded = loadExpandedInferenceFixture(fixture.root, expandedPolicy);
   const tests = [];
 
   for (const model of models) {
@@ -265,7 +284,13 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
         browser,
         archive,
         catalogSha256,
-        manifest: required(manifests.get(model.modelId), `Manifest for ${model.modelId}`).manifest
+        manifest: required(manifests.get(model.modelId), `Manifest for ${model.modelId}`).manifest,
+        expandedInference: createExpandedInferenceEvidence(
+          expanded.fixture,
+          expanded.fixtureSha256,
+          model.manifestSha256,
+          fakeExpandedInferenceObservation(expanded.fixture)
+        )
       });
       tests.push({
         file: POLICY.testFile,
@@ -302,10 +327,109 @@ async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
   };
 }
 
+function fakeExpandedInferenceObservation(fixture: ExpandedInferenceFixture): ExpandedInferenceObservation {
+  const decisionRuns = fixture.decisionCases.map((item) => {
+    const probabilities = item.reference.probabilities;
+    const selectedIndex = maximumIndex(probabilities);
+    return {
+      id: item.id,
+      tokenCount: item.tokenCount,
+      selected: item.reference.options[selectedIndex]!,
+      selectedIndex,
+      probabilities: item.reference.options.map((option, index) => ({
+        option,
+        logit: item.reference.logits[index]!,
+        probability: probabilities[index]!
+      }))
+    };
+  });
+  const typed = fixture.typedSystemOne;
+  const single = Object.fromEntries(
+    Object.entries(typed.single).map(([name, reference]) => [
+      name,
+      fakeTypedRun(reference, {[name]: typed.questions[name]!})
+    ])
+  );
+  return {
+    decisionRuns,
+    typedSystemOne: {
+      packed: fakeTypedRun(typed.packed, typed.questions),
+      single
+    }
+  } as ExpandedInferenceObservation;
+}
+
+function fakeTypedRun(
+  reference: TypedReferenceRun,
+  questions: Readonly<Record<string, KevSystemOneQuestion>>
+): KevSystemOneResult<'kev-0.6b-q4f16'> {
+  const answerEntries = Object.entries(questions).map(
+    ([name, question]) => [name, fakeTypedAnswer(question, reference.answers[name]!)] as const
+  );
+  return {
+    model: 'kev-0.6b-q4f16',
+    tokenCount: reference.tokenCount,
+    answers: Object.fromEntries(answerEntries),
+    answerEntries
+  } as KevSystemOneResult<'kev-0.6b-q4f16'>;
+}
+
+function fakeTypedAnswer(question: KevSystemOneQuestion, reference: TypedReferenceAnswer): KevSystemOneAnswer {
+  if (question.type === 'choice') {
+    const keys = Object.keys(question.criteria);
+    const entries = keys.map((key, index) => [key, publicRound(reference.probabilities[index]!)] as const);
+    return {
+      type: 'choice',
+      choice: keys[maximumIndex(entries.map(([, probability]) => probability))]!,
+      confidence: 0.5,
+      probabilities: Object.fromEntries(entries),
+      probabilityEntries: entries
+    };
+  }
+  if (question.type === 'noul') {
+    return {type: 'noul', noul: publicRound(reference.probabilities[1]!)};
+  }
+  const entries = question.criteria.map(
+    (_, index) => [String(index), publicRound(reference.probabilities[index]!)] as const
+  );
+  return {
+    type: 'score',
+    score: 0,
+    confidence: 0.5,
+    legend: Object.fromEntries(question.criteria.map((label, index) => [String(index), String(label)])),
+    probabilities: Object.fromEntries(entries),
+    probabilityEntries: entries
+  };
+}
+
+function publicRound(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function maximumIndex(values: readonly number[]): number {
+  let index = 0;
+  for (let candidate = 1; candidate < values.length; candidate++) {
+    if (values[candidate]! > values[index]!) index = candidate;
+  }
+  return index;
+}
+
 async function saveReport(fixture: Fixture, report: AnyRecord): Promise<string> {
   const path = join(fixture.root, 'playwright-report.json');
   await writeFile(path, `${JSON.stringify(report)}\n`);
   return path;
+}
+
+function updateEvidenceRecord(report: AnyRecord, mutate: (record: AnyRecord) => void): void {
+  const result = required(report.suites[0].specs[0].tests[0].results[0], 'Playwright result');
+  const stdout = required(result.stdout[0], 'Playwright evidence stdout');
+  const record = JSON.parse(stdout.slice(POLICY.evidencePrefix.length));
+  mutate(record);
+  result.stdout[0] = `${POLICY.evidencePrefix}${JSON.stringify(record)}\n`;
+}
+
+function maxDifference(left: number[], right: number[]): number {
+  return Math.max(...left.map((value, index) => Math.abs(value - required(right[index], 'Reference value'))));
 }
 
 test('accepts an exact installed archive with all curated model/browser GPU cases', async (t) => {
@@ -498,6 +622,102 @@ test('rejects any skip, failure, retry, or omitted required browser case', async
   omitted.suites[0].specs.pop();
   omitted.stats.expected -= 1;
   assert.throws(() => validatePlaywrightReport(omitted, context), /pass count differs/u);
+});
+
+test('requires every pinned representative decision and typed System One run without cross-runtime tolerances', async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  const valid = await prepareValidReport(fixture);
+  const context = {
+    archive: valid.archive,
+    catalogSha256: valid.catalogSha256,
+    manifests: valid.manifests,
+    models: valid.models,
+    policy: POLICY,
+    workspaceRoot: fixture.root
+  };
+  const corruptions: Array<(record: AnyRecord) => void> = [
+    (record) => record.expandedInference.decisionCases.pop(),
+    (record) => record.expandedInference.decisionCases.push(structuredClone(record.expandedInference.decisionCases[1])),
+    (record) => {
+      record.expandedInference.decisionCases[1].request.state = 'different input';
+    },
+    (record) => {
+      record.expandedInference.decisionCases[1].observed.probabilities[0] = 1.25;
+    },
+    (record) => {
+      record.expandedInference.decisionCases[1].observed.selectedIndex = 1;
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.questions.refund.type = 'score';
+    },
+    (record) => {
+      delete record.expandedInference.typedSystemOne.single.refund;
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.packed.observed.answerEntries[1][0] = 'team';
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.packed.observed.answers.refund.noul = 1.1;
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.packed.observed.answers.sentiment.score = 5;
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.packed.reference.answers.team.logits[0] = 99;
+    },
+    (record) => {
+      record.expandedInference.typedSystemOne.single.sentiment.comparison.sentiment = 0;
+    }
+  ];
+
+  for (const mutate of corruptions) {
+    const report = structuredClone(valid.report);
+    updateEvidenceRecord(report, mutate);
+    assert.throws(() => validatePlaywrightReport(report, context));
+  }
+
+  const observational = structuredClone(valid.report);
+  updateEvidenceRecord(observational, (record) => {
+    const expanded = record.expandedInference;
+    const decision = expanded.decisionCases[1];
+    decision.observed.logits = [0, 3, 0];
+    decision.observed.probabilities = [0.1, 0.8, 0.1];
+    decision.observed.selected = decision.request.questions[0].options[1];
+    decision.observed.selectedIndex = 1;
+    decision.comparison.maxAbsoluteLogitDifference = maxDifference(decision.observed.logits, decision.reference.logits);
+    decision.comparison.maxAbsoluteProbabilityDifference = maxDifference(
+      decision.observed.probabilities,
+      decision.reference.probabilities
+    );
+
+    const team = expanded.typedSystemOne.packed.observed.answers.team;
+    team.choice = 'sales';
+    team.probabilities = {billing: 0.1, support: 0.2, sales: 0.7};
+    team.probabilityEntries = [
+      ['billing', 0.1],
+      ['support', 0.2],
+      ['sales', 0.7]
+    ];
+    expanded.typedSystemOne.packed.observed.answerEntries[0][1] = structuredClone(team);
+    expanded.typedSystemOne.packed.comparison.team = maxDifference(
+      team.probabilityEntries.map((entry: [string, number]) => entry[1]),
+      expanded.typedSystemOne.packed.reference.answers.team.probabilities
+    );
+  });
+  assert.doesNotThrow(() => validatePlaywrightReport(observational, context));
+});
+
+test('rejects changes to the pinned expanded-input fixture bytes', async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  const path = join(fixture.root, POLICY.expandedInference.fixturePath);
+  const bytes = await readFile(path, 'utf8');
+  await writeFile(path, bytes.replace('A customer was charged twice.', 'A customer has two charges.'));
+  assert.throws(
+    () => loadExpandedInferenceFixture(fixture.root, validatePolicy(POLICY).expandedInference),
+    /fixture digest mismatch/u
+  );
 });
 
 test('rejects evidence detached from the archive, install, model manifest, or physical GPU', async (t) => {

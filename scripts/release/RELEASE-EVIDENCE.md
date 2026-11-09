@@ -8,6 +8,10 @@ The archive must be an npm tarball with only regular files. The verifier compare
 
 Nine shard files are reconstructed by the browser loader from the pinned upstream source and are not separate tarball members. For that reason, the browser record must include a `verifiedFiles` item for every manifest entry. The browser spec independently reads the complete CacheStorage entries after a successful load, measures their byte lengths, and computes SHA-256 values. The gate compares that measured list against all 14 entries in the archive-pinned manifest. It also requires online inference, an offline repeat with identical results and zero network attempts, and matches against both the pinned Windows baseline fixture and the one-input upstream CPU reference fixture.
 
+Release evidence schema 2 also requires the committed [expanded inference fixture](../../tests/fixtures/kev06-expanded-inference.json), pinned by the policy and verifier. The real browser test passes its four decision requests (22, 64, 57 and 243 reference tokens) through `decide()`, then runs one `systemOne()` request containing a choice, yes/no (`noul`) and score question, followed by each question separately. The report carries each request, token count, option order, output, and descriptive maximum differences from the pinned ONNX CPU observations (ORT 1.31.1, CPUExecutionProvider, `ORT_ENABLE_ALL`, four threads). It checks required case IDs, exact fixture inputs, result shapes, finite logits, selected-option argmax, probability ranges and normalization. Typed choice distributions must match their criterion keys/order; `noul` and score outputs must be in their declared ranges; score legends and levels must match the fixture. Typed probabilities are rounded to four decimal places by the public API, so their normalization check allows only the per-value rounding error plus floating-point summation error.
+
+The expanded CPU differences are recorded but are not pass/fail accuracy thresholds. The browser API does not expose token IDs or option indices; those fields in the fixture describe the CPU reference packing only and are not claimed as current browser measurements. The test does not require packed and separate `systemOne()` results to be equal. The original single-input baseline checks and their existing tolerances remain unchanged, and the added observations do not make a general model-quality claim.
+
 The release matrix contains only Chromium on Windows hardware. It makes no Firefox or WebKit verification claim. The gate requires the actual WebGPU adapter to be non-fallback and to report the catalog's required features and limits. Adapter Info can be empty; the gate requires the value and source to be recorded but does not invent adapter fields. GPU manufacturer, device name, driver, and PNP ID are collected separately from `Win32_VideoController`. The host check requires exactly one visible WMI video controller and rejects known virtual host or display-adapter signatures. It records `Win32_ComputerSystem.HypervisorPresent` as reported but does not treat `true` alone as proof of a virtual machine: Windows VBS can use the hypervisor on a physical device ([`Win32_ComputerSystem`](https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-computersystem), [VBS](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-vbs)). Accordingly, `device.isVirtual: false` is an observation-based screen for known signatures, not an absolute proof of physical hardware. WMI describes host-visible inventory and does not prove which adapter Chromium selected; browser Adapter Info remains a separate `navigator.gpu.requestAdapter().info` observation and may be empty. Host and OS metadata must likewise match their declared source data.
 
 ## Run
@@ -72,6 +76,8 @@ node --import tsx --test scripts/release/tvm-build-evidence.test.ts scripts/rele
 
 ## Evidence record
 
+The evidence prefix and browser record use schema 2. The existing `inference.online` and `inference.offline` fields retain their one-input meanings and thresholds; the added observations are recorded separately as `expandedInference`.
+
 Import the helper from the dedicated Playwright spec using `../../scripts/release/verify-release-evidence.ts`. Call it after the test has installed and exercised the candidate package. The helper returns the archive, sorted curated model requirements, catalog digest, and each exact static manifest. The `verifiedFiles` values below must come from the test's independent CacheStorage reads and SHA-256 calculations, not from copying the expected manifest values.
 
 The `*ComparisonPassed` and `observedOfflineNetworkAttempts` names in the example stand for values produced by the browser test's real comparisons and request monitor; they are not constants to set to passing values. The observed model ID, descriptor digest, inference arrays, adapter values, host metadata, and cache measurements must come from the running test.
@@ -113,7 +119,7 @@ const upstreamReferenceMatched = upstreamFixtureComparisonPassed;
 const offlineMatchesOnline = offlineOutputComparisonPassed;
 const offlineNetworkAttempts = observedOfflineNetworkAttempts;
 const record = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   testKind: 'real-model-webgpu',
   catalogSha256: inputs.catalogSha256,
   model: {
@@ -177,9 +183,10 @@ const record = {
       weightsSha256: '777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b',
       scope: 'single-input-upstream-onnx-cpu-reference'
     }
-  }
+  },
+  expandedInference: expandedInferenceEvidence
 };
-console.log(`WEB_DECISION_RELEASE_EVIDENCE_V1:${JSON.stringify(record)}`);
+console.log(`WEB_DECISION_RELEASE_EVIDENCE_V2:${JSON.stringify(record)}`);
 ```
 
 The measured `verifiedFiles` list must contain exactly one `{path, bytes, sha256}` item for each path in `manifest.files`, including all reconstructed shards. `online` and `offline` each need `{completed: true, modelId, backend: 'tvm-webgpu', assetManifestSha256, selected, optionOrder, logits, probabilities}`. Derive `logits` and `probabilities` from the actual browser result's ordered probability entries. Do not include `optionIndices`: the public browser API does not expose the original token indices. The verifier compares the option order and each output value against both pinned references using their declared tolerances, then requires offline output to equal online output. Online must set `referenceMatched: true`; offline must set `matchesOnline: true` and `networkAttempts: []`.

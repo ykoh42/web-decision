@@ -6,6 +6,16 @@ import {lstat, readFile, readdir, realpath} from 'node:fs/promises';
 import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
+import {
+  EXPANDED_INFERENCE_FIXTURE_PATH,
+  EXPANDED_INFERENCE_FIXTURE_SHA256,
+  loadExpandedInferenceFixture,
+  validateExpandedInferenceEvidence,
+  validateExpandedInferenceFixture,
+  validateExpandedInferencePolicy,
+  type ExpandedInferenceFixture,
+  type ExpandedInferencePolicy
+} from '../../tests/browser/kev06-expanded-inference.ts';
 
 type AnyRecord = Record<string, any>;
 type RequiredFiles = string[];
@@ -16,9 +26,10 @@ interface BrowserRequirement {
 }
 
 interface EvidencePolicy {
-  schemaVersion: 1;
+  schemaVersion: 2;
   evidencePrefix: string;
   testFile: string;
+  expandedInference: ExpandedInferencePolicy;
   browsers: BrowserRequirement[];
   requireNonFallbackAdapter: true;
   requirePhysicalDevice: true;
@@ -167,7 +178,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(process.env.WEB_DECISION_WORKSPACE_ROOT ?? resolve(SCRIPT_DIRECTORY, '../..'));
 const RELEASE_SCRIPT_DIRECTORY = join(WORKSPACE_ROOT, 'scripts/release');
 const POLICY_PATH = join(RELEASE_SCRIPT_DIRECTORY, 'release-evidence-policy.json');
-export const RELEASE_EVIDENCE_POLICY_SHA256 = '0384ae7fa266b052bb05fd96e7586aa972fffb0c20c1e2eab11172130319206f';
+export const RELEASE_EVIDENCE_POLICY_SHA256 = '47d4320285c8ed820e6d73d1046aeab9224679a1f75490b48e2080bcee86605e';
 export const BASELINE_REFERENCE = Object.freeze({
   packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
   fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',
@@ -264,10 +275,11 @@ export function validatePolicy(input: unknown): EvidencePolicy {
     'Release evidence policy must be an object.'
   );
   const policy = input as AnyRecord;
-  fail(policy.schemaVersion === 1, 'Unsupported release evidence policy schema.');
+  fail(policy.schemaVersion === 2, 'Unsupported release evidence policy schema.');
   fail(typeof policy.evidencePrefix === 'string' && policy.evidencePrefix.length > 0, 'Evidence prefix is required.');
   const testFile = normalizedRelativePath(policy.testFile, 'Policy test file');
   fail(testFile.startsWith('tests/browser/'), 'The release evidence spec must be under tests/browser/.');
+  const expandedInference = validateExpandedInferencePolicy(policy.expandedInference);
   fail(policy.requireNonFallbackAdapter === true, 'The policy must require a non-fallback GPU adapter.');
   fail(policy.requirePhysicalDevice === true, 'The policy must require physical hardware metadata.');
   fail(policy.requiredApi === 'webgpu', 'The policy must require WebGPU.');
@@ -289,9 +301,10 @@ export function validatePolicy(input: unknown): EvidencePolicy {
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     evidencePrefix: policy.evidencePrefix,
     testFile,
+    expandedInference,
     browsers: browserList.map((browser) => ({...browser})),
     requireNonFallbackAdapter: true,
     requirePhysicalDevice: true,
@@ -391,6 +404,38 @@ async function assertCommittedReferenceFixtures(workspaceRoot: string): Promise<
     upstream.maxAbsoluteProbabilityDifference,
     UPSTREAM_EXPECTED_OUTPUT.maxAbsoluteProbabilityDifference,
     'Upstream probability tolerance mismatch.'
+  );
+
+  const expanded = await readCommittedFixture(
+    workspaceRoot,
+    EXPANDED_INFERENCE_FIXTURE_PATH,
+    EXPANDED_INFERENCE_FIXTURE_SHA256
+  );
+  validateExpandedInferenceFixture(expanded as unknown as ExpandedInferenceFixture);
+  assert.equal(
+    expanded.tokenizerSha256,
+    upstream.tokenizerSha256,
+    'Expanded tokenizer differs from the pinned upstream fixture.'
+  );
+  assert.equal(
+    expanded.sourceGraphSha256,
+    upstream.graphSha256,
+    'Expanded ONNX graph differs from the pinned fixture.'
+  );
+  assert.equal(
+    expanded.sourceWeightsSha256,
+    upstream.weightsSha256,
+    'Expanded ONNX weights differ from the pinned fixture.'
+  );
+  assert.deepEqual(
+    expanded.decisionCases[0]?.tokenIds,
+    upstream.tokenIds,
+    'Expanded baseline token IDs differ from the existing one-input reference.'
+  );
+  assert.deepEqual(
+    expanded.decisionCases[0]?.optionIndices,
+    upstream.optionIndices,
+    'Expanded baseline option indices differ from the existing one-input reference.'
   );
 }
 
@@ -975,7 +1020,7 @@ function validateTestEvidence(
   browser: BrowserRequirement,
   context: VerificationContext
 ): void {
-  assert.equal(record.schemaVersion, 1, 'Unsupported browser evidence schema.');
+  assert.equal(record.schemaVersion, 2, 'Unsupported browser evidence schema.');
   assert.equal(record.testKind, 'real-model-webgpu', 'Evidence must come from a real-model WebGPU test.');
   for (const field of ['requestedId', 'loadedId', 'describedId']) {
     assert.equal(record.model?.[field], model.modelId, `Test model ${field} mismatch for ${model.modelId}.`);
@@ -1044,6 +1089,13 @@ function validateTestEvidence(
     'Browser package version does not match the archive.'
   );
   validateInferenceEvidence(record.inference, model);
+  const expandedFixture = loadExpandedInferenceFixture(context.workspaceRoot, context.policy.expandedInference);
+  validateExpandedInferenceEvidence(
+    record.expandedInference,
+    expandedFixture.fixture,
+    expandedFixture.fixtureSha256,
+    model.manifestSha256
+  );
   validateHardware(record, model, browser, context.policy);
 }
 

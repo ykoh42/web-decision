@@ -4,6 +4,7 @@ import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {expect, test} from '@playwright/test';
 import type {DecisionRequest, DecisionResult, ModelProgress} from 'web-decision';
+import type {LoadedKev06DecisionModel, KevSystemOneResult} from '../../packages/web-decision/src/index.d.ts';
 import {
   BASELINE_EXPECTED_OUTPUT,
   BASELINE_REFERENCE,
@@ -18,6 +19,17 @@ import {
   type ExpectedInference,
   type ObservedInference
 } from './kev06-release-evidence.ts';
+import {
+  createExpandedInferenceEvidence,
+  EXPANDED_DECISION_CASE_IDS,
+  EXPANDED_INFERENCE_FIXTURE_PATH,
+  EXPANDED_INFERENCE_FIXTURE_SHA256,
+  type ExpandedInferenceFixture,
+  type ExpandedInferenceObservation,
+  type DecisionInferenceObservation,
+  validateExpandedInferenceEvidence,
+  validateExpandedInferenceFixture
+} from './kev06-expanded-inference.ts';
 
 type AssetMetadata = Readonly<{bytes: number; sha256: string}>;
 type VerifiedFile = AssetMetadata & Readonly<{path: string}>;
@@ -51,25 +63,50 @@ type OnlineResult = InferenceSnapshot & {
   disposed: boolean;
   sourceReachedFullLength: boolean;
   verifiedFiles: VerifiedFile[];
+  expandedInference: ExpandedInferenceObservation;
 };
 type OfflineResult = InferenceSnapshot;
+type BrowserTypedQuestion =
+  | Readonly<{type: 'choice'; instructions: string; criteria: Readonly<Record<string, string | null>>}>
+  | Readonly<{type: 'noul'; instructions: string}>
+  | Readonly<{type: 'score'; instructions: string; criteria: readonly string[]}>;
+interface BrowserOnlineOptions {
+  expectedSourceBytes: number;
+  representativeCases: readonly Readonly<{id: string; request: DecisionRequest}>[];
+  typedProbe: Readonly<{id: string; state: string; questions: Readonly<Record<string, BrowserTypedQuestion>>}>;
+  expectedFiles: Record<string, AssetMetadata>;
+}
 
 const enabled = process.env.WEB_DECISION_KEV06_DEFAULT_GPU === '1';
 const modelId = 'kev-0.6b-q4f16';
 const upstreamSourceBytes = 335_357_952;
-const evidencePrefix = 'WEB_DECISION_RELEASE_EVIDENCE_V1:';
+const evidencePrefix = 'WEB_DECISION_RELEASE_EVIDENCE_V2:';
 const progressPrefix = 'KEV06_DEFAULT_PROGRESS ';
 const baselineFixtureBytes = readFileSync(new URL('../fixtures/kev06-main-baseline.json', import.meta.url));
 const upstreamFixtureBytes = readFileSync(new URL('../fixtures/kev06-upstream-onnx-reference.json', import.meta.url));
+const expandedFixtureBytes = readFileSync(new URL('../fixtures/kev06-expanded-inference.json', import.meta.url));
 const baselineFixtureSha256 = sha256(baselineFixtureBytes);
 const upstreamFixtureSha256 = sha256(upstreamFixtureBytes);
+const expandedFixtureSha256 = sha256(expandedFixtureBytes);
 const baseline = JSON.parse(baselineFixtureBytes.toString('utf8')) as Baseline;
 const upstreamReference = JSON.parse(upstreamFixtureBytes.toString('utf8')) as UpstreamReferenceFixture;
+const expandedFixture = JSON.parse(expandedFixtureBytes.toString('utf8')) as ExpandedInferenceFixture;
 const baselineQuestion = baseline.request.questions[0];
 if (!baselineQuestion) throw new Error('The baseline fixture has no question.');
 const baselineOptionOrder = baselineQuestion.options;
 const upstreamPath =
   '/onnx-community/kev-0.6b-ONNX/resolve/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/onnx/model_q4f16.onnx_data';
+
+validateExpandedInferenceFixture(expandedFixture);
+if (expandedFixtureSha256 !== EXPANDED_INFERENCE_FIXTURE_SHA256) {
+  throw new Error('Expanded inference fixture digest differs from its policy pin.');
+}
+if (EXPANDED_INFERENCE_FIXTURE_PATH !== 'tests/fixtures/kev06-expanded-inference.json') {
+  throw new Error('Expanded inference fixture path differs from its policy pin.');
+}
+if (expandedFixture.decisionCases[0]?.id !== EXPANDED_DECISION_CASE_IDS[0]) {
+  throw new Error('Expanded inference baseline case is not first in the pinned matrix.');
+}
 
 test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release evidence', async ({
   page,
@@ -173,108 +210,16 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
     manifestSha256: model.manifestSha256
   });
 
-  const online = await page.evaluate(
-    async ({expectedSourceBytes, request, expectedFiles}) => {
-      const reportProgress = (stage: string, details: Record<string, unknown> = {}) =>
-        console.info(`KEV06_DEFAULT_PROGRESS ${JSON.stringify({stage, ...details})}`);
-      reportProgress('adapter.request.started');
-      if (!navigator.gpu) throw new Error('WebGPU is unavailable in Chromium.');
-      const adapter = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});
-      if (!adapter) throw new Error('Chromium did not provide a WebGPU adapter.');
-      if (!adapter.features.has('shader-f16')) throw new Error('The adapter does not support shader-f16.');
-      const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
-      const adapterIsFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
-      if (adapterIsFallback !== false) {
-        throw new Error(`Expected a non-fallback WebGPU adapter; got ${String(adapterIsFallback)}.`);
-      }
-      reportProgress('adapter.request.completed', {
-        adapterInfo: adapter.info ?? {},
-        adapterIsFallback,
-        features: [...adapter.features]
-      });
-      const sourceProgress: ModelProgress[] = [];
-      reportProgress('load.started', {modelId: 'kev-0.6b-q4f16'});
-      const model = await window.webDecision.loadDecisionModel({
-        modelId: 'kev-0.6b-q4f16',
-        onProgress(event) {
-          if (event.phase === 'upstream-source') {
-            const progress = {
-              loadedBytes: event.loadedBytes,
-              totalBytes: event.totalBytes,
-              fraction: event.fraction
-            };
-            sourceProgress.push(progress);
-            reportProgress('source-progress', progress);
-          }
-        }
-      });
-      reportProgress('load.completed', {
-        model: model.description.modelId,
-        backend: model.description.backend.name
-      });
-      let result: OnlineResult | undefined;
-      try {
-        reportProgress('inference.started');
-        const decision = await model.decide(request);
-        const answer = decision.answers[0];
-        if (!answer) throw new Error('The model returned no answer.');
-        reportProgress('inference.completed', {
-          selected: answer.selected,
-          optionOrder: answer.probabilities.map(({option}) => option)
-        });
-        result = {
-          modelId: model.description.modelId,
-          backend: model.description.backend.name,
-          assetManifestSha256: model.description.assets.manifestSha256,
-          selected: answer.selected,
-          probabilities: answer.probabilities,
-          adapterInfo: adapter.info ?? {},
-          adapterIsFallback,
-          adapterFeatures: [...adapter.features],
-          adapterLimits: {
-            maxBufferSize: adapter.limits.maxBufferSize,
-            maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-            maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
-            maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
-            maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
-            maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
-            maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
-            maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
-            maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension
-          },
-          userAgent: navigator.userAgent,
-          sourceProgress,
-          disposed: false,
-          sourceReachedFullLength: false,
-          verifiedFiles: []
-        };
-      } finally {
-        reportProgress('dispose.started');
-        await model.dispose();
-        reportProgress('dispose.completed', {disposed: true});
-      }
-      if (!result) throw new Error('The model returned no result.');
-      result.disposed = true;
-      const finalSourceProgress = sourceProgress[sourceProgress.length - 1];
-      result.sourceReachedFullLength =
-        finalSourceProgress?.loadedBytes === expectedSourceBytes &&
-        finalSourceProgress.totalBytes === expectedSourceBytes &&
-        finalSourceProgress.fraction === 1;
-      const cache = await caches.open('web-decision-assets-v1');
-      for (const [path, metadata] of Object.entries(expectedFiles)) {
-        const key = new URL('https://kev-assets.web-decision.invalid/.web-decision-cache/sha256/');
-        key.searchParams.set('digest', metadata.sha256);
-        const response = await cache.match(key.href);
-        if (!response) throw new Error(`The cached model file is missing: ${path}`);
-        const bytes = await response.arrayBuffer();
-        const digest = await crypto.subtle.digest('SHA-256', bytes);
-        const sha256 = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
-        result.verifiedFiles.push({path, bytes: bytes.byteLength, sha256});
-      }
-      return result;
+  const online = await page.evaluate<OnlineResult, BrowserOnlineOptions>(runOnlineInference, {
+    expectedSourceBytes: upstreamSourceBytes,
+    representativeCases: expandedFixture.decisionCases.map(({id, request}) => ({id, request})),
+    typedProbe: {
+      id: expandedFixture.typedSystemOne.id,
+      state: expandedFixture.typedSystemOne.state,
+      questions: expandedFixture.typedSystemOne.questions as unknown as Readonly<Record<string, BrowserTypedQuestion>>
     },
-    {expectedSourceBytes: upstreamSourceBytes, request: baseline.request, expectedFiles: manifestFiles}
-  );
+    expectedFiles: manifestFiles
+  });
 
   expect(huggingFaceGets.length).toBeGreaterThan(0);
   expect(huggingFaceGets.every((url) => new URL(url).pathname === upstreamPath)).toBe(true);
@@ -376,8 +321,16 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
   expect(inference.offline.matchesOnline).toBe(true);
   expect(onlineHuggingFaceGets.length).toBeGreaterThan(0);
 
+  const expandedInference = createExpandedInferenceEvidence(
+    expandedFixture,
+    expandedFixtureSha256,
+    model.manifestSha256,
+    online.expandedInference
+  );
+  validateExpandedInferenceEvidence(expandedInference, expandedFixture, expandedFixtureSha256, model.manifestSha256);
+
   const record = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     testKind: 'real-model-webgpu',
     catalogSha256: inputs.catalogSha256,
     model: {
@@ -414,7 +367,8 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
       features: online.adapterFeatures,
       limits: online.adapterLimits
     },
-    inference
+    inference,
+    expandedInference
   };
 
   for (const [feature, minimum] of Object.entries(model.backend.requiredLimits)) {
@@ -423,6 +377,183 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
   for (const feature of model.backend.requiredFeatures) expect(online.adapterFeatures).toContain(feature);
   console.log(`${evidencePrefix}${JSON.stringify(record)}`);
 });
+
+async function runOnlineInference({
+  expectedSourceBytes,
+  representativeCases,
+  typedProbe,
+  expectedFiles
+}: BrowserOnlineOptions): Promise<OnlineResult> {
+  const reportProgress = (stage: string, details: Record<string, unknown> = {}) =>
+    console.info(`KEV06_DEFAULT_PROGRESS ${JSON.stringify({stage, ...details})}`);
+  const adapter = await requireAdapter(reportProgress);
+  const sourceProgress: ModelProgress[] = [];
+  reportProgress('load.started', {modelId: 'kev-0.6b-q4f16'});
+  const model = await window.webDecision.loadDecisionModel({
+    modelId: 'kev-0.6b-q4f16',
+    onProgress(event) {
+      if (event.phase === 'upstream-source') {
+        const progress = {
+          loadedBytes: event.loadedBytes,
+          totalBytes: event.totalBytes,
+          fraction: event.fraction
+        };
+        sourceProgress.push(progress);
+        reportProgress('source-progress', progress);
+      }
+    }
+  });
+  reportProgress('load.completed', {
+    model: model.description.modelId,
+    backend: model.description.backend.name
+  });
+
+  let result: OnlineResult | undefined;
+  try {
+    const decision = await runDecisionCases(model, representativeCases, reportProgress);
+    const typedSystemOne = await runTypedProbe(model, typedProbe, reportProgress);
+    result = {
+      modelId: model.description.modelId,
+      backend: model.description.backend.name,
+      assetManifestSha256: model.description.assets.manifestSha256,
+      selected: decision.baselineAnswer.selected,
+      probabilities: decision.baselineAnswer.probabilities,
+      adapterInfo: adapter.info ?? {},
+      adapterIsFallback: adapter.isFallback,
+      adapterFeatures: [...adapter.value.features],
+      adapterLimits: adapterLimits(adapter.value),
+      userAgent: navigator.userAgent,
+      sourceProgress,
+      disposed: false,
+      sourceReachedFullLength: sourceReachedFullLength(sourceProgress, expectedSourceBytes),
+      verifiedFiles: [],
+      expandedInference: {decisionRuns: decision.runs, typedSystemOne}
+    };
+  } finally {
+    reportProgress('dispose.started');
+    await model.dispose();
+    reportProgress('dispose.completed', {disposed: true});
+  }
+  if (!result) throw new Error('The model returned no result.');
+  result.disposed = true;
+  result.verifiedFiles = await measureCachedFiles(expectedFiles);
+  return result;
+
+  async function requireAdapter(
+    reportProgress: (stage: string, details?: Record<string, unknown>) => void
+  ): Promise<{value: GPUAdapter; info: GPUAdapterInfo; isFallback: false}> {
+    reportProgress('adapter.request.started');
+    if (!navigator.gpu) throw new Error('WebGPU is unavailable in Chromium.');
+    const adapter = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});
+    if (!adapter) throw new Error('Chromium did not provide a WebGPU adapter.');
+    if (!adapter.features.has('shader-f16')) throw new Error('The adapter does not support shader-f16.');
+    const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
+    const adapterIsFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
+    if (adapterIsFallback !== false) {
+      throw new Error(`Expected a non-fallback WebGPU adapter; got ${String(adapterIsFallback)}.`);
+    }
+    const info = adapter.info ?? {};
+    reportProgress('adapter.request.completed', {
+      adapterInfo: info,
+      adapterIsFallback,
+      features: [...adapter.features]
+    });
+    return {value: adapter, info, isFallback: false};
+  }
+
+  async function runDecisionCases(
+    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    cases: BrowserOnlineOptions['representativeCases'],
+    reportProgress: (stage: string, details?: Record<string, unknown>) => void
+  ): Promise<{runs: DecisionInferenceObservation[]; baselineAnswer: Answer}> {
+    const runs: DecisionInferenceObservation[] = [];
+    let baselineDecision: DecisionResult | undefined;
+    for (const testCase of cases) {
+      reportProgress('representative.decide.started', {caseId: testCase.id});
+      const decision = await activeModel.decide(testCase.request);
+      const answer = decision.answers[0];
+      if (!answer) throw new Error(`The model returned no answer for ${testCase.id}.`);
+      runs.push({
+        id: testCase.id,
+        tokenCount: decision.tokenCount,
+        selected: answer.selected,
+        selectedIndex: answer.selectedIndex,
+        probabilities: answer.probabilities
+      });
+      if (testCase.id === 'baseline-double-charge') baselineDecision = decision;
+      reportProgress('representative.decide.completed', {
+        caseId: testCase.id,
+        tokenCount: decision.tokenCount,
+        selected: answer.selected
+      });
+    }
+    if (!baselineDecision) throw new Error('The expanded inference matrix omitted its baseline request.');
+    const baselineAnswer = baselineDecision.answers[0];
+    if (!baselineAnswer) throw new Error('The model returned no answer for its baseline request.');
+    reportProgress('inference.completed', {
+      selected: baselineAnswer.selected,
+      optionOrder: baselineAnswer.probabilities.map(({option}) => option)
+    });
+    return {runs, baselineAnswer};
+  }
+
+  async function runTypedProbe(
+    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    probe: BrowserOnlineOptions['typedProbe'],
+    reportProgress: (stage: string, details?: Record<string, unknown>) => void
+  ): Promise<ExpandedInferenceObservation['typedSystemOne']> {
+    const kev06Model = activeModel as unknown as LoadedKev06DecisionModel;
+    reportProgress('typed.packed.started', {caseId: probe.id});
+    const packed = await kev06Model.systemOne(probe.state, probe.questions);
+    reportProgress('typed.packed.completed', {tokenCount: packed.tokenCount});
+    const single: Record<string, KevSystemOneResult<'kev-0.6b-q4f16'>> = {};
+    for (const name of Object.keys(probe.questions)) {
+      const question = probe.questions[name];
+      if (!question) throw new Error(`Typed question ${name} is missing.`);
+      reportProgress('typed.single.started', {question: name});
+      single[name] = await kev06Model.systemOne(probe.state, {[name]: question});
+      reportProgress('typed.single.completed', {question: name, tokenCount: single[name]!.tokenCount});
+    }
+    return {packed, single};
+  }
+
+  function adapterLimits(adapter: GPUAdapter): Readonly<Record<string, number>> {
+    return {
+      maxBufferSize: adapter.limits.maxBufferSize,
+      maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+      maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+      maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
+      maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+      maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+      maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+      maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
+      maxComputeWorkgroupsPerDimension: adapter.limits.maxComputeWorkgroupsPerDimension
+    };
+  }
+
+  function sourceReachedFullLength(progress: readonly ModelProgress[], expectedSourceBytes: number): boolean {
+    const final = progress[progress.length - 1];
+    return (
+      final?.loadedBytes === expectedSourceBytes && final.totalBytes === expectedSourceBytes && final.fraction === 1
+    );
+  }
+
+  async function measureCachedFiles(expectedFiles: Record<string, AssetMetadata>): Promise<VerifiedFile[]> {
+    const cache = await caches.open('web-decision-assets-v1');
+    const files: VerifiedFile[] = [];
+    for (const [path, metadata] of Object.entries(expectedFiles)) {
+      const key = new URL('https://kev-assets.web-decision.invalid/.web-decision-cache/sha256/');
+      key.searchParams.set('digest', metadata.sha256);
+      const response = await cache.match(key.href);
+      if (!response) throw new Error(`The cached model file is missing: ${path}`);
+      const bytes = await response.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const sha256 = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+      files.push({path, bytes: bytes.byteLength, sha256});
+    }
+    return files;
+  }
+}
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name];

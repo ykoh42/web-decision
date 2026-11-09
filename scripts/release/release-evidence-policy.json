@@ -1,7 +1,15 @@
 {
-  "schemaVersion": 1,
-  "evidencePrefix": "WEB_DECISION_RELEASE_EVIDENCE_V1:",
+  "schemaVersion": 2,
+  "evidencePrefix": "WEB_DECISION_RELEASE_EVIDENCE_V2:",
   "testFile": "tests/browser/kev06-default-source-real-webgpu.spec.ts",
+  "expandedInference": {
+    "fixturePath": "tests/fixtures/kev06-expanded-inference.json",
+    "fixtureSha256": "e42c5882958ac78374f138a41f2eed78245810845d1f0fbf5af76188d669088b",
+    "decisionCaseIds": ["baseline-double-charge", "account-security", "delayed-package", "long-tracking-context"],
+    "typedSystemOneId": "typed-system-one-probe",
+    "typedQuestionNames": ["team", "refund", "sentiment"],
+    "typedQuestionTypes": ["choice", "noul", "score"]
+  },
   "browsers": [{"name": "chromium", "project": "chromium"}],
   "requireNonFallbackAdapter": true,
   "requirePhysicalDevice": true,
