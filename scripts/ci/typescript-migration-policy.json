@@ -32,7 +32,6 @@
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/strands-device-loss.test.mjs",
     "packages/web-decision/test/strands-input-snapshot.test.mjs",
-    "packages/web-decision/test/strands-range-cache.test.mjs",
     "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
     "packages/web-decision/test/tamev.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",

@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from 'node:test';
+import type {AssetCache} from '../src/assets.js';
 import {RangeCacheTransaction} from '../src/strands/range-cache.mjs';
 import {readVerifiedRange} from '../src/strands/range-reader.mjs';
 
 const base = new URL('https://fixture.invalid/model/');
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 function reusableChunks() {
   const shared = new Uint8Array(4);
@@ -39,13 +40,13 @@ test('snapshots reused response chunks before the next read for network and offl
     async match() {
       return writes ? {body: reusableChunks()} : undefined;
     },
-    async put(_key, response) {
+    async put(_key: string, response: Response) {
       assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expected);
       writes++;
     }
   };
-  const online = await readVerifiedRange(base, spec, {cache});
-  const offline = await readVerifiedRange(base, spec, {cache, offline: true});
+  const online = await readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache});
+  const offline = await readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache, offline: true});
   assert.deepEqual(new Uint8Array(online.bytes), expected);
   assert.deepEqual(new Uint8Array(offline.bytes), expected);
   assert.equal(offline.cachedByHash, true);
@@ -56,8 +57,8 @@ test('snapshots reused response chunks before the next read for network and offl
 test('short and oversized range bodies fail without caching', async (t) => {
   const expected = Uint8Array.of(1, 2, 3, 4);
   const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
-  let body,
-    writes = 0,
+  let body: unknown;
+  let writes = 0,
     released = 0,
     cancelled = 0;
   t.mock.method(globalThis, 'fetch', async () => ({
@@ -103,10 +104,10 @@ test('aborting a pending range body preserves the reason and cancels its reader'
   const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: '0'.repeat(64)};
   const controller = new AbortController(),
     reason = Error('stop range');
-  let started,
-    cancelled = 0,
+  let started!: () => void;
+  let cancelled = 0,
     writes = 0;
-  const reading = new Promise((resolve) => {
+  const reading = new Promise<void>((resolve) => {
     started = resolve;
   });
   const body = {
@@ -136,7 +137,7 @@ test('aborting a pending range body preserves the reason and cancels its reader'
       writes++;
     }
   };
-  const promise = readVerifiedRange(base, spec, {cache, signal: controller.signal});
+  const promise = readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache, signal: controller.signal});
   await reading;
   controller.abort(reason);
   await assert.rejects(promise, (error) => error === reason);
@@ -153,7 +154,7 @@ test('oversized cached ranges fail offline and are replaced online', async (t) =
     async match() {
       return new Response(Uint8Array.of(1, 2, 3, 4, 5));
     },
-    async put(_key, value) {
+    async put(_key: string, value: Response) {
       assert.deepEqual(new Uint8Array(await value.arrayBuffer()), expected);
       writes++;
     }
@@ -174,10 +175,10 @@ test('aborting a pending cached body preserves the reason without fetching', asy
   const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: '0'.repeat(64)};
   const controller = new AbortController(),
     reason = Error('stop cache');
-  let started,
-    cancelled = 0,
+  let started!: () => void;
+  let cancelled = 0,
     requests = 0;
-  const reading = new Promise((resolve) => {
+  const reading = new Promise<void>((resolve) => {
     started = resolve;
   });
   const body = {
@@ -203,7 +204,7 @@ test('aborting a pending cached body preserves the reason without fetching', asy
     requests++;
     throw Error('unexpected fetch');
   });
-  const promise = readVerifiedRange(base, spec, {cache, signal: controller.signal});
+  const promise = readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache, signal: controller.signal});
   await reading;
   controller.abort(reason);
   await assert.rejects(promise, (error) => error === reason);
@@ -214,8 +215,8 @@ test('aborting a pending cached body preserves the reason without fetching', asy
 test('aborted offline marker read cancels a response resolved during cancellation', async () => {
   const controller = new AbortController(),
     reason = new Error('stop marker');
-  let resolveMatch,
-    cancelled = 0;
+  let resolveMatch!: (response: Response) => void;
+  let cancelled = 0;
   const response = new Response(
     new ReadableStream({
       cancel() {
@@ -226,13 +227,13 @@ test('aborted offline marker read cancels a response resolved during cancellatio
   );
   const cache = {
     match: () =>
-      new Promise((resolve) => {
+      new Promise<Response>((resolve) => {
         resolveMatch = resolve;
       })
   };
   const tx = new RangeCacheTransaction({
     base: new URL('https://fixture.invalid/model/'),
-    cache,
+    cache: cache as unknown as AssetCache,
     offline: true,
     signal: controller.signal,
     markerId: 'fixture'
@@ -247,22 +248,22 @@ test('aborted offline marker read cancels a response resolved during cancellatio
 
 test('verified range is cached and rechecked offline without a network request', async () => {
   const originalFetch = globalThis.fetch,
-    entries = new Map(),
+    entries = new Map<string, Response>(),
     bytes = new TextEncoder().encode('test');
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const spec = {path: 'fixture.bin', totalBytes: 8, offset: 2, length: 4, sha256};
   const cache = {
-    async match(key) {
+    async match(key: string) {
       return entries.get(key)?.clone();
     },
-    async put(key, value) {
+    async put(key: string, value: Response) {
       entries.set(key, value.clone());
     }
   };
   let requests = 0;
   globalThis.fetch = async (_url, options) => {
     requests++;
-    assert.equal(options.headers.Range, 'bytes=2-5');
+    assert.equal(new Headers(options?.headers).get('Range'), 'bytes=2-5');
     return new Response(bytes, {status: 206, headers: {'content-range': 'bytes 2-5/8', 'content-length': '4'}});
   };
   try {
