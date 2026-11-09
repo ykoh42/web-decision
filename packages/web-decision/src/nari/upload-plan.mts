@@ -1,18 +1,44 @@
+interface FileDescriptor {
+  path: string;
+  bytes: number;
+  sha256: string;
+}
+interface ChunkDescriptor {
+  offset: number;
+  bytes: number;
+  sha256: string;
+}
+interface InventoryRow extends FileDescriptor {
+  chunks: ChunkDescriptor[];
+}
+interface UploadEntry {
+  target: string;
+  graphArgument: string;
+  source: string;
+  dtype: string;
+  shape: number[];
+  file: FileDescriptor;
+}
+interface UploadPlan {
+  ordered: UploadEntry[];
+  letterFile: FileDescriptor;
+}
+
 const MAX = 4 * 1024 * 1024;
 const ROTARY = ['body.rotary_emb.inv_freq', 'body.rotary_emb.original_inv_freq'];
 const SHA = /^[a-f0-9]{64}$/;
-const safe = (value) => Number.isSafeInteger(value) && value >= 0;
-const dense = (array, length) =>
+const safe = (value: number) => Number.isSafeInteger(value) && value >= 0;
+const dense = (array: unknown, length: number) =>
   Array.isArray(array) &&
   array.length === length &&
   Array.from({length}, (_, i) => Object.hasOwn(array, i)).every(Boolean);
-const invalid = () => {
+const invalid: () => never = () => {
   throw Error('invalid Nari upload');
 };
-export const aligned = (value) => Math.ceil(value / 4) * 4;
+export const aligned = (value: number) => Math.ceil(value / 4) * 4;
 
-export function bytesFor(entry) {
-  const width = {float16: 2, float32: 4, int32: 4, uint32: 4}[entry.dtype];
+export function bytesFor(entry: {dtype: string; shape: number[]}) {
+  const width = ({float16: 2, float32: 4, int32: 4, uint32: 4} as Record<string, number>)[entry.dtype];
   if (
     !width ||
     !Array.isArray(entry.shape) ||
@@ -27,7 +53,7 @@ export function bytesFor(entry) {
   return bytes;
 }
 
-function validateDescriptor(file, seen) {
+function validateDescriptor(file: FileDescriptor, seen: Set<string>) {
   if (
     !file ||
     typeof file.path !== 'string' ||
@@ -42,12 +68,12 @@ function validateDescriptor(file, seen) {
   seen.add(file.path);
 }
 
-function validateEntries(plan, bindings) {
+function validateEntries(plan: UploadPlan, bindings: number) {
   if (!plan || !dense(plan.ordered, bindings) || !plan.letterFile) invalid();
   const fileCount = bindings - 2;
-  const targets = new Set(),
-    argumentsSeen = new Set(),
-    files = new Set();
+  const targets = new Set<string>(),
+    argumentsSeen = new Set<string>(),
+    files = new Set<string>();
   for (let i = 0; i < bindings; i++) {
     const entry = plan.ordered[i];
     if (
@@ -82,7 +108,7 @@ function validateEntries(plan, bindings) {
   return [...plan.ordered.slice(0, fileCount).map((entry) => entry.file), plan.letterFile];
 }
 
-function validateRanges(row, file) {
+function validateRanges(row: InventoryRow, file: FileDescriptor) {
   if (
     !file ||
     row.bytes !== file.bytes ||
@@ -111,7 +137,7 @@ function validateRanges(row, file) {
   if (position !== file.bytes) invalid();
 }
 
-function validateInventory(inventory, expected, bindings) {
+function validateInventory(inventory: InventoryRow[], expected: FileDescriptor[], bindings: number) {
   if (!dense(inventory, bindings - 1)) invalid();
   const expectedByPath = new Map(expected.map((file) => [file.path, file])),
     byFile = new Map();
@@ -125,27 +151,32 @@ function validateInventory(inventory, expected, bindings) {
   return byFile;
 }
 
-function snapshotRotary(rotary) {
+function snapshotRotary(rotary: Record<string, Float32Array>) {
   if (
     !rotary ||
     !ROTARY.every(
       (key) =>
         rotary[key] instanceof Float32Array &&
-        rotary[key].length === 32 &&
-        Array.from(rotary[key]).every(Number.isFinite)
+        rotary[key]!.length === 32 &&
+        Array.from(rotary[key]!).every(Number.isFinite)
     ) ||
-    !rotary[ROTARY[0]].every((value, i) => Object.is(value, rotary[ROTARY[1]][i]))
+    !rotary[ROTARY[0]!]!.every((value, i) => Object.is(value, rotary[ROTARY[1]!]![i]))
   )
     invalid();
   return ROTARY.map((key) => {
     const bytes = new Uint8Array(128),
       view = new DataView(bytes.buffer);
-    for (let i = 0; i < 32; i++) view.setFloat32(i * 4, rotary[key][i], true);
+    for (let i = 0; i < 32; i++) view.setFloat32(i * 4, rotary[key]![i]!, true);
     return bytes;
   });
 }
 
-export function prepareUpload(plan, inventory, rotary, bindings = 730) {
+export function prepareUpload(
+  plan: UploadPlan,
+  inventory: InventoryRow[],
+  rotary: Record<string, Float32Array>,
+  bindings = 730
+) {
   if (bindings !== 730 && bindings !== 606) invalid();
   const snapshot = structuredClone(plan),
     rows = structuredClone(inventory);
