@@ -13,7 +13,10 @@ test('a failed root scope close retains resources and never disposes the runtime
     throw cause;
   };
 
-  await assert.rejects(model.dispose(), (error) => error.code === 'INFERENCE_ERROR' && error.cause === cause);
+  await assert.rejects(
+    model.dispose(),
+    (error) => (error as {code: string}).code === 'INFERENCE_ERROR' && (error as {cause: unknown}).cause === cause
+  );
   await assert.rejects(model.dispose(), {code: 'INFERENCE_ERROR'});
   assert.equal(retained, 1);
   assert.equal(model.runtime, runtime);
@@ -49,7 +52,10 @@ test('a failing runtime disposal retains session ownership', async () => {
   runtime.dispose = () => {
     throw cause;
   };
-  await assert.rejects(model.dispose(), (error) => error.code === 'INFERENCE_ERROR' && error.cause === cause);
+  await assert.rejects(
+    model.dispose(),
+    (error) => (error as {code: string}).code === 'INFERENCE_ERROR' && (error as {cause: unknown}).cause === cause
+  );
   assert.equal(retained, 1);
   assert.equal(model.runtime, runtime);
   assert.deepEqual(model.weights, ['fake']);

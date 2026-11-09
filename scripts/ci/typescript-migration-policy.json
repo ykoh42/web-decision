@@ -151,7 +151,6 @@
     "packages/web-decision/test/h2o-teardown-loader.test.mjs",
     "packages/web-decision/test/h2o-tokenizer-snapshot.test.mjs",
     "packages/web-decision/test/imajev-candidate-loader.test.mjs",
-    "packages/web-decision/test/imajev-disposal.test.mjs",
     "packages/web-decision/test/imajev-loader.test.mjs",
     "packages/web-decision/test/imajev-session.test.mjs",
     "packages/web-decision/test/imajev-source.test.mjs",

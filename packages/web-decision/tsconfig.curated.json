@@ -23,6 +23,7 @@
     "test/curated-*.test.mts",
     "test/build-normalization.test.mts",
     "test/bundler-notices.test.mts",
+    "test/imajev-disposal.test.mts",
     "test/kev06-contract.test.mts",
     "test/mapika4b-source.test.mts",
     "test/mapika4b-tokenizer.test.mts",
