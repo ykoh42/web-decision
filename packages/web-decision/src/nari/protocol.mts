@@ -12,16 +12,79 @@ const HEADER = '### 상태 (state)\n';
 const INSTRUCTION = 'Answer with one letter.';
 const VOCAB_SIZE = 248320;
 
-function encodeIds(tokenizer, value) {
-  const tokens = tokenizer.encode(value, {add_special_tokens: false})?.ids;
-  if (!tokens || typeof tokens[Symbol.iterator] !== 'function') throw new TypeError('Invalid tokenizer output');
-  const result = Array.from(tokens);
-  if (result.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= VOCAB_SIZE))
-    throw new RangeError('Tokenizer returned an out-of-bounds token ID');
-  return result;
+interface NariTokenizerEncoding {
+  readonly ids?: unknown;
 }
 
-function assertUserText(tokenizer, value, controlIds) {
+interface NariTokenizer {
+  encode(value: string, options: {readonly add_special_tokens: false}): NariTokenizerEncoding | null | undefined;
+}
+
+interface NariQuestionCandidate {
+  readonly instructions?: unknown;
+  readonly options?: unknown;
+}
+
+interface NariQuestion {
+  readonly instructions: string;
+  readonly options: readonly string[];
+}
+
+interface NariRequestCandidate {
+  readonly state?: unknown;
+  readonly questions?: unknown;
+}
+
+interface NariEncodedQuestions {
+  readonly qids: number[];
+  readonly optRel: number[];
+  readonly optQ: number[];
+  readonly optType: number[];
+  readonly slots: number[];
+  readonly nLetters: number[];
+}
+
+interface NariTemperatures {
+  readonly [key: string]: number | undefined;
+}
+
+export interface NariPackedRequest {
+  readonly inputIds: number[];
+  readonly optPos: number[];
+  readonly optQ: number[];
+  readonly optType: number[];
+  readonly slotPos: number[];
+  readonly nLetters: number[];
+  readonly options: string[][];
+}
+
+export interface NariChoiceProbability {
+  readonly option: string;
+  readonly probability: number;
+  readonly logit: number;
+}
+
+export interface NariChoiceResult {
+  readonly selected: string;
+  readonly selectedIndex: number;
+  readonly probabilities: readonly NariChoiceProbability[];
+}
+
+function encodeIds(tokenizer: NariTokenizer, value: string): number[] {
+  const tokens = tokenizer.encode(value, {add_special_tokens: false})?.ids;
+  if (!tokens || typeof (tokens as {readonly [Symbol.iterator]?: unknown})[Symbol.iterator] !== 'function')
+    throw new TypeError('Invalid tokenizer output');
+  const result = Array.from(tokens as Iterable<unknown>);
+  if (result.some((id) => !Number.isSafeInteger(id) || (id as number) < 0 || (id as number) >= VOCAB_SIZE))
+    throw new RangeError('Tokenizer returned an out-of-bounds token ID');
+  return result as number[];
+}
+
+function assertUserText(
+  tokenizer: NariTokenizer,
+  value: unknown,
+  controlIds: ReadonlySet<number>
+): asserts value is string {
   if (typeof value !== 'string') throw new TypeError('Text fields must be strings');
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
@@ -36,18 +99,25 @@ function assertUserText(tokenizer, value, controlIds) {
     throw new RangeError('User input contains a reserved control token');
 }
 
-function validateQuestion(tokenizer, question, controlIds) {
-  if (!question || typeof question.instructions !== 'string' || !question.instructions.trim())
+function validateQuestion(
+  tokenizer: NariTokenizer,
+  question: unknown,
+  controlIds: ReadonlySet<number>
+): asserts question is NariQuestion {
+  const candidate = question as NariQuestionCandidate;
+  if (!question || typeof candidate.instructions !== 'string' || !candidate.instructions.trim())
     throw new RangeError('Question needs nonempty instructions');
-  if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 255)
+  if (!Array.isArray(candidate.options) || candidate.options.length < 2 || candidate.options.length > 255)
     throw new RangeError('Question needs 2 to 255 options');
-  if (question.options.some((option) => typeof option !== 'string' || !option.trim()))
+  if ((candidate.options as unknown[]).some((option: unknown) => typeof option !== 'string' || !option.trim()))
     throw new RangeError('Options must be nonempty strings');
-  if (new Set(question.options).size !== question.options.length) throw new RangeError('Options must be unique');
-  for (const value of [question.instructions, ...question.options]) assertUserText(tokenizer, value, controlIds);
+  if (new Set(candidate.options as unknown[]).size !== candidate.options.length)
+    throw new RangeError('Options must be unique');
+  for (const value of [candidate.instructions, ...(candidate.options as string[])])
+    assertUserText(tokenizer, value, controlIds);
 }
 
-function encodeQuestions(ids, questions) {
+function encodeQuestions(ids: (text: string) => number[], questions: readonly NariQuestion[]): NariEncodedQuestions {
   const qids = [],
     optRel = [],
     optQ = [],
@@ -63,7 +133,7 @@ function encodeQuestions(ids, questions) {
     qids.push(...ids(`\n### 질문 ${index + 1}: q${index} [하나 고르기]\n${question.instructions}\n`));
     const hasLetters = question.options.length <= 26;
     for (const [optionIndex, option] of question.options.entries()) {
-      const shown = hasLetters ? `${LETTERS[optionIndex]}. ${option}\n` : `- ${option}\n`;
+      const shown = hasLetters ? `${LETTERS[optionIndex]!}. ${option}\n` : `- ${option}\n`;
       qids.push(...ids(shown));
       optRel.push(qids.length - 1);
       optQ.push(index);
@@ -82,24 +152,35 @@ function encodeQuestions(ids, questions) {
 }
 
 /** Reproduce v4chat on accepted text choices, rejecting rather than truncating state. */
-export function packNariRequest(tokenizer, request, addedTokenIds) {
-  if (!request || typeof request !== 'object' || !Array.isArray(request.questions) || !request.questions.length)
+export function packNariRequest(tokenizer: NariTokenizer, request: unknown, addedTokenIds: unknown): NariPackedRequest {
+  const requestCandidate = request as NariRequestCandidate;
+  if (
+    !request ||
+    typeof request !== 'object' ||
+    !Array.isArray(requestCandidate.questions) ||
+    !requestCandidate.questions.length
+  )
     throw new RangeError('At least one question is required');
   if (
     !Array.isArray(addedTokenIds) ||
     !addedTokenIds.length ||
-    addedTokenIds.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= VOCAB_SIZE) ||
-    new Set(addedTokenIds).size !== addedTokenIds.length
+    addedTokenIds.some(
+      (id: unknown) => !Number.isSafeInteger(id) || (id as number) < 0 || (id as number) >= VOCAB_SIZE
+    ) ||
+    new Set(addedTokenIds as unknown[]).size !== addedTokenIds.length
   )
     throw new RangeError('Invalid tokenizer control-token binding');
-  const controlIds = new Set(addedTokenIds);
-  assertUserText(tokenizer, request.state, controlIds);
-  for (const question of request.questions) validateQuestion(tokenizer, question, controlIds);
-  const ids = (text) => encodeIds(tokenizer, text);
-  const {qids, optRel, optQ, optType, slots, nLetters} = encodeQuestions(ids, request.questions);
+  const controlIds = new Set(addedTokenIds as number[]);
+  assertUserText(tokenizer, requestCandidate.state, controlIds);
+  for (const question of requestCandidate.questions as unknown[]) validateQuestion(tokenizer, question, controlIds);
+  const ids = (text: string) => encodeIds(tokenizer, text);
+  const {qids, optRel, optQ, optType, slots, nLetters} = encodeQuestions(
+    ids,
+    requestCandidate.questions as NariQuestion[]
+  );
   const open = ids(OPEN),
     header = ids(HEADER),
-    state = ids(request.state);
+    state = ids(requestCandidate.state as string);
   const budget = 2048 - open.length - header.length - qids.length;
   if (budget < 32 || state.length > budget) throw new RangeError('Input exceeds token limit; no truncation applied');
   const base = open.length + header.length + state.length;
@@ -111,18 +192,24 @@ export function packNariRequest(tokenizer, request, addedTokenIds) {
     optType,
     slotPos: slots.map((pos) => (pos < 0 ? -1 : base + pos)),
     nLetters,
-    options: request.questions.map((question) => [...question.options])
+    options: (requestCandidate.questions as NariQuestion[]).map((question) => [...question.options])
   };
 }
 
-function logSoftmax(values) {
+function logSoftmax(values: readonly number[]): number[] {
   const max = Math.max(...values);
   const normalizer = Math.log(values.reduce((sum, value) => sum + Math.exp(value - max), 0));
   return values.map((value) => value - max - normalizer);
 }
 
 /** Reproduce the combined head/letter score and type-specific temperature. */
-export function decodeNariChoice(options, headScores, letterScores, temperatures, lmWeight = 0.5) {
+export function decodeNariChoice(
+  options: readonly string[],
+  headScores: ArrayLike<number> | Iterable<number> | null | undefined,
+  letterScores: ArrayLike<number> | Iterable<number> | null | undefined,
+  temperatures: NariTemperatures | null | undefined,
+  lmWeight = 0.5
+): NariChoiceResult {
   const head = Array.from(headScores ?? []);
   const letter = letterScores == null ? null : Array.from(letterScores);
   if (
@@ -143,7 +230,7 @@ export function decodeNariChoice(options, headScores, letterScores, temperatures
   if (letter) {
     const a = logSoftmax(head),
       b = logSoftmax(letter);
-    logits = a.map((value, i) => (1 - lmWeight) * value + lmWeight * b[i]);
+    logits = a.map((value, i) => (1 - lmWeight) * value + lmWeight * b[i]!);
   }
   const bucket = hasLetters ? (options.length <= 2 ? '2' : options.length <= 5 ? '3-5' : '6+') : '27+';
   const temperature = temperatures?.[`choice:${bucket}`] ?? temperatures?.['*'] ?? 1;
@@ -154,8 +241,8 @@ export function decodeNariChoice(options, headScores, letterScores, temperatures
   const probabilities = exp.map((value) => value / sum);
   const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
   return {
-    selected: options[selectedIndex],
+    selected: options[selectedIndex]!,
     selectedIndex,
-    probabilities: options.map((option, i) => ({option, probability: probabilities[i], logit: logits[i]}))
+    probabilities: options.map((option, i) => ({option, probability: probabilities[i]!, logit: logits[i]!}))
   };
 }

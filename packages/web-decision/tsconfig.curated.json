@@ -40,6 +40,8 @@
     "test/model-assets.test.mts",
     "test/nari-adapter.test.mts",
     "test/nari-session.test.mts",
+    "src/nari/session.mts",
+    "src/nari/protocol.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
     "test/parameter-upload-count.test.mts",

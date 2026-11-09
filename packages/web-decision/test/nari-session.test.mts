@@ -25,10 +25,10 @@ test('session submits all questions jointly and returns model choices', async ()
     async dispose() {}
   };
   const session = createNariSession({tokenizer, controlIds: [248045], runner});
-  const result = (await session.decide({
+  const result = await session.decide({
     state: 'x',
     questions: [request.questions[0], {instructions: 'x', options: ['c', 'd']}]
-  })) as unknown as {answers: {selected: string}[]};
+  });
   assert.equal(calls, 1);
   assert.deepEqual(
     result.answers.map((value) => value.selected),
