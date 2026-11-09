@@ -36,5 +36,3 @@ export interface TinyDecideSourceOptions {
 export interface TinyDecideAssetSource {
   read(name: TinyDecideAssetName): Promise<ArrayBuffer>;
 }
-
-export function openTinyDecideSource(options: TinyDecideSourceOptions): Promise<TinyDecideAssetSource>;

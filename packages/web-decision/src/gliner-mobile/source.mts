@@ -1,11 +1,12 @@
+import type {AssetSourceOptions} from '../asset-source-types.js';
 import {openAssetCache, readVerifiedAsset} from '../assets.js';
 import {GLINER_MOBILE_SPEC} from './contract.mjs';
 
-export async function openGlinerMobileSource({base, signal, cacheEnabled, offline, onProgress}) {
+export async function openGlinerMobileSource({base, signal, cacheEnabled, offline, onProgress}: AssetSourceOptions) {
   const cache = await openAssetCache(cacheEnabled, signal);
   let loadedBytes = 0;
   return {
-    async read(name) {
+    async read(name: string) {
       const bytes = await readVerifiedAsset(base, GLINER_MOBILE_SPEC.manifest, name, {
         cache,
         signal,

@@ -1,12 +1,20 @@
+import type {AssetSourceOptions, ManifestSourceSpec} from '../asset-source-types.js';
 import {openAssetCache, readVerifiedAsset} from '../assets.js';
 import {VERDICT_SPEC} from './contract.mjs';
 
-export async function openVerdictSource({base, signal, cacheEnabled, offline, onProgress, spec = VERDICT_SPEC}) {
+export async function openVerdictSource({
+  base,
+  signal,
+  cacheEnabled,
+  offline,
+  onProgress,
+  spec = VERDICT_SPEC
+}: AssetSourceOptions & {spec?: ManifestSourceSpec | undefined}) {
   const cache = await openAssetCache(cacheEnabled, signal);
   let loadedBytes = 0;
 
   return {
-    async read(name) {
+    async read(name: string) {
       const bytes = await readVerifiedAsset(base, spec.manifest, name, {
         cache,
         signal,
