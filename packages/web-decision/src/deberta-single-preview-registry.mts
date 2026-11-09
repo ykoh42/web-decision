@@ -5,7 +5,7 @@ import {DEBERTA_REQUIRED_LIMITS} from './deberta/device.mjs';
 const MODEL_ID = deberta.model;
 const MODEL_IDS = Object.freeze([MODEL_ID]);
 
-function deepFreeze(value) {
+function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);
@@ -83,11 +83,11 @@ export function listDecisionModels() {
   return MODEL_IDS;
 }
 
-export function isDecisionModel(value) {
+export function isDecisionModel(value: unknown): boolean {
   return value === MODEL_ID;
 }
 
-export function describeModel(model) {
+export function describeModel(model: unknown) {
   if (model !== MODEL_ID) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return description;
 }
