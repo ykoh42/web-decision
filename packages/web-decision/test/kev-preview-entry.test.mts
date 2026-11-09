@@ -12,16 +12,16 @@ test('the release entry exposes only Kev 0.6B Q4F16', () => {
   assert.equal(Object.isFrozen(describeModel('kev-0.6b-q4f16').backend.requiredLimits), true);
   const limits = describeModel('kev-0.6b-q4f16').features.textChoice.limits;
   assert.deepEqual(
-    limits.find((limit) => limit.resource === 'questions'),
+    limits.find((limit: {resource: string}) => limit.resource === 'questions'),
     {
       resource: 'questions',
       scope: 'request',
       min: 1
     }
   );
-  assert.equal(limits.find((limit) => limit.resource === 'options').max, 255);
+  assert.equal(limits.find((limit: {resource: string}) => limit.resource === 'options').max, 255);
   assert.equal(
-    limits.some((limit) => limit.resource === 'characters'),
+    limits.some((limit: {resource: string}) => limit.resource === 'characters'),
     false
   );
 });

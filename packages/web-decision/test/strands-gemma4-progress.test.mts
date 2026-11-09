@@ -3,7 +3,7 @@ import test from 'node:test';
 import {createGemma4Progress} from '../src/strands/gemma4-progress.mjs';
 
 test('Gemma 4 loader reports each verified byte once against the full shard total', () => {
-  const events = [];
+  const events: {loadedBytes: number; totalBytes: number; fraction: number}[] = [];
   const progress = createGemma4Progress((event) => events.push(event), 100);
 
   progress(70); // runtime manifest, graph, specs, tokenizer, and cache metadata
