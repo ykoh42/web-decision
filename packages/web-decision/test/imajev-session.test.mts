@@ -11,6 +11,7 @@ test('the copied real protocol and session preserve answered and abstained resul
   assert.equal(result.tokenCount, 2);
   assert.equal(f.calls(), 2);
   const [unknown, known] = result.answers;
+  assert.ok(unknown && known);
   assert.equal(unknown.abstained, true);
   assert.equal(unknown.selected, null);
   assert.equal(unknown.selectedIndex, null);
@@ -29,7 +30,7 @@ test('unknown winner can abstain even when its probability is below one half', a
   row.set([Math.log(0.3), Math.log(0.3), Math.log(0.4)]);
   const f = fixture(createFixtureImajevSession, {rows: [row]});
   f.request.questions.length = 1;
-  const answer = (await f.model.decide(f.request)).answers[0];
+  const answer = (await f.model.decide(f.request)).answers[0]!;
   assert.equal(answer.abstained, true);
   assert.equal(answer.selected, null);
   assert.ok(Math.abs(answer.unknownProbability - 0.4) < 1e-7);
@@ -43,14 +44,14 @@ test('unknown dominance retains the relative known probabilities and best known 
   row.set([-1000, -900, 1000]);
   const f = fixture(createFixtureImajevSession, {rows: [row]});
   f.request.questions.length = 1;
-  const answer = (await f.model.decide(f.request)).answers[0];
+  const answer = (await f.model.decide(f.request)).answers[0]!;
   assert.equal(answer.abstained, true);
   assert.equal(answer.selected, null);
   assert.equal(answer.selectedIndex, null);
   assert.deepEqual(answer.bestKnown, {option: 'blue', index: 1});
   assert.equal(answer.unknownProbability, 1);
-  assert.ok(Math.abs(answer.probabilities[0].probability - Math.exp(-100)) < 1e-55);
-  assert.equal(answer.probabilities[1].probability, 1);
+  assert.ok(Math.abs(answer.probabilities[0]!.probability - Math.exp(-100)) < 1e-55);
+  assert.equal(answer.probabilities[1]!.probability, 1);
   await f.model.dispose();
 });
 
@@ -70,6 +71,8 @@ test('unsupported request and decision fields reject before graph execution', as
 
 test('Imajev rejects an over-limit generic option array before reading it', async () => {
   const f = fixture(createFixtureImajevSession);
+  // Preserve a sparse array so validation cannot read its throwing getter.
+  // oxlint-disable-next-line unicorn/no-new-array
   const options = new Array(256);
   let reads = 0;
   Object.defineProperty(options, '0', {
@@ -96,6 +99,7 @@ test('token-ID ties preserve the first known choice and can select abstention', 
     const answer = safeImajevAnswer(decodeChoice(row.options, row.logits, calibration, row.labelIds));
     assert.equal(answer.abstained, row.abstained);
     if (row.abstained) {
+      assert.ok(answer.abstained);
       assert.equal(answer.selected, null);
       assert.equal(answer.bestKnown.option, row.choice);
     } else assert.equal(answer.selected, row.choice);
@@ -103,11 +107,11 @@ test('token-ID ties preserve the first known choice and can select abstention', 
 });
 
 test('active fake cancellation returns early while disposal waits for pending work', async () => {
-  let start, release;
-  const started = new Promise((resolve) => {
+  let start!: () => void, release!: () => void;
+  const started = new Promise<void>((resolve) => {
     start = resolve;
   });
-  const gate = new Promise((resolve) => {
+  const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   const f = fixture(createFixtureImajevSession, {syncGate: gate, syncStarted: start});
@@ -129,14 +133,13 @@ test('active fake cancellation returns early while disposal waits for pending wo
 test('failed syncs retain the scope until a delayed readback writes, then prevent reuse and disposal', async () => {
   const f = fixture(createFixtureImajevSession);
   f.request.questions.length = 1;
-  let finishReadback,
-    startSync,
-    syncs = 0,
+  let finishReadback!: () => void, startSync!: () => void;
+  let syncs = 0,
     writes = 0;
-  const readback = new Promise((resolve) => {
+  const readback = new Promise<void>((resolve) => {
     finishReadback = resolve;
   });
-  const started = new Promise((resolve) => {
+  const started = new Promise<void>((resolve) => {
     startSync = resolve;
   });
   const runtime = f.model.runtime;
@@ -194,7 +197,7 @@ test('a pre-sync graph failure makes one shared fallback sync and retains its or
   f.model.fn = () => {
     throw cause;
   };
-  await assert.rejects(f.model.decide(f.request), (error) => error.cause === cause);
+  await assert.rejects(f.model.decide(f.request), (error) => (error as {cause: unknown}).cause === cause);
   assert.equal(f.events.filter((event) => event === 'sync').length, 1);
   assert.ok(f.events.indexOf('sync') < f.events.indexOf('end'));
   await f.model.dispose();
@@ -210,7 +213,10 @@ test('a failed fallback keeps the original error and retains uncertain resources
     syncs++;
     throw 0;
   };
-  await assert.rejects(f.model.decide(f.request), (error) => Object.hasOwn(error, 'cause') && error.cause === false);
+  await assert.rejects(
+    f.model.decide(f.request),
+    (error) => Object.hasOwn(error as object, 'cause') && (error as {cause: unknown}).cause === false
+  );
   assert.equal(syncs, 1);
   assert.equal(f.events.includes('end'), false);
   await assert.rejects(f.model.dispose(), {code: 'INFERENCE_ERROR'});
@@ -224,18 +230,18 @@ test('an observed device loss skips fallback and preserves the graph error', asy
     f.model.lifecycle.loss = {reason: 'unknown'};
     throw cause;
   };
-  await assert.rejects(f.model.decide(f.request), (error) => error.cause === cause);
+  await assert.rejects(f.model.decide(f.request), (error) => (error as {cause: unknown}).cause === cause);
   assert.equal(f.events.filter((event) => event === 'sync').length, 0);
   await assert.rejects(f.model.dispose(), {code: 'INFERENCE_ERROR'});
   assert.equal(f.events.includes('dispose'), false);
 });
 
 test('abort returns while a pre-sync failure drains, and disposal waits', async () => {
-  let start, release;
-  const started = new Promise((resolve) => {
+  let start!: () => void, release!: () => void;
+  const started = new Promise<void>((resolve) => {
     start = resolve;
   });
-  const gate = new Promise((resolve) => {
+  const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
   const f = fixture(createFixtureImajevSession, {syncGate: gate, syncStarted: start});

@@ -133,8 +133,9 @@ export function fixture<T>(
     uncaptured: [],
     lifecycle,
     disposalGuard: {blocked: false, retain() {}}
-  }) as Omit<T, 'runtime' | 'lifecycle' | 'disposalGuard'> & {
+  }) as Omit<T, 'runtime' | 'device' | 'lifecycle' | 'disposalGuard'> & {
     runtime: typeof runtime;
+    device: typeof device;
     lifecycle: typeof lifecycle;
     disposalGuard: {retain(): void};
   };
