@@ -102,7 +102,6 @@
     "packages/web-decision/test/parallel-model-assets.test.mjs",
     "packages/web-decision/test/pinned-text-loader.test.mjs",
     "packages/web-decision/test/pplx-loader.test.mjs",
-    "packages/web-decision/test/pplx-runner.test.mjs",
     "packages/web-decision/test/pplx-upload.test.mjs",
     "packages/web-decision/test/request-field-sessions.test.mjs",
     "packages/web-decision/test/request-fields.test.mjs",

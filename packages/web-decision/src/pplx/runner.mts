@@ -1,7 +1,7 @@
 import {H2oTvmRunner} from '../h2o/runner.mjs';
 import {withStrandsScope} from '../strands/scope.mjs';
 import {createFlashGraphInputs} from './graph-inputs.mjs';
-import type {FlashGraphInput, FlashTensor, FlashTvmRuntime, PackedFlashRequest} from './types.js';
+import type {FlashGraphInput, FlashTensor, FlashTvmRuntime} from './types.js';
 
 interface FlashReadbackLease {
   prepareReadback(): void;
@@ -29,7 +29,7 @@ export class FlashTvmRunner extends H2oTvmRunner {
   declare fn: (...args: unknown[]) => FlashTensor;
   declare weights: unknown[];
 
-  override async run(packed: PackedFlashRequest): Promise<Float32Array[]> {
+  override async run(packed: unknown): Promise<Float32Array[]> {
     const inputs = createFlashGraphInputs(packed, 248062);
     const count = inputs[4]!.data.length;
     return this.exclusive(() =>

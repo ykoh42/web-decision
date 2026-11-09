@@ -2,13 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {FlashTvmRunner} from '../src/pplx/runner.mjs';
 
+interface FakeTensor {
+  value?: Float32Array | number[];
+}
+
 function fixture() {
-  const calls = [],
-    writes = [],
-    events = [];
+  const calls: FakeTensor[][] = [],
+    writes: {bytes: number[]; length: number}[] = [],
+    events: string[] = [];
   const context = {
-    pendingGPUToCPUCopy: null,
-    copyRawBytesToBuffer(data, _ptr, _offset, length) {
+    pendingGPUToCPUCopy: null as Promise<void> | null,
+    copyRawBytesToBuffer(data: Uint8Array, _ptr: number, _offset: number, length: number) {
       writes.push({bytes: [...data], length});
     }
   };
@@ -33,20 +37,20 @@ function fixture() {
     cpu() {
       return 'cpu';
     },
-    empty(shape, dtype, where) {
+    empty(shape: number[], dtype: string, where: unknown) {
       return {
         shape,
         dtype,
         byteOffset: 0,
         getDataPtr: () => 1,
-        copyFrom(data) {
+        copyFrom(this: FakeTensor, data: ArrayLike<number>) {
           if (where === 'cpu') {
             context.pendingGPUToCPUCopy = Promise.resolve();
             this.value = Float32Array.from({length: 510}, (_, i) => i);
           } else this.value = Array.from(data);
           return this;
         },
-        toArray() {
+        toArray(this: FakeTensor) {
           return this.value;
         }
       };
@@ -62,7 +66,7 @@ function fixture() {
     runtime,
     device,
     gpu,
-    fn: (...args) => {
+    fn: (...args: FakeTensor[]) => {
       calls.push(args);
       return {dtype: 'float32', shape: [1, 2, 255]};
     },
@@ -80,12 +84,12 @@ test('runs one graph with both markers and reads the corresponding score rows', 
   const f = fixture();
   const rows = await f.runner.run({ids: [4, 248062, 5, 248062, 6], groups: [{index: 1}, {index: 3}]});
   assert.equal(f.calls.length, 1);
-  assert.deepEqual(f.calls[0][4].value, [1, 3]);
-  assert.equal(f.calls[0].length, 687);
+  assert.deepEqual(f.calls[0]![4]!.value, [1, 3]);
+  assert.equal(f.calls[0]!.length, 687);
   assert.equal(rows.length, 2);
-  assert.equal(rows[0][254], 254);
-  assert.equal(rows[1][0], 255);
-  assert.ok(f.writes[0].bytes.every((value) => value === 0));
+  assert.equal(rows[0]![254], 254);
+  assert.equal(rows[1]![0], 255);
+  assert.ok(f.writes[0]!.bytes.every((value) => value === 0));
   assert.deepEqual(f.events, ['begin', 'end']);
   await f.runner.dispose();
 });
