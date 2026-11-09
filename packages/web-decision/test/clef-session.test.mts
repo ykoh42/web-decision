@@ -4,18 +4,23 @@ import {createClefSession} from '../src/clef/session.mjs';
 import {approximateSoftmax} from '../src/clef/softmax.mjs';
 import {packChoiceRequest, unpackChoiceScores} from '../src/clef/protocol.mjs';
 
-const tokenizer = {encode: (text) => ({ids: Array.from({length: Math.ceil(text.length / 4)}, () => 1)})};
+type ClefSessionOptions = Parameters<typeof createClefSession>[0];
+type ClefRunner = ClefSessionOptions['runner'];
+type ClefTokenizer = ClefSessionOptions['tokenizer'];
+type ClefDecisionOptions = NonNullable<Parameters<ReturnType<typeof createClefSession>['decide']>[1]>;
+
+const tokenizer: ClefTokenizer = {encode: (text) => ({ids: Array.from({length: Math.ceil(text.length / 4)}, () => 1)})};
 const request = () => ({state: 's', questions: [{instructions: 'choose', options: ['a', 'b']}]});
 const deferred = () => {
-  let resolve;
-  const promise = new Promise((done) => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
     resolve = done;
   });
   return {promise, resolve};
 };
-const tick = () => new Promise((resolve) => setImmediate(resolve));
+const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-function makeSession(run, events = [], inputTokenizer = tokenizer) {
+function makeSession(run: ClefRunner['run'], events: string[] = [], inputTokenizer: ClefTokenizer = tokenizer) {
   return createClefSession({
     tokenizer: inputTokenizer,
     controlIds: [2],
@@ -34,7 +39,7 @@ function makeSession(run, events = [], inputTokenizer = tokenizer) {
 test('abort returns promptly while active work, queued work and dispose remain serialized', async () => {
   const started = deferred(),
     gate = deferred(),
-    events = [];
+    events: string[] = [];
   let calls = 0;
   const session = makeSession(async () => {
     events.push('run');
@@ -55,7 +60,7 @@ test('abort returns promptly while active work, queued work and dispose remain s
   await tick();
   assert.deepEqual(events, ['run']);
   gate.resolve();
-  assert.equal((await second).answers[0].selected, 'a');
+  assert.equal((await second).answers[0]!.selected, 'a');
   await release;
   await disposal;
   assert.deepEqual(events, ['run', 'run', 'release', 'dispose']);
@@ -66,7 +71,7 @@ test('abort returns promptly while active work, queued work and dispose remain s
 test('a cancelled queued decision does not invoke the runner', async () => {
   const started = deferred(),
     gate = deferred(),
-    events = [];
+    events: string[] = [];
   const session = makeSession(async () => {
     events.push('run');
     started.resolve();
@@ -88,7 +93,7 @@ test('a cancelled queued decision does not invoke the runner', async () => {
 
 test('the default request path has no one-megabyte text-byte cap', async () => {
   const state = 'x'.repeat(1_048_577);
-  const compressingTokenizer = {
+  const compressingTokenizer: ClefTokenizer = {
     encode(text) {
       return {ids: text === state ? [] : Array(Math.ceil(text.length / 4)).fill(1)};
     }
@@ -105,13 +110,13 @@ test('the default request path has no one-megabyte text-byte cap', async () => {
   );
 
   const result = await session.decide({...request(), state});
-  assert.equal(result.answers[0].selected, 'a');
+  assert.equal(result.answers[0]!.selected, 'a');
   assert.equal(calls, 1);
   await session.dispose();
 });
 
 test('the session keeps the 512-token native graph boundary before inference', async () => {
-  const characterTokenizer = {encode: (text) => ({ids: Array(text.length).fill(1)})};
+  const characterTokenizer: ClefTokenizer = {encode: (text) => ({ids: Array(text.length).fill(1)})};
   const questions = [{instructions: 'q', options: ['a', 'b']}];
   const base = packChoiceRequest(characterTokenizer, {state: '', questions}, [2]);
   const stateLength = 512 - base.ids.length;
@@ -154,7 +159,9 @@ test('joint questions, invalid scores, request validation and near-tie differenc
     ['b', 'c']
   );
   await assert.rejects(session.decide({...combined, images: []}), {code: 'INVALID_INPUT'});
-  await assert.rejects(session.decide(combined, {temperature: 1}), {code: 'INVALID_INPUT'});
+  await assert.rejects(session.decide(combined, {temperature: 1} as unknown as ClefDecisionOptions), {
+    code: 'INVALID_INPUT'
+  });
   assert.equal(calls, 1);
   await session.dispose();
   const bad = makeSession(async () => [Float32Array.of(NaN, 0)]);
@@ -167,12 +174,12 @@ test('joint questions, invalid scores, request validation and near-tie differenc
   );
   const logits = [Float32Array.of(0.6212127208709717, 0.6212127804756165, -0.6041103601455688)];
   const probs = approximateSoftmax(logits);
-  assert.equal(probs[0][0], probs[0][1]);
-  assert.equal(unpackChoiceScores(packed, logits, probs).answers[0].selected, 'a');
+  assert.equal(probs[0]![0], probs[0]![1]);
+  assert.equal(unpackChoiceScores(packed, logits, probs).answers[0]!.selected, 'a');
   // Recorded Torch CPU FP32 probabilities differ here: it selects b.
   assert.equal(
     unpackChoiceScores(packed, logits, [Float32Array.of(0.4359838366508484, 0.4359838664531708, 0.12803223729133606)])
-      .answers[0].selected,
+      .answers[0]!.selected,
     'b'
   );
 });

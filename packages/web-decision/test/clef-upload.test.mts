@@ -2,8 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {uploadFakeClefParameters} from '../src/clef/upload.mjs';
-const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const entry = (data, dtype = 'float16') => ({
+
+type FakeUploadOptions = Parameters<typeof uploadFakeClefParameters>[1];
+
+interface FakeClefEntry {
+  position: number;
+  target: string;
+  dtype: 'uint32' | 'float16' | 'float32';
+  shape: number[];
+  bytes: number;
+  chunks: Array<{offset: number; length: number; sha256: string}>;
+}
+
+const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+const entry = (data: Uint8Array, dtype: FakeClefEntry['dtype'] = 'float16'): FakeClefEntry => ({
   position: 17,
   target: 'x',
   dtype,
@@ -14,11 +26,11 @@ const entry = (data, dtype = 'float16') => ({
 
 test('authenticates and pads an FP16 two-byte tail before an aligned write', async () => {
   const bytes = Uint8Array.of(0, 60, 0, 64, 0, 66),
-    writes = [];
+    writes: Array<[number, number[]]> = [];
   const result = await uploadFakeClefParameters([entry(bytes)], {
     fake: true,
     createTensor: () => ({}),
-    readRange: () => bytes,
+    readRange: (() => bytes) as unknown as FakeUploadOptions['readRange'],
     writeRange: (_tensor, offset, data) => writes.push([offset, [...data]])
   });
   assert.equal(result.length, 1);
@@ -28,31 +40,34 @@ test('authenticates and pads an FP16 two-byte tail before an aligned write', asy
 test('rejects bad hashes, nonfinite values, and malformed ranges', async () => {
   const bytes = Uint8Array.of(0, 60, 0, 64),
     metadata = entry(bytes),
-    options = {
+    options: FakeUploadOptions = {
       fake: true,
       createTensor: () => ({}),
-      readRange: () => Uint8Array.of(1, 60, 0, 64),
+      readRange: (() => Uint8Array.of(1, 60, 0, 64)) as unknown as FakeUploadOptions['readRange'],
       writeRange: () => assert.fail('must not write')
     };
   await assert.rejects(uploadFakeClefParameters([metadata], options), /hash mismatch/);
   const nonfinite = Uint8Array.of(0, 124, 0, 64);
   await assert.rejects(
-    uploadFakeClefParameters([entry(nonfinite)], {...options, readRange: () => nonfinite}),
+    uploadFakeClefParameters([entry(nonfinite)], {
+      ...options,
+      readRange: (() => nonfinite) as unknown as FakeUploadOptions['readRange']
+    }),
     /Nonfinite/
   );
   const bad = structuredClone(metadata);
-  bad.chunks[0].offset = 4;
+  bad.chunks[0]!.offset = 4;
   await assert.rejects(uploadFakeClefParameters([bad], options), /range/);
 });
 
 test('waits for an issued write to settle after cancellation', async () => {
   const bytes = Uint8Array.of(0, 60, 0, 64),
     controller = new AbortController();
-  let release, started;
-  const entered = new Promise((resolve) => {
+  let release!: () => void, started!: () => void;
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<void>((resolve) => {
     release = resolve;
   });
   let settled = false;
@@ -60,7 +75,7 @@ test('waits for an issued write to settle after cancellation', async () => {
     fake: true,
     signal: controller.signal,
     createTensor: () => ({}),
-    readRange: () => bytes,
+    readRange: (() => bytes) as unknown as FakeUploadOptions['readRange'],
     writeRange: async () => {
       started();
       await pending;
@@ -78,11 +93,11 @@ test('waits for an issued write to settle after cancellation', async () => {
 
 test('abort during parameter hashing returns promptly and handles a late rejection', async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-  let started, rejectHash;
-  const entered = new Promise((resolve) => {
+  let started!: () => void, rejectHash!: (reason?: unknown) => void;
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const pending = new Promise((_, reject) => {
+  const pending = new Promise<ArrayBuffer>((_, reject) => {
     rejectHash = reject;
   });
   Object.defineProperty(globalThis, 'crypto', {
@@ -96,7 +111,9 @@ test('abort during parameter hashing returns promptly and handles a late rejecti
       }
     }
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'crypto', original) : delete globalThis.crypto));
+  t.after(() =>
+    original ? Object.defineProperty(globalThis, 'crypto', original) : delete (globalThis as {crypto?: Crypto}).crypto
+  );
   const bytes = Uint8Array.of(0, 60, 0, 64),
     controller = new AbortController(),
     reason = Error('hash cancelled');
@@ -105,7 +122,7 @@ test('abort during parameter hashing returns promptly and handles a late rejecti
     fake: true,
     signal: controller.signal,
     createTensor: () => ({}),
-    readRange: () => bytes,
+    readRange: (() => bytes) as unknown as FakeUploadOptions['readRange'],
     writeRange: () => {
       writes++;
     }
@@ -125,11 +142,11 @@ test('abort during parameter hashing returns promptly and handles a late rejecti
 
 test('abort after the digest settles takes precedence over a mismatching hash', async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-  let started, resolveHash;
-  const entered = new Promise((resolve) => {
+  let started!: () => void, resolveHash!: (value: ArrayBuffer) => void;
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<ArrayBuffer>((resolve) => {
     resolveHash = resolve;
   });
   Object.defineProperty(globalThis, 'crypto', {
@@ -143,7 +160,9 @@ test('abort after the digest settles takes precedence over a mismatching hash', 
       }
     }
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'crypto', original) : delete globalThis.crypto));
+  t.after(() =>
+    original ? Object.defineProperty(globalThis, 'crypto', original) : delete (globalThis as {crypto?: Crypto}).crypto
+  );
   const bytes = Uint8Array.of(0, 60, 0, 64),
     controller = new AbortController(),
     reason = Error('hash cancelled');
@@ -152,7 +171,7 @@ test('abort after the digest settles takes precedence over a mismatching hash', 
     fake: true,
     signal: controller.signal,
     createTensor: () => ({}),
-    readRange: () => bytes,
+    readRange: (() => bytes) as unknown as FakeUploadOptions['readRange'],
     writeRange: () => {
       writes++;
     }
