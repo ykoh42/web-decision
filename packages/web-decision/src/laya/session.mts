@@ -3,11 +3,51 @@ import {validateDecisionFields, validateRequestFields} from '../request-fields.m
 import {WebDecisionError} from '../kev.js';
 import {LAYA_MAX_OPTIONS, LAYA_MODEL} from './contract.mjs';
 import {finishLayaSystemOne, prepareLayaSystemOne, validateLayaDecisionRequest} from './protocol.mjs';
+import type {
+  LayaChoiceAnswer,
+  LayaDecisionResult,
+  LayaGenericRequest,
+  LayaGenericResult,
+  LayaQuestionValue,
+  LayaTemperatures,
+  PreparedLayaRow
+} from './protocol.mjs';
+import type {LayaTokenizer} from './tokenizer.mjs';
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+type LayaSignal = AbortSignal;
+
+interface LayaDecisionOptions {
+  readonly signal?: LayaSignal | null;
+}
+
+interface LayaRunner {
+  run(
+    rows: PreparedLayaRow[],
+    signal?: LayaSignal | null
+  ): Promise<{
+    rows: Array<{logits: number[]; actLogits: number[]}>;
+  }>;
+  dispose(): Promise<void>;
+}
+
+interface LayaSessionOptions {
+  readonly runner: LayaRunner;
+  readonly tokenizer: LayaTokenizer;
+  readonly temperatures: LayaTemperatures;
+  readonly model?: string;
+}
+
+export interface LayaSession {
+  systemOne(state: unknown, questions: unknown, options?: LayaDecisionOptions): Promise<LayaDecisionResult>;
+  decide(request: unknown, options?: LayaDecisionOptions): Promise<LayaGenericResult>;
+  releaseCachedMemory(): Promise<void>;
+  dispose(): Promise<void>;
+}
+
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
 const closedError = () => new WebDecisionError('SESSION_CLOSED', 'The Laya model has been disposed.');
 
-function validateSignal(options) {
+function validateSignal(options: LayaDecisionOptions | null | undefined): LayaSignal | null | undefined {
   validateDecisionFields(options);
   const signal = options?.signal;
   if (
@@ -20,7 +60,12 @@ function validateSignal(options) {
   return signal;
 }
 
-export function createLayaSession({runner, tokenizer, temperatures, model = LAYA_MODEL}) {
+export function createLayaSession({
+  runner,
+  tokenizer,
+  temperatures,
+  model = LAYA_MODEL
+}: LayaSessionOptions): LayaSession {
   if (
     typeof runner?.run !== 'function' ||
     typeof runner?.dispose !== 'function' ||
@@ -32,11 +77,14 @@ export function createLayaSession({runner, tokenizer, temperatures, model = LAYA
   )
     throw new TypeError('Laya session components are required.');
 
-  let queue = Promise.resolve();
+  let queue: Promise<void | LayaDecisionResult> = Promise.resolve();
   let closed = false;
-  let disposing;
+  let disposing: Promise<void> | undefined;
 
-  function infer(prepared, signal) {
+  function infer(
+    prepared: ReturnType<typeof prepareLayaSystemOne>,
+    signal: LayaSignal | null | undefined
+  ): Promise<LayaDecisionResult> {
     if (closed) throw closedError();
     signal?.throwIfAborted();
     const task = queue.then(async () => {
@@ -50,7 +98,11 @@ export function createLayaSession({runner, tokenizer, temperatures, model = LAYA
     return signal ? waitForAbort(() => task, signal) : task;
   }
 
-  async function systemOne(state, questions, options = {}) {
+  async function systemOne(
+    state: unknown,
+    questions: unknown,
+    options: LayaDecisionOptions = {}
+  ): Promise<LayaDecisionResult> {
     if (closed) throw closedError();
     const signal = validateSignal(options);
     signal?.throwIfAborted();
@@ -60,13 +112,19 @@ export function createLayaSession({runner, tokenizer, temperatures, model = LAYA
 
   return {
     systemOne,
-    async decide(request, options = {}) {
+    async decide(request: unknown, options: LayaDecisionOptions = {}): Promise<LayaGenericResult> {
       if (closed) throw closedError();
-      const checked = validateRequestFields(request, Infinity, Infinity, Infinity, LAYA_MAX_OPTIONS);
+      const checked = validateRequestFields(
+        request,
+        Infinity,
+        Infinity,
+        Infinity,
+        LAYA_MAX_OPTIONS
+      ) as LayaGenericRequest;
       validateLayaDecisionRequest(checked);
-      const questions = Object.create(null);
+      const questions: Record<string, LayaQuestionValue> = Object.create(null);
       for (let index = 0; index < checked.questions.length; index++) {
-        const question = checked.questions[index];
+        const question = checked.questions[index]!;
         questions[String(index)] = {type: 'choice', instructions: question.instructions, criteria: question.options};
       }
       const typed = await systemOne(checked.state, questions, options);
@@ -74,13 +132,13 @@ export function createLayaSession({runner, tokenizer, temperatures, model = LAYA
         tokenCount: typed.tokenCount,
         ...(typed.truncated ? {truncated: true} : {}),
         answers: checked.questions.map((question, index) => {
-          const answer = typed.answers[String(index)];
+          const answer = typed.answers[String(index)] as LayaChoiceAnswer;
           return {
             selected: answer.choice,
             selectedIndex: question.options.indexOf(answer.choice),
             probabilities: question.options.map((option) => ({
               option,
-              probability: answer.probabilities[option]
+              probability: answer.probabilities[option]!
             }))
           };
         })
