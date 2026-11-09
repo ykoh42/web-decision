@@ -171,7 +171,6 @@
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/kev-gpu.test.mjs",
     "packages/web-decision/test/kev-reflexes.test.mjs",
-    "packages/web-decision/test/kev-systemone-render-depth.test.mjs",
     "packages/web-decision/test/kev-systemone.test.mjs",
     "packages/web-decision/test/kev.test.mjs",
     "packages/web-decision/test/kev06-asset-import-loader.mjs",

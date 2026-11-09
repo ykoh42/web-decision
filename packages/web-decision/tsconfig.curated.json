@@ -25,6 +25,7 @@
     "test/bundler-notices.test.mts",
     "test/imajev-disposal.test.mts",
     "test/kev06-contract.test.mts",
+    "test/kev-systemone-render-depth.test.mts",
     "test/mapika4b-source.test.mts",
     "test/mapika4b-tokenizer.test.mts",
     "test/mapika-contract.test.mts",

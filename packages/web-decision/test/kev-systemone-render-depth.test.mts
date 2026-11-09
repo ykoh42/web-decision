@@ -2,25 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {prepareKevSystemOne} from '../src/kev/system-one.mjs';
 
-function renderState(state, maxInputCharacters) {
+function renderState(state: unknown, maxInputCharacters?: number) {
   return prepareKevSystemOne(state, {check: {type: 'noul', instructions: null}}, maxInputCharacters).request.state;
 }
 
-function nestedObject(depth) {
-  let value = 'leaf';
+function nestedObject(depth: number) {
+  let value: unknown = 'leaf';
   for (let index = 0; index < depth; index++) value = {item: value};
   return value;
 }
 
-function nestedObjectText(depth) {
+function nestedObjectText(depth: number) {
   let text = 'leaf';
   for (let level = depth - 1; level >= 0; level--)
     text = `${' '.repeat(level * 2)}item:${level === depth - 1 ? ' ' : '\n'}${text}`;
   return text;
 }
 
-function nestedArray(depth) {
-  let value = 'leaf';
+function nestedArray(depth: number) {
+  let value: unknown = 'leaf';
   for (let index = 0; index < depth; index++) value = [value];
   return value;
 }
@@ -51,7 +51,7 @@ test('System One strips array item prefixes using Python whitespace rules', () =
 });
 
 test('System One rejects cycles and renders a shared acyclic value each time it appears', () => {
-  const cycle = {};
+  const cycle: {self?: unknown} = {};
   cycle.self = cycle;
   assert.throws(() => renderState(cycle), {code: 'INVALID_INPUT', message: /cycles/});
 
