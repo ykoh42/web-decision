@@ -26,7 +26,6 @@
     "packages/web-decision/src/elephant/runner.mjs",
     "packages/web-decision/src/elephant/session.mjs",
     "packages/web-decision/src/elephant/source.mjs",
-    "packages/web-decision/src/fp16-device.js",
     "packages/web-decision/src/gliner-mobile/loader.mjs",
     "packages/web-decision/src/gliner-mobile/protocol.mjs",
     "packages/web-decision/src/gliner-mobile/runner.mjs",

@@ -2,7 +2,7 @@ import {waitForAbort} from './assets.js';
 import {WebDecisionError} from './kev.js';
 import {retainStrandsResources} from './strands/disposal-guard.mjs';
 
-function destroyDevice(device) {
+function destroyDevice(device: GPUDevice | null | undefined): void {
   if (!device) return;
   try {
     device.destroy();
@@ -12,8 +12,13 @@ function destroyDevice(device) {
 }
 
 /** Request a shader-f16 device with the limits required by a pinned graph. */
-export async function requestFp16Device(gpu, signal, modelName, requiredLimits) {
-  let device;
+export async function requestFp16Device(
+  gpu: GPU,
+  signal: AbortSignal | null | undefined,
+  modelName: string,
+  requiredLimits: Record<string, number>
+): Promise<GPUDevice> {
+  let device: GPUDevice | undefined;
   try {
     signal?.throwIfAborted();
     const adapter = await waitForAbort(() => gpu.requestAdapter({powerPreference: 'high-performance'}), signal);
@@ -22,7 +27,7 @@ export async function requestFp16Device(gpu, signal, modelName, requiredLimits) 
     if (!adapter.features.has('shader-f16'))
       throw new WebDecisionError('UNSUPPORTED_ENVIRONMENT', 'This model requires WebGPU shader-f16 support.');
     for (const [name, needed] of Object.entries(requiredLimits)) {
-      const available = adapter.limits[name];
+      const available = (adapter.limits as unknown as Record<string, unknown>)[name];
       if (typeof available !== 'number' || !Number.isFinite(available) || available < needed)
         throw new WebDecisionError(
           'UNSUPPORTED_ENVIRONMENT',
@@ -40,7 +45,8 @@ export async function requestFp16Device(gpu, signal, modelName, requiredLimits) 
   } catch (cause) {
     destroyDevice(device);
     signal?.throwIfAborted();
-    if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
+    if (cause instanceof WebDecisionError || (cause as {name?: unknown} | null | undefined)?.name === 'AbortError')
+      throw cause;
     throw new WebDecisionError('MODEL_LOAD_FAILED', `Could not initialize a compatible ${modelName} WebGPU device.`, {
       cause
     });
