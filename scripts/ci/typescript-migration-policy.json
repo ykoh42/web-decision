@@ -12,7 +12,6 @@
     "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/deberta/packing.mjs",
     "packages/web-decision/src/deberta/typed.mjs",
-    "packages/web-decision/src/decima-base-clean-preview-entry.mjs",
     "packages/web-decision/src/gliner-mobile/loader.mjs",
     "packages/web-decision/src/gpu-session-utils.js",
     "packages/web-decision/src/h2o/loader.mjs",

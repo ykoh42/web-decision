@@ -3,10 +3,11 @@ import {WebDecisionError} from './kev.js';
 import {DECIMA_BASE_CLEAN_MODEL, DECIMA_BASE_CLEAN_SPEC} from './decima/contract.mjs';
 import {loadDecimaModel, validateDecimaLoadOptions} from './decima/loader.mjs';
 
+type BaseCleanLimits = typeof DECIMA_BASE_CLEAN_SPEC & {readonly maxChoices?: number; readonly maxQuestions?: number};
 const MODEL_IDS = Object.freeze([DECIMA_BASE_CLEAN_MODEL]);
 const modelCard = `https://huggingface.co/${DECIMA_BASE_CLEAN_SPEC.repository}/tree/${DECIMA_BASE_CLEAN_SPEC.revision}`;
 
-function freeze(value) {
+function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) freeze(child);
     Object.freeze(value);
@@ -55,8 +56,13 @@ function describeBaseClean() {
             description:
               'Uses the checkpoint choice_fit rendering and reports the adapted rows; each row includes question text and special tokens.'
           },
-          {resource: 'options', scope: 'question', min: 2, max: DECIMA_BASE_CLEAN_SPEC.maxChoices},
-          {resource: 'questions', scope: 'request', min: 1, max: DECIMA_BASE_CLEAN_SPEC.maxQuestions}
+          {resource: 'options', scope: 'question', min: 2, max: (DECIMA_BASE_CLEAN_SPEC as BaseCleanLimits).maxChoices},
+          {
+            resource: 'questions',
+            scope: 'request',
+            min: 1,
+            max: (DECIMA_BASE_CLEAN_SPEC as BaseCleanLimits).maxQuestions
+          }
         ],
         handling: 'independent-questions',
         tokenCount: 'sum-question-rows',
@@ -88,16 +94,16 @@ export function listDecisionModels() {
   return MODEL_IDS;
 }
 
-export function isDecisionModel(value) {
+export function isDecisionModel(value: unknown): boolean {
   return value === DECIMA_BASE_CLEAN_MODEL;
 }
 
-export function describeModel(model) {
+export function describeModel(model: unknown) {
   if (!isDecisionModel(model)) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return description;
 }
 
-export async function loadDecisionModel(options) {
+export async function loadDecisionModel(options: unknown) {
   const checked = validateDecimaLoadOptions(options);
   if (checked.model !== DECIMA_BASE_CLEAN_MODEL)
     throw new WebDecisionError('INVALID_INPUT', 'Select the Decima base-clean int8 model.');
