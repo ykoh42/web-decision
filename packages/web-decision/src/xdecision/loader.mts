@@ -10,13 +10,13 @@ type XDecisionSession = Omit<LoadedXDecisionModel, 'description'>;
 
 interface XDecisionRuntime {
   readonly [dependency: string]: unknown;
+  readonly spec?: ManifestSourceSpec;
   readonly openSource?: (options: XDecisionSourceOptions) => XDecisionSource | Promise<XDecisionSource>;
 }
 
 interface XDecisionLoaderRuntime extends XDecisionRuntime {
   readonly model: typeof XDECISION_MODEL;
   readonly modelName: string;
-  readonly spec: typeof XDECISION_SPEC;
   readonly openSource: (options: XDecisionSourceOptions) => XDecisionSource | Promise<XDecisionSource>;
 }
 
@@ -38,7 +38,6 @@ export function loadXDecisionModel(
     ...runtime,
     model: XDECISION_MODEL,
     modelName: 'xDecision',
-    spec: XDECISION_SPEC,
     openSource: runtime.openSource ?? openSource
   });
 }
