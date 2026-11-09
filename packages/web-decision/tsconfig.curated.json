@@ -108,6 +108,8 @@
     "src/strands/range-source.mts",
     "src/strands/session.mts",
     "src/strands/source-loader-internal.mts",
+    "src/h2o/tokenizer.mts",
+    "src/h2o/tokenizer-adapter.mts",
     "src/safedecide/*.mts",
     "src/tamev/contract.mts",
     "src/tamev/loader.mts",
