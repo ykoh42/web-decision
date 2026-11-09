@@ -451,8 +451,7 @@ export function createH2oPublicSourceFactory({
         signal
       },
       policy,
-      // The existing reader call site uses `cache: false` as its no-cache sentinel.
-      readVerifiedRange as unknown as RangeReader,
+      readVerifiedRange,
       () => createIncrementalSha256(HashClass)
     );
 }

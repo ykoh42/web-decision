@@ -81,7 +81,7 @@ function assetBase(value: string) {
 // The pin authenticates this exact projection, not the upstream publisher.
 export async function openNariSource(
   baseValue: string,
-  {signal, reader = readVerifiedRange as unknown as NariReader, variant = NARI_FULL}: SourceOptions = {}
+  {signal, reader = readVerifiedRange, variant = NARI_FULL}: SourceOptions = {}
 ) {
   if (variant !== NARI_FULL && variant !== NARI_MIXED) throw invalid('Unknown Nari variant.');
   if (typeof reader !== 'function') throw invalid('Invalid Nari range reader.');

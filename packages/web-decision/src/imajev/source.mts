@@ -73,10 +73,7 @@ async function verifiedBytes(reader: ImajevReader, base: URL, entry: ImajevRange
 }
 
 /** Open only the locally pinned experimental metadata; hashes do not authenticate a publisher. */
-export async function openImajevSource(
-  baseValue: string,
-  {signal, reader = readVerifiedRange as unknown as ImajevReader}: SourceOptions = {}
-) {
+export async function openImajevSource(baseValue: string, {signal, reader = readVerifiedRange}: SourceOptions = {}) {
   if (typeof reader !== 'function') throw invalid();
   const base = assetBase(baseValue);
   const bytes = await verifiedBytes(

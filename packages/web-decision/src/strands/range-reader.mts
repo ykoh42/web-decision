@@ -13,7 +13,7 @@ interface VerifiedRangeSpec {
 }
 
 interface ReadVerifiedRangeOptions {
-  readonly cache?: AssetCache | null | undefined;
+  readonly cache?: AssetCache | false | null | undefined;
   readonly signal?: AbortSignal | null | undefined;
   readonly offline?: boolean | undefined;
 }
