@@ -6,10 +6,46 @@ import {NARI_MODEL_ID, NARI_MIXED_MODEL_ID, validateNariOptions} from '../src/na
 import {NARI_MIXED} from '../src/nari/variants.mjs';
 import {WebDecisionError} from '../src/kev.js';
 
-function fixture() {
-  const events = [];
+type FakeDevice = {lost: Promise<unknown>; destroy(): void};
+type FakeAdapter = {
+  features: Set<string>;
+  limits: {maxStorageBuffersPerShaderStage: number; maxStorageBufferBindingSize: number; maxBufferSize: number};
+  requestDevice(options?: unknown): Promise<FakeDevice>;
+};
+type FakeSource = {
+  plan: {ordered: {source: string; file: {bytes: number}}[]; letterFile: {bytes: number}};
+  readAsset(name: string, options?: {signal?: AbortSignal | undefined}): Promise<Uint8Array>;
+  close(): void;
+};
+type FakeOwner = {phase: string; blocked: boolean; lost: boolean; uncaptured: unknown[]; retain(): void};
+type FakeRunner = {run(): Promise<void>; releaseCachedMemory(): Promise<void>; dispose(): Promise<void>};
+type FakeDependencies = {
+  fake: true;
+  gpu: {requestAdapter(): Promise<FakeAdapter>};
+  ownership: () => {initialize(): FakeOwner; fail(runtime: unknown, gpu?: FakeDevice): void};
+  openSource(base: URL, context: {signal?: AbortSignal | undefined; variant: string}): Promise<FakeSource>;
+  tokenizer(): {tokenizer: {encode(): void}; controlIds: number[]};
+  instantiate(): Promise<{dispose(): void}>;
+  upload(
+    owner: unknown,
+    source: FakeSource,
+    context: {expectedBindings: number; signal: AbortSignal}
+  ): Promise<{parameters: unknown[]; letterRows: unknown}>;
+  runner(context: {expectedBindings: number}): FakeRunner;
+};
+type FakeOptions = {model: string; assetsUrl: string; signal?: AbortSignal | undefined};
+
+function fixture(): {
+  events: string[];
+  adapter: FakeAdapter;
+  source: FakeSource;
+  device: FakeDevice;
+  deps: FakeDependencies;
+  options: FakeOptions;
+} {
+  const events: string[] = [];
   const device = {
-    lost: new Promise(() => {}),
+    lost: new Promise<unknown>(() => {}),
     destroy() {
       events.push('destroy');
     }
@@ -27,7 +63,7 @@ function fixture() {
       ordered: Array.from({length: 728}, (_, i) => ({source: 'planned-asset', file: {bytes: i ? 4 : 134184960}})),
       letterFile: {bytes: 4}
     },
-    async readAsset(name) {
+    async readAsset(name: string) {
       events.push(name);
       return new Uint8Array([1]);
     },
@@ -39,12 +75,12 @@ function fixture() {
     phase: 'prepared',
     blocked: false,
     lost: false,
-    uncaptured: [],
+    uncaptured: [] as unknown[],
     retain() {
       events.push('retain');
     }
   };
-  const deps = {
+  const deps: FakeDependencies = {
     fake: true,
     gpu: {
       async requestAdapter() {
@@ -154,7 +190,7 @@ test('real loader rejects a model ID different from the routed registration befo
               requestAdapter() {
                 throw Error('GPU must not be accessed');
               }
-            }
+            } as unknown as GPU
           }
         ),
       {code: 'INVALID_INPUT'}
@@ -166,7 +202,7 @@ test('rejects unsupported options and insufficient adapters without asset fetche
   const {events, deps, options, adapter} = fixture();
   for (const change of [{cache: true}, {offline: true}, {onProgress() {}}, {maxPrefetchBytes: 1}, {model: 'other'}])
     await assert.rejects(loadFakeNariCandidate({...options, ...change}, deps), {code: 'INVALID_INPUT'});
-  assert.deepEqual(events, []);
+  assert.deepEqual(events, [] as string[]);
   adapter.limits.maxBufferSize--;
   await assert.rejects(loadFakeNariCandidate(options, deps), {code: 'UNSUPPORTED_ENVIRONMENT'});
   assert.equal(events.includes('source'), false);
@@ -184,13 +220,13 @@ test('rejects unsupported options and insufficient adapters without asset fetche
 
 test('abort while device request is pending destroys the late device', async () => {
   const {events, deps, options, adapter, device} = fixture();
-  let resolveDevice, entered;
-  const started = new Promise((resolve) => {
+  let resolveDevice!: (value: FakeDevice) => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   adapter.requestDevice = () => {
     entered();
-    return new Promise((resolve) => {
+    return new Promise<FakeDevice>((resolve) => {
       resolveDevice = resolve;
     });
   };
@@ -209,13 +245,13 @@ test('abort while device request is pending destroys the late device', async () 
 
 test('abort during device request observes a late rejection', async () => {
   const {events, deps, options, adapter} = fixture();
-  let rejectDevice, entered;
-  const started = new Promise((resolve) => {
+  let rejectDevice!: (reason?: unknown) => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   adapter.requestDevice = () => {
     entered();
-    return new Promise((_resolve, reject) => {
+    return new Promise<FakeDevice>((_resolve, reject) => {
       rejectDevice = reject;
     });
   };
@@ -224,7 +260,7 @@ test('abort during device request observes a late rejection', async () => {
   const job = loadFakeNariCandidate({...options, signal: controller.signal}, deps);
   await started;
   controller.abort(reason);
-  await assert.rejects(job, (error) => error === reason);
+  await assert.rejects(job, (error: unknown) => error === reason);
   assert.ok(events.includes('close'));
   rejectDevice(Error('late device failure'));
   await nextTurn();
@@ -233,9 +269,9 @@ test('abort during device request observes a late rejection', async () => {
 
 test('abort during small asset reads closes the source and observes late failures', async () => {
   const {events, deps, options, source} = fixture();
-  const pending = [];
+  const pending: Array<{resolve(value: Uint8Array): void; reject(reason?: unknown): void}> = [];
   source.readAsset = () =>
-    new Promise((resolve, reject) => {
+    new Promise<Uint8Array>((resolve, reject) => {
       pending.push({resolve, reject});
     });
   const controller = new AbortController();
@@ -243,24 +279,24 @@ test('abort during small asset reads closes the source and observes late failure
   const job = loadFakeNariCandidate({...options, signal: controller.signal}, deps);
   while (pending.length < 4) await nextTurn();
   controller.abort(reason);
-  await assert.rejects(job, (error) => error === reason);
+  await assert.rejects(job, (error: unknown) => error === reason);
   assert.ok(events.includes('close'));
   assert.ok(events.includes('fail'));
   assert.equal(events.includes('device'), false);
-  pending[0].resolve(new Uint8Array([1]));
+  pending[0]!.resolve(new Uint8Array([1]));
   for (const item of pending.slice(1)) item.reject(Error('late asset failure'));
   await nextTurn();
 });
 
 test('a late source is closed after cancellation', async () => {
   const {events, deps, options, source} = fixture();
-  let resolveSource, entered;
-  const started = new Promise((resolve) => {
+  let resolveSource!: (value: FakeSource) => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   deps.openSource = () => {
     entered();
-    return new Promise((resolve) => {
+    return new Promise<FakeSource>((resolve) => {
       resolveSource = resolve;
     });
   };
@@ -292,9 +328,9 @@ test('GPU upload failures during load use the model-load error code and preserve
     events.push('upload-failed');
     throw uploadError;
   };
-  await assert.rejects(loadFakeNariCandidate(options, deps), (error) => {
-    assert.equal(error.code, 'MODEL_LOAD_FAILED');
-    assert.equal(error.cause, uploadError);
+  await assert.rejects(loadFakeNariCandidate(options, deps), (error: unknown) => {
+    assert.equal((error as WebDecisionError).code, 'MODEL_LOAD_FAILED');
+    assert.equal((error as Error & {cause?: unknown}).cause, uploadError);
     return true;
   });
   assert.ok(events.includes('retain'));
@@ -304,18 +340,18 @@ test('GPU upload failures during load use the model-load error code and preserve
 
 test('device loss during weight upload preserves the load-time device error', async () => {
   const {events, deps, options, device} = fixture();
-  let lose;
-  device.lost = new Promise((resolve) => {
+  let lose!: (value: unknown) => void;
+  device.lost = new Promise<unknown>((resolve) => {
     lose = resolve;
   });
-  let uploadStarted;
-  const started = new Promise((resolve) => {
+  let uploadStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
     uploadStarted = resolve;
   });
   deps.upload = (_owner, _source, {signal}) => {
     events.push('upload');
     uploadStarted();
-    return new Promise((_resolve, reject) => {
+    return new Promise<{parameters: unknown[]; letterRows: unknown}>((_resolve, reject) => {
       signal.addEventListener(
         'abort',
         () => reject(new WebDecisionError('INFERENCE_ERROR', 'Nari parameter upload failed.')),
@@ -327,10 +363,10 @@ test('device loss during weight upload preserves the load-time device error', as
   await started;
   const loss = {reason: 'destroyed', message: 'Device was destroyed.'};
   lose(loss);
-  await assert.rejects(job, (error) => {
-    assert.equal(error.code, 'MODEL_LOAD_FAILED');
-    assert.equal(error.message, 'The GPU device was lost while loading the model.');
-    assert.equal(error.cause, loss);
+  await assert.rejects(job, (error: unknown) => {
+    assert.equal((error as WebDecisionError).code, 'MODEL_LOAD_FAILED');
+    assert.equal((error as Error & {cause?: unknown}).message, 'The GPU device was lost while loading the model.');
+    assert.equal((error as Error & {cause?: unknown}).cause, loss);
     return true;
   });
   assert.ok(events.includes('retain'));
@@ -340,14 +376,14 @@ test('device loss during weight upload preserves the load-time device error', as
 
 test('caller cancellation during weight upload preserves the caller reason', async () => {
   const {events, deps, options} = fixture();
-  let uploadStarted;
-  const started = new Promise((resolve) => {
+  let uploadStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
     uploadStarted = resolve;
   });
   deps.upload = (_owner, _source, {signal}) => {
     events.push('upload');
     uploadStarted();
-    return new Promise((_resolve, reject) => {
+    return new Promise<{parameters: unknown[]; letterRows: unknown}>((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(Error('upload interrupted')), {once: true});
     });
   };
@@ -356,7 +392,7 @@ test('caller cancellation during weight upload preserves the caller reason', asy
   const job = loadFakeNariCandidate({...options, signal: controller.signal}, deps);
   await started;
   controller.abort(reason);
-  await assert.rejects(job, (error) => error === reason);
+  await assert.rejects(job, (error: unknown) => error === reason);
   assert.ok(events.includes('retain'));
   assert.ok(events.includes('close'));
   assert.equal(events.includes('runner'), false);
@@ -364,16 +400,16 @@ test('caller cancellation during weight upload preserves the caller reason', asy
 
 test('device loss during runtime creation disposes the late uninitialized runtime', async () => {
   const {events, deps, options, device} = fixture();
-  let lose, finish, entered;
-  device.lost = new Promise((resolve) => {
+  let lose!: (value: unknown) => void, finish!: (value: {dispose(): void}) => void, entered!: () => void;
+  device.lost = new Promise<unknown>((resolve) => {
     lose = resolve;
   });
-  const started = new Promise((resolve) => {
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   deps.instantiate = () => {
     entered();
-    return new Promise((resolve) => {
+    return new Promise<{dispose(): void}>((resolve) => {
       finish = resolve;
     });
   };

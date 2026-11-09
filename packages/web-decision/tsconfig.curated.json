@@ -53,6 +53,7 @@
     "test/model-source.test.mts",
     "test/nari-adapter.test.mts",
     "test/nari-checkpoints.test.mts",
+    "test/nari-loader.test.mts",
     "test/nari-session.test.mts",
     "test/kev08-systemone.test.mts",
     "test/kev08.test.mts",
