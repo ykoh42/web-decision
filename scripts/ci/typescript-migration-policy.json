@@ -217,7 +217,6 @@
     "packages/web-decision/test/pplx-loader.test.mjs",
     "packages/web-decision/test/pplx-runner.test.mjs",
     "packages/web-decision/test/pplx-session.test.mjs",
-    "packages/web-decision/test/pplx-source.test.mjs",
     "packages/web-decision/test/pplx-tokenizer.test.mjs",
     "packages/web-decision/test/pplx-upload.test.mjs",
     "packages/web-decision/test/preview-entrypoints.test.mjs",

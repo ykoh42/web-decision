@@ -28,6 +28,7 @@
     "test/model-assets.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
+    "test/pplx-source.test.mts",
     "test/runtime-lifecycle.test.mts",
     "test/strands-loader-entry.test.mts",
     "test/strands-preflight.test.mts",
