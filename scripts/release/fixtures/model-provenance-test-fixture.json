@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "modelId": "kev-0.6b-q4f16",
+  "status": "test-fixture",
+  "notAnApproval": true,
+  "purpose": "Synthetic release-verifier test data only; no source, rights, or release status is asserted."
+}

@@ -7,6 +7,11 @@ import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
 import {
+  assertCommittedPackageProvenance,
+  assertProductionPackageRoot,
+  assertTestFixtureProvenance
+} from '../ci/model-provenance.ts';
+import {
   EXPANDED_INFERENCE_FIXTURE_PATH,
   EXPANDED_INFERENCE_FIXTURE_SHA256,
   loadExpandedInferenceFixture,
@@ -623,10 +628,16 @@ export async function loadInstalledCatalog(packageRoot: string): Promise<PublicC
   return loadPublicCatalog(packageRoot, packageEntryPath(metadata));
 }
 
-async function loadCommittedCatalog(packageRoot: string): Promise<ModelRequirement[]> {
+async function loadCommittedCatalog(
+  packageRoot: string,
+  provenanceMode: 'production' | 'test-fixture' = 'production',
+  workspaceRoot = WORKSPACE_ROOT
+): Promise<{models: ModelRequirement[]; provenanceSha256: string}> {
   const catalogRoot = join(packageRoot, 'src/catalog');
-  const modelSpec = JSON.parse(await readFile(join(catalogRoot, 'model-spec.json'), 'utf8')) as ModelSpecFile;
-  const artifactLock = JSON.parse(await readFile(join(catalogRoot, 'artifacts.lock.json'), 'utf8')) as ArtifactLockFile;
+  const modelSpecBytes = await readFile(join(catalogRoot, 'model-spec.json'));
+  const artifactLockBytes = await readFile(join(catalogRoot, 'artifacts.lock.json'));
+  const modelSpec = JSON.parse(modelSpecBytes.toString('utf8')) as ModelSpecFile;
+  const artifactLock = JSON.parse(artifactLockBytes.toString('utf8')) as ArtifactLockFile;
   fail(modelSpec.schemaVersion === 1 && artifactLock.schemaVersion === 1, 'Unsupported generated catalog schema.');
   fail(Array.isArray(modelSpec.models) && modelSpec.models.length > 0, 'Committed model spec must not be empty.');
   fail(artifactLock.byModelId && typeof artifactLock.byModelId === 'object', 'Committed artifact lock is missing.');
@@ -642,6 +653,22 @@ async function loadCommittedCatalog(packageRoot: string): Promise<ModelRequireme
     [...ids].sort(),
     'Artifact lock IDs must exactly match the committed model spec.'
   );
+
+  let provenanceSha256: string;
+  if (provenanceMode === 'test-fixture') {
+    const checked = await assertTestFixtureProvenance(
+      packageRoot,
+      WORKSPACE_ROOT,
+      modelSpec,
+      artifactLock,
+      artifactLockBytes
+    );
+    provenanceSha256 = checked.manifestSha256;
+  } else {
+    assertProductionPackageRoot(packageRoot, workspaceRoot);
+    const checked = await assertCommittedPackageProvenance(workspaceRoot);
+    provenanceSha256 = checked.manifestSha256;
+  }
 
   const models = modelSpec.models.map(({modelId, description}) => {
     const artifacts = artifactLock.byModelId[modelId];
@@ -698,7 +725,7 @@ async function loadCommittedCatalog(packageRoot: string): Promise<ModelRequireme
       bundledRuntimeFiles
     };
   });
-  return models.sort((left, right) => left.modelId.localeCompare(right.modelId));
+  return {models: models.sort((left, right) => left.modelId.localeCompare(right.modelId)), provenanceSha256};
 }
 
 function manifestModelId(manifest: AssetManifest): string | undefined {
@@ -803,22 +830,24 @@ export async function readArchiveModelManifests(
   return result;
 }
 
-export async function collectReleaseEvidenceInputs({
-  archivePath,
-  installedPackagePath,
-  sourcePackageRoot = join(WORKSPACE_ROOT, 'packages/web-decision')
-}: {
+interface ReleaseInputOptions {
   archivePath: string;
   installedPackagePath: string;
-  sourcePackageRoot?: string;
-}): Promise<{
+  sourcePackageRoot: string;
+  workspaceRoot: string;
+}
+
+async function collectReleaseEvidenceInputsInternal(
+  {archivePath, installedPackagePath, sourcePackageRoot, workspaceRoot}: ReleaseInputOptions,
+  provenanceMode: 'production' | 'test-fixture'
+): Promise<{
   archive: ArchiveInfo;
   models: ModelRequirement[];
   catalogSha256: string;
   manifests: Map<string, ArchiveManifestEvidence>;
 }> {
   const archive = await verifyArchiveInstall(archivePath, installedPackagePath);
-  const models = await loadCommittedCatalog(sourcePackageRoot);
+  const {models, provenanceSha256} = await loadCommittedCatalog(sourcePackageRoot, provenanceMode, workspaceRoot);
   const expectedPublicCatalog = models.map(({modelId, backend, manifestSha256, requiredFiles}) => ({
     modelId,
     backend,
@@ -838,7 +867,52 @@ export async function collectReleaseEvidenceInputs({
     'Installed public catalog differs from the committed model/artifact inputs.'
   );
   const manifests = await readArchiveModelManifests(archive, models);
-  return {archive, models, catalogSha256: canonicalSha256(models), manifests};
+  return {archive, models, catalogSha256: canonicalSha256({models, provenanceSha256}), manifests};
+}
+
+export async function collectReleaseEvidenceInputs({
+  archivePath,
+  installedPackagePath,
+  sourcePackageRoot = join(WORKSPACE_ROOT, 'packages/web-decision'),
+  workspaceRoot = WORKSPACE_ROOT
+}: {
+  archivePath: string;
+  installedPackagePath: string;
+  sourcePackageRoot?: string;
+  workspaceRoot?: string;
+}): Promise<{
+  archive: ArchiveInfo;
+  models: ModelRequirement[];
+  catalogSha256: string;
+  manifests: Map<string, ArchiveManifestEvidence>;
+}> {
+  return collectReleaseEvidenceInputsInternal(
+    {archivePath, installedPackagePath, sourcePackageRoot, workspaceRoot},
+    'production'
+  );
+}
+
+/** Test-only path for synthetic fixtures; the release CLI never calls this function. */
+export async function collectReleaseEvidenceInputsForTestFixture({
+  archivePath,
+  installedPackagePath,
+  sourcePackageRoot,
+  workspaceRoot = WORKSPACE_ROOT
+}: {
+  archivePath: string;
+  installedPackagePath: string;
+  sourcePackageRoot: string;
+  workspaceRoot?: string;
+}): Promise<{
+  archive: ArchiveInfo;
+  models: ModelRequirement[];
+  catalogSha256: string;
+  manifests: Map<string, ArchiveManifestEvidence>;
+}> {
+  return collectReleaseEvidenceInputsInternal(
+    {archivePath, installedPackagePath, sourcePackageRoot, workspaceRoot},
+    'test-fixture'
+  );
 }
 
 function collectPlaywrightTests(
@@ -1305,16 +1379,22 @@ export function validatePlaywrightReport(
   return {modelCount: models.length, browserCount: browsers.length, caseCount: cases.size};
 }
 
-export async function verifyReleaseArtifacts({
-  archivePath,
-  installedPackagePath,
-  playwrightReportPath,
-  workspaceRoot = WORKSPACE_ROOT,
-  sourcePackageRoot = join(workspaceRoot, 'packages/web-decision'),
-  policy
-}: ArtifactVerificationOptions): Promise<AnyRecord> {
+async function verifyReleaseArtifactsInternal(
+  {
+    archivePath,
+    installedPackagePath,
+    playwrightReportPath,
+    workspaceRoot = WORKSPACE_ROOT,
+    sourcePackageRoot = join(workspaceRoot, 'packages/web-decision'),
+    policy
+  }: ArtifactVerificationOptions,
+  provenanceMode: 'production' | 'test-fixture'
+): Promise<AnyRecord> {
   const checkedPolicy = validatePolicy(policy);
-  const inputs = await collectReleaseEvidenceInputs({archivePath, installedPackagePath, sourcePackageRoot});
+  const inputs = await collectReleaseEvidenceInputsInternal(
+    {archivePath, installedPackagePath, sourcePackageRoot, workspaceRoot},
+    provenanceMode
+  );
   const report = JSON.parse(await readFile(playwrightReportPath, 'utf8'));
   const browserResults = validatePlaywrightReport(report, {
     ...inputs,
@@ -1350,14 +1430,24 @@ export async function verifyReleaseArtifacts({
   };
 }
 
+export async function verifyReleaseArtifacts(options: ArtifactVerificationOptions): Promise<AnyRecord> {
+  return verifyReleaseArtifactsInternal(options, 'production');
+}
+
+/** Test-only path for synthetic fixtures; the release CLI never calls this function. */
+export async function verifyReleaseArtifactsForTestFixture(options: ArtifactVerificationOptions): Promise<AnyRecord> {
+  return verifyReleaseArtifactsInternal(options, 'test-fixture');
+}
+
 export async function verifyReleaseEvidence(options: ReleaseEvidenceOptions): Promise<AnyRecord> {
   const root = resolve(options.workspaceRoot ?? WORKSPACE_ROOT);
   const policy = await loadTrustedPolicy(root);
   await assertCommittedReferenceFixtures(root);
   assertCommittedCatalogSources(root);
-  fail(options.buildEvidencePath, 'TVM build evidence is required.');
   const sourceRoot = options.sourcePackageRoot ?? join(root, 'packages/web-decision');
-  const models = await loadCommittedCatalog(sourceRoot);
+  assertProductionPackageRoot(sourceRoot, root);
+  const {models} = await loadCommittedCatalog(sourceRoot, 'production', root);
+  fail(options.buildEvidencePath, 'TVM build evidence is required.');
   const buildModels = await Promise.all(
     models.map(async (model) => {
       const manifest: unknown = JSON.parse(await readFile(join(sourceRoot, model.manifestPath), 'utf8'));

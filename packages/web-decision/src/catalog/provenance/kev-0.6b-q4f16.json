@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "modelId": "kev-0.6b-q4f16",
+  "status": "pending",
+  "knownSource": {
+    "repository": "onnx-community/kev-0.6b-ONNX",
+    "revision": "5a827091b3d58fe4fdfc02a5a5b2ce364047d678",
+    "path": "onnx/model_q4f16.onnx_data",
+    "bytes": 335357952,
+    "sha256": "777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b"
+  },
+  "knownReferences": [
+    {
+      "url": "https://huggingface.co/onnx-community/kev-0.6b-ONNX/blob/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/README.md",
+      "sha256": "c1e475f5e8642ed37005c58b15b09f7e5a92d20a91ab37e96e4e683126c7d214",
+      "scope": "publisher declaration; not proof of exact conversion inputs"
+    },
+    {
+      "url": "https://huggingface.co/jaredpalmer/kev-0.6b/blob/ac5bda89ec391ee5fe0c17dd44cae01815dbffcd/README.md",
+      "sha256": "8d5642bb152900d912d4e822e7fdf910a8879f42383505b1458fc01fd96aa0c2",
+      "scope": "published model card; not proof of exact conversion inputs"
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3-0.6B-Base/blob/da87bfb608c14b7cf20ba1ce41287e8de496c0cd/LICENSE",
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+      "scope": "base model license file; not proof of exact conversion inputs"
+    }
+  ],
+  "unresolved": [
+    "Exact Kev adapter source revision used to create the pinned ONNX conversion is not established.",
+    "Exact Qwen3-0.6B base revision used by that conversion is not established.",
+    "The conversion recipe, configuration, and tool revisions are not pinned as committed evidence.",
+    "Redistribution rights for the exact converted and embedded artifacts have not been approved."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "modelId": "kev-0.6b-q4f16",
+      "status": "test-fixture",
+      "artifactLockSha256": "de416e32aba154eb27b355edb75251a5389126fc044feb210a47b90535c46f5b",
+      "evidence": {
+        "path": "src/catalog/provenance/release-test-fixture.json",
+        "sha256": "94b1a7808a3b3855b88ae654876b4c4002b428c2235c75024d73242da25f0741"
+      }
+    }
+  ]
+}

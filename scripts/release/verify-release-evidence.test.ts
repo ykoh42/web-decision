@@ -20,7 +20,8 @@ import {
   validatePolicyBytes,
   verifyArchiveInstall,
   collectReleaseEvidenceInputs,
-  verifyReleaseArtifacts
+  collectReleaseEvidenceInputsForTestFixture,
+  verifyReleaseArtifactsForTestFixture
 } from './verify-release-evidence.ts';
 import {
   createExpandedInferenceEvidence,
@@ -133,6 +134,16 @@ async function putPackageTree(
       schemaVersion: 1,
       byModelId: Object.fromEntries(descriptors.map(({modelId, artifacts}) => [modelId, artifacts]))
     })}\n`
+  );
+  const provenanceRoot = join(sourceRoot, 'src/catalog/provenance');
+  await mkdir(provenanceRoot, {recursive: true});
+  await copyFile(
+    join(WORKSPACE_ROOT, 'scripts/release/fixtures/model-provenance.json'),
+    join(sourceRoot, 'src/catalog/model-provenance.json')
+  );
+  await copyFile(
+    join(WORKSPACE_ROOT, 'scripts/release/fixtures/model-provenance-test-fixture.json'),
+    join(provenanceRoot, 'release-test-fixture.json')
   );
   for (const descriptor of descriptors) {
     const manifestPath = join(packageRoot, 'assets', descriptor.modelId, 'manifest.json');
@@ -267,7 +278,7 @@ function makeRecord({model, browser, archive, catalogSha256, manifest, expandedI
 }
 
 async function prepareValidReport(fixture: Fixture): Promise<AnyRecord> {
-  const inputs = await collectReleaseEvidenceInputs({
+  const inputs = await collectReleaseEvidenceInputsForTestFixture({
     archivePath: fixture.archivePath,
     installedPackagePath: fixture.packageRoot,
     sourcePackageRoot: fixture.sourceRoot
@@ -438,7 +449,7 @@ test('accepts an exact installed archive with all curated model/browser GPU case
   const valid = await prepareValidReport(fixture);
   const reportPath = await saveReport(fixture, valid.report);
 
-  const result = await verifyReleaseArtifacts({
+  const result = await verifyReleaseArtifactsForTestFixture({
     archivePath: fixture.archivePath,
     installedPackagePath: fixture.packageRoot,
     playwrightReportPath: reportPath,
@@ -518,7 +529,7 @@ test('derives release expectations from curated JSON inputs and never imports th
     'throw new Error("Legacy model registry must not be imported by the release gate.");\n'
   );
 
-  const inputs = await collectReleaseEvidenceInputs({
+  const inputs = await collectReleaseEvidenceInputsForTestFixture({
     archivePath: fixture.archivePath,
     installedPackagePath: fixture.packageRoot,
     sourcePackageRoot: fixture.sourceRoot
@@ -529,6 +540,19 @@ test('derives release expectations from curated JSON inputs and never imports th
     ['kev-0.6b-q4f16']
   );
   assert.equal(inputs.manifests.get('kev-0.6b-q4f16')?.manifest.model, 'kev-0.6b-q4f16');
+});
+
+test('production release verification rejects the explicitly synthetic fixture source root', async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  await assert.rejects(
+    collectReleaseEvidenceInputs({
+      archivePath: fixture.archivePath,
+      installedPackagePath: fixture.packageRoot,
+      sourcePackageRoot: fixture.sourceRoot
+    }),
+    /Release verification must use the committed package source root/u
+  );
 });
 
 test('allows a catalog model with no required features but keeps Kev shader-f16 mandatory', async (t) => {
@@ -572,7 +596,7 @@ test('derives a non-empty exact asset requirement set from the committed manifes
   modelSpec.models = [];
   await writeFile(modelSpecPath, JSON.stringify(modelSpec));
   await assert.rejects(
-    collectReleaseEvidenceInputs({
+    collectReleaseEvidenceInputsForTestFixture({
       archivePath: fixture.archivePath,
       installedPackagePath: fixture.packageRoot,
       sourcePackageRoot: fixture.sourceRoot
@@ -584,7 +608,7 @@ test('derives a non-empty exact asset requirement set from the committed manifes
   modelSpec.models[0].description.assets.requiredFiles = ['manifest.json'];
   await writeFile(modelSpecPath, JSON.stringify(modelSpec));
   await assert.rejects(
-    collectReleaseEvidenceInputs({
+    collectReleaseEvidenceInputsForTestFixture({
       archivePath: fixture.archivePath,
       installedPackagePath: fixture.packageRoot,
       sourcePackageRoot: fixture.sourceRoot

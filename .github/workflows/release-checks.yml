@@ -62,6 +62,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Install workspace
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Enforce committed model provenance and rights evidence
+        run: pnpm run check:model-provenance
       - name: Check formatting and lint
         if: matrix.node == '24.0.0'
         env:

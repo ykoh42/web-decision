@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "modelId": "kev-0.6b-q4f16",
+      "status": "pending",
+      "artifactLockSha256": "8ee05a3babbd3ec82aae5203d960a904e4156b67fc622c2a72965f1a12d020bf",
+      "evidence": {
+        "path": "src/catalog/provenance/kev-0.6b-q4f16.json",
+        "sha256": "859ffa258a87cf470c02de18cc555d6c786cded91202e1f62a0dff9c43df461a"
+      }
+    }
+  ]
+}

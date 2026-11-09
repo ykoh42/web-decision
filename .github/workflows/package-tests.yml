@@ -126,3 +126,5 @@ jobs:
             export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
           fi
           pnpm run check:complexity:complete
+      - name: Enforce committed model provenance and rights evidence
+        run: pnpm run check:model-provenance
