@@ -4,7 +4,7 @@ import {OPENDECIDER_NANO_TOKENS} from './tokenizer.mjs';
 
 type NanoTokenizer = {encode(text: string): unknown};
 type NanoQuestion = {instructions: string; options: string[]};
-type NanoRequest = {state: unknown; questions: NanoQuestion[]};
+type NanoRequest = {state: unknown; questions: {instructions: unknown; options: unknown}[]};
 type NanoPacked = {
   questions: {ids: number[]; markerPositions: number[]; options: string[]; truncated: boolean}[];
   tokenCount: number;
@@ -39,7 +39,10 @@ function encode(tokenizer: NanoTokenizer, text: string) {
   return ids;
 }
 
-function validateQuestion(question: NanoQuestion, index: number) {
+function validateQuestion(
+  question: {instructions: unknown; options: unknown},
+  index: number
+): asserts question is NanoQuestion {
   if (!question || typeof question.instructions !== 'string' || !question.instructions.trim())
     throw invalid(`Question ${index} needs non-empty instructions.`);
   if (!Array.isArray(question.options) || question.options.length < 2)

@@ -63,7 +63,7 @@ export class ExperimentalStrandsSession {
     const signal = options?.signal;
     signal?.throwIfAborted();
     validateDecisionFields(options);
-    request = validateRequestFields(request, Infinity, Infinity, Infinity, 255);
+    request = validateRequestFields(request, Infinity, Infinity, Infinity, 255) as DecisionRequest;
     if (this.closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
     const packed: PackedRequest = packStrandsRequest(this.tokenizer!, request);
     if (this.closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');

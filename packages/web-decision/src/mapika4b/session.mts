@@ -82,7 +82,7 @@ export function createMapika4Session({tokenizer, labels, limits, runner}: Create
       if (signal != null) validateH2oSignal(signal);
       signal?.throwIfAborted();
       validateDecisionFields(options);
-      const checked = validateRequestFields(request, 255, Infinity, Infinity, MAPIKA4_MAX_OPTIONS);
+      const checked = validateRequestFields(request, 255, Infinity, Infinity, MAPIKA4_MAX_OPTIONS) as DecisionRequest;
       requireOpen();
       const packed: PackedMapikaRequest = packMapikaRequest(tokenizer, labels!, checked, limits!);
       requireOpen();
