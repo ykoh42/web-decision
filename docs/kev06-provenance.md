@@ -1,0 +1,11 @@
+# Kev 0.6B provenance review
+
+Reviewed 2026-11-09. The catalog pins the following public upstream asset:
+
+- Repository: [onnx-community/kev-0.6b-ONNX](https://huggingface.co/onnx-community/kev-0.6b-ONNX/tree/5a827091b3d58fe4fdfc02a5a5b2ce364047d678), revision `5a827091b3d58fe4fdfc02a5a5b2ce364047d678`.
+- File: `onnx/model_q4f16.onnx_data`, 335,357,952 bytes, SHA-256 `777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b`.
+- The [pinned upstream model card](https://huggingface.co/onnx-community/kev-0.6b-ONNX/blob/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/README.md) declares Apache-2.0 and identifies its ONNX files as conversions of `jaredpalmer/kev-0.6b`. The card's SHA-256 is `c1e475f5e8642ed37005c58b15b09f7e5a92d20a91ab37e96e4e683126c7d214`.
+- A [published Kev model card](https://huggingface.co/jaredpalmer/kev-0.6b/blob/ac5bda89ec391ee5fe0c17dd44cae01815dbffcd/README.md) declares Apache-2.0 and identifies `Qwen/Qwen3-0.6B-Base` as its base model. Its SHA-256 is `8d5642bb152900d912d4e822e7fdf910a8879f42383505b1458fc01fd96aa0c2`.
+- The [Qwen base model license](https://huggingface.co/Qwen/Qwen3-0.6B-Base/blob/da87bfb608c14b7cf20ba1ce41287e8de496c0cd/LICENSE) contains Apache-2.0; that file's SHA-256 is `832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e`.
+
+The ONNX card does not pin the original Kev adapter revision or Qwen base revision used for conversion. The cited Kev and Qwen revisions document their publishers' license declarations; they do not establish the exact conversion inputs. The catalog therefore retains `separate-review-required`. Before release, verify the conversion lineage and all obligations for the embedded assets and redistributed artifacts. The release evidence must also match the exact final package and model artifacts.
