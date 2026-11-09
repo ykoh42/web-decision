@@ -2,7 +2,8 @@ import {createHash} from 'node:crypto';
 import {readFile, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import {resolve} from 'node:path';
-import {expect, test} from '@playwright/test';
+import {expect, test, type Page} from '@playwright/test';
+import type {DecisionResult, LoadedDecisionModel} from '../../packages/web-decision/src/index.d.ts';
 
 const enabled = process.env.WEB_DECISION_STRANDS_REAL_GPU === '1';
 const modelId = 'experimental-strands-qwen-2b-fp16';
@@ -18,7 +19,7 @@ const smallFiles = [
   ['full-fused-tvm-4096-candidate-v1/model.wasm', pins.wasm],
   ['checkpoint/tokenizer.json', pins.tokenizer],
   ['checkpoint/tokenizer_config.json', pins.tokenizerConfig]
-];
+] as const;
 const references = [
   {
     state: 'A red parcel goes to the first desk.',
@@ -57,18 +58,21 @@ const references = [
   }
 ];
 
-function sha256(bytes) {
+function sha256(bytes: Uint8Array) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
 async function verifyAssets() {
-  const assets = {};
+  const assets: Record<string, {bytes: number; sha256: string}> = {};
   for (const [path, expected] of smallFiles) {
     const bytes = await readFile(resolve(assetRoot, path));
     expect(sha256(bytes), path).toBe(expected);
     assets[path] = {bytes: bytes.byteLength, sha256: expected};
   }
-  const manifest = JSON.parse(await readFile(resolve(assetRoot, smallFiles[0][0]), 'utf8'));
+  const manifest = JSON.parse(await readFile(resolve(assetRoot, smallFiles[0][0]), 'utf8')) as {
+    records: Array<{chunks: unknown[]}>;
+    totalBytes: number;
+  };
   expect(manifest.records).toHaveLength(328);
   expect(manifest.totalBytes).toBe(3_776_255_872);
   return {
@@ -81,11 +85,11 @@ async function verifyAssets() {
   };
 }
 
-async function readChromeGpuReport(page) {
+async function readChromeGpuReport(page: Page) {
   await page.goto('chrome://gpu');
   const report = await page.evaluate(() => {
-    const parts = [];
-    function visit(root) {
+    const parts: string[] = [];
+    function visit(root: Document | ShadowRoot) {
       if (root?.textContent) parts.push(root.textContent);
       for (const element of root?.querySelectorAll?.('*') ?? []) if (element.shadowRoot) visit(element.shadowRoot);
     }
@@ -98,9 +102,9 @@ async function readChromeGpuReport(page) {
   };
 }
 
-function assertDecision(result, expected) {
+function assertDecision(result: DecisionResult, expected: (typeof references)[number]) {
   expect(result.answers).toHaveLength(1);
-  const answer = result.answers[0];
+  const answer = result.answers[0]!;
   expect(result.tokenCount).toBe(expected.tokenCount);
   expect(answer.probabilities.map(({option}) => option)).toEqual(expected.options);
   expect(answer.selected).toBe(expected.selected);
@@ -115,11 +119,16 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
   test.skip(!enabled, 'Set WEB_DECISION_STRANDS_REAL_GPU=1 to run the pinned local Strands model on WebGPU.');
   test.skip(process.platform !== 'darwin', 'This evidence test currently targets the M4 Pro macOS host.');
   test.skip(browserName !== 'chromium', 'The hardware evidence path uses Chromium chrome://gpu.');
+  if (!process.env.WEB_DECISION_INSTALLED_BUNDLE) {
+    throw new Error(
+      'The legacy Strands browser test requires WEB_DECISION_INSTALLED_BUNDLE to point to a compatible legacy bundle.'
+    );
+  }
   test.setTimeout(20 * 60 * 1000);
 
   const assets = await verifyAssets();
   expect(assets.weights.chunks).toBe(635);
-  const bundleSha256 = sha256(await readFile(resolve('packages/web-decision/dist/index.js')));
+  const bundleSha256 = sha256(await readFile(resolve(process.env.WEB_DECISION_INSTALLED_BUNDLE)));
   await page.goto('/');
   await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
 
@@ -128,24 +137,30 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
       if (!navigator.gpu) throw new Error('WebGPU is unavailable.');
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) throw new Error('WebGPU did not provide an adapter.');
-      if (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter)
+      if (
+        (adapter as GPUAdapter & {isFallbackAdapter?: boolean}).isFallbackAdapter ||
+        (adapter.info as GPUAdapterInfo & {isFallbackAdapter?: boolean})?.isFallbackAdapter
+      )
         throw new Error('A hardware WebGPU adapter is required.');
       if (!adapter.features.has('shader-f16')) throw new Error('The adapter does not support shader-f16.');
 
-      let progress;
+      let progress!: {loadedBytes: number; totalBytes: number; fraction: number};
       const loadStarted = performance.now();
-      const model = await window.webDecision.loadDecisionModel({
-        model: id,
+      const legacy = window.webDecision as unknown as typeof import('../../packages/web-decision/src/index.d.ts');
+      const model = (await legacy.loadDecisionModel({
+        model: id as 'experimental-strands-qwen-2b-fp16',
         assetsUrl: '/',
         cache: false,
-        onProgress: (value) => {
-          progress = value;
+        onProgress: (value: unknown) => {
+          progress = value as typeof progress;
         }
-      });
+      })) as unknown as LoadedDecisionModel & {
+        tokenizer: {encode(text: string, options: {add_special_tokens: boolean}): {ids: number[]}};
+      };
       const loadElapsedMs = performance.now() - loadStarted;
 
       try {
-        const timed = async (run) => {
+        const timed = async <T>(run: () => Promise<T>) => {
           const start = performance.now();
           const result = await run();
           return {elapsedMs: performance.now() - start, result};
@@ -159,10 +174,10 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
         }
 
         const multi = await model.decide({
-          state: cases[0].state,
+          state: cases[0]!.state,
           questions: [
-            {instructions: cases[0].instructions, options: cases[0].options},
-            {instructions: cases[1].instructions, options: cases[1].options}
+            {instructions: cases[0]!.instructions, options: cases[0]!.options},
+            {instructions: cases[1]!.instructions, options: cases[1]!.options}
           ]
         });
         const options = Array.from({length: 255}, (_, index) => `option-${index}`);
@@ -177,14 +192,15 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
           });
           overOptions = {code: 'UNEXPECTED_SUCCESS'};
         } catch (error) {
-          overOptions = {code: error.code ?? error.name, message: error.message};
+          const failure = error as {code?: string; name: string; message: string};
+          overOptions = {code: failure.code ?? failure.name, message: failure.message};
         }
 
         const maxTokens = 4096;
         const stateText = '<state>\n\n</state>\n';
-        const questionText = (instructions) =>
+        const questionText = (instructions: string) =>
           `<question type="choice">\nSelect exactly one option.\n${instructions}\n<options>\n1. no\n2. yes\n</options>\n</question>\n<answer>`;
-        const tokenCount = (instructions) =>
+        const tokenCount = (instructions: string) =>
           model.tokenizer.encode(stateText, {add_special_tokens: true}).ids.length +
           model.tokenizer.encode(questionText(instructions), {add_special_tokens: false}).ids.length;
         const baseInstructions = 'Choose exactly one option.';
@@ -206,19 +222,24 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
           });
           overContext = {code: 'UNEXPECTED_SUCCESS'};
         } catch (error) {
-          overContext = {code: error.code ?? error.name, message: error.message};
+          const failure = error as {code?: string; name: string; message: string};
+          overContext = {code: failure.code ?? failure.name, message: failure.message};
         }
 
         return {
           model: model.description.model,
-          sameRegistration: model.description === window.webDecision.describeModel(id),
+          sameRegistration:
+            model.description === legacy.describeModel(id as Parameters<typeof legacy.describeModel>[0]),
           descriptionFrozen: Object.isFrozen(model.description),
           backend: model.description.backend?.name,
           verification: model.description.verification,
           adapterInfo: {
             vendor: adapter.info?.vendor,
             architecture: adapter.info?.architecture,
-            isFallbackAdapter: adapter.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? false
+            isFallbackAdapter:
+              (adapter as GPUAdapter & {isFallbackAdapter?: boolean}).isFallbackAdapter ??
+              (adapter.info as GPUAdapterInfo & {isFallbackAdapter?: boolean})?.isFallbackAdapter ??
+              false
           },
           progress,
           loadElapsedMs,
@@ -246,25 +267,25 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
   expect(inference.progress.loadedBytes).toBe(inference.progress.totalBytes);
   expect(inference.progress.fraction).toBe(1);
   for (let index = 0; index < references.length; index++)
-    assertDecision(inference.outputs[index].result, references[index]);
-  expect(inference.multi.tokenCount).toBe(references[0].tokenCount + references[1].tokenCount);
+    assertDecision(inference.outputs[index]!.result, references[index]!);
+  expect(inference.multi.tokenCount).toBe(references[0]!.tokenCount + references[1]!.tokenCount);
   expect(inference.multi.answers.map(({selected}) => selected)).toEqual(['red', 'red']);
   expect(inference.multi.answers.map(({probabilities}) => probabilities.map(({option}) => option))).toEqual([
     ['red', 'blue'],
     ['blue', 'red']
   ]);
   expect(inference.maxOptions.count).toBe(255);
-  expect(inference.maxOptions.result.answers[0].probabilities.map(({option}) => option)).toEqual(
+  expect(inference.maxOptions.result.answers[0]!.probabilities.map(({option}) => option)).toEqual(
     Array.from({length: 255}, (_, index) => `option-${index}`)
   );
   expect(
-    inference.maxOptions.result.answers[0].probabilities.reduce((sum, item) => sum + item.probability, 0)
+    inference.maxOptions.result.answers[0]!.probabilities.reduce((sum, item) => sum + item.probability, 0)
   ).toBeCloseTo(1, 12);
-  const maxOptionAnswer = inference.maxOptions.result.answers[0];
-  expect(maxOptionAnswer.selected).toBe(maxOptionAnswer.probabilities[maxOptionAnswer.selectedIndex].option);
+  const maxOptionAnswer = inference.maxOptions.result.answers[0]!;
+  expect(maxOptionAnswer.selected).toBe(maxOptionAnswer.probabilities[maxOptionAnswer.selectedIndex]!.option);
   expect(inference.overOptions.code).toBe('INVALID_INPUT');
   expect(inference.maxContext.result.tokenCount).toBe(4096);
-  expect(inference.maxContext.result.answers[0].probabilities.map(({option}) => option)).toEqual(['no', 'yes']);
+  expect(inference.maxContext.result.answers[0]!.probabilities.map(({option}) => option)).toEqual(['no', 'yes']);
   expect(inference.overContext.code).toBe('INVALID_INPUT');
 
   const gpuPage = await page.context().newPage();
@@ -302,9 +323,9 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
       instructions,
       options,
       tokenCount: result.tokenCount,
-      selected: result.answers[0].selected,
-      selectedIndex: result.answers[0].selectedIndex,
-      probabilities: result.answers[0].probabilities,
+      selected: result.answers[0]!.selected,
+      selectedIndex: result.answers[0]!.selectedIndex,
+      probabilities: result.answers[0]!.probabilities,
       elapsedMs
     })),
     multipleQuestionRows: inference.multi,
@@ -314,8 +335,8 @@ test('Strands Qwen 2B runs pinned local assets on M4 Pro WebGPU', async ({page, 
       selected: maxOptionAnswer.selected,
       selectedIndex: maxOptionAnswer.selectedIndex,
       outputCount: maxOptionAnswer.probabilities.length,
-      firstOption: maxOptionAnswer.probabilities[0].option,
-      lastOption: maxOptionAnswer.probabilities.at(-1).option,
+      firstOption: maxOptionAnswer.probabilities[0]!.option,
+      lastOption: maxOptionAnswer.probabilities.at(-1)!.option,
       probabilitySum: maxOptionAnswer.probabilities.reduce((sum, item) => sum + item.probability, 0)
     },
     overMaximumOptions: inference.overOptions,
