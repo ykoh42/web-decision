@@ -118,3 +118,27 @@ test('TAMEV loader preserves malformed URL error code, message, and cause type',
     }
   );
 });
+
+test('TAMEV loader skips signal getters after earlier validation groups fail', () => {
+  const invalidCases = [
+    {model: 'other', assetsUrl: 'https://example.test/tamev/'},
+    {model: TAMEV_MICRO_MODEL, assetsUrl: 'https://example.test/tamev/', cache: 'enabled'},
+    {model: TAMEV_MICRO_MODEL, assetsUrl: 'https://example.test/tamev/', onProgress: null}
+  ];
+  for (const invalidOptions of invalidCases) {
+    const signalReads: string[] = [];
+    const signal = new Proxy(
+      {},
+      {
+        get(_target, key) {
+          signalReads.push(String(key));
+          return () => {};
+        }
+      }
+    );
+    assert.throws(() => validateTamevLoadOptions({...invalidOptions, signal}, TAMEV_MICRO_PROFILE), {
+      code: 'INVALID_INPUT'
+    });
+    assert.deepEqual(signalReads, []);
+  }
+});

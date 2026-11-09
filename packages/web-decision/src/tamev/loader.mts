@@ -115,63 +115,30 @@ function snapshotLoadOptionValues(options: object): TamevOptionValues {
   );
 }
 
-function hasModelMismatch(values: TamevOptionValues, profile: TamevProfile): boolean {
-  return values.model !== undefined && values.model !== profile.model;
-}
-
-function hasInvalidAssetsUrl(values: TamevOptionValues): boolean {
-  return values.assetsUrl !== undefined && (typeof values.assetsUrl !== 'string' || !values.assetsUrl);
-}
-
-function requiresExplicitAssetsUrl(values: TamevOptionValues, profile: TamevProfile): boolean {
-  return values.assetsUrl === undefined && !ID_ONLY_MODELS.has(profile.model);
-}
-
-function hasInvalidCacheType(values: TamevOptionValues): boolean {
-  return values.cache !== undefined && typeof values.cache !== 'boolean';
-}
-
-function hasInvalidOfflineType(values: TamevOptionValues): boolean {
-  return values.offline !== undefined && typeof values.offline !== 'boolean';
-}
-
-function disablesCacheWhileOffline(values: TamevOptionValues): boolean {
-  return values.offline === true && values.cache === false;
-}
-
-function hasInvalidPrefetchLimit(values: TamevOptionValues): boolean {
-  return values.maxPrefetchBytes !== undefined && values.maxPrefetchBytes !== 0;
-}
-
-function requestsDebertaReadback(values: TamevOptionValues): boolean {
-  return values.debertaReadback !== undefined;
-}
-
-function hasInvalidProgressCallback(values: TamevOptionValues): boolean {
-  return values.onProgress !== undefined && typeof values.onProgress !== 'function';
-}
-
-function hasInvalidSignal(values: TamevOptionValues): boolean {
+function hasInvalidModelOrSourceOptions(values: TamevOptionValues, profile: TamevProfile): boolean {
   return (
-    values.signal != null &&
-    (typeof (values.signal as TamevSignalCandidate).throwIfAborted !== 'function' ||
-      typeof (values.signal as TamevSignalCandidate).addEventListener !== 'function' ||
-      typeof (values.signal as TamevSignalCandidate).removeEventListener !== 'function')
+    (values.model !== undefined && values.model !== profile.model) ||
+    (values.assetsUrl !== undefined && (typeof values.assetsUrl !== 'string' || !values.assetsUrl)) ||
+    (values.assetsUrl === undefined && !ID_ONLY_MODELS.has(profile.model))
   );
 }
 
-function rejectInvalidLoadOptionValues(values: TamevOptionValues, profile: TamevProfile): void {
-  if (hasModelMismatch(values, profile)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidAssetsUrl(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (requiresExplicitAssetsUrl(values, profile))
-    throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidCacheType(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidOfflineType(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (disablesCacheWhileOffline(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidPrefetchLimit(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (requestsDebertaReadback(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidProgressCallback(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
-  if (hasInvalidSignal(values)) throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
+function hasInvalidCacheOrPrefetchOptions(values: TamevOptionValues): boolean {
+  return ((values.cache !== undefined && typeof values.cache !== 'boolean') ||
+    (values.offline !== undefined && typeof values.offline !== 'boolean') ||
+    (values.offline && values.cache === false) ||
+    (values.maxPrefetchBytes !== undefined && values.maxPrefetchBytes !== 0) ||
+    values.debertaReadback !== undefined) as boolean;
+}
+
+function hasInvalidProgressOrSignalOptions(values: TamevOptionValues): boolean {
+  return (
+    (values.onProgress !== undefined && typeof values.onProgress !== 'function') ||
+    (values.signal != null &&
+      (typeof (values.signal as TamevSignalCandidate).throwIfAborted !== 'function' ||
+        typeof (values.signal as TamevSignalCandidate).addEventListener !== 'function' ||
+        typeof (values.signal as TamevSignalCandidate).removeEventListener !== 'function'))
+  );
 }
 
 function resolveTamevBase(values: TamevOptionValues, profile: TamevProfile): URL {
@@ -198,7 +165,12 @@ export function validateTamevLoadOptions(
     throw fail('INVALID_INPUT', `${profile.name} load options are required.`);
   assertLoadOptionDescriptors(options, profile);
   const values = snapshotLoadOptionValues(options);
-  rejectInvalidLoadOptionValues(values, profile);
+  if (
+    hasInvalidModelOrSourceOptions(values, profile) ||
+    hasInvalidCacheOrPrefetchOptions(values) ||
+    hasInvalidProgressOrSignalOptions(values)
+  )
+    throw fail('INVALID_INPUT', `Invalid ${profile.name} load option values.`);
   const base = resolveTamevBase(values, profile);
   return {
     base,
