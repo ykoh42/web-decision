@@ -1,5 +1,5 @@
 import {execFileSync} from 'node:child_process';
-import {copyFile, mkdir, mkdtemp, readdir, rm, symlink, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -69,7 +69,6 @@ try {
       stdio: 'inherit'
     }
   );
-  await copyFile(join(testDirectory, 'kanana-core-modules.mjs'), join(emittedTests, 'test', 'kanana-core-modules.mjs'));
   await symlink(join(testDirectory, 'fixtures'), join(emittedTests, 'test', 'fixtures'), 'junction');
   const runTests = (files: string[], useTsx: boolean) => {
     const testArguments = [...(useTsx ? ['--import', 'tsx'] : []), '--test', ...files];

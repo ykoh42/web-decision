@@ -33,7 +33,6 @@
     "packages/web-decision/test/imajev-candidate-loader.test.mjs",
     "packages/web-decision/test/imajev-session.test.mjs",
     "packages/web-decision/test/imajev-source.test.mjs",
-    "packages/web-decision/test/kanana-core-modules.mjs",
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/mapika-session.test.mjs",
