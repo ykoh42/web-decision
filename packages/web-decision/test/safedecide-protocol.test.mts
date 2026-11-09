@@ -4,10 +4,10 @@ import {prepareSafeDecideSystemOne, finishSafeDecideSystemOne} from '../src/safe
 import {createSafeDecideSession} from '../src/safedecide/session.mjs';
 
 function fakeTokenizer({truncateAfter = Number.POSITIVE_INFINITY} = {}) {
-  const calls = [];
+  const calls: {first: string; second: string}[] = [];
   return {
     calls,
-    encodePair(first, second) {
+    encodePair(first: string, second: string) {
       calls.push({first, second});
       return {
         inputIds: Array.from({length: Math.min(4, first.length + second.length)}, (_, index) => index + 2),
@@ -18,10 +18,10 @@ function fakeTokenizer({truncateAfter = Number.POSITIVE_INFINITY} = {}) {
 }
 
 function whitespacePairTokenizer(limit = 640) {
-  const calls = [];
+  const calls: {first: string; second: string}[] = [];
   return {
     calls,
-    encodePair(first, second) {
+    encodePair(first: string, second: string) {
       calls.push({first, second});
       const firstTokens = first.trim().split(/\s+/u);
       const secondTokens = second.trim().split(/\s+/u);
@@ -46,7 +46,7 @@ function whitespacePairTokenizer(limit = 640) {
   };
 }
 
-const config = {
+const config: Parameters<typeof createSafeDecideSession>[0]['config'] = {
   temperatures: {choice: 1, noul: 1, score: 1},
   selective_rule: {
     alpha: 0.1,
@@ -115,7 +115,7 @@ test('SafeDecide uses the question id when the instruction is omitted or empty',
     {decision: {type: 'choice', instructions: '', criteria: {a: null, b: null}}},
     tokenizer
   );
-  assert.match(tokenizer.calls[0].first, /question: decision$/);
+  assert.match(tokenizer.calls[0]!.first, /question: decision$/);
 });
 
 test('SafeDecide passes over-200K structured state and option text through 640-token pair encoding', async () => {
@@ -128,7 +128,7 @@ test('SafeDecide passes over-200K structured state and option text through 640-t
     runner: {
       async run(rows) {
         runnerCalls++;
-        assert.ok(rows.every((row) => row.inputIds.length <= 640));
+        assert.ok(rows.every((row) => (row as {inputIds: number[]}).inputIds.length <= 640));
         return rows.map((_, index) => index);
       },
       async dispose() {}
@@ -157,7 +157,7 @@ test('SafeDecide right-truncates each pair and accepts requests above 512 pairs'
     runner: {
       async run(rows) {
         runnerCalls++;
-        assert.ok(rows.every((row) => row.inputIds.length <= 640));
+        assert.ok(rows.every((row) => (row as {inputIds: number[]}).inputIds.length <= 640));
         return rows.map((_, index) => index);
       },
       async dispose() {}
@@ -172,7 +172,7 @@ test('SafeDecide right-truncates each pair and accepts requests above 512 pairs'
   assert.ok(result.tokenCount <= 640 * 2);
   assert.equal(runnerCalls, 1);
 
-  const makeCriteria = (count, prefix) =>
+  const makeCriteria = (count: number, prefix: string) =>
     Object.fromEntries(Array.from({length: count}, (_, index) => [`${prefix}-${index}`, null]));
   const questions = {
     first: {type: 'choice', criteria: makeCriteria(256, 'first')},
@@ -183,14 +183,15 @@ test('SafeDecide right-truncates each pair and accepts requests above 512 pairs'
     }
   };
   const resultAboveFormerCap = await model.systemOne('state', questions);
-  assert.equal(resultAboveFormerCap.answers.third.type, 'choice');
+  assert.equal(resultAboveFormerCap.answers.third!.type, 'choice');
   assert.equal(tokenizer.calls.length, 2 + 256 + 254 + 3);
   assert.equal(runnerCalls, 2);
   await model.dispose();
 });
 
 test('SafeDecide accepts more than 512 options in one question', () => {
-  const criteria = (count) => Object.fromEntries(Array.from({length: count}, (_, index) => [`option-${index}`, null]));
+  const criteria = (count: number) =>
+    Object.fromEntries(Array.from({length: count}, (_, index) => [`option-${index}`, null]));
   const tokenizer = fakeTokenizer();
   const prepared = prepareSafeDecideSystemOne('state', {wide: {type: 'choice', criteria: criteria(513)}}, tokenizer);
 
@@ -200,7 +201,7 @@ test('SafeDecide accepts more than 512 options in one question', () => {
 });
 
 test('SafeDecide accepts more than 256 two-option questions', () => {
-  const questions = (count) =>
+  const questions = (count: number) =>
     Object.fromEntries(
       Array.from({length: count}, (_, index) => [`q${index}`, {type: 'choice', criteria: {first: null, second: null}}])
     );
@@ -231,7 +232,7 @@ test('SafeDecide generic decide accepts more than 512 pairs', async () => {
     state: 'state',
     questions: [{instructions: 'Choose.', options: wideOptions}]
   });
-  assert.equal(wide.answers[0].probabilities.length, 513);
+  assert.equal(wide.answers[0]!.probabilities.length, 513);
 
   const manyQuestions = Array.from({length: 257}, (_, index) => ({
     instructions: `Choose ${index}.`,
@@ -247,7 +248,7 @@ test('SafeDecide generic decide accepts more than 512 pairs', async () => {
 });
 
 test('SafeDecide preserves option cardinality across preflight and snapshot', () => {
-  const criteria = (count, prefix, reads, snapshotCount = count) => {
+  const criteria = (count: number, prefix: string, reads: Record<string, number>, snapshotCount = count) => {
     const target = Object.fromEntries(
       Array.from({length: Math.max(count, snapshotCount)}, (_, index) => [`${prefix}-${index}`, null])
     );
@@ -261,7 +262,7 @@ test('SafeDecide preserves option cardinality across preflight and snapshot', ()
       }
     });
   };
-  const questions = (thirdCount, reads, thirdSnapshotCount = thirdCount) => ({
+  const questions = (thirdCount: number, reads: Record<string, number>, thirdSnapshotCount = thirdCount) => ({
     first: {type: 'choice', criteria: criteria(256, 'first', reads)},
     second: {type: 'choice', criteria: criteria(254, 'second', reads)},
     third: {type: 'choice', criteria: criteria(thirdCount, 'third', reads, thirdSnapshotCount)}
@@ -294,7 +295,7 @@ test('SafeDecide preserves option cardinality across preflight and snapshot', ()
 test('SafeDecide rejects a changed Score length before reading values or tokenizing', () => {
   let lengthReads = 0,
     valueReads = 0;
-  const levels = new Proxy(new Array(513).fill(null), {
+  const levels = new Proxy(Array(513).fill(null), {
     get(target, key, receiver) {
       if (key === 'length') {
         lengthReads++;
@@ -319,7 +320,7 @@ test('SafeDecide rejects a changed Score length before reading values or tokeniz
   const boundaryTokenizer = fakeTokenizer();
   const prepared = prepareSafeDecideSystemOne(
     'state',
-    {score: {type: 'score', criteria: new Array(513).fill(null)}},
+    {score: {type: 'score', criteria: Array(513).fill(null)}},
     boundaryTokenizer
   );
   assert.equal(prepared.rows.length, 513);
@@ -366,11 +367,13 @@ test('SafeDecide accepts JSON state values and rejects unsafe shapes before pair
   for (const state of ['text', [null, false, {nested: 'value'}], {nested: {value: 1}}])
     assert.equal(prepareSafeDecideSystemOne(state, questions, tokenizer).rows.length, 2);
 
-  const cyclic = {};
+  const cyclic: {self?: unknown} = {};
   cyclic.self = cyclic;
+  // This test requires a missing array element, not an undefined value.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparse = new Array(2);
   sparse[1] = 'value';
-  const arrayWithExtra = ['value'];
+  const arrayWithExtra: string[] & {extra?: boolean} = ['value'];
   arrayWithExtra.extra = true;
   const accessor = {};
   Object.defineProperty(accessor, 'nested', {
@@ -430,10 +433,10 @@ test('SafeDecide rejects malformed question and criteria shapes during preflight
   assert.equal(tokenizer.calls.length, callsBeforeInvalid);
 
   const defaultChoice = prepareSafeDecideSystemOne('state', {q: {criteria: {a: null, b: null}}}, tokenizer);
-  assert.equal(defaultChoice.questions[0].type, 'choice');
+  assert.equal(defaultChoice.questions[0]!.type, 'choice');
   const defaultNoul = prepareSafeDecideSystemOne('state', {q: {type: 'noul'}}, tokenizer);
   assert.deepEqual(
-    defaultNoul.questions[0].options.map(({text}) => text),
+    defaultNoul.questions[0]!.options.map(({text}) => text),
     ['no', 'yes']
   );
   assert.throws(() => prepareSafeDecideSystemOne('state', {q: choice}, {}), TypeError);
@@ -446,7 +449,7 @@ test('SafeDecide rejects malformed question and criteria shapes during preflight
         [1, 0],
         config,
         undefined,
-        0.3
+        0.3 as Parameters<typeof finishSafeDecideSystemOne>[4]
       ),
     {code: 'INVALID_INPUT'}
   );
@@ -525,7 +528,7 @@ test('SafeDecide rejects malformed call options and generic requests before toke
 test('SafeDecide preserves calibrated probabilities, expected Score, Noul truth probability, action, and guarantee', () => {
   const prepared = {
     tokenCount: 15,
-    rows: new Array(7).fill({}),
+    rows: Array(7).fill({}),
     truncatedQuestions: [],
     questions: [
       {id: 'choice', type: 'choice', options: [{name: 'a'}, {name: 'b'}]},
@@ -533,7 +536,11 @@ test('SafeDecide preserves calibrated probabilities, expected Score, Noul truth 
       {id: 'noul', type: 'noul', options: [{name: 'false'}, {name: 'true'}]}
     ]
   };
-  const result = finishSafeDecideSystemOne(prepared, [2, 0, 0, 0, 0, 0, 1], config);
+  const result = finishSafeDecideSystemOne(
+    prepared as unknown as Parameters<typeof finishSafeDecideSystemOne>[0],
+    [2, 0, 0, 0, 0, 0, 1],
+    config
+  );
 
   assert.deepEqual(result.guarantee, {
     alpha: 0.1,
@@ -541,13 +548,17 @@ test('SafeDecide preserves calibrated probabilities, expected Score, Noul truth 
     statement: 'The default guarantee applies to exchangeable data.'
   });
   assert.equal(result.outputTokenCount, 0);
-  assert.equal(result.answers.choice.choice, 'a');
-  assert.equal(result.answers.choice.action, 'automate');
-  assert.ok(Math.abs(result.answers.score.score - 1) < 1e-12);
-  assert.equal(result.answers.score.choice, '0');
-  assert.equal(result.answers.score.action, 'escalate');
-  assert.ok(Math.abs(result.answers.noul.noul - 0.7310585786300049) < 1e-12);
-  assert.equal(result.answers.noul.action, 'automate');
+  const choiceAnswer = result.answers.choice;
+  const scoreAnswer = result.answers.score;
+  const noulAnswer = result.answers.noul;
+  assert.ok(choiceAnswer?.type === 'choice' && scoreAnswer?.type === 'score' && noulAnswer?.type === 'noul');
+  assert.equal(choiceAnswer.choice, 'a');
+  assert.equal(choiceAnswer.action, 'automate');
+  assert.ok(Math.abs(scoreAnswer.score - 1) < 1e-12);
+  assert.equal(scoreAnswer.choice, '0');
+  assert.equal(scoreAnswer.action, 'escalate');
+  assert.ok(Math.abs(noulAnswer.noul - 0.7310585786300049) < 1e-12);
+  assert.equal(noulAnswer.action, 'automate');
 });
 
 test('SafeDecide applies certified alpha thresholds including the never-automate level', () => {
@@ -557,10 +568,22 @@ test('SafeDecide applies certified alpha thresholds including the never-automate
     truncatedQuestions: [],
     questions: [{id: 'q', type: 'choice', options: [{name: 'a'}, {name: 'b'}]}]
   };
-  const tied = finishSafeDecideSystemOne(prepared, [0, 0], config, undefined, 0.2);
-  const strict = finishSafeDecideSystemOne(prepared, [10, -10], config, undefined, 0.05);
-  assert.equal(tied.answers.q.action, 'automate');
-  assert.equal(strict.answers.q.action, 'escalate');
+  const tied = finishSafeDecideSystemOne(
+    prepared as unknown as Parameters<typeof finishSafeDecideSystemOne>[0],
+    [0, 0],
+    config,
+    undefined,
+    0.2
+  );
+  const strict = finishSafeDecideSystemOne(
+    prepared as unknown as Parameters<typeof finishSafeDecideSystemOne>[0],
+    [10, -10],
+    config,
+    undefined,
+    0.05
+  );
+  assert.equal(tied.answers.q!.action, 'automate');
+  assert.equal(strict.answers.q!.action, 'escalate');
   assert.equal(strict.guarantee.alpha, 0.05);
 });
 
@@ -571,6 +594,18 @@ test('SafeDecide rejects malformed option scores', () => {
     truncatedQuestions: [],
     questions: [{id: 'q', type: 'choice', options: [{name: 'a'}, {name: 'b'}]}]
   };
-  assert.throws(() => finishSafeDecideSystemOne(prepared, [1], config), {code: 'INFERENCE_ERROR'});
-  assert.throws(() => finishSafeDecideSystemOne(prepared, [1, Number.NaN], config), {code: 'INFERENCE_ERROR'});
+  assert.throws(
+    () =>
+      finishSafeDecideSystemOne(prepared as unknown as Parameters<typeof finishSafeDecideSystemOne>[0], [1], config),
+    {code: 'INFERENCE_ERROR'}
+  );
+  assert.throws(
+    () =>
+      finishSafeDecideSystemOne(
+        prepared as unknown as Parameters<typeof finishSafeDecideSystemOne>[0],
+        [1, Number.NaN],
+        config
+      ),
+    {code: 'INFERENCE_ERROR'}
+  );
 });
