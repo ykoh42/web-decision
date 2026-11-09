@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
+import {appendFileSync, copyFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {test} from 'node:test';
+import {fileURLToPath} from 'node:url';
 import {
+  checkSharedReleaseInputs,
   discoverChangedJavaScriptPaths,
   discoverInlineJavaScriptPaths,
   discoverJavaScriptPaths,
@@ -286,4 +288,48 @@ test('rejects glob paths and changed reasons in the exact exception list', (cont
     requireComplete: false
   });
   assert.ok(result.problems.some((problem) => problem.includes('changed its recorded exception reason')));
+});
+
+test('shared historical inputs must match both their pinned bytes and all release locks', (context) => {
+  const root = mkdtempSync(join(tmpdir(), 'web-decision-shared-release-'));
+  context.after(() => rmSync(root, {recursive: true, force: true}));
+  const sourceRoot = fileURLToPath(new URL('../../', import.meta.url));
+  const inputPaths = [
+    'scripts/release/kev-current-source-preview-package-policy.mjs',
+    'scripts/release/kev-current-source-preview-safety.mjs'
+  ];
+  const locks = ['0.1.0', '0.2.0', '0.3.0'].map((version) => `releases/web-decision-${version}/source-lock.json`);
+  for (const path of [...inputPaths, ...locks]) {
+    const destination = join(root, path);
+    mkdirSync(dirname(destination), {recursive: true});
+    copyFileSync(join(sourceRoot, path), destination);
+  }
+  assert.deepEqual(checkSharedReleaseInputs(root), []);
+  appendFileSync(join(root, inputPaths[0]!), '\n');
+  assert.ok(
+    checkSharedReleaseInputs(root).some((problem) => problem.includes('differs from its historical release hash'))
+  );
+  write(root, locks[1]!, JSON.stringify({files: []}));
+  assert.ok(checkSharedReleaseInputs(root).some((problem) => problem.includes('does not pin the expected')));
+});
+
+test('a shared release exception cannot be copied to another JavaScript file', () => {
+  assert.throws(
+    () =>
+      parseTypeScriptMigrationPolicy(
+        {
+          schemaVersion: 1,
+          baselineCommit: initialInventoryCommit,
+          managedJavaScript: [],
+          exceptions: [
+            {
+              path: 'src/other.mjs',
+              reason: 'Immutable shared historical release input; releases 0.1.0, 0.2.0 and 0.3.0 pin SHA-256 abc.'
+            }
+          ]
+        },
+        'test policy'
+      ),
+    /not a pinned shared release input/u
+  );
 });

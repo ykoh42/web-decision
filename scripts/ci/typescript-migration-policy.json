@@ -84,8 +84,6 @@
     "packages/web-decision/test/verdict.test.mjs",
     "scripts/ci/check_cognitive_complexity.mjs",
     "scripts/fetch-model.test.mjs",
-    "scripts/release/kev-current-source-preview-package-policy.mjs",
-    "scripts/release/kev-current-source-preview-safety.mjs",
     "tests/browser/kev06-real-webgpu.spec.mjs",
     "tests/browser/stable-model-id.spec.mjs",
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
@@ -550,6 +548,14 @@
     {
       "path": "releases/web-decision-0.3.0/test/tamev-micro-wasm.spec.mjs",
       "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "scripts/release/kev-current-source-preview-package-policy.mjs",
+      "reason": "Immutable shared historical release input; releases 0.1.0, 0.2.0 and 0.3.0 pin SHA-256 219f7a59d67f2e5fe91af021812e19708421cbaec81e2eeef0b950ff22cb9540."
+    },
+    {
+      "path": "scripts/release/kev-current-source-preview-safety.mjs",
+      "reason": "Immutable shared historical release input; releases 0.1.0, 0.2.0 and 0.3.0 pin SHA-256 a80d1930d2de2e41a799df87302efbf040e0082e3a62251ca89033c473f57492."
     }
   ]
 }

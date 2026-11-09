@@ -1,4 +1,5 @@
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {existsSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -6,6 +7,21 @@ import {defaultTreeAdapter, parse, type DefaultTreeAdapterTypes} from 'parse5';
 
 const policyPath = 'scripts/ci/typescript-migration-policy.json';
 const initialInventoryCommit = 'baa3c144d23e1882ba29084c9f95897b8c56accb';
+
+const sharedReleaseInputHashes = new Map([
+  [
+    'scripts/release/kev-current-source-preview-package-policy.mjs',
+    '219f7a59d67f2e5fe91af021812e19708421cbaec81e2eeef0b950ff22cb9540'
+  ],
+  [
+    'scripts/release/kev-current-source-preview-safety.mjs',
+    'a80d1930d2de2e41a799df87302efbf040e0082e3a62251ca89033c473f57492'
+  ]
+]);
+const sharedReleaseVersions = ['0.1.0', '0.2.0', '0.3.0'];
+const sharedReleaseReason = (hash: string): string =>
+  `Immutable shared historical release input; releases 0.1.0, 0.2.0 and 0.3.0 pin SHA-256 ${hash}.`;
+
 const javascriptExtension = /\.(?:js|mjs|cjs|jsx)$/u;
 const releasePath = /^releases\/web-decision-(\d+\.\d+\.\d+)\//u;
 const acceptedReasonPrefixes = [
@@ -59,6 +75,13 @@ function isExactJavaScriptPath(path: string): boolean {
 
 function validateExceptionReason(exception: JavaScriptException): string | null {
   const {path, reason} = exception;
+  const sharedHash = sharedReleaseInputHashes.get(path);
+  if (sharedHash)
+    return reason === sharedReleaseReason(sharedHash)
+      ? null
+      : `Exception ${path} must retain its exact shared release pin.`;
+  if (reason.startsWith('Immutable shared historical release input;'))
+    return `Exception ${path} is not a pinned shared release input.`;
   const prefix = acceptedReasonPrefixes.find((candidate) => reason.startsWith(candidate));
   if (!prefix || reason.trim().length < 32) {
     return `Exception ${path} needs an exact path and a specific historical, generated, upstream, or browser-build reason.`;
@@ -170,7 +193,11 @@ export function validateTypeScriptMigrationPolicy(
       currentPaths,
       context.previousPolicy ? previousManaged : context.seedJavaScriptPaths,
       new Set(
-        policy.exceptions.filter(({reason}) => reason.startsWith('Immutable historical release ')).map(({path}) => path)
+        policy.exceptions
+          .filter(
+            ({path, reason}) => reason.startsWith('Immutable historical release ') || sharedReleaseInputHashes.has(path)
+          )
+          .map(({path}) => path)
       )
     )
   ];
@@ -233,7 +260,12 @@ function exceptionPathProblems(
   const problems: string[] = [];
   for (const [path, reason] of exceptionPaths) {
     if (!currentPaths.has(path)) problems.push(`${path} is stale in exceptions; remove the missing exception entry.`);
-    if (!previousExceptions.has(path) && seedJavaScriptPaths.has(path) && !path.startsWith('releases/')) {
+    if (
+      !previousExceptions.has(path) &&
+      seedJavaScriptPaths.has(path) &&
+      !path.startsWith('releases/') &&
+      !sharedReleaseInputHashes.has(path)
+    ) {
       problems.push(`${path} was in the original inventory; it cannot be newly exempted from migration.`);
     }
     if (previousPolicy && previousExceptions.has(path) && previousExceptions.get(path) !== reason) {
@@ -366,6 +398,42 @@ function defaultBaseCommit(root: string, policy: TypeScriptMigrationPolicy): str
   return resolveCommit(root, policy.baselineCommit);
 }
 
+/** Verify immutable shared inputs and the release locks that reference them. */
+export function checkSharedReleaseInputs(root: string): string[] {
+  const problems: string[] = [];
+  for (const [path, expectedHash] of sharedReleaseInputHashes) {
+    try {
+      const actualHash = createHash('sha256')
+        .update(readFileSync(join(root, path)))
+        .digest('hex');
+      if (actualHash !== expectedHash) problems.push(`${path} differs from its historical release hash.`);
+    } catch {
+      problems.push(`${path} is missing from the historical release inputs.`);
+    }
+    for (const version of sharedReleaseVersions) checkSharedReleaseLock(root, version, path, expectedHash, problems);
+  }
+  return problems;
+}
+
+function checkSharedReleaseLock(
+  root: string,
+  version: string,
+  path: string,
+  expectedHash: string,
+  problems: string[]
+): void {
+  const lockPath = `releases/web-decision-${version}/source-lock.json`;
+  try {
+    const lock: unknown = JSON.parse(readFileSync(join(root, lockPath), 'utf8'));
+    const files = isRecord(lock) && Array.isArray(lock.files) ? lock.files.filter(isRecord) : [];
+    const matching = files.filter((entry) => entry.path === path);
+    if (matching.length !== 1 || matching[0]?.sha256 !== expectedHash)
+      problems.push(`${lockPath} does not pin the expected ${path} hash.`);
+  } catch {
+    problems.push(`${lockPath} cannot be read as a historical release lock.`);
+  }
+}
+
 export function checkTypeScriptMigration(
   root: string,
   options: {baseRef?: string; requireComplete?: boolean} = {}
@@ -381,6 +449,7 @@ export function checkTypeScriptMigration(
     requireComplete: options.requireComplete ?? false
   };
   const result = validateTypeScriptMigrationPolicy(policy, context);
+  result.problems.push(...checkSharedReleaseInputs(root));
   if (context.requireComplete) {
     for (const path of discoverInlineJavaScriptPaths(root)) {
       result.problems.push(`${path} contains inline JavaScript; move it to a TypeScript module.`);
