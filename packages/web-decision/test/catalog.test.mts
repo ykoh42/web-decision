@@ -51,7 +51,7 @@ test('catalog description retains the existing Kev contract and narrows bundle v
   const {model, ...expected} = structuredClone(legacy);
   assert.equal(model, entry.modelId);
   expected.verification.currentBundleGpu = 'not-revalidated';
-  expected.verification.priorEvidence = entry.description.verification.priorEvidence;
+  expected.verification.priorEvidence = entry.description.verification.priorEvidence!;
   expected.assets.requiredFiles = ['manifest.json', ...Object.keys(entry.artifacts.manifest.files)];
 
   assert.equal(adapter, 'kev06');

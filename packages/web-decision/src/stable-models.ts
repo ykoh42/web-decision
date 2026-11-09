@@ -30,7 +30,7 @@ export function isStableModelId(value: unknown): value is StableModelId {
 
 export function describeStableModel(modelId: unknown) {
   if (!isStableModelId(modelId)) throw new WebDecisionError('INVALID_INPUT', 'Unsupported stable decision model.');
-  return descriptions[modelId];
+  return descriptions[modelId]!;
 }
 
 export function normalizeStableModelOptions(options: unknown) {

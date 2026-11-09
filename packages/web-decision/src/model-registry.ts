@@ -144,10 +144,62 @@ import {
   VERDICT_TOTAL_BYTES
 } from './verdict/contract.mjs';
 
+type Limit = {resource: string; scope: string; min?: number; max?: number; description?: string};
+type Checkpoint = {repository: string; revision: string; [key: string]: unknown};
+type Assets = {integrity: string; location?: string; [key: string]: unknown};
+type ChoiceOptions = {
+  tokenLimits: readonly Limit[];
+  maxQuestions?: number | undefined;
+  minOptions?: number | undefined;
+  maxOptions?: number | null | undefined;
+  maxOptionsDescription?: string | undefined;
+  maxQuestionsDescription?: string | undefined;
+  maxTotalOptions?: number | undefined;
+  maxTotalOptionsDescription?: string | undefined;
+  handling: string;
+  tokenCount: string;
+  abstention?: string | undefined;
+  scoreBasis?: string | undefined;
+  temperature: unknown;
+  temperatureAppliedBy?: string | undefined;
+};
+type RegistrationOptions = Omit<ChoiceOptions, 'tokenLimits'> & {
+  family: string;
+  model: string;
+  precision: string;
+  checkpoint: Checkpoint;
+  assets: Assets;
+  requiredFiles: readonly string[];
+  limits: readonly Limit[];
+  typedTextQuestionTypes?: readonly string[] | undefined;
+  selectiveAction?: unknown;
+  requiredLimits?: Readonly<Record<string, number>> | undefined;
+  requiresNonFallbackAdapter?: boolean | undefined;
+  backend?: string | undefined;
+  gpuVerification?: string | undefined;
+  cpuWasmVerification?: string | undefined;
+  javascriptVerification?: string | undefined;
+  additionalFiles?: string | undefined;
+  priorEvidence?: string | undefined;
+  modelTerms?: string | undefined;
+  modelLicenseUrl?: string | undefined;
+  sourceModelCard?: string | undefined;
+};
+type TamevProfile = typeof TAMEV_MICRO_PROFILE | typeof TAMEV_NANO_PROFILE | typeof TAMEV_NANO_FLASH_PROFILE;
+type SkejjaProfile = {
+  readonly model: string;
+  readonly repository: string;
+  readonly revision: string;
+  readonly files: Readonly<Record<string, {readonly sha256: string}>>;
+  readonly onnxFile: string;
+  readonly maxChoices: number;
+  readonly temperature: number;
+};
+
 const DEFAULT_MODEL = 'kev-0.6b-q4f16';
 const STRANDS_MODEL = 'experimental-strands-qwen-2b-fp16';
 
-function deepFreeze(value) {
+function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);
@@ -155,7 +207,7 @@ function deepFreeze(value) {
   return value;
 }
 
-function tokenLimit(scope, max, description) {
+function tokenLimit(scope: string, max: number, description: string): Limit {
   return {resource: 'tokens', scope, max, description};
 }
 
@@ -174,7 +226,7 @@ function choice({
   scoreBasis = 'choices',
   temperature,
   temperatureAppliedBy
-}) {
+}: ChoiceOptions) {
   return {
     status: 'implemented',
     abstention,
@@ -212,7 +264,7 @@ function choice({
   };
 }
 
-function bindingLimits(bytes) {
+function bindingLimits(bytes: number) {
   return {maxBufferSize: bytes, maxStorageBufferBindingSize: bytes, maxStorageBuffersPerShaderStage: 8};
 }
 
@@ -250,7 +302,7 @@ function registration({
   modelTerms = 'separate-review-required',
   modelLicenseUrl,
   sourceModelCard
-}) {
+}: RegistrationOptions) {
   return deepFreeze({
     family,
     description: {
@@ -355,7 +407,7 @@ const kevFiles = [
 ];
 const textGraphFiles = ['manifest.json', 'model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'weights/index.json'];
 
-function decimaRegistration(spec) {
+function decimaRegistration(spec: import('./decima/contract.mjs').DecimaModelSpec) {
   const stateLimit =
     spec.stateOverflow === 'reject'
       ? 'longer input is rejected before inference.'
@@ -386,7 +438,7 @@ function decimaRegistration(spec) {
   });
 }
 
-function tamevRegistration(profile, cpuWasmVerification) {
+function tamevRegistration(profile: TamevProfile, cpuWasmVerification: string) {
   return registration({
     family: 'tamev',
     model: profile.model,
@@ -418,7 +470,7 @@ function tamevRegistration(profile, cpuWasmVerification) {
   });
 }
 
-function skejjaRegistration(profile, cpuWasmVerification) {
+function skejjaRegistration(profile: SkejjaProfile, cpuWasmVerification: string) {
   return registration({
     family: 'skejja',
     model: profile.model,
@@ -426,7 +478,7 @@ function skejjaRegistration(profile, cpuWasmVerification) {
     checkpoint: {
       repository: profile.repository,
       revision: profile.revision,
-      graphSha256: profile.files[profile.onnxFile].sha256
+      graphSha256: profile.files[profile.onnxFile]!.sha256
     },
     assets: {integrity: 'pinned-files'},
     requiredFiles: Object.keys(profile.files),
@@ -457,7 +509,7 @@ function skejjaRegistration(profile, cpuWasmVerification) {
   });
 }
 
-function ettinRegistration(cpuWasmVerification) {
+function ettinRegistration(cpuWasmVerification: string) {
   return registration({
     family: 'ettin',
     model: ETTIN_PROFILE.model,
@@ -465,7 +517,7 @@ function ettinRegistration(cpuWasmVerification) {
     checkpoint: {
       repository: ETTIN_PROFILE.repository,
       revision: ETTIN_PROFILE.revision,
-      graphSha256: ETTIN_FILES['model_int8.onnx'].sha256
+      graphSha256: ETTIN_FILES['model_int8.onnx']!.sha256
     },
     assets: {integrity: 'pinned-files'},
     requiredFiles: Object.keys(ETTIN_FILES),
@@ -1041,7 +1093,7 @@ const models = [
       checkpoint: {
         repository: CRIVO_REPOSITORY,
         revision: CRIVO_REVISION,
-        graphSha256: spec.files[spec.graphFile].sha256,
+        graphSha256: spec.files[spec.graphFile]!.sha256,
         sourceRepository: CRIVO_SOURCE_REPOSITORY,
         sourceRevision: CRIVO_SOURCE_REVISION
       },
@@ -1075,7 +1127,7 @@ const models = [
 ];
 const h2oDescription = models.find(
   (item) => item.description.model === 'experimental-h2o-lightning-4b-q4f16'
-).description;
+)!.description;
 models.push(
   deepFreeze({
     family: 'h2o',
@@ -1116,7 +1168,7 @@ models.push(
     }
   })
 );
-const nariDescription = models.find((item) => item.description.model === NARI_FULL.model).description;
+const nariDescription = models.find((item) => item.description.model === NARI_FULL.model)!.description;
 models.push(
   deepFreeze({
     family: 'nari',
@@ -1195,7 +1247,7 @@ models.push(
     requiresNonFallbackAdapter: true
   })
 );
-function registerMapika4(model, graphSha256) {
+function registerMapika4(model: string, graphSha256: string) {
   return registration({
     family: 'mapika4b',
     model,
@@ -1222,8 +1274,8 @@ function registerMapika4(model, graphSha256) {
 models.push(registerMapika4(MAPIKA4_MODEL, MAPIKA4_GRAPH_SHA256));
 models.push(registerMapika4(MAPIKA4_DLIGHT_MODEL, MAPIKA4_DLIGHT_GRAPH_SHA256));
 models.push(registerMapika4(MAPIKA4_DLIGHT_ALL_MODEL, MAPIKA4_DLIGHT_ALL_GRAPH_SHA256));
-function registerElephant(model) {
-  const {graphSha256, maxBranchTokens} = elephantVariant(model);
+function registerElephant(model: string) {
+  const {graphSha256, maxBranchTokens} = elephantVariant(model)!;
   return registration({
     family: 'elephant',
     model,
@@ -1374,7 +1426,7 @@ const byName = new Map(models.map((item) => [item.description.model, item]));
 const names = Object.freeze(models.map((item) => item.description.model));
 
 /** A registration is shared by routing and the public, immutable descriptor. */
-export function getModelRegistration(model = DEFAULT_MODEL) {
+export function getModelRegistration(model: unknown = DEFAULT_MODEL) {
   const result = typeof model === 'string' ? byName.get(model) : undefined;
   if (!result) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return result;
@@ -1385,12 +1437,12 @@ export function listDecisionModels() {
   return names;
 }
 
-export function isDecisionModel(value) {
+export function isDecisionModel(value: unknown): value is string {
   return typeof value === 'string' && byName.has(value);
 }
 
 /** No network request or model load is needed. */
-export function describeModel(model) {
+export function describeModel(model: unknown) {
   if (!isDecisionModel(model)) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return getModelRegistration(model).description;
 }
