@@ -23,7 +23,12 @@
     {
       "url": "https://huggingface.co/jaredpalmer/kev-0.6b/resolve/abe7110dedfd68a185839550079bcf7c26f561ac/training_config.json",
       "sha256": "ab20e55cbb832f409de9daf42f868b69be1eb59e51720302b166bc560fd8d240",
-      "scope": "source training configuration; pins the training base revision but not the ONNX conversion inputs"
+      "scope": "source training configuration; records the training base revision and suite-manifest hash, but does not attest the ONNX conversion inputs"
+    },
+    {
+      "url": "https://github.com/jaredpalmer/kev/blob/37cb2f6155afec1054de2cc78dfd7c7dd24a956d/evals/v7/decision-v7/manifest.json",
+      "sha256": "a8f50e481b7d90b97da049e0ff6a01cee2f1ed204aed61a8265af0edbb5514d2",
+      "scope": "frozen source-training manifest; pins the base and ten public dataset revisions and the training-partition digest, but does not attest the ONNX conversion inputs"
     },
     {
       "url": "https://huggingface.co/jaredpalmer/kev-0.6b/resolve/abe7110dedfd68a185839550079bcf7c26f561ac/provenance.json",
