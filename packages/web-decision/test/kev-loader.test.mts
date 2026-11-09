@@ -182,6 +182,7 @@ if (registerHooks) {
   const loaderUrls = new Set([
     new URL('../src/index.js', import.meta.url).href,
     new URL('../src/index.ts', import.meta.url).href,
+    new URL('../src/index.mts', import.meta.url).href,
     new URL('../src/kev-loader.js', import.meta.url).href,
     new URL('../src/kev-loader.ts', import.meta.url).href
   ]);
@@ -208,6 +209,7 @@ if (registerHooks) {
     './kev-gpu.js',
     './assets.js',
     './runtime/tvm.js',
+    './runtime/tvm.generated.mjs',
     './kev06/contract.js',
     './kev06/upstream-source.mjs',
     './model.js',
@@ -233,7 +235,7 @@ if (registerHooks) {
     }
   });
   try {
-    const indexModule: unknown = await import('../src/index.js');
+    const indexModule: unknown = await import('../src/index.mts');
     const rawLoader = isRecord(indexModule) ? indexModule.loadDecisionModel : undefined;
     if (!isRawLoader(rawLoader)) throw new TypeError('The Kev index module did not export loadDecisionModel().');
     loadDecisionModel = async (options) => requireModel(await rawLoader(options));

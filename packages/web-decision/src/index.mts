@@ -1,6 +1,5 @@
 import {Tokenizer} from '@huggingface/tokenizers';
-import {instantiate} from '../../../.toolchains/apache-tvm-src/web/src/runtime.ts';
-import {createPolyfillWASI} from '../../../.toolchains/apache-tvm-src/web/src/compact.ts';
+import {instantiate, createPolyfillWASI} from './runtime/tvm.generated.mjs';
 import {CACHE_NAME} from './assets.js';
 import {WebDecisionError} from './kev.js';
 import {loadExperimentalDeberta} from './deberta/loader.mjs';
@@ -38,21 +37,27 @@ export {WebDecisionError};
 export {describeModel, isDecisionModel, listDecisionModels} from './model-registry.js';
 export {describeStableModel, isStableModelId, listStableModelIds} from './stable-models.js';
 
-function loadRegisteredModel(family, options, description, modelId) {
+function loadRegisteredModel(
+  family: string,
+  options: Record<string, unknown>,
+  description: ReturnType<typeof selectModelRegistration>['description'],
+  modelId: string | undefined
+) {
   const runtimeBindings = {Tokenizer, instantiate, createPolyfillWASI};
-  const loaders = {
+  // Each legacy loader validates its own options and runtime bindings.
+  const loaders: Record<string, () => Promise<unknown>> = {
     kev: () => loadKevDecisionModel(options, description, modelId),
     deberta: () => loadExperimentalDeberta(options),
     mapika: () => loadExperimentalMapika(options),
-    'mapika-q4': () => loadExperimentalMapikaQ4(options),
+    'mapika-q4': () => loadExperimentalMapikaQ4(options as unknown as Parameters<typeof loadExperimentalMapikaQ4>[0]),
     kev08: () => loadExperimentalKev08(options),
     h2o: () => loadH2oCandidate(options, {expectedModel: description.model, runtimeBindings}),
     nari: () => loadNariCandidate(options, {...runtimeBindings, expectedModel: description.model}),
-    imajev: () => loadImajevCandidate(options, runtimeBindings),
-    pplx: () => loadFlashCandidate(options, runtimeBindings),
+    imajev: () => loadImajevCandidate(options, runtimeBindings as unknown as Parameters<typeof loadImajevCandidate>[1]),
+    pplx: () => loadFlashCandidate(options, runtimeBindings as unknown as Parameters<typeof loadFlashCandidate>[1]),
     mapika4b: () => loadMapika4Candidate(options, runtimeBindings),
     elephant: () => loadElephantCandidate(options, runtimeBindings),
-    clef: () => loadClefCandidate(options, runtimeBindings),
+    clef: () => loadClefCandidate(options, runtimeBindings as unknown as Parameters<typeof loadClefCandidate>[1]),
     'opendecider-nano': () => loadOpenDeciderNano(options, runtimeBindings),
     decima: () => loadDecimaModel(options),
     tinydecide: () => loadTinyDecide(options),
@@ -60,8 +65,9 @@ function loadRegisteredModel(family, options, description, modelId) {
     skejja: () => loadSkejja(options),
     ettin: () => loadEttin(options),
     laya: () => loadLayaModel(options),
-    'laya-typed': () => loadLayaTypedDecisionsModel(options),
-    xdecision: () => loadXDecisionModel(options),
+    'laya-typed': () =>
+      loadLayaTypedDecisionsModel(options as unknown as Parameters<typeof loadLayaTypedDecisionsModel>[0]),
+    xdecision: () => loadXDecisionModel(options as unknown as Parameters<typeof loadXDecisionModel>[0]),
     'gliner-mobile': () => loadGlinerMobileModel(options),
     'd1-omni': () => loadD1OmniModel(options),
     verdict: () => loadVerdictModel(options),
@@ -75,10 +81,10 @@ function loadRegisteredModel(family, options, description, modelId) {
         signal: options.signal,
         onProgress: options.onProgress,
         maxPrefetchBytes: options.maxPrefetchBytes,
-        createTokenizer: (data, config) => new Tokenizer(data, config),
-        createRuntime: (wasm) => instantiate(wasm, createPolyfillWASI()),
+        createTokenizer: (data: unknown, config: unknown) => new Tokenizer(data as object, config as object),
+        createRuntime: (wasm: unknown) => instantiate(wasm as ArrayBuffer, createPolyfillWASI()),
         gpuApi: globalThis.navigator?.gpu
-      }),
+      } as unknown as Parameters<typeof loadExperimentalStrandsFromSource>[0]),
     'strands-gemma4': () =>
       loadExperimentalStrandsGemma4FromSource({
         assetsUrl: options.assetsUrl,
@@ -87,10 +93,10 @@ function loadRegisteredModel(family, options, description, modelId) {
         signal: options.signal,
         onProgress: options.onProgress,
         maxPrefetchBytes: options.maxPrefetchBytes,
-        createTokenizer: (data, config) => new Tokenizer(data, config),
-        createRuntime: (wasm) => instantiate(wasm, createPolyfillWASI()),
+        createTokenizer: (data: unknown, config: unknown) => new Tokenizer(data as object, config as object),
+        createRuntime: (wasm: unknown) => instantiate(wasm as ArrayBuffer, createPolyfillWASI()),
         gpuApi: globalThis.navigator?.gpu
-      })
+      } as unknown as Parameters<typeof loadExperimentalStrandsGemma4FromSource>[0])
   };
   const load = loaders[family];
   if (!load) throw new WebDecisionError('INVALID_ASSET', `No loader is registered for ${family}.`);
@@ -98,14 +104,14 @@ function loadRegisteredModel(family, options, description, modelId) {
 }
 
 /** Load a registered decision model, or a stable public ID with model-specific options. */
-export async function loadDecisionModel(options) {
+export async function loadDecisionModel(options: unknown) {
   if (typeof options === 'string')
     throw new WebDecisionError('INVALID_INPUT', 'Pass a stable ID as the modelId property.');
   const stableRequest =
     options && typeof options === 'object' && 'modelId' in options ? normalizeStableModelOptions(options) : undefined;
   if (stableRequest?.modelId === 'kev-0.6b-q4f16' && Object.hasOwn(stableRequest.options, 'assetsUrl'))
     throw new WebDecisionError('INVALID_INPUT', 'assetsUrl is not supported for the stable Kev model ID.');
-  const loadOptions = stableRequest?.options ?? options;
+  const loadOptions = (stableRequest?.options ?? options) as Record<string, unknown>;
   const {family, description} = selectModelRegistration(loadOptions);
   const debertaReadback = loadOptions && Object.getOwnPropertyDescriptor(loadOptions, 'debertaReadback');
   if (
@@ -114,7 +120,9 @@ export async function loadDecisionModel(options) {
     (!Object.hasOwn(debertaReadback, 'value') || debertaReadback.value !== undefined)
   )
     throw new WebDecisionError('INVALID_INPUT', 'debertaReadback is only supported by the DeBERTa model.');
-  const model = await loadRegisteredModel(family, loadOptions, description, stableRequest?.modelId);
+  const model = (await loadRegisteredModel(family, loadOptions, description, stableRequest?.modelId)) as object & {
+    dispose?: () => unknown;
+  };
   try {
     if (stableRequest?.modelId.startsWith('tamev-')) {
       const descriptor = Object.getOwnPropertyDescriptor(model, 'systemOne');
@@ -123,7 +131,7 @@ export async function loadDecisionModel(options) {
       const systemOne = descriptor.value.bind(model);
       Object.defineProperty(model, 'systemOne', {
         ...descriptor,
-        value: async (...args) => ({...(await systemOne(...args)), model: stableRequest.modelId})
+        value: async (...args: unknown[]) => ({...(await systemOne(...args)), model: stableRequest.modelId})
       });
     }
     // Keep route IDs internal to dispatch and expose the stable ID to callers.

@@ -139,6 +139,7 @@
     "src/skejja/source.mts",
     "src/request-fields.mts",
     "src/deberta/loader.mts",
+    "src/index.mts",
     "test/deberta-loader.test.mts",
     "src/model-registry.ts",
     "src/strands/loader.mts",
