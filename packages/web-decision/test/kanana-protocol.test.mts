@@ -3,6 +3,27 @@ import {File} from 'node:buffer';
 import test from 'node:test';
 import {chatTemplate, protocol} from './kanana-core-modules.mjs';
 
+type TestAnswer = {
+  type: string;
+  choice?: string;
+  probabilityEntries?: [string, number][];
+  probabilities?: Record<string, number>;
+  confidence?: number;
+  noul?: number;
+  score?: number;
+  legend?: Record<string, string>;
+};
+type MultiAnswerResult = {
+  model: string;
+  usage: unknown;
+  answerEntries: [string, unknown][];
+  answers: Record<string, TestAnswer> & {'10': TestAnswer; truth: TestAnswer; severity: TestAnswer};
+};
+type OrderedAnswerResult = {
+  answerEntries: [string, unknown][];
+  answers: Record<string, TestAnswer> & {'10': TestAnswer};
+};
+
 const {
   answerKananaQuestion,
   finishKananaSystemOne,
@@ -14,7 +35,7 @@ const {
 const {renderKananaChatTemplate} = chatTemplate;
 
 function choice(
-  criteria = new Map([
+  criteria: unknown = new Map([
     ['billing', 'Billing'],
     ['support', 'Support']
   ])
@@ -64,7 +85,7 @@ test('state format follows Kanana text, JSON and messages rules and preserves im
   assert.throws(
     () => prepareKananaSystemOne(null),
     (error) => {
-      assert.deepEqual(Object.keys(error), ['name', 'code']);
+      assert.deepEqual(Object.keys(error as object), ['name', 'code']);
       return true;
     }
   );
@@ -97,8 +118,8 @@ test('text-only preparation preserves JSON state, question order and the existin
     prepared.questionEntries.map(({id}) => id),
     ['10', '2', 'truth']
   );
-  assert.deepEqual(prepared.questionEntries[0].candidateKeys, ['10', '2']);
-  assert.deepEqual(prepared.questionEntries[1].candidateKeys, ['0', '1', '2']);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateKeys, ['10', '2']);
+  assert.deepEqual(prepared.questionEntries[1]!.candidateKeys, ['0', '1', '2']);
   assert.equal(prepared.temperature, 0.25);
   assert.deepEqual(prepared.images, []);
   assert.deepEqual(prepared.stateImages, []);
@@ -164,7 +185,7 @@ test('text-only preparation rejects inherited images before reading the inherite
     });
   } finally {
     if (previousImages) Object.defineProperty(Object.prototype, 'images', previousImages);
-    else delete Object.prototype.images;
+    else delete (Object.prototype as unknown as Record<string, unknown>).images;
   }
 });
 
@@ -236,7 +257,7 @@ test('text-only preparation rejects an inherited image part type before inspecti
     );
   } finally {
     if (previousType) Object.defineProperty(Object.prototype, 'type', previousType);
-    else delete Object.prototype.type;
+    else delete (Object.prototype as unknown as Record<string, unknown>).type;
   }
 });
 
@@ -270,7 +291,7 @@ test('text-only preparation rejects inherited message content before inspecting 
     );
   } finally {
     if (previousContent) Object.defineProperty(Object.prototype, 'content', previousContent);
-    else delete Object.prototype.content;
+    else delete (Object.prototype as unknown as Record<string, unknown>).content;
   }
 });
 
@@ -288,9 +309,9 @@ test('text-only preparation rejects image entries inherited into sparse message 
     }
   );
   const inheritedImagePart = {type: 'image', image: imageSource};
-  const sparseMessages = [];
+  const sparseMessages: unknown[] = [];
   sparseMessages.length = 1;
-  const sparseContent = [];
+  const sparseContent: unknown[] = [];
   sparseContent.length = 1;
 
   try {
@@ -318,7 +339,7 @@ test('text-only preparation rejects image entries inherited into sparse message 
     );
   } finally {
     if (previousZero) Object.defineProperty(Object.prototype, '0', previousZero);
-    else delete Object.prototype[0];
+    else delete (Object.prototype as unknown as Record<PropertyKey, unknown>)[0];
   }
 });
 
@@ -336,10 +357,10 @@ test('raw browser image sources survive cloning but decoded drawable sources are
   try {
     const blob = new Blob(['blob image'], {type: 'image/png'});
     const file = new File(['file image'], 'photo.png', {type: 'image/png'});
-    const bitmap = new globalThis.ImageBitmap();
-    const imageElement = new globalThis.HTMLImageElement();
-    const canvas = new globalThis.HTMLCanvasElement();
-    const offscreen = new globalThis.OffscreenCanvas();
+    const bitmap = new (globalThis as unknown as Record<string, new () => object>).ImageBitmap!();
+    const imageElement = new (globalThis as unknown as Record<string, new () => object>).HTMLImageElement!();
+    const canvas = new (globalThis as unknown as Record<string, new () => object>).HTMLCanvasElement!();
+    const offscreen = new (globalThis as unknown as Record<string, new () => object>).OffscreenCanvas!();
     const url = new URL('https://example.test/photo.png');
     const sources = [blob, file, url, imageElement];
     const messages = [
@@ -366,11 +387,17 @@ test('raw browser image sources survive cloning but decoded drawable sources are
       prepared.stateImages.map(({image}) => image),
       [imageElement, url.href]
     );
-    assert.strictEqual(prepared.images[0].image, blob);
-    assert.strictEqual(prepared.images[1].image, file);
-    assert.strictEqual(prepared.images[2].image, url.href);
-    assert.strictEqual(prepared.state[0].content[0].image, imageElement);
-    assert.strictEqual(prepared.state[0].content[1].image_url, url.href);
+    assert.strictEqual(prepared.images[0]!.image, blob);
+    assert.strictEqual(prepared.images[1]!.image, file);
+    assert.strictEqual(prepared.images[2]!.image, url.href);
+    assert.strictEqual(
+      (prepared.state as {content: {image?: unknown; image_url?: unknown}[]}[])[0]!.content[0]!.image,
+      imageElement
+    );
+    assert.strictEqual(
+      (prepared.state as {content: {image?: unknown; image_url?: unknown}[]}[])[0]!.content[1]!.image_url,
+      url.href
+    );
 
     for (const source of [bitmap, canvas, offscreen]) {
       assert.throws(
@@ -396,7 +423,7 @@ test('raw browser image sources survive cloning but decoded drawable sources are
     for (const name of names) {
       const descriptor = previous.get(name);
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-      else delete globalThis[name];
+      else delete (globalThis as unknown as Record<string, unknown>)[name];
     }
   }
 });
@@ -430,11 +457,14 @@ test('ordered maps and entry tuples preserve numeric-looking question and choice
     prepared.questionEntries.map(({id}) => id),
     ['10', '2', '1']
   );
-  assert.deepEqual(prepared.questionEntries[0].candidateKeys, ['10', '2', '1']);
-  assert.deepEqual(prepared.questionEntries[0].candidateTexts, ['10: ten', '2: two', '1: one']);
-  assert.deepEqual(prepared.questionEntries[1].candidateKeys, ['0', '1', '2']);
-  assert.deepEqual(prepared.questionEntries[2].candidateKeys, ['false', 'true']);
-  assert.deepEqual([...prepared.questionEntries[0].question.criteria.keys()], ['10', '2', '1']);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateKeys, ['10', '2', '1']);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateTexts, ['10: ten', '2: two', '1: one']);
+  assert.deepEqual(prepared.questionEntries[1]!.candidateKeys, ['0', '1', '2']);
+  assert.deepEqual(prepared.questionEntries[2]!.candidateKeys, ['false', 'true']);
+  assert.deepEqual(
+    [...(prepared.questionEntries[0]!.question as {criteria: Map<string, unknown>}).criteria.keys()],
+    ['10', '2', '1']
+  );
 });
 
 test('Noul fallback candidates match the pinned prompt text', () => {
@@ -447,11 +477,11 @@ test('Noul fallback candidates match the pinned prompt text', () => {
     questions: {truth: {type: 'noul'}}
   });
 
-  assert.deepEqual(withInstructions.questionEntries[0].candidateTexts, [
+  assert.deepEqual(withInstructions.questionEntries[0]!.candidateTexts, [
     'false: No. This is false: Is the claim true?',
     'true: Yes. This is true: Is the claim true?'
   ]);
-  assert.deepEqual(withoutInstructions.questionEntries[0].candidateTexts, ['false: false', 'true: true']);
+  assert.deepEqual(withoutInstructions.questionEntries[0]!.candidateTexts, ['false: false', 'true: true']);
 });
 
 test('plain object maps reject integer-index keys while ordered entries retain their order', () => {
@@ -491,7 +521,7 @@ test('plain object maps reject integer-index keys while ordered entries retain t
       ]
     ]
   });
-  assert.deepEqual(prepared.questionEntries[0].candidateKeys, ['10', '2', '1']);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateKeys, ['10', '2', '1']);
 });
 
 test('query rendering matches Python message, image, extra-field, and option ordering', () => {
@@ -575,10 +605,12 @@ test('query rendering matches Python message, image, extra-field, and option ord
       text: 'after\n{"name":"camera"}\n\n[assistant]\nsecond turn\n{"tool_calls":[{"id":"call-1"}]}\n\nTask:\nchoice\n\nQuestion:\nSelect a route\n\nOptions:\nA: replace\nB: refund: Refund'
     }
   ]);
-  assert.deepEqual(prepared.questionEntries[0].candidateKeys, ['refund', 'replace']);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateKeys, ['refund', 'replace']);
   const [, truthQuery] = renderKananaQueryMessages(prepared, 'truth');
   assert.ok(
-    truthQuery.content[truthQuery.content.length - 1].text.endsWith('\n\nOptions:\nA: false: No\nB: true: Yes')
+    (truthQuery.content[truthQuery.content.length - 1]! as {text: string}).text.endsWith(
+      '\n\nOptions:\nA: false: No\nB: true: Yes'
+    )
   );
 });
 
@@ -603,16 +635,16 @@ test('query input marks only state text editable without changing rendered promp
   const original = renderKananaQueryMessages(prepared, 'route');
   const userContent = input.messages[1].content;
 
-  assert.equal(userContent[0].text, 'State:\n');
+  assert.equal((userContent[0]! as {text: string}).text, 'State:\n');
   assert.deepEqual(
     userContent.filter((part) => part.type === 'image').map(({image}) => image),
     ['attachment.png', 'state.png']
   );
   assert.deepEqual(
-    input.editableUserTextIndexes.map((index) => userContent[index].text),
+    input.editableUserTextIndexes.map((index) => (userContent[index]! as {text?: string}).text),
     ['[user]\n', 'Before image', 'After image']
   );
-  assert.ok(input.editableUserTextIndexes.every((index) => userContent[index].type === 'text'));
+  assert.ok(input.editableUserTextIndexes.every((index) => userContent[index]!.type === 'text'));
   assert.equal(renderKananaChatTemplate(input.messages), renderKananaChatTemplate(original));
 });
 
@@ -621,7 +653,7 @@ test('JSON prompt rendering treats Number as Python float and BigInt as exact in
   assert.equal(unsafeNumber, 9007199254740992);
 
   const prepared = prepareKananaSystemOne({
-    state: new Map([
+    state: new Map<string, unknown>([
       ['fraction', 1],
       ['integralNumber', 2],
       ['exactInteger', 2n],
@@ -640,7 +672,7 @@ test('JSON prompt rendering treats Number as Python float and BigInt as exact in
   const [, user] = renderKananaQueryMessages(prepared, 'route');
 
   assert.ok(
-    user.content[0].text.startsWith(
+    (user.content[0]! as {text: string}).text.startsWith(
       'State:\n{"fraction":1.0,"integralNumber":2.0,"exactInteger":2,"negativeZero":-0.0,' +
         '"unsafeNumber":9007199254740992.0,"fixedSmall":0.0001,"exponentSmall":1e-05,' +
         '"exponentSmallest":1e-06,"fixedLarge":1000000000000000.0,"exponentLarge":1e+16,' +
@@ -652,10 +684,10 @@ test('JSON prompt rendering treats Number as Python float and BigInt as exact in
 test('ordered Map state preserves integer-like keys while plain objects reject them', () => {
   const questions = {route: choice()};
   const ordered = prepareKananaSystemOne({
-    state: new Map([
+    state: new Map<string, unknown>([
       [
         'nested',
-        new Map([
+        new Map<string, unknown>([
           ['10', 10n],
           ['2', -2n]
         ])
@@ -666,10 +698,10 @@ test('ordered Map state preserves integer-like keys while plain objects reject t
   });
 
   assert.equal(
-    renderKananaQueryMessages(ordered, 'route')[1].content[0].text,
+    (renderKananaQueryMessages(ordered, 'route')[1].content[0]! as {text: string}).text,
     'State:\n{"nested":{"10":10,"2":-2},"name":"ordered"}\n\nTask:\nchoice\n\nQuestion:\nSelect a route\n\nOptions:\nA: billing: Billing\nB: support: Support'
   );
-  const plain = {};
+  const plain: Record<string, unknown> = {};
   plain['10'] = 10;
   plain['2'] = 2;
   assert.throws(() => prepareKananaSystemOne({state: plain, questions}), {
@@ -680,7 +712,7 @@ test('ordered Map state preserves integer-like keys while plain objects reject t
 
 test('plain objects with integer-like keys are rejected recursively through arrays', () => {
   const questions = {route: choice()};
-  const nested = {};
+  const nested: Record<string, unknown> = {};
   nested['10'] = 'ten';
   nested['2'] = 'two';
 
@@ -718,9 +750,12 @@ test('query schemas preserve inclusion, hiding, and the complete ordered Score s
   ]);
   const prepared = prepareKananaSystemOne({state: 'state', questions, querySchemas});
 
-  assert.deepEqual([...prepared.questionEntries[0].querySchema.criteria], [['replace', null]]);
-  assert.equal(prepared.questionEntries[1].querySchema, null);
-  assert.deepEqual(prepared.questionEntries[2].querySchema, {
+  assert.deepEqual(
+    [...(prepared.questionEntries[0]!.querySchema as {criteria: Map<string, unknown>}).criteria],
+    [['replace', null]]
+  );
+  assert.equal(prepared.questionEntries[1]!.querySchema, null);
+  assert.deepEqual(prepared.questionEntries[2]!.querySchema, {
     type: 'score',
     criteria: ['low', 'middle', 'high']
   });
@@ -754,25 +789,26 @@ test('query schemas preserve inclusion, hiding, and the complete ordered Score s
 });
 
 test('choice labels reach IU at 255 options and 256 options hide only the query schema', () => {
-  const criteria = (count) => Array.from({length: count}, (_, index) => [String(index), `option ${index}`]);
+  const criteria = (count: number) =>
+    Array.from({length: count}, (_, index): [string, string] => [String(index), `option ${index}`]);
   const atLimit = prepareKananaSystemOne({state: 'state', questions: [['route', choice(criteria(255))]]});
-  const atLimitText = renderKananaQueryMessages(atLimit, 'route')[1]
-    .content.map(({text}) => text ?? '')
+  const atLimitText = (renderKananaQueryMessages(atLimit, 'route')[1].content as {text?: string}[])
+    .map(({text}) => text ?? '')
     .join('');
 
-  assert.equal(atLimit.questionEntries[0].candidateKeys.length, 255);
-  assert.equal(atLimit.questionEntries[0].querySchema.criteria.size, 255);
+  assert.equal(atLimit.questionEntries[0]!.candidateKeys.length, 255);
+  assert.equal((atLimit.questionEntries[0]!.querySchema as {criteria: Map<string, unknown>}).criteria.size, 255);
   assert.ok(atLimitText.includes('\nA: 0: option 0'));
   assert.ok(atLimitText.endsWith('IU: 254: option 254'));
 
   const aboveLimit = prepareKananaSystemOne({state: 'state', questions: [['route', choice(criteria(256))]]});
-  const aboveLimitText = renderKananaQueryMessages(aboveLimit, 'route')[1]
-    .content.map(({text}) => text ?? '')
+  const aboveLimitText = (renderKananaQueryMessages(aboveLimit, 'route')[1].content as {text?: string}[])
+    .map(({text}) => text ?? '')
     .join('');
 
-  assert.equal(aboveLimit.questionEntries[0].candidateKeys.length, 256);
-  assert.equal(aboveLimit.questionEntries[0].candidateKeys[255], '255');
-  assert.equal(aboveLimit.questionEntries[0].querySchema, null);
+  assert.equal(aboveLimit.questionEntries[0]!.candidateKeys.length, 256);
+  assert.equal(aboveLimit.questionEntries[0]!.candidateKeys[255], '255');
+  assert.equal(aboveLimit.questionEntries[0]!.querySchema, null);
   assert.equal(aboveLimitText.includes('\n\nOptions:\n'), false);
 });
 
@@ -896,7 +932,7 @@ test('question validation keeps the pinned Choice, Noul, Score, and description 
       code: 'candidate_collision'
     }
   );
-  const sparseState = [];
+  const sparseState: unknown[] = [];
   sparseState.length = 1;
   assert.throws(() => prepareKananaSystemOne({state: sparseState, questions: {truth: {type: 'noul'}}}), {
     code: 'invalid_json'
@@ -921,10 +957,10 @@ test('Score accepts ten ordered levels and rejects eleven without truncating', (
   });
 
   assert.deepEqual(
-    prepared.questionEntries[0].candidateKeys,
+    prepared.questionEntries[0]!.candidateKeys,
     Array.from({length: 10}, (_, index) => String(index))
   );
-  assert.deepEqual(prepared.questionEntries[0].candidateTexts, tenLevels);
+  assert.deepEqual(prepared.questionEntries[0]!.candidateTexts, tenLevels);
   assert.throws(
     () =>
       prepareKananaSystemOne({
@@ -961,7 +997,7 @@ test('native answers retain model question names, typed fields, and candidate or
     ],
     'kanana-2-v-decide-3b-2611',
     usage
-  );
+  ) as MultiAnswerResult;
 
   assert.equal(result.model, 'kanana-2-v-decide-3b-2611');
   assert.deepEqual(result.usage, usage);
@@ -972,17 +1008,17 @@ test('native answers retain model question names, typed fields, and candidate or
   assert.equal(result.answers['10'].type, 'choice');
   assert.equal(result.answers['10'].choice, '1');
   assert.deepEqual(
-    result.answers['10'].probabilityEntries.map(([key]) => key),
+    result.answers['10'].probabilityEntries!.map(([key]) => key),
     ['10', '2', '1']
   );
   assert.equal(result.answers.truth.type, 'noul');
-  assert.ok(Math.abs(result.answers.truth.noul - 0.9820137900379085) < 1e-12);
+  assert.ok(Math.abs(result.answers.truth.noul! - 0.9820137900379085) < 1e-12);
   assert.equal(result.answers.severity.type, 'score');
-  assert.ok(Math.abs(result.answers.severity.score - 4 / 3) < 1e-12);
+  assert.ok(Math.abs(result.answers.severity.score! - 4 / 3) < 1e-12);
   assert.deepEqual(result.answers.severity.legend, {0: 'low', 1: 'middle', 2: 'high'});
-  assert.ok(Math.abs(result.answers.severity.confidence - 0.25) < 1e-12);
+  assert.ok(Math.abs(result.answers.severity.confidence! - 0.25) < 1e-12);
   assert.deepEqual(
-    result.answers.severity.probabilityEntries.map(([key]) => key),
+    result.answers.severity.probabilityEntries!.map(([key]) => key),
     ['0', '1', '2']
   );
 });
@@ -998,7 +1034,7 @@ test('choice ties select the first candidate in criteria order', () => {
     },
     ['first', 'second'],
     [0, 0]
-  );
+  ) as {choice: string; probabilityEntries: [string, number][]; confidence: number};
 
   assert.equal(answer.choice, 'first');
   assert.deepEqual(answer.probabilityEntries, [
@@ -1028,7 +1064,7 @@ test('ordered result entries preserve integer-key order when JavaScript object k
     billing_units: 3,
     input_tokens: 0,
     output_tokens: 0
-  });
+  }) as OrderedAnswerResult;
 
   assert.deepEqual(
     result.answerEntries.map(([id]) => id),
@@ -1036,14 +1072,14 @@ test('ordered result entries preserve integer-key order when JavaScript object k
   );
   assert.deepEqual(Object.keys(result.answers), ['1', '2', '10']);
   assert.deepEqual(
-    result.answers['10'].probabilityEntries.map(([key]) => key),
+    result.answers['10'].probabilityEntries!.map(([key]) => key),
     ['10', '2', '1']
   );
-  assert.deepEqual(Object.keys(result.answers['10'].probabilities), ['1', '2', '10']);
+  assert.deepEqual(Object.keys(result.answers['10'].probabilities!), ['1', '2', '10']);
 });
 
 test('Noul returns P(true), and answer calculation rejects mismatched candidate rows', () => {
-  const noul = answerKananaQuestion({type: 'noul'}, ['false', 'true'], [-1, 1]);
+  const noul = answerKananaQuestion({type: 'noul'}, ['false', 'true'], [-1, 1]) as {type: string; noul: number};
   assert.equal(noul.type, 'noul');
   assert.ok(Math.abs(noul.noul - 0.8807970779778823) < 1e-12);
   assert.equal(Object.hasOwn(noul, 'confidence'), false);
@@ -1063,9 +1099,17 @@ test('Noul returns P(true), and answer calculation rejects mismatched candidate 
   assert.throws(() => answerKananaQuestion({type: 'choice', criteria: {a: null}}, ['wrong'], [0]), {
     code: 'logits'
   });
-  assert.throws(() => finishKananaSystemOne({questionEntries: []}, [[1]], 'model'), {
-    code: 'logits'
-  });
+  assert.throws(
+    () =>
+      (finishKananaSystemOne as unknown as (...arguments_: unknown[]) => unknown)(
+        {questionEntries: []},
+        [[1]],
+        'model'
+      ),
+    {
+      code: 'logits'
+    }
+  );
   const prepared = prepareKananaSystemOne({state: 'state', questions: {truth: {type: 'noul'}}});
   assert.throws(
     () =>

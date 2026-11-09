@@ -23,6 +23,7 @@
     "test/kanana-image-processing.test.mts",
     "test/kanana-magick-image.test.mts",
     "test/kanana-pnm-image.test.mts",
-    "test/kanana-image-ingress.test.mts"
+    "test/kanana-image-ingress.test.mts",
+    "test/kanana-protocol.test.mts"
   ]
 }
