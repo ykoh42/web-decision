@@ -185,7 +185,6 @@
     "packages/web-decision/test/safedecide-loader.test.mjs",
     "packages/web-decision/test/safedecide-protocol.test.mjs",
     "packages/web-decision/test/safedecide-runner.test.mjs",
-    "packages/web-decision/test/safedecide-tokenizer.test.mjs",
     "packages/web-decision/test/shard-prefetch.test.mjs",
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/strands-device-loss.test.mjs",

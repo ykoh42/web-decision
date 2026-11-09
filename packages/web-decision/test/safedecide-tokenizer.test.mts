@@ -21,20 +21,20 @@ const modelConfig = {
 };
 
 class FakeTokenizer {
-  token_to_id(token) {
+  token_to_id(token: string) {
     return (
-      {'<pad>': 0, '<eos>': 1, '<bos>': 2, '<unk>': 3, '<mask>': 4}[token] ??
-      {a: 5, b: 6, c: 7, x: 5, y: 6, z: 7}[token]
+      ({'<pad>': 0, '<eos>': 1, '<bos>': 2, '<unk>': 3, '<mask>': 4} as Record<string, number>)[token] ??
+      ({a: 5, b: 6, c: 7, x: 5, y: 6, z: 7} as Record<string, number>)[token]
     );
   }
 
-  tokenize(text) {
+  tokenize(text: string) {
     return text ? text.split(' ') : [];
   }
 
   get post_processor() {
     return {
-      post_process(first, second) {
+      post_process(first: string[], second: string[]) {
         return {tokens: ['<bos>', ...first, '<eos>', ...second, '<eos>']};
       }
     };
@@ -42,22 +42,51 @@ class FakeTokenizer {
 }
 
 test('SafeDecide tokenizer adds the checkpoint pair template and maps special token IDs', () => {
-  const tokenizer = createSafeDecideTokenizer(FakeTokenizer, data, config, modelConfig, 8);
+  const tokenizer = createSafeDecideTokenizer(
+    FakeTokenizer as unknown as Parameters<typeof createSafeDecideTokenizer>[0],
+    data,
+    config,
+    modelConfig,
+    8
+  );
   assert.deepEqual(tokenizer.encodePair('a b', 'x'), {inputIds: [2, 5, 6, 1, 5, 1], truncated: false});
   assert.deepEqual(tokenizer.special, {bosId: 2, eosId: 1, padId: 0, maskId: 4});
 });
 
 test('SafeDecide truncates the longer pair from the right while reserving pair special tokens', () => {
-  const tokenizer = createSafeDecideTokenizer(FakeTokenizer, data, config, modelConfig, 6);
+  const tokenizer = createSafeDecideTokenizer(
+    FakeTokenizer as unknown as Parameters<typeof createSafeDecideTokenizer>[0],
+    data,
+    config,
+    modelConfig,
+    6
+  );
   assert.deepEqual(tokenizer.encodePair('a b c', 'x'), {inputIds: [2, 5, 6, 1, 5, 1], truncated: true});
   assert.deepEqual(tokenizer.encodePair('a b c', 'x y z'), {inputIds: [2, 5, 6, 1, 5, 1], truncated: true});
 });
 
 test('SafeDecide tokenizer rejects unexpected vocabulary and special-token mappings', () => {
   const wrong = {...config, pad_token: '<missing>'};
-  assert.throws(() => createSafeDecideTokenizer(FakeTokenizer, data, wrong, modelConfig, 8), {code: 'INVALID_ASSET'});
   assert.throws(
-    () => createSafeDecideTokenizer(FakeTokenizer, {...data, truncation: {max_length: 384}}, config, modelConfig, 8),
+    () =>
+      createSafeDecideTokenizer(
+        FakeTokenizer as unknown as Parameters<typeof createSafeDecideTokenizer>[0],
+        data,
+        wrong,
+        modelConfig,
+        8
+      ),
+    {code: 'INVALID_ASSET'}
+  );
+  assert.throws(
+    () =>
+      createSafeDecideTokenizer(
+        FakeTokenizer as unknown as Parameters<typeof createSafeDecideTokenizer>[0],
+        {...data, truncation: {max_length: 384}},
+        config,
+        modelConfig,
+        8
+      ),
     {code: 'INVALID_ASSET'}
   );
 });

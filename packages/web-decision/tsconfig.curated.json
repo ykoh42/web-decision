@@ -46,6 +46,7 @@
     "test/pplx-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",
     "test/safedecide-source.test.mts",
+    "test/safedecide-tokenizer.test.mts",
     "test/strands-gemma4-runner.test.mts",
     "test/strands-gemma4-session.test.mts",
     "test/strands-loader-entry.test.mts",
