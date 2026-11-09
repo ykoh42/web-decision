@@ -10,21 +10,21 @@ import {
 
 function tokenizer() {
   const pieces = new Map([[2, '<bos>']]);
-  const ids = new Map();
+  const ids = new Map<string, number>();
   let nextId = 10;
   return {
-    encode(text, {add_special_tokens}) {
+    encode(text: string, {add_special_tokens}: {add_special_tokens?: boolean}) {
       const encoded = Array.from(text, (piece) => {
         if (!ids.has(piece)) {
           ids.set(piece, nextId);
           pieces.set(nextId, piece);
           nextId++;
         }
-        return ids.get(piece);
+        return ids.get(piece)!;
       });
       return {ids: add_special_tokens ? [2, ...encoded] : encoded};
     },
-    decode(tokenIds) {
+    decode(tokenIds: number[]) {
       return tokenIds.map((id) => pieces.get(id) ?? '').join('');
     }
   };
@@ -32,21 +32,21 @@ function tokenizer() {
 
 function lineTokenizer() {
   const pieces = new Map([[2, '<bos>']]);
-  const ids = new Map();
+  const ids = new Map<string, number>();
   let nextId = 10;
   return {
-    encode(text, {add_special_tokens}) {
+    encode(text: string, {add_special_tokens}: {add_special_tokens?: boolean}) {
       const encoded = (text.match(/[^\n]+|\n/gu) ?? []).map((piece) => {
         if (!ids.has(piece)) {
           ids.set(piece, nextId);
           pieces.set(nextId, piece);
           nextId++;
         }
-        return ids.get(piece);
+        return ids.get(piece)!;
       });
       return {ids: add_special_tokens ? [2, ...encoded] : encoded};
     },
-    decode(tokenIds) {
+    decode(tokenIds: number[]) {
       return tokenIds.map((id) => pieces.get(id) ?? '').join('');
     }
   };
@@ -73,14 +73,14 @@ test('renders Strands state and typed questions with ordered option spans', () =
   );
 
   assert.equal(packed.rows.length, 3);
-  assert.equal(packed.rows[0].stateText, '<state>\n{\n  "text": "  hello  ",\n  "count": 2\n}\n</state>\n');
+  assert.equal(packed.rows[0]!.stateText, '<state>\n{\n  "text": "  hello  ",\n  "count": 2\n}\n</state>\n');
   assert.equal(
-    packed.rows[0].questionText,
+    packed.rows[0]!.questionText,
     '<question type="choice">\nSelect exactly one option.\nPick a color.\n<options>\n1. red — warm color\n2. blue\n</options>\n</question>\n<answer>'
   );
-  assert.deepEqual(packed.rows[0].options, ['red', 'blue']);
-  assert.equal(packed.rows[1].questionText.includes('1. false\n2. true — yes'), true);
-  assert.equal(packed.rows[2].questionText.includes('1. 0 — low\n2. 1 — medium\n3. 2 — high'), true);
+  assert.deepEqual(packed.rows[0]!.options, ['red', 'blue']);
+  assert.equal(packed.rows[1]!.questionText.includes('1. false\n2. true — yes'), true);
+  assert.equal(packed.rows[2]!.questionText.includes('1. 0 — low\n2. 1 — medium\n3. 2 — high'), true);
   assert.deepEqual(
     packed.rows.map((row) => row.answerIndex),
     packed.rows.map((row) => row.inputIds.length - 1)
@@ -110,9 +110,9 @@ test('renders structured numbers as Python does after parsing the JSON wire', ()
   );
   const expected =
     '[\n    1e-07,\n    1e-05,\n    0.0001,\n    10000000000000000,\n    -1e-07,\n    1e+21,\n    0\n  ]';
-  assert.ok(packed.rows[0].stateText.includes(`"numbers": ${expected}`));
-  assert.ok(packed.rows[0].questionText.includes('1e-07'));
-  assert.ok(packed.rows[0].questionText.includes('10000000000000000'));
+  assert.ok(packed.rows[0]!.stateText.includes(`"numbers": ${expected}`));
+  assert.ok(packed.rows[0]!.questionText.includes('1e-07'));
+  assert.ok(packed.rows[0]!.questionText.includes('10000000000000000'));
   for (const value of [NaN, Infinity, -Infinity]) {
     assert.throws(
       () => packStrandsGemma4Request(tokenizer(), {value}, {pick: {type: 'noul', instructions: 'Valid?'}}),
@@ -137,9 +137,9 @@ test('accepts only pinned Strands content types for option descriptions', () => 
       criteria: {true: {evidence: ['yes', 1]}, false: null}
     }
   });
-  assert.equal(packed.rows[0].questionText.includes('"enabled": true'), true);
-  assert.equal(packed.rows[0].questionText.includes('false'), true);
-  assert.equal(packed.rows[1].questionText.includes('"evidence"'), true);
+  assert.equal(packed.rows[0]!.questionText.includes('"enabled": true'), true);
+  assert.equal(packed.rows[0]!.questionText.includes('false'), true);
+  assert.equal(packed.rows[1]!.questionText.includes('"evidence"'), true);
 
   for (const description of [1, true]) {
     assert.throws(
@@ -163,7 +163,7 @@ test('keeps Unicode option offsets exact, including surrogate pairs', () => {
   const packed = packStrandsGemma4Request(tokenizer(), '상태 🙂', {
     language: {type: 'choice', instructions: 'Choose.', criteria: {日本語: '東アジア', '👩‍💻': 'developer'}}
   });
-  const row = packed.rows[0];
+  const row = packed.rows[0]!;
   assert.equal(row.options[0], '日本語');
   assert.equal(row.options[1], '👩‍💻');
   const prefixLength = row.inputIds.length - Array.from(row.questionText).length;
@@ -261,7 +261,9 @@ test('unpacks mixed typed answers by original question name and model id', () =>
   assert.equal(result.model, 'experimental-strands-gemma4-e2b');
   assert.equal(result.tokenCount, packed.tokenCount);
   assert.deepEqual(Object.keys(result.answers), ['__proto__', 'truth', 'rating']);
-  assert.equal(result.answers.__proto__.choice, 'second');
+  const proto = result.answers.__proto__;
+  assert.ok(proto && proto.type === 'choice');
+  assert.equal(proto.choice, 'second');
   assert.deepEqual(result.answers.truth, {type: 'noul', noul: 0.25});
   assert.deepEqual(result.answers.rating, {
     type: 'score',
@@ -282,7 +284,7 @@ test('never truncates a prompt to fit the pinned context window', () => {
 });
 
 test('keeps choices above 255 options and bounds them by the tokenized context', () => {
-  const choice = (count) => ({
+  const choice = (count: number) => ({
     pick: {
       type: 'choice',
       instructions: 'Pick.',
@@ -293,11 +295,11 @@ test('keeps choices above 255 options and bounds them by the tokenized context',
   assert.doesNotThrow(() => packStrandsGemma4Request(tokenizer(), '', choice(255)));
   assert.doesNotThrow(() => packStrandsGemma4Request(tokenizer(), '', choice(256)));
   const largeChoice = packStrandsGemma4Request(lineTokenizer(), '', choice(1000));
-  assert.equal(largeChoice.rows[0].options.length, 1000);
-  assert.ok(largeChoice.rows[0].inputIds.length < STRANDS_GEMMA4_MAX_LENGTH);
+  assert.equal(largeChoice.rows[0]!.options.length, 1000);
+  assert.ok(largeChoice.rows[0]!.inputIds.length < STRANDS_GEMMA4_MAX_LENGTH);
   assert.throws(() => packStrandsGemma4Request(tokenizer(), '', choice(1)), {code: 'INVALID_INPUT'});
   assert.throws(() => packStrandsGemma4Request(tokenizer(), '', choice(512)), {code: 'INVALID_INPUT'});
-  const score = (count) => ({
+  const score = (count: number) => ({
     rate: {type: 'score', instructions: 'Rate.', criteria: Array.from({length: count}, (_, i) => `level-${i}`)}
   });
   assert.doesNotThrow(() => packStrandsGemma4Request(tokenizer(), '', score(2)));
