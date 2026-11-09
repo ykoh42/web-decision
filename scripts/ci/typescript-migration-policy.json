@@ -20,8 +20,6 @@
     "packages/web-decision/src/decima/protocol.mjs",
     "packages/web-decision/src/decima/runner.mjs",
     "packages/web-decision/src/decima/session.mjs",
-    "packages/web-decision/src/decima/source.mjs",
-    "packages/web-decision/src/decima/tokenizer.mjs",
     "packages/web-decision/src/decima/typed.mjs",
     "packages/web-decision/src/elephant/loader.mjs",
     "packages/web-decision/src/elephant/protocol.mjs",
