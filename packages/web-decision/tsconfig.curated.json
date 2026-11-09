@@ -49,6 +49,7 @@
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
     "test/parameter-upload-count.test.mts",
+    "test/pplx-session.test.mts",
     "test/pplx-source.test.mts",
     "test/pplx-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",

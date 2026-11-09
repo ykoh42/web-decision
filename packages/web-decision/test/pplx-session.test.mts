@@ -13,7 +13,7 @@ const config = {
   maxInputTokens: 512
 };
 const tokenizer = {
-  encode(text) {
+  encode(text: string) {
     if (!text.startsWith('<|im_start|>')) return {ids: [3]};
     return {ids: [1, ...Array.from(text.matchAll(/<\|fim_suffix\|>/g), () => 248062), 2]};
   }
@@ -27,10 +27,10 @@ const request = () => ({
 });
 
 test('runs the whole joint request once and retains question order', async () => {
-  const calls = [],
-    events = [];
+  const calls: Array<{groups: readonly {readonly index: number}[]}> = [],
+    events: string[] = [];
   const runner = {
-    async run(packed) {
+    async run(packed: {groups: readonly {readonly index: number}[]}) {
       calls.push(packed);
       const first = new Float32Array(255),
         second = new Float32Array(255);
@@ -49,7 +49,7 @@ test('runs the whole joint request once and retains question order', async () =>
   const result = await session.decide(request());
   assert.equal(calls.length, 1);
   assert.deepEqual(
-    calls[0].groups.map((group) => group.index),
+    calls[0]!.groups.map((group) => group.index),
     [1, 2]
   );
   assert.deepEqual(
@@ -64,7 +64,7 @@ test('runs the whole joint request once and retains question order', async () =>
 });
 
 test('aborting the caller keeps later inference and disposal behind active work', async () => {
-  let finish,
+  let finish!: () => void,
     started = false,
     calls = 0;
   const runner = {
@@ -72,7 +72,7 @@ test('aborting the caller keeps later inference and disposal behind active work'
       calls++;
       if (calls === 1) {
         started = true;
-        await new Promise((resolve) => {
+        await new Promise<void>((resolve) => {
           finish = resolve;
         });
       }
@@ -105,7 +105,11 @@ test('rejects unsupported request fields and excessive questions before running'
     async releaseCachedMemory() {},
     async dispose() {}
   };
-  const session = createFlashSession({tokenizer, config, runner});
+  const session = createFlashSession({
+    tokenizer,
+    config,
+    runner: runner as unknown as Parameters<typeof createFlashSession>[0]['runner']
+  });
   await assert.rejects(session.decide({...request(), image: 'unsupported'}), {code: 'INVALID_INPUT'});
   await assert.rejects(session.decide({state: 'x', questions: Array(256).fill(request().questions[0])}), {
     code: 'INVALID_INPUT'
@@ -124,7 +128,7 @@ test('a one-option choice returns that option with probability one', async () =>
   };
   const session = createFlashSession({tokenizer, config, runner});
   const result = await session.decide({state: 'record', questions: [{instructions: 'Choose', options: ['only']}]});
-  assert.equal(result.answers[0].selected, 'only');
-  assert.equal(result.answers[0].probabilities[0].probability, 1);
+  assert.equal(result.answers[0]!.selected, 'only');
+  assert.equal(result.answers[0]!.probabilities[0]!.probability, 1);
   await session.dispose();
 });
