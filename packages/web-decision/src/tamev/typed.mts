@@ -1,14 +1,43 @@
 import {WebDecisionError} from '../kev.js';
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+interface TamevTokenRow {
+  readonly ids: readonly number[];
+  readonly truncated: boolean;
+}
+interface TamevTokenizer {
+  encodeContext(text: string): TamevTokenRow;
+  encodeOption(text: string): TamevTokenRow;
+}
+interface TamevQuestion {
+  readonly id: string;
+  readonly type: 'choice' | 'noul' | 'score';
+  readonly instructions: string;
+  readonly labels: readonly string[];
+  readonly options: readonly string[];
+  readonly legend?: readonly unknown[] | undefined;
+}
+interface TamevPreparedQuestion extends TamevQuestion {
+  readonly contextIds: readonly number[];
+  readonly optionRows: readonly (readonly number[])[];
+  readonly tokenCount: number;
+  readonly truncated: boolean;
+}
+interface TamevPrepared {
+  readonly questions: readonly TamevPreparedQuestion[];
+}
+interface TamevResultRow {
+  readonly probabilities: readonly number[];
+}
+
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
 const QUESTION_FIELDS = new Set(['type', 'instructions', 'criteria']);
 
-function stringValue(value) {
+function stringValue(value: unknown): string {
   if (typeof value === 'boolean') return value ? 'True' : 'False';
   return String(value);
 }
 
-export function renderTamevValue(value, indent = 0, stack = new Set()) {
+export function renderTamevValue(value: unknown, indent = 0, stack: Set<object> = new Set()): string {
   const pad = '  '.repeat(indent);
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'boolean') return stringValue(value);
@@ -36,7 +65,7 @@ export function renderTamevValue(value, indent = 0, stack = new Set()) {
   }
 }
 
-function objectEntries(value, label) {
+function objectEntries(value: unknown, label: string): [string, unknown][] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(`${label} must be an object.`);
   return Reflect.ownKeys(value).map((key) => {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -46,12 +75,12 @@ function objectEntries(value, label) {
   });
 }
 
-function questionEntries(questions) {
+function questionEntries(questions: unknown): [string, Record<string, unknown>][] {
   const entries = objectEntries(questions, 'TAMEV questions');
   if (entries.length < 1) throw invalid('TAMEV needs at least one named question.');
   return entries.map(([id, value]) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(`Question ${id} must be an object.`);
-    const fields = Object.create(null);
+    const fields: Record<string, unknown> = Object.create(null);
     for (const [key, item] of objectEntries(value, `Question ${id}`)) {
       if (!QUESTION_FIELDS.has(key)) throw invalid(`Question ${id} has an unsupported field.`);
       fields[key] = item;
@@ -60,23 +89,23 @@ function questionEntries(questions) {
   });
 }
 
-function criteriaObject(criteria, id) {
+function criteriaObject(criteria: unknown, id: string): [string, unknown][] {
   const entries = objectEntries(criteria, `Question ${id} criteria`);
   if (entries.length < 2) throw invalid(`Question ${id} needs at least 2 criteria.`);
   return entries;
 }
 
-function option(label, description) {
+function option(label: string, description: unknown) {
   const rendered = description == null || description === '' ? label : `${label}: ${renderTamevValue(description)}`;
   return {label, rendered};
 }
 
-function truthy(value) {
+function truthy(value: unknown): boolean {
   return value != null && value !== false && value !== 0 && value !== '';
 }
 
-function prepareQuestion(id, question) {
-  if (!['choice', 'noul', 'score'].includes(question.type))
+function prepareQuestion(id: string, question: Record<string, unknown>): TamevQuestion {
+  if (!['choice', 'noul', 'score'].includes(question.type as string))
     throw invalid(`Question ${id} type must be choice, noul or score.`);
   const instructions = question.instructions == null ? '' : renderTamevValue(question.instructions);
   if (question.type === 'choice') {
@@ -93,7 +122,7 @@ function prepareQuestion(id, question) {
   }
   if (question.type === 'noul') {
     const criteria = question.criteria == null ? [] : objectEntries(question.criteria, `Question ${id} criteria`);
-    const values = new Map(criteria);
+    const values = new Map<unknown, unknown>(criteria);
     const falseValue = values.get('false') || values.get('no') || values.get(false);
     const trueValue = values.get('true') || values.get('yes') || values.get(true);
     const no = option('No / False', truthy(falseValue) ? falseValue : null);
@@ -103,7 +132,8 @@ function prepareQuestion(id, question) {
   if (!Array.isArray(question.criteria) || question.criteria.length < 2)
     throw invalid(`Question ${id} score criteria need at least 2 ordered levels.`);
   const criteria = question.criteria.map((value, index) => {
-    if (!Object.hasOwn(question.criteria, index)) throw invalid(`Question ${id} score criteria cannot contain holes.`);
+    if (!Object.hasOwn(question.criteria as object, index))
+      throw invalid(`Question ${id} score criteria cannot contain holes.`);
     return value;
   });
   return {
@@ -116,7 +146,13 @@ function prepareQuestion(id, question) {
   };
 }
 
-export function prepareTamevSystemOne(state, questions, tokenizer) {
+export function prepareTamevSystemOne(
+  state: unknown,
+  questions: unknown,
+  tokenizer: TamevTokenizer,
+  profile?: unknown
+): TamevPrepared;
+export function prepareTamevSystemOne(state: unknown, questions: unknown, tokenizer: TamevTokenizer): TamevPrepared {
   const stateText = typeof state === 'string' ? state : renderTamevValue(state);
   const preparedQuestions = questionEntries(questions).map(([id, question]) => prepareQuestion(id, question));
   return {
@@ -137,25 +173,25 @@ export function prepareTamevSystemOne(state, questions, tokenizer) {
   };
 }
 
-function rounded(value) {
+function rounded(value: number): number {
   return Number(value.toFixed(4));
 }
 
-function firstMaximumIndex(values) {
+function firstMaximumIndex(values: readonly number[]): number {
   let index = 0;
   for (let candidate = 1; candidate < values.length; candidate++) {
-    if (values[candidate] > values[index]) index = candidate;
+    if (values[candidate]! > values[index]!) index = candidate;
   }
   return index;
 }
 
-function choiceConfidence(probabilities, maximumIndex) {
+function choiceConfidence(probabilities: readonly number[], maximumIndex: number): number {
   const count = probabilities.length;
   if (count <= 1) return 1;
-  return rounded((probabilities[maximumIndex] - 1 / count) / (1 - 1 / count));
+  return rounded((probabilities[maximumIndex]! - 1 / count) / (1 - 1 / count));
 }
 
-function scoreConfidence(probabilities) {
+function scoreConfidence(probabilities: readonly number[]): number {
   const mode = firstMaximumIndex(probabilities);
   const expectedDistance = probabilities.reduce(
     (total, probability, index) => total + probability * Math.abs(index - mode),
@@ -164,9 +200,9 @@ function scoreConfidence(probabilities) {
   return rounded(1 - expectedDistance / (probabilities.length - 1));
 }
 
-function finishAnswer(question, probabilities) {
-  if (question.type === 'noul') return {type: 'noul', noul: rounded(probabilities[1])};
-  const values = Object.fromEntries(question.labels.map((label, index) => [label, rounded(probabilities[index])]));
+function finishAnswer(question: TamevPreparedQuestion, probabilities: readonly number[]) {
+  if (question.type === 'noul') return {type: 'noul', noul: rounded(probabilities[1]!)};
+  const values = Object.fromEntries(question.labels.map((label, index) => [label, rounded(probabilities[index]!)]));
   if (question.type === 'choice') {
     const choiceIndex = firstMaximumIndex(probabilities);
     return {
@@ -181,15 +217,15 @@ function finishAnswer(question, probabilities) {
     type: 'score',
     score: rounded(score),
     confidence: scoreConfidence(probabilities),
-    legend: Object.fromEntries(question.legend.map((label, index) => [String(index), label])),
+    legend: Object.fromEntries(question.legend!.map((label, index) => [String(index), label])),
     probabilities: values
   };
 }
 
-export function finishTamevSystemOne(prepared, rows, model) {
+export function finishTamevSystemOne(prepared: TamevPrepared, rows: readonly TamevResultRow[], model: unknown) {
   if (rows.length !== prepared.questions.length) throw new TypeError('TAMEV Micro result rows are incomplete.');
   const answers = Object.fromEntries(
-    prepared.questions.map((question, index) => [question.id, finishAnswer(question, rows[index].probabilities)])
+    prepared.questions.map((question, index) => [question.id, finishAnswer(question, rows[index]!.probabilities)])
   );
   const tokenCount = prepared.questions.reduce((count, question) => count + question.tokenCount, 0);
   return {

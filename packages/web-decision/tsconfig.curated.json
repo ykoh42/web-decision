@@ -96,6 +96,7 @@
     "src/tamev/session.mts",
     "src/tamev/source.mts",
     "src/tamev/tokenizer.mts",
+    "src/tamev/typed.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]

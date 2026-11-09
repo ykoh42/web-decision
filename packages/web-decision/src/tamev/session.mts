@@ -136,14 +136,7 @@ export function createTamevSession({
       requireOpen();
       const signal = readSignal(options, profile);
       signal?.throwIfAborted();
-      const prepared = (
-        prepareTamevSystemOne as unknown as (
-          state: unknown,
-          questions: unknown,
-          tokenizer: TamevTokenizer | null,
-          profile: TamevProfile
-        ) => ReturnType<typeof prepareTamevSystemOne>
-      )(state, questions, tokenizer, profile);
+      const prepared = prepareTamevSystemOne(state, questions, tokenizer as TamevTokenizer, profile);
       const rows = await infer(prepared, signal, false);
       return finishTamevSystemOne(prepared, rows, model);
     },
