@@ -3,9 +3,22 @@ import assert from 'node:assert/strict';
 import {ExperimentalMapikaSession} from '../src/mapika/session.js';
 import {trackRuntime} from '../src/runtime-lifecycle.js';
 
-function setup({clear = () => {}, sync = async () => {}, pop = async () => null} = {}) {
-  const events = [],
-    lifecycle = {loss: null, disposed: false};
+type TestSession = Omit<ExperimentalMapikaSession, 'runtime' | 'lifecycle'> & {
+  runtime: NonNullable<ExperimentalMapikaSession['runtime']> & {lib: {webGPUContext: {copyRawBytesToBuffer(): void}}};
+  lifecycle: NonNullable<ExperimentalMapikaSession['lifecycle']>;
+};
+type TestError = Error & {code: string; cause: Error};
+function setup({
+  clear = () => {},
+  sync = async () => {},
+  pop = async () => null
+}: {
+  clear?: () => void;
+  sync?: () => Promise<void>;
+  pop?: () => Promise<Error | null>;
+} = {}) {
+  const events: string[] = [],
+    lifecycle: {loss: unknown; disposed: boolean} = {loss: null, disposed: false};
   const runtime = {
     beginScope() {
       events.push('begin');
@@ -31,7 +44,7 @@ function setup({clear = () => {}, sync = async () => {}, pop = async () => null}
     }
   };
   const gpu = {
-    pushErrorScope(name) {
+    pushErrorScope(name: string) {
       events.push(`push:${name}`);
     },
     async popErrorScope() {
@@ -39,31 +52,38 @@ function setup({clear = () => {}, sync = async () => {}, pop = async () => null}
       return pop();
     }
   };
-  const session = new ExperimentalMapikaSession({runtime, device, gpu, lifecycle, uncaptured: [], weights: []});
+  const session = new ExperimentalMapikaSession({
+    runtime,
+    device,
+    gpu,
+    lifecycle,
+    uncaptured: [],
+    weights: []
+  } as unknown as ConstructorParameters<typeof ExperimentalMapikaSession>[0]) as TestSession;
   return {session, lifecycle, events};
 }
 
-function configureInference(session) {
-  session.runtime.empty = (shape) => ({
+function configureInference(session: TestSession) {
+  session.runtime.empty = (shape: number[]) => ({
     byteOffset: 0,
     getDataPtr: () => 0,
     copyFrom() {
       return this;
     },
-    toArray: () => new Float32Array(shape[1] * 255)
+    toArray: () => new Float32Array(shape[1]! * 255)
   });
   session.runtime.cpu = () => 'cpu';
   session.runtime.lib = {webGPUContext: {copyRawBytesToBuffer() {}}};
   session.fn = () => ({});
-  session.limits = {temperature: 1};
+  session.limits = {temperature: 1} as typeof session.limits;
   return {ids: [1, 2], groups: [{slot: 1, options: ['a', 'b']}]};
 }
 
 test('a failed inference waits for fallback synchronization before closing its scope', async () => {
-  let finish,
-    calls = 0,
+  let finish!: () => void;
+  let calls = 0,
     settled = false;
-  const wait = new Promise((resolve) => {
+  const wait = new Promise<void>((resolve) => {
     finish = resolve;
   });
   const cause = new Error('initial sync failed');
@@ -76,8 +96,8 @@ test('a failed inference waits for fallback synchronization before closing its s
   const pending = session
     .run(configureInference(session))
     .then(
-      () => ({ok: true}),
-      (error) => ({ok: false, error})
+      () => ({ok: true as const}),
+      (error: unknown) => ({ok: false as const, error})
     )
     .then((outcome) => {
       settled = true;
@@ -93,16 +113,16 @@ test('a failed inference waits for fallback synchronization before closing its s
   }
   const outcome = await pending;
   assert.equal(outcome.ok, false);
-  assert.equal(outcome.error.cause, cause);
+  assert.equal((outcome.error as TestError).cause, cause);
   assert.ok(events.includes('end'));
   await session.dispose();
 });
 
 test('queued work and disposal wait for the fallback sync after a pre-sync failure', async () => {
-  let finish,
-    clears = 0,
+  let finish!: () => void;
+  let clears = 0,
     syncs = 0;
-  const wait = new Promise((resolve) => {
+  const wait = new Promise<void>((resolve) => {
     finish = resolve;
   });
   const cause = new Error('clear failed after submitting work');
@@ -115,8 +135,8 @@ test('queued work and disposal wait for the fallback sync after a pre-sync failu
     }
   });
   const first = session.releaseCachedMemory().then(
-    () => ({ok: true}),
-    (error) => ({ok: false, error})
+    () => ({ok: true as const}),
+    (error: unknown) => ({ok: false as const, error})
   );
   await new Promise((resolve) => setImmediate(resolve));
   const second = session.releaseCachedMemory(),
@@ -131,7 +151,7 @@ test('queued work and disposal wait for the fallback sync after a pre-sync failu
   }
   const outcome = await first;
   assert.equal(outcome.ok, false);
-  assert.equal(outcome.error.cause, cause);
+  assert.equal((outcome.error as TestError).cause, cause);
   await second;
   await disposal;
   assert.equal(clears, 2);
@@ -150,7 +170,10 @@ test('preserves a falsy work failure if fallback synchronization also rejects', 
   });
   await assert.rejects(
     session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && error.cause === false
+    (error) =>
+      (error as TestError).code === 'INFERENCE_ERROR' &&
+      Object.hasOwn(error as object, 'cause') &&
+      (error as {cause: unknown}).cause === false
   );
   assert.equal(events.filter((event) => event === 'sync').length, 1);
   assert.ok(events.includes('end'));
@@ -158,7 +181,7 @@ test('preserves a falsy work failure if fallback synchronization also rejects', 
 });
 
 test('skips fallback synchronization if the device is already lost', async () => {
-  let fixture;
+  let fixture!: ReturnType<typeof setup>;
   const cause = new Error('work failed');
   fixture = setup({
     clear: () => {
@@ -166,14 +189,14 @@ test('skips fallback synchronization if the device is already lost', async () =>
       throw cause;
     }
   });
-  await assert.rejects(fixture.session.releaseCachedMemory(), (error) => error.cause === cause);
+  await assert.rejects(fixture.session.releaseCachedMemory(), (error) => (error as TestError).cause === cause);
   assert.ok(!fixture.events.includes('sync'));
   await fixture.session.dispose();
 });
 
 test('releases cached memory in queue order and disposes only after work settles', async () => {
-  let finish;
-  const wait = new Promise((resolve) => {
+  let finish!: () => void;
+  const wait = new Promise<void>((resolve) => {
     finish = resolve;
   });
   const {session, events} = setup({sync: () => wait});
@@ -204,7 +227,7 @@ test('reports GPU validation and device loss without poisoning disposal', async 
     first = setup({pop: async () => validation});
   await assert.rejects(
     first.session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && error.cause === validation
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && (error as TestError).cause === validation
   );
   assert.ok(first.events.includes('end'));
   await first.session.dispose();
@@ -213,15 +236,15 @@ test('reports GPU validation and device loss without poisoning disposal', async 
   lost.lifecycle.loss = {reason: 'unknown'};
   await assert.rejects(
     lost.session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause.message)
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && /lost/.test((error as TestError).cause.message)
   );
   await lost.session.dispose();
   assert.ok(lost.events.includes('dispose'));
 });
 
 test('reports device loss while GPU error scopes are being closed', async () => {
-  let resolveLoss;
-  const lost = new Promise((resolve) => {
+  let resolveLoss!: (info: {reason: string; message?: string}) => void;
+  const lost = new Promise<{reason: string; message?: string}>((resolve) => {
     resolveLoss = resolve;
   });
   let pops = 0;
@@ -238,8 +261,11 @@ test('reports device loss while GPU error scopes are being closed', async () => 
 
   const release = session.releaseCachedMemory();
   await lost;
-  assert.equal(session.lifecycle.loss?.reason, 'unknown');
-  await assert.rejects(release, (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message));
+  assert.equal((session.lifecycle.loss as {reason?: string} | null)?.reason, 'unknown');
+  await assert.rejects(
+    release,
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && /lost/.test((error as TestError).cause?.message)
+  );
   assert.deepEqual(events, ['begin', 'push:out-of-memory', 'push:validation', 'clear', 'sync', 'pop', 'pop', 'end']);
   await session.dispose();
 });
@@ -247,10 +273,10 @@ test('reports device loss while GPU error scopes are being closed', async () => 
 test('does not return a Mapika answer if the device is lost while inference scopes close', async () => {
   const normal = setup();
   const expected = await normal.session.run(configureInference(normal.session));
-  assert.equal(expected.answers[0].selected, 'a');
+  assert.equal(expected.answers[0]!.selected, 'a');
   await normal.session.dispose();
 
-  let lost;
+  let lost!: ReturnType<typeof setup>;
   lost = setup({
     pop: async () => {
       lost.lifecycle.loss = {reason: 'unknown'};
@@ -259,14 +285,14 @@ test('does not return a Mapika answer if the device is lost while inference scop
   });
   await assert.rejects(
     lost.session.run(configureInference(lost.session)),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && /lost/.test((error as TestError).cause?.message)
   );
   await lost.session.dispose();
 });
 
 test('does not close or dispose a runtime again after device loss disposes it during cleanup', async () => {
-  let resolveLoss;
-  const lost = new Promise((resolve) => {
+  let resolveLoss!: (info: {reason: string; message?: string}) => void;
+  const lost = new Promise<{reason: string; message?: string}>((resolve) => {
     resolveLoss = resolve;
   });
   let pops = 0;
@@ -284,7 +310,7 @@ test('does not close or dispose a runtime again after device loss disposes it du
 
   await assert.rejects(
     session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && /lost/.test((error as TestError).cause?.message)
   );
   await session.dispose();
   assert.equal(events.filter((event) => event === 'dispose').length, 1);
@@ -292,7 +318,7 @@ test('does not close or dispose a runtime again after device loss disposes it du
 });
 
 test('preserves an existing validation error if the device is also lost during cleanup', async () => {
-  let fixture;
+  let fixture!: ReturnType<typeof setup>;
   const validation = Error('bad kernel');
   fixture = setup({
     pop: async () => {
@@ -302,7 +328,7 @@ test('preserves an existing validation error if the device is also lost during c
   });
   await assert.rejects(
     fixture.session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && error.cause === validation
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && (error as TestError).cause === validation
   );
   await fixture.session.dispose();
 });
@@ -316,7 +342,10 @@ test('reports and preserves falsy failures from device work and cleanup', async 
     });
     await assert.rejects(
       work.session.releaseCachedMemory(),
-      (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, cause)
+      (error) =>
+        (error as TestError).code === 'INFERENCE_ERROR' &&
+        Object.hasOwn(error as object, 'cause') &&
+        Object.is((error as TestError).cause, cause)
     );
     await work.session.dispose();
 
@@ -327,7 +356,10 @@ test('reports and preserves falsy failures from device work and cleanup', async 
     });
     await assert.rejects(
       pop.session.releaseCachedMemory(),
-      (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, cause)
+      (error) =>
+        (error as TestError).code === 'INFERENCE_ERROR' &&
+        Object.hasOwn(error as object, 'cause') &&
+        Object.is((error as TestError).cause, cause)
     );
     await pop.session.dispose();
 
@@ -338,7 +370,10 @@ test('reports and preserves falsy failures from device work and cleanup', async 
     };
     await assert.rejects(
       end.session.releaseCachedMemory(),
-      (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, cause)
+      (error) =>
+        (error as TestError).code === 'INFERENCE_ERROR' &&
+        Object.hasOwn(error as object, 'cause') &&
+        Object.is((error as TestError).cause, cause)
     );
     end.session.runtime.endScope = endScope;
     await end.session.dispose();
@@ -356,13 +391,16 @@ test('keeps the first failure even if its cause is falsy', async () => {
   });
   await assert.rejects(
     fixture.session.releaseCachedMemory(),
-    (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && error.cause === null
+    (error) =>
+      (error as TestError).code === 'INFERENCE_ERROR' &&
+      Object.hasOwn(error as object, 'cause') &&
+      (error as TestError).cause === null
   );
   await fixture.session.dispose();
 });
 
 test('keeps an uncaptured GPU error reported during cleanup ahead of device loss', async () => {
-  let fixture;
+  let fixture!: ReturnType<typeof setup>;
   fixture = setup({
     pop: async () => {
       fixture.lifecycle.loss = {reason: 'unknown'};

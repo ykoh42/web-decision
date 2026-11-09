@@ -16,7 +16,6 @@
     "packages/web-decision/test/imajev-candidate-loader.test.mjs",
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
-    "packages/web-decision/test/mapika-session.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/nari-upload.test.mjs",
     "packages/web-decision/test/skejja.test.mjs",
