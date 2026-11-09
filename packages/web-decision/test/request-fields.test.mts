@@ -11,6 +11,8 @@ import type {KevTokenizer} from '../src/kev.js';
 
 type TestQuestion = {instructions: string; options: string[]; [field: string]: unknown};
 type TestRequest = {state: string; questions: TestQuestion[]; [field: string]: unknown};
+type TestSnapshot = {state: unknown; questions: Array<{instructions: unknown; options: unknown}>};
+type TextChoiceSnapshot = {state: string; questions: Array<{instructions: string; options: string[]}>};
 const makeRequest = (): TestRequest => ({state: 'text', questions: [{instructions: 'Choose', options: ['A', 'B']}]});
 const isInvalid = {code: 'INVALID_INPUT'};
 
@@ -214,7 +216,7 @@ test('data-only preflight enforces exact token, character, option, and question 
     2,
     2,
     validation
-  );
+  ) as TextChoiceSnapshot;
   assert.equal(exact.questions[0]!.options.length, 2);
 
   // oxlint-disable-next-line unicorn/no-new-array -- Preserve sparse entries for the validation fixture.
@@ -264,8 +266,8 @@ test('data-only preflight enforces exact token, character, option, and question 
     Infinity,
     Infinity,
     validation
-  );
-  assert.equal(nonArray.questions[0].options, 'later validation');
+  ) as TestSnapshot;
+  assert.equal(nonArray.questions[0]!.options, 'later validation');
 
   assert.throws(
     () =>
@@ -306,7 +308,8 @@ test('data-only preflight enforces exact token, character, option, and question 
     isInvalid
   );
   assert.equal(
-    validateRequestFields({state: 's', questions: [{instructions: 'i', options: null}]}).questions[0].options,
+    (validateRequestFields({state: 's', questions: [{instructions: 'i', options: null}]}) as TestSnapshot).questions[0]!
+      .options,
     null
   );
 });
@@ -355,7 +358,13 @@ test('Kev applies an explicitly configured character safety cap before tokenizat
     state: 's'.repeat(maxInputCharacters - 4) + '😀',
     questions: [{instructions: 'i', options: ['o']}]
   };
-  const checked = validateRequestFields(request, Infinity, maxInputCharacters, Infinity, KEV_MAX_OPTIONS);
+  const checked = validateRequestFields(
+    request,
+    Infinity,
+    maxInputCharacters,
+    Infinity,
+    KEV_MAX_OPTIONS
+  ) as TextChoiceSnapshot;
   assert.equal(
     checked.state.length + checked.questions[0]!.instructions.length + checked.questions[0]!.options[0]!.length,
     maxInputCharacters
@@ -422,7 +431,9 @@ test('Kev preserves the upstream 255-option limit and checks packed marker budge
 
 test('Kev does not impose a character cap unless the caller configures one', () => {
   const state = 's'.repeat(65_537);
-  const checked = validateRequestFields({state, questions: [{instructions: 'choose', options: ['yes']}]});
+  const checked = validateRequestFields({state, questions: [{instructions: 'choose', options: ['yes']}]}) as {
+    state: string;
+  };
   assert.equal(checked.state.length, state.length);
 });
 
@@ -448,8 +459,8 @@ test('model-specific option limits are checked before reading entries', () => {
     const request = makeRequest();
     request.questions[0]!.options = choices;
     const checked = validateRequestFields(request, Infinity, Infinity, Infinity, 255);
-    assert.deepEqual(checked.questions[0].options, choices);
-    assert.notEqual(checked.questions[0].options, choices);
+    assert.deepEqual(checked.questions[0]!.options, choices);
+    assert.notEqual(checked.questions[0]!.options, choices);
   }
   const choices = Array.from({length: 256}, (_, i) => `option ${i}`);
   let reads = 0;
@@ -469,7 +480,7 @@ test('the shared request snapshot does not impose an option cap when a model dec
   const options = Array.from({length: 256}, (_, index) => `option ${index}`);
   const request = makeRequest();
   request.questions[0]!.options = options;
-  assert.equal(validateRequestFields(request).questions[0]!.options.length, 256);
+  assert.equal((validateRequestFields(request) as TextChoiceSnapshot).questions[0]!.options.length, 256);
 });
 
 test('guarded existing packers keep ordinary packed output unchanged; unsupported fields fail before tokenizer', () => {
@@ -499,7 +510,7 @@ test('guarded existing packers keep ordinary packed output unchanged; unsupporte
     const request = makeRequest(),
       before = pack(request),
       snapshot = validateRequestFields(request);
-    assert.deepEqual(pack(snapshot), before);
+    assert.deepEqual(pack(snapshot as TestRequest), before);
     for (const bad of [
       {...request, image: 'ignored'},
       {...request, questions: [{...request.questions[0]!, type: 'score', criteria: 'x'}]}
