@@ -3,25 +3,25 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {loadFakeH2oCandidate, PRELIMINARY_LIMITS} from '../src/h2o/loader.mjs';
 import {createH2oSession} from '../src/h2o/session.mjs';
-import {initializeH2oRuntime, attachH2oRunner} from '../src/h2o/owner.mjs';
+import {initializeH2oRuntime, attachH2oRunner, type H2oTensor} from '../src/h2o/owner.mjs';
 
-const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url)));
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((a, b) => {
+const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url), 'utf8'));
+function deferred<T = void>() {
+  let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((a, b) => {
     resolve = a;
     reject = b;
   });
   return {promise, resolve, reject};
 }
 const tick = () => new Promise((resolve) => setImmediate(resolve));
-async function until(predicate) {
+async function until(predicate: () => boolean) {
   for (let n = 0; n < 20 && !predicate(); n++) await tick();
   assert.ok(predicate());
 }
 function fixture() {
-  const events = [],
-    loss = deferred();
+  const events: string[] = [],
+    loss = deferred<{reason: string}>();
   const gpu = {
     lost: loss.promise,
     destroy() {
@@ -34,7 +34,7 @@ function fixture() {
       return null;
     }
   };
-  const context = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+  const context = {pendingGPUToCPUCopy: null as Promise<void> | null, copyRawBytesToBuffer() {}};
   const device = {
     async sync() {
       const p = context.pendingGPUToCPUCopy;
@@ -44,7 +44,7 @@ function fixture() {
   };
   const runtime = {
     lib: {webGPUContext: context},
-    initWebGPU(g) {
+    initWebGPU(g: typeof gpu) {
       g.lost.then(
         () => this.dispose(),
         () => {}
@@ -74,7 +74,7 @@ function fixture() {
     getGlobalFunc() {
       return () => {};
     },
-    empty(shape, dtype, where) {
+    empty(shape: number[], dtype: string, where: unknown) {
       return {
         shape,
         dtype,
@@ -126,7 +126,7 @@ function fixture() {
     async preparePlan() {
       return plan;
     },
-    async verifyWasm(bytes) {
+    async verifyWasm(bytes: Uint8Array) {
       return bytes;
     },
     async prepareTokenizer() {
@@ -136,21 +136,21 @@ function fixture() {
       events.push('runtime');
       return runtime;
     },
-    initialize(rt, g) {
+    initialize(rt: Parameters<typeof initializeH2oRuntime>[0], g: Parameters<typeof initializeH2oRuntime>[1]) {
       events.push('initialize');
       return initializeH2oRuntime(rt, g, {teardownTimeoutMs: 15});
     },
-    async upload({owner}) {
+    async upload({owner}: {owner: NonNullable<Parameters<typeof attachH2oRunner>[0]>}) {
       events.push('upload');
       const weights = Array(682).fill({});
-      owner.uploadedWeights = weights;
+      owner.uploadedWeights = weights as H2oTensor[];
       return weights;
     },
-    attach(owner, weights) {
+    attach(owner: Parameters<typeof attachH2oRunner>[0], weights: Parameters<typeof attachH2oRunner>[1]) {
       events.push('attach');
       return attachH2oRunner(owner, weights);
     },
-    async createSession(args) {
+    async createSession(args: Parameters<typeof createH2oSession>[0]) {
       events.push('session');
       return createH2oSession(args);
     },
@@ -175,7 +175,7 @@ test('actual loader fake seam returns real session with observer-backed teardown
 
 test('late device after cancellation is destroyed before runtime or observer exists', async () => {
   const f = fixture(),
-    pending = deferred(),
+    pending = deferred<typeof f.gpu>(),
     controller = new AbortController(),
     reason = Error('stop');
   f.adapter.requestDevice = () => {
@@ -198,7 +198,7 @@ test('late device after cancellation is destroyed before runtime or observer exi
 for (const trigger of ['abort', 'loss'])
   test(`late uninitialized runtime after ${trigger} is disposed by existing loader`, async () => {
     const f = fixture(),
-      pending = deferred(),
+      pending = deferred<typeof f.runtime>(),
       controller = new AbortController(),
       reason = Error('stop');
     f.deps.createRuntime = () => {
@@ -210,7 +210,7 @@ for (const trigger of ['abort', 'loss'])
     if (trigger === 'abort') controller.abort(reason);
     else f.loss.resolve({reason: 'unknown'});
     await assert.rejects(task, (error) =>
-      trigger === 'abort' ? error === reason : error.code === 'MODEL_LOAD_FAILED'
+      trigger === 'abort' ? error === reason : (error as {code: string}).code === 'MODEL_LOAD_FAILED'
     );
     assert.deepEqual(f.events, ['device', 'runtime', 'source-close', 'gpu-destroy']);
     pending.resolve(f.runtime);
@@ -240,11 +240,11 @@ test('load watcher installation failure detaches its caller abort listener', asy
   const signal = controller.signal;
   const add = signal.addEventListener.bind(signal),
     remove = signal.removeEventListener.bind(signal);
-  signal.addEventListener = (...args) => {
+  signal.addEventListener = (...args: Parameters<typeof signal.addEventListener>) => {
     adds++;
     return add(...args);
   };
-  signal.removeEventListener = (...args) => {
+  signal.removeEventListener = (...args: Parameters<typeof signal.removeEventListener>) => {
     removes++;
     return remove(...args);
   };
@@ -263,7 +263,7 @@ test('upload failure and abort retain initialized owner without disposal', async
     const f = fixture(),
       controller = new AbortController(),
       reason = Error('stop');
-    let owner;
+    let owner!: NonNullable<Parameters<typeof attachH2oRunner>[0]>;
     f.deps.upload = async (args) => {
       owner = args.owner;
       f.events.push('upload');
@@ -271,7 +271,7 @@ test('upload failure and abort retain initialized owner without disposal', async
       throw reason;
     };
     await assert.rejects(loadFakeH2oCandidate({...opts, signal: controller.signal}, f.deps), (error) =>
-      mode === 'abort' ? error === reason : error.code === 'MODEL_LOAD_FAILED'
+      mode === 'abort' ? error === reason : (error as {code: string}).code === 'MODEL_LOAD_FAILED'
     );
     assert.equal(owner.disposalGuard.blocked, true);
     assert.deepEqual(f.events, ['device', 'runtime', 'initialize', 'upload', 'source-close']);
@@ -280,13 +280,13 @@ test('upload failure and abort retain initialized owner without disposal', async
 
 test('abort while async session creation is pending waits and then retains attached owner', async () => {
   const f = fixture(),
-    pending = deferred(),
+    pending = deferred<Awaited<ReturnType<typeof createH2oSession>>>(),
     controller = new AbortController(),
     reason = Error('stop');
-  let captured, owner;
+  let captured!: Parameters<typeof createH2oSession>[0], owner!: NonNullable<Parameters<typeof attachH2oRunner>[0]>;
   const attach = f.deps.attach;
   f.deps.attach = (o, weights) => {
-    owner = o;
+    owner = o!;
     return attach(o, weights);
   };
   f.deps.createSession = (args) => {
@@ -311,10 +311,10 @@ test('abort while async session creation is pending waits and then retains attac
 test('failed source close after session attachment retains owner and preserves failure', async () => {
   const f = fixture(),
     reason = Error('source-close failure');
-  let owner;
+  let owner!: NonNullable<Parameters<typeof attachH2oRunner>[0]>;
   const attach = f.deps.attach;
   f.deps.attach = (o, weights) => {
-    owner = o;
+    owner = o!;
     return attach(o, weights);
   };
   f.source.close = async () => {
@@ -323,7 +323,7 @@ test('failed source close after session attachment retains owner and preserves f
   };
   await assert.rejects(
     loadFakeH2oCandidate(opts, f.deps),
-    (error) => error.code === 'MODEL_LOAD_FAILED' && error.cause === reason
+    (error) => (error as {code: string}).code === 'MODEL_LOAD_FAILED' && (error as {cause: unknown}).cause === reason
   );
   assert.equal(owner.disposalGuard.blocked, true);
   assert.deepEqual(f.events, [
@@ -340,7 +340,7 @@ test('failed source close after session attachment retains owner and preserves f
 
 test('invalid uploaded tensors fail actual attachment and retain owner', async () => {
   const f = fixture();
-  let owner;
+  let owner!: NonNullable<Parameters<typeof attachH2oRunner>[0]>;
   f.deps.upload = async (args) => {
     owner = args.owner;
     f.events.push('upload');
