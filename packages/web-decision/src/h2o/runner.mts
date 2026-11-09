@@ -38,17 +38,20 @@ type H2oWebGpuContext = {
 type H2oGraphOutput = {dtype?: unknown; shape?: unknown};
 type H2oScopeRunner = Parameters<typeof withStrandsScope>[0];
 type H2oScopeLease = Parameters<Parameters<typeof withStrandsScope>[2]>[0];
+type H2oLifecycle = NonNullable<H2oScopeRunner['lifecycle']>;
+type H2oDisposalGuard = H2oRuntimeOwner['disposalGuard'];
+type H2oTeardownObserver = {beforeDispose(): unknown; afterDispose(timeoutMs: number): unknown};
 type H2oRunnerOptions = {
-  runtime: H2oRuntime;
+  runtime: unknown;
   device: unknown;
-  gpu: H2oRuntimeOwner['gpu'];
-  fn: H2oRuntimeOwner['fn'];
-  weights: readonly unknown[];
-  lifecycle: NonNullable<H2oScopeRunner['lifecycle']>;
-  disposalGuard: H2oRuntimeOwner['disposalGuard'];
-  uncaptured: readonly unknown[];
-  teardownObserver: {beforeDispose(): unknown; afterDispose(timeoutMs: number): unknown};
-  teardownTimeoutMs: number;
+  gpu: unknown;
+  fn: unknown;
+  weights: unknown;
+  lifecycle: unknown;
+  disposalGuard: unknown;
+  uncaptured: unknown;
+  teardownObserver: unknown;
+  teardownTimeoutMs: unknown;
 };
 
 const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
@@ -177,7 +180,7 @@ export class H2oTvmRunner {
   declare fn: unknown;
   declare weights: unknown[];
   declare lifecycle: H2oScopeRunner['lifecycle'];
-  declare disposalGuard: H2oRunnerOptions['disposalGuard'] | null | undefined;
+  declare disposalGuard: H2oDisposalGuard | null | undefined;
   declare uncaptured: unknown[];
   declare teardownObserver: unknown;
   declare teardownTimeoutMs: unknown;
@@ -209,10 +212,10 @@ export class H2oTvmRunner {
       !lifecycle ||
       !disposalGuard ||
       !Array.isArray(uncaptured) ||
-      typeof teardownObserver?.beforeDispose !== 'function' ||
-      typeof teardownObserver?.afterDispose !== 'function' ||
+      typeof (teardownObserver as {beforeDispose?: unknown} | null | undefined)?.beforeDispose !== 'function' ||
+      typeof (teardownObserver as {afterDispose?: unknown} | null | undefined)?.afterDispose !== 'function' ||
       !Number.isSafeInteger(teardownTimeoutMs) ||
-      teardownTimeoutMs < 1
+      (teardownTimeoutMs as number) < 1
     )
       throw new TypeError('An owned pinned TVM runtime and 682 ordered tensors are required.');
     Object.assign(this, {
@@ -294,24 +297,22 @@ export class H2oTvmRunner {
         const checkBeforeDispose = () => {
           assertUsable(this);
           if (
-            (this.lifecycle as H2oRunnerOptions['lifecycle']).disposed ||
-            (this.lifecycle as H2oRunnerOptions['lifecycle']).loss ||
+            (this.lifecycle as H2oLifecycle).disposed ||
+            (this.lifecycle as H2oLifecycle).loss ||
             this.uncaptured.length
           )
             throw new Error('GPU device failed before H2O disposal.');
         };
-        await (this.teardownObserver as H2oRunnerOptions['teardownObserver']).beforeDispose();
+        await (this.teardownObserver as H2oTeardownObserver).beforeDispose();
         checkBeforeDispose();
         (this.runtime as H2oRunnerRuntime).endScope();
-        await (this.teardownObserver as H2oRunnerOptions['teardownObserver']).beforeDispose();
+        await (this.teardownObserver as H2oTeardownObserver).beforeDispose();
         checkBeforeDispose();
         (this.runtime as H2oRunnerRuntime).dispose();
-        await (this.teardownObserver as H2oRunnerOptions['teardownObserver']).afterDispose(
-          this.teardownTimeoutMs as number
-        );
+        await (this.teardownObserver as H2oTeardownObserver).afterDispose(this.teardownTimeoutMs as number);
         if (
-          (this.lifecycle as H2oRunnerOptions['lifecycle']).loss ||
-          (this.disposalGuard as H2oRunnerOptions['disposalGuard']).blocked ||
+          (this.lifecycle as H2oLifecycle).loss ||
+          (this.disposalGuard as H2oDisposalGuard).blocked ||
           this.uncaptured.length ||
           this.poisoned
         )
@@ -323,7 +324,7 @@ export class H2oTvmRunner {
         this.poisoned = true;
         retained.add(this);
         try {
-          (this.disposalGuard as H2oRunnerOptions['disposalGuard'] | null | undefined)?.retain();
+          (this.disposalGuard as H2oDisposalGuard | null | undefined)?.retain();
         } catch {
           retainStrandsResources(this.runtime, this.gpu);
         }

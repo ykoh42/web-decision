@@ -62,7 +62,6 @@ export class ElephantTvmRunner extends H2oTvmRunner {
   declare device: unknown;
   declare fn: (...args: unknown[]) => ElephantTvmTensor | null | undefined;
   declare weights: unknown[];
-  declare exclusive: <T>(operation: () => Promise<T>) => Promise<T>;
 
   declare private readonly maxBranchTokens: number;
 
