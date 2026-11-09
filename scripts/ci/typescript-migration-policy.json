@@ -4,13 +4,10 @@
   "managedJavaScript": [
     "packages/web-decision/src/crivo/loader.mjs",
     "packages/web-decision/src/crivo/protocol.mjs",
-    "packages/web-decision/src/d1-omni/contract.mjs",
     "packages/web-decision/src/d1-omni/loader.mjs",
     "packages/web-decision/src/d1-omni/protocol.mjs",
     "packages/web-decision/src/d1-omni/runner.mjs",
     "packages/web-decision/src/d1-omni/session.mjs",
-    "packages/web-decision/src/d1-omni/source.mjs",
-    "packages/web-decision/src/d1-omni/tokenizer.mjs",
     "packages/web-decision/src/deberta-single-preview-entry.js",
     "packages/web-decision/src/deberta-single-preview-registry.mjs",
     "packages/web-decision/src/deberta/device.mjs",
