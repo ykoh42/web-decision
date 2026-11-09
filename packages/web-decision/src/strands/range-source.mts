@@ -1,4 +1,5 @@
 import {sha256, waitForAbort} from '../assets.js';
+import type {AssetCache} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {
   MANIFEST_SHA256,
@@ -12,10 +13,93 @@ import {
 import {RangeCacheTransaction} from './range-cache.mjs';
 
 const MAX_SMALL = 20 * 1024 * 1024;
-const invalid = (message) => new WebDecisionError('INVALID_ASSET', message);
-const range = (offset, length, sha256) => Object.freeze({offset, length, sha256});
+const invalid = (message: string) => new WebDecisionError('INVALID_ASSET', message);
 
-const PINNED_SMALL_FILES = Object.freeze([
+type SmallFileId = 'manifest' | 'wasm' | 'tokenizer' | 'tokenizerConfig';
+
+interface SmallRange {
+  readonly offset: number;
+  readonly length: number;
+  readonly sha256: string;
+}
+
+interface SmallFile {
+  readonly id: SmallFileId;
+  readonly path: string;
+  readonly bytes: number;
+  readonly sha256: string;
+  readonly chunks: readonly SmallRange[];
+}
+
+interface RangeSpec {
+  readonly path: string;
+  readonly totalBytes: number;
+  readonly offset: number;
+  readonly length: number;
+  readonly sha256: string;
+}
+
+interface WeightRecord {
+  readonly sourcePath: string;
+  readonly sourceFileBytes: number;
+  readonly sourceOffset: number;
+  readonly chunks: readonly {
+    readonly offset: number;
+    readonly bytes: number;
+    readonly sha256: string;
+  }[];
+}
+
+interface RangeReadResult {
+  readonly bytes: ArrayBuffer;
+  readonly cachedByHash: boolean;
+}
+
+interface TransactionOptions {
+  readonly signal?: AbortSignal | null;
+}
+
+interface RangedSourceTransaction {
+  open(): PromiseLike<unknown>;
+  require(specs: readonly RangeSpec[]): void;
+  read(base: URL, spec: RangeSpec, options?: TransactionOptions): PromiseLike<RangeReadResult>;
+  seal(): void;
+  commit(options?: TransactionOptions): PromiseLike<boolean>;
+}
+
+export interface PinnedRangeSourceOptions {
+  readonly base: URL;
+  readonly cache?: AssetCache | null | undefined;
+  readonly offline?: boolean | undefined;
+  readonly signal?: AbortSignal | null | undefined;
+}
+
+interface OpenRangedSourceOptions {
+  readonly base: URL;
+  readonly cache: AssetCache | null | undefined;
+  readonly offline?: boolean | undefined;
+  readonly signal?: AbortSignal | null | undefined;
+  readonly markerId: string;
+  readonly files: readonly SmallFile[];
+  readonly parseManifest: (bytes: Uint8Array | undefined, signal?: AbortSignal | null) => PromiseLike<unknown>;
+}
+
+interface RangedSourceBytes {
+  readonly manifest?: Uint8Array;
+  readonly wasm?: Uint8Array;
+  readonly tokenizer?: Uint8Array;
+  readonly tokenizerConfig?: Uint8Array;
+}
+
+interface RangedSourceResult {
+  readonly bytes: RangedSourceBytes;
+  readonly manifest: unknown;
+  readonly transaction: RangedSourceTransaction;
+}
+
+const range = (offset: number, length: number, sha256: string): SmallRange => Object.freeze({offset, length, sha256});
+
+const PINNED_SMALL_FILES: readonly SmallFile[] = Object.freeze([
   Object.freeze({
     id: 'manifest',
     path: 'fused-ordered-manifest-4096-candidate-v1.json',
@@ -50,7 +134,7 @@ const PINNED_SMALL_FILES = Object.freeze([
   })
 ]);
 
-function smallRanges(files) {
+function smallRanges(files: readonly SmallFile[]): RangeSpec[] {
   if (
     !Array.isArray(files) ||
     files.length !== 4 ||
@@ -58,7 +142,7 @@ function smallRanges(files) {
     !['manifest', 'wasm', 'tokenizer', 'tokenizerConfig'].every((id) => files.some((file) => file.id === id))
   )
     throw invalid('Unexpected small-asset set.');
-  const specs = [];
+  const specs: RangeSpec[] = [];
   for (const file of files) {
     if (
       !Number.isSafeInteger(file.bytes) ||
@@ -80,9 +164,11 @@ function smallRanges(files) {
   return specs;
 }
 
-function weightRanges(manifest) {
-  if (!Array.isArray(manifest?.records)) throw invalid('Model manifest has no tensor records.');
-  return manifest.records.flatMap((record) =>
+function weightRanges(manifest: unknown): RangeSpec[] {
+  if (!Array.isArray((manifest as {readonly records?: unknown} | null | undefined)?.records))
+    throw invalid('Model manifest has no tensor records.');
+  const records = (manifest as {readonly records: readonly WeightRecord[]}).records;
+  return records.flatMap((record) =>
     record.chunks.map((chunk) => ({
       path: record.sourcePath,
       totalBytes: record.sourceFileBytes,
@@ -93,13 +179,21 @@ function weightRanges(manifest) {
   );
 }
 
-/** Generic composition is exported only for tiny fixtures; production uses the pinned wrapper below. */
-async function openRangedSource({base, cache, offline = false, signal, markerId, files, parseManifest}) {
+/** Generic composition is kept internal; production uses the pinned wrapper below. */
+async function openRangedSource({
+  base,
+  cache,
+  offline = false,
+  signal,
+  markerId,
+  files,
+  parseManifest
+}: OpenRangedSourceOptions): Promise<RangedSourceResult> {
   const small = smallRanges(files),
-    transaction = new RangeCacheTransaction({base, cache, offline, signal, markerId});
+    transaction: RangedSourceTransaction = new RangeCacheTransaction({base, cache, offline, signal, markerId});
   await transaction.open();
   transaction.require(small);
-  const bytes = {};
+  const bytes: Partial<Record<SmallFileId, Uint8Array>> = {};
   for (const file of files) {
     const data = new Uint8Array(file.bytes);
     for (const chunk of file.chunks) {
@@ -123,7 +217,12 @@ async function openRangedSource({base, cache, offline = false, signal, markerId,
   return {bytes, manifest, transaction};
 }
 
-export function openPinnedRangeSource({base, cache, offline, signal}) {
+export function openPinnedRangeSource({
+  base,
+  cache,
+  offline,
+  signal
+}: PinnedRangeSourceOptions): Promise<RangedSourceResult> {
   return openRangedSource({
     base,
     cache,
