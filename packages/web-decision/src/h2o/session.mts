@@ -3,16 +3,49 @@ import {WebDecisionError} from '../kev.js';
 import {waitForAbort} from '../assets.js';
 import {validateDecisionFields, validateRequestFields} from '../request-fields.mjs';
 import {MAX_H2O_OPTIONS, packH2oRequest, unpackH2oScores} from './protocol.mjs';
+import type {H2oPromptTokenizer, H2oRequest, H2oScoreResult, PackedH2oRequest} from './protocol.mjs';
 import {validateH2oSignal} from './signal.mjs';
 
+type H2oGraphInput = {
+  dtype: 'int32' | 'float16';
+  shape: number[];
+  data: Int32Array | Uint16Array;
+};
+type H2oSessionRunner = {
+  run(inputs: H2oGraphInput[]): Promise<unknown>;
+  releaseCachedMemory(): Promise<unknown> | unknown;
+  dispose(): Promise<unknown> | unknown;
+};
+type H2oSessionOptions = {
+  tokenizer: H2oPromptTokenizer | null | undefined;
+  plan: {labels: string[]; labelIds: number[]} | null | undefined;
+  addedTokens: string[] | null | undefined;
+  runner: H2oSessionRunner | null | undefined;
+};
+type H2oDecisionOptions = {signal?: AbortSignal | null | undefined; [key: string]: unknown};
+type ValidateRequestFields = (
+  request: unknown,
+  maxQuestions: number,
+  maxInputCharacters: number,
+  maxInputTokens: number,
+  maxOptions: number
+) => H2oRequest;
+type ValidateDecisionFields = (options: unknown) => void;
+export type H2oSession = {
+  decide(request: H2oRequest | null | undefined, options?: H2oDecisionOptions | null): Promise<H2oScoreResult>;
+  releaseCachedMemory(): Promise<unknown>;
+  dispose(): Promise<void>;
+};
+
 const LABEL_HASH = '3bc0a3b69d62425be332c93e83bce1585fbeb3f4fdd8e0221cf22d0b73f61283';
-const fail = (code, message) => new WebDecisionError(code, message);
-const digest = async (bytes) =>
-  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+const fail = (code: 'INVALID_ASSET' | 'SESSION_CLOSED' | 'INVALID_INPUT' | 'INFERENCE_ERROR', message: string) =>
+  new WebDecisionError(code, message);
+const digest = async (bytes: Uint8Array): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource))]
     .map((x) => x.toString(16).padStart(2, '0'))
     .join('');
 
-function graphInputs(ids) {
+function graphInputs(ids: number[]): H2oGraphInput[] {
   const n = ids.length;
   return [
     {dtype: 'int32', shape: [1, n], data: Int32Array.from(ids)},
@@ -23,7 +56,7 @@ function graphInputs(ids) {
   ];
 }
 
-export async function createH2oSession({tokenizer, plan, addedTokens, runner}) {
+export async function createH2oSession({tokenizer, plan, addedTokens, runner}: H2oSessionOptions): Promise<H2oSession> {
   if (
     !tokenizer ||
     typeof tokenizer.encode !== 'function' ||
@@ -41,31 +74,37 @@ export async function createH2oSession({tokenizer, plan, addedTokens, runner}) {
   if ((await digest(new TextEncoder().encode(JSON.stringify([labels, labelIds])))) !== LABEL_HASH)
     throw fail('INVALID_ASSET', 'Label rows do not match the pinned head.');
   const config = {labels, labelIds, addedTokens: [...addedTokens], maxInputTokens: 512};
-  let queue = Promise.resolve(),
+  let queue: Promise<unknown> = Promise.resolve(),
     closed = false,
-    disposing;
-  const requireOpen = () => {
+    disposing: Promise<void> | undefined;
+  const requireOpen = (): void => {
     if (closed) throw fail('SESSION_CLOSED', 'The model has been disposed.');
   };
-  const enqueue = (task) => {
-    const p = queue.then(task);
+  const enqueue = <T,>(task: () => T | PromiseLike<T>): Promise<T> => {
+    const p = queue.then(task) as Promise<T>;
     queue = p.catch(() => {});
     return p;
   };
   return {
-    async decide(request, options = {}) {
+    async decide(request: H2oRequest | null | undefined, options: unknown = {}): Promise<H2oScoreResult> {
       requireOpen();
-      const signal = options?.signal;
+      const signal = (options as H2oDecisionOptions | null | undefined)?.signal;
       requireOpen();
       if (signal != null) validateH2oSignal(signal);
       requireOpen();
       signal?.throwIfAborted();
       requireOpen();
-      validateDecisionFields(options);
+      (validateDecisionFields as ValidateDecisionFields)(options);
       requireOpen();
-      request = validateRequestFields(request, Infinity, Infinity, Infinity, MAX_H2O_OPTIONS);
+      request = (validateRequestFields as ValidateRequestFields)(
+        request,
+        Infinity,
+        Infinity,
+        Infinity,
+        MAX_H2O_OPTIONS
+      );
       requireOpen();
-      const packed = packH2oRequest(tokenizer, request, config);
+      const packed: PackedH2oRequest = packH2oRequest(tokenizer as H2oPromptTokenizer, request, config);
       requireOpen();
       if (
         packed.questions.some(
@@ -74,18 +113,18 @@ export async function createH2oSession({tokenizer, plan, addedTokens, runner}) {
             ids.length < 2 ||
             ids.length > 512 ||
             Array.from({length: ids.length}, (_, i) => i).some(
-              (i) => !Object.hasOwn(ids, i) || !Number.isSafeInteger(ids[i]) || ids[i] < 0 || ids[i] >= 248320
+              (i) => !Object.hasOwn(ids, i) || !Number.isSafeInteger(ids[i]) || ids[i]! < 0 || ids[i]! >= 248320
             )
         )
       )
         throw fail('INVALID_INPUT', 'Invalid H2O graph input tokens.');
       const run = async () => {
-        const rows = [];
+        const rows: number[][] = [];
         for (const question of packed.questions) {
           signal?.throwIfAborted();
-          let scores;
+          let scores: unknown;
           try {
-            scores = await runner.run(graphInputs(question.ids));
+            scores = await (runner as H2oSessionRunner).run(graphInputs(question.ids));
           } catch (cause) {
             throw new WebDecisionError('INFERENCE_ERROR', 'H2O candidate inference failed.', {cause});
           }
@@ -106,14 +145,14 @@ export async function createH2oSession({tokenizer, plan, addedTokens, runner}) {
     },
     async releaseCachedMemory() {
       if (closed) throw fail('SESSION_CLOSED', 'The model has been disposed.');
-      return enqueue(() => runner.releaseCachedMemory());
+      return enqueue(() => (runner as H2oSessionRunner).releaseCachedMemory());
     },
     dispose() {
       if (disposing) return disposing;
       closed = true;
       disposing = queue.then(async () => {
         try {
-          await runner.dispose();
+          await (runner as H2oSessionRunner).dispose();
         } finally {
           // Closed sessions may remain reachable in application state.
           tokenizer = runner = null;

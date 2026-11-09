@@ -1,12 +1,40 @@
 import {WebDecisionError} from '../kev.js';
 
+export type H2oQuestion = {instructions: string; options: string[]};
+export type H2oRequest = {state: string; questions: H2oQuestion[]};
+export type H2oPromptConfig = {
+  labels: string[];
+  labelIds: number[];
+  addedTokens: string[];
+  maxInputTokens: number;
+};
+export type H2oPromptTokenizer = {
+  encode(text: string, options: {add_special_tokens: false}): {ids: unknown};
+};
+export type PackedH2oQuestion = {
+  prompt: string;
+  ids: number[];
+  labels: string[];
+  options: string[];
+  labelIds: number[];
+};
+export type PackedH2oRequest = {questions: PackedH2oQuestion[]};
+export type H2oScoreResult = {
+  tokenCount: number;
+  answers: Array<{
+    selected: string | undefined;
+    selectedIndex: number;
+    probabilities: Array<{option: string; probability: number; logit: number}>;
+  }>;
+};
+
 const SYSTEM =
   'You are a decision engine. You read a record and answer one question about it by choosing exactly one option. Reply with a single letter.';
 const LOG_FLOOR = Math.log(1e-12);
 export const MAX_H2O_OPTIONS = 255;
 const PY_WHITESPACE = new Set([0x85, 0xa0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000]);
 
-function isPythonWhitespace(code) {
+function isPythonWhitespace(code: number): boolean {
   return (
     (code >= 9 && code <= 13) ||
     (code >= 28 && code <= 32) ||
@@ -15,7 +43,7 @@ function isPythonWhitespace(code) {
   );
 }
 
-function pythonStrip(value, trailing = true) {
+function pythonStrip(value: string, trailing = true): string {
   let first = 0,
     last = value.length;
   while (first < last && isPythonWhitespace(value.charCodeAt(first))) first++;
@@ -23,11 +51,11 @@ function pythonStrip(value, trailing = true) {
   return value.slice(first, last);
 }
 
-function invalid(message) {
+function invalid(message: string): WebDecisionError {
   return new WebDecisionError('INVALID_INPUT', message);
 }
 
-function safeText(value, reserved) {
+function safeText(value: unknown, reserved: string[]): string {
   if (typeof value !== 'string') throw invalid('Text must be a string.');
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
@@ -42,7 +70,7 @@ function safeText(value, reserved) {
   return value;
 }
 
-function validateQuestion(question, index) {
+function validateQuestion(question: H2oQuestion | null | undefined, index: number): void {
   if (!question || typeof question.instructions !== 'string' || !question.instructions.trim())
     throw invalid(`Question ${index} needs instructions.`);
   if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > MAX_H2O_OPTIONS)
@@ -53,7 +81,13 @@ function validateQuestion(question, index) {
     throw invalid(`Question ${index} has duplicate options.`);
 }
 
-function renderQuestion(tokenizer, state, question, index, config) {
+function renderQuestion(
+  tokenizer: H2oPromptTokenizer,
+  state: string,
+  question: H2oQuestion,
+  index: number,
+  config: H2oPromptConfig
+): PackedH2oQuestion {
   validateQuestion(question, index);
   const instructions = pythonStrip(safeText(question.instructions, config.addedTokens), false);
   const options = question.options.map((value) => safeText(value, config.addedTokens));
@@ -61,18 +95,22 @@ function renderQuestion(tokenizer, state, question, index, config) {
   const lines = options.map((option, i) => `${labels[i]}) ${option}: ${option}`);
   const user = pythonStrip(`record: ${state}\nquestion: ${instructions}\noptions:\n${lines.join('\n')}`);
   const prompt = `<|im_start|>system\n${SYSTEM}<|im_end|>\n<|im_start|>user\n${user}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:`;
-  const encoded = tokenizer.encode(prompt, {add_special_tokens: false}).ids;
+  const encoded = (tokenizer.encode(prompt, {add_special_tokens: false}) as {ids: unknown}).ids;
   if (!Array.isArray(encoded)) throw invalid('Invalid token IDs.');
   // Tokenizers may reuse their output buffer. Each question and queued request
   // must keep the tokens produced for its own prompt.
-  const ids = Array.from(encoded);
+  const ids = Array.from(encoded) as number[];
   if (ids.length > config.maxInputTokens) throw invalid('Packed input exceeds the token limit.');
   if (ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= 2 ** 31)) throw invalid('Invalid token IDs.');
   return {prompt, ids, labels, options: [...options], labelIds: config.labelIds.slice(0, options.length)};
 }
 
 /** H2O reads each question as a separate complete prompt and forward pass. */
-export function packH2oRequest(tokenizer, request, config) {
+export function packH2oRequest(
+  tokenizer: H2oPromptTokenizer,
+  request: H2oRequest | null | undefined,
+  config: H2oPromptConfig
+): PackedH2oRequest {
   if (!request || typeof request !== 'object' || Array.isArray(request)) throw invalid('A request is required.');
   if (!Array.isArray(request.questions) || !request.questions.length) throw invalid('Provide at least one question.');
   if (
@@ -92,7 +130,7 @@ export function packH2oRequest(tokenizer, request, config) {
 }
 
 /** Match the upstream pooled readout's log-probability floor and temperature. */
-export function unpackH2oScores(rows, packed, temperature) {
+export function unpackH2oScores(rows: number[][], packed: PackedH2oRequest, temperature: number): H2oScoreResult {
   if (!Number.isFinite(temperature) || temperature <= 0) throw invalid('Invalid temperature.');
   if (
     !Array.isArray(rows) ||
@@ -103,7 +141,7 @@ export function unpackH2oScores(rows, packed, temperature) {
   return {
     tokenCount: packed.questions.reduce((total, question) => total + question.ids.length, 0),
     answers: packed.questions.map(({options}, i) => {
-      const logits = rows[i].slice(0, options.length),
+      const logits = rows[i]!.slice(0, options.length),
         maximum = Math.max(...logits);
       const z = maximum + Math.log(logits.reduce((total, value) => total + Math.exp(value - maximum), 0));
       const logprobs = logits.map((value) => Math.max(value - z, LOG_FLOOR));
@@ -115,7 +153,7 @@ export function unpackH2oScores(rows, packed, temperature) {
       return {
         selected: options[selectedIndex],
         selectedIndex,
-        probabilities: options.map((option, j) => ({option, probability: probabilities[j], logit: logits[j]}))
+        probabilities: options.map((option, j) => ({option, probability: probabilities[j]!, logit: logits[j]!}))
       };
     })
   };
