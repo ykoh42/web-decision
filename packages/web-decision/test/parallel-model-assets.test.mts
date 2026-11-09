@@ -25,9 +25,9 @@ const cases = [
   {name: 'Elephant', open: openElephantSource, first: 'inventory.json', files: elephantFiles(ELEPHANT_MODEL)}
 ];
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((success, failure) => {
+function deferred<T = void>() {
+  let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((success, failure) => {
     resolve = success;
     reject = failure;
   });
@@ -38,8 +38,8 @@ for (const item of cases) {
   test(`${item.name} cancels sibling fetches and body on initial asset failure`, async (t) => {
     const entered = deferred();
     const bodyRead = deferred();
-    const pending = [];
-    const signals = [];
+    const pending: ReturnType<typeof deferred<Response>>[] = [];
+    const signals: AbortSignal[] = [];
     let cancelled = 0;
     const body = new ReadableStream({
       pull() {
@@ -50,21 +50,26 @@ for (const item of cases) {
         cancelled++;
       }
     });
-    t.mock.method(globalThis, 'fetch', async (url, {signal}) => {
-      const name = new URL(url).pathname.split('/').at(-1);
+    t.mock.method(globalThis, 'fetch', async (url: string, {signal}: {signal: AbortSignal}) => {
+      const name = new URL(url).pathname.split('/').at(-1)!;
       signals.push(signal);
       if (name === item.first) {
         await entered.promise;
         return new Response(null, {status: 500});
       }
       if (name === 'tokenizer_config.json') return new Response(body, {status: 200});
-      const wait = deferred();
+      const wait = deferred<Response>();
       pending.push(wait);
       return wait.promise;
     });
     const caller = new AbortController();
     const job = item.open(new URL('https://example.test/assets/'), {signal: caller.signal});
-    await assert.rejects(job, (error) => error.code === 'ASSET_LOAD_FAILED' && /500/.test(error.cause?.message));
+    await assert.rejects(
+      job,
+      (error) =>
+        (error as {code: string}).code === 'ASSET_LOAD_FAILED' &&
+        /500/.test((error as {cause?: {message: string}}).cause?.message ?? '')
+    );
     assert.equal(signals.length, 4);
     assert.ok(signals.every((signal) => signal.aborted));
     assert.equal(cancelled, 1);
@@ -76,11 +81,11 @@ for (const item of cases) {
   });
 
   test(`${item.name} preserves caller abort and cancels late responses`, async (t) => {
-    const pending = [];
-    const signals = [];
-    t.mock.method(globalThis, 'fetch', (_url, {signal}) => {
+    const pending: ReturnType<typeof deferred<Response>>[] = [];
+    const signals: AbortSignal[] = [];
+    t.mock.method(globalThis, 'fetch', (_url: string, {signal}: {signal: AbortSignal}) => {
       signals.push(signal);
-      const wait = deferred();
+      const wait = deferred<Response>();
       pending.push(wait);
       return wait.promise;
     });
@@ -93,7 +98,15 @@ for (const item of cases) {
     assert.ok(signals.every((signal) => signal.aborted));
     assert.equal(getEventListeners(caller.signal, 'abort').length, 0);
     let cancelled = 0;
-    pending[0].resolve(new Response(new ReadableStream({cancel: () => cancelled++})));
+    pending[0]!.resolve(
+      new Response(
+        new ReadableStream({
+          cancel: () => {
+            cancelled++;
+          }
+        })
+      )
+    );
     for (const wait of pending.slice(1)) wait.reject(Error('late fetch failure'));
     await nextTurn();
     assert.equal(cancelled, 1);
@@ -101,15 +114,15 @@ for (const item of cases) {
 
   test(`${item.name} checks caller cancellation after the batch before parsing`, async (t) => {
     const byLength = new Map(Object.values(item.files).map((file) => [file.bytes, file.sha256]));
-    t.mock.method(crypto.subtle, 'digest', (_algorithm, bytes) => {
+    t.mock.method(crypto.subtle, 'digest', (_algorithm: AlgorithmIdentifier, bytes: BufferSource) => {
       const sha = byLength.get(bytes.byteLength);
       assert.ok(sha);
       // These synthetic zero bytes are deliberately not authenticated assets.
       return Promise.resolve(Uint8Array.from(Buffer.from(sha, 'hex')).buffer);
     });
-    t.mock.method(globalThis, 'fetch', (url) => {
-      const name = new URL(url).pathname.split('/').at(-1);
-      let remaining = item.files[name].bytes;
+    t.mock.method(globalThis, 'fetch', (url: string) => {
+      const name = new URL(url).pathname.split('/').at(-1)!;
+      let remaining = (item.files as Record<string, {bytes: number; sha256: string}>)[name]!.bytes;
       return new Response(
         new ReadableStream({
           pull(controller) {
