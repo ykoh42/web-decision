@@ -54,7 +54,9 @@ test('unverified candidate manifests cannot reach fetch, cache or GPU', async ()
       await assert.rejects(loadExperimentalImajev({assetsUrl: 'https://fixture.invalid/'}), {
         code: 'UNSUPPORTED_ENVIRONMENT'
       });
-      assert.throws(() => rejectUnverifiedImajevAssets(manifest), {code: 'UNSUPPORTED_ENVIRONMENT'});
+      assert.throws(() => (rejectUnverifiedImajevAssets as (value: unknown) => never)(manifest), {
+        code: 'UNSUPPORTED_ENVIRONMENT'
+      });
     }
     assert.deepEqual([fetches, gpuReads, cacheReads], [0, 0, 0]);
   } finally {
@@ -62,9 +64,9 @@ test('unverified candidate manifests cannot reach fetch, cache or GPU', async ()
       ['fetch', oldFetch],
       ['navigator', oldNavigator],
       ['caches', oldCaches]
-    ]) {
+    ] as const) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-      else delete globalThis[key];
+      else delete (globalThis as unknown as Record<string, unknown>)[key];
     }
   }
 });
