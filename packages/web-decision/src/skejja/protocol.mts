@@ -2,11 +2,25 @@ import {WebDecisionError} from '../kev.js';
 import {createSkejjaPrompt} from './tokenizer.mjs';
 import {SKEJJA_MAX_CHOICES, SKEJJA_MAX_SCORE_LEVELS, SKEJJA_INT8_PROFILE} from './contract.mjs';
 
+import type {SkejjaTokenizer} from './tokenizer.mjs';
+
+type SkejjaProfile = {
+  readonly model: string;
+  readonly temperature: number;
+  readonly plattA: number;
+  readonly plattB: number;
+};
+type QuestionSnapshot = Record<string, unknown>;
+type PreparedQuestion = ReturnType<typeof prepareQuestion>;
+type PreparedSystem = ReturnType<typeof prepareQuestions>;
+type PreparedDecision = ReturnType<typeof prepareSkejjaDecision>;
+type Calibration = ReadonlyMap<string, readonly [number, number]>;
+
 const QUESTION_FIELDS = new Set(['type', 'instructions', 'criteria']);
 const NOUL_PATTERN = /^Does the user want to (.*)\?$/;
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
+const invalid = (message: string) => new WebDecisionError('INVALID_INPUT', message);
 
-function serializeJson(value, stack = new Set()) {
+function serializeJson(value: unknown, stack = new Set<object>()): string {
   if (value === null) return 'null';
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'boolean') return String(value);
@@ -34,12 +48,12 @@ function serializeJson(value, stack = new Set()) {
   }
 }
 
-export function asSkejjaText(value) {
+export function asSkejjaText(value: unknown): string {
   if (value == null) return '';
   return typeof value === 'string' ? value : serializeJson(value);
 }
 
-function objectEntries(value, label) {
+function objectEntries(value: unknown, label: string): [string, unknown][] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(`${label} must be an object.`);
   return Reflect.ownKeys(value).map((key) => {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -49,9 +63,9 @@ function objectEntries(value, label) {
   });
 }
 
-function snapshotQuestion(value, id) {
+function snapshotQuestion(value: unknown, id: string): QuestionSnapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(`Question ${id} must be an object.`);
-  const question = Object.create(null);
+  const question: QuestionSnapshot = Object.create(null);
   for (const [key, item] of objectEntries(value, `Question ${id}`)) {
     if (!QUESTION_FIELDS.has(key)) throw invalid(`Question ${id} has an unsupported field.`);
     question[key] = item;
@@ -59,17 +73,23 @@ function snapshotQuestion(value, id) {
   return question;
 }
 
-function readQuestions(questions) {
+function readQuestions(questions: unknown): [string, QuestionSnapshot][] {
   const entries = objectEntries(questions, 'Skejja questions');
   if (entries.length < 1) throw invalid('Skejja needs at least one question.');
   return entries.map(([id, value]) => [id, snapshotQuestion(value, id)]);
 }
 
-function questionBody(instructions, state) {
+function questionBody(instructions: string, state: string): string {
   return instructions ? `${instructions}\n\n${state}` : state;
 }
 
-function choiceQuestion(id, instructions, criteria, state, tokenizer) {
+function choiceQuestion(
+  id: string,
+  instructions: string,
+  criteria: unknown,
+  state: string,
+  tokenizer: SkejjaTokenizer
+) {
   const entries = objectEntries(criteria, `Question ${id} criteria`);
   if (entries.length < 2 || entries.length > SKEJJA_MAX_CHOICES)
     throw invalid(`Question ${id} needs 2 to ${SKEJJA_MAX_CHOICES} choice options.`);
@@ -77,13 +97,13 @@ function choiceQuestion(id, instructions, criteria, state, tokenizer) {
   const names = entries.map(([name]) => name);
   const labels = entries.map(([name, description]) => asSkejjaText(description) || name.replaceAll('_', ' '));
   const prompt = createSkejjaPrompt(tokenizer, labels, questionBody(instructions, state));
-  return {id, type: 'choice', names, labels, ...prompt};
+  return {id, type: 'choice' as const, names, labels, ...prompt};
 }
 
-function scoreQuestion(id, instructions, criteria, state, tokenizer) {
+function scoreQuestion(id: string, instructions: string, criteria: unknown, state: string, tokenizer: SkejjaTokenizer) {
   if (!Array.isArray(criteria) || criteria.length < 2 || criteria.length > SKEJJA_MAX_SCORE_LEVELS)
     throw invalid(`Question ${id} score criteria need 2 to ${SKEJJA_MAX_SCORE_LEVELS} ordered levels.`);
-  const values = [];
+  const values: unknown[] = [];
   for (let index = 0; index < criteria.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(criteria, String(index));
     if (!descriptor || !Object.hasOwn(descriptor, 'value'))
@@ -92,10 +112,17 @@ function scoreQuestion(id, instructions, criteria, state, tokenizer) {
   }
   const labels = values.map(asSkejjaText);
   const prompt = createSkejjaPrompt(tokenizer, labels, questionBody(instructions, state));
-  return {id, type: 'score', labels, values, ...prompt};
+  return {id, type: 'score' as const, labels, values, ...prompt};
 }
 
-function noulQuestion(id, instructions, criteria, state, tokenizer, profile) {
+function noulQuestion(
+  id: string,
+  instructions: string,
+  criteria: unknown,
+  state: string,
+  tokenizer: SkejjaTokenizer,
+  profile: SkejjaProfile
+) {
   const hasCriteria = criteria != null;
   let label;
   if (hasCriteria) {
@@ -109,12 +136,12 @@ function noulQuestion(id, instructions, criteria, state, tokenizer, profile) {
   }
 
   const match = label.trim().match(NOUL_PATTERN);
-  const inferenceLabel = match ? match[1] : label;
+  const inferenceLabel = match ? match[1]! : label;
   const head = hasCriteria ? instructions : '';
   const prompt = createSkejjaPrompt(tokenizer, [inferenceLabel], questionBody(head, state));
   return {
     id,
-    type: 'noul',
+    type: 'noul' as const,
     labels: [inferenceLabel],
     label,
     calibrationKey: JSON.stringify([profile.model, label, head]),
@@ -122,7 +149,7 @@ function noulQuestion(id, instructions, criteria, state, tokenizer, profile) {
   };
 }
 
-export function normalizeSkejjaNoulQuestion(question) {
+export function normalizeSkejjaNoulQuestion(question: unknown) {
   const input = snapshotQuestion(question, 'calibration');
   if (input.type !== 'noul') throw invalid('Skejja calibrates only Noul questions.');
   const instructions = asSkejjaText(input.instructions);
@@ -137,9 +164,16 @@ export function normalizeSkejjaNoulQuestion(question) {
   return {type: 'noul', instructions, criteria: {true: asSkejjaText(values.get('true'))}};
 }
 
-function prepareQuestion(id, question, state, tokenizer, profile) {
+function prepareQuestion(
+  id: string,
+  question: QuestionSnapshot,
+  state: string,
+  tokenizer: SkejjaTokenizer,
+  profile: SkejjaProfile
+) {
   const type = question.type;
-  if (!['choice', 'noul', 'score'].includes(type)) throw invalid(`Question ${id} type must be choice, noul or score.`);
+  if (!['choice', 'noul', 'score'].includes(type as string))
+    throw invalid(`Question ${id} type must be choice, noul or score.`);
   const instructions = asSkejjaText(question.instructions);
   const criteria = question.criteria;
   if (type === 'choice') return choiceQuestion(id, instructions, criteria, state, tokenizer);
@@ -147,7 +181,7 @@ function prepareQuestion(id, question, state, tokenizer, profile) {
   return noulQuestion(id, instructions, criteria, state, tokenizer, profile);
 }
 
-function prepareQuestions(questions, state, tokenizer, profile) {
+function prepareQuestions(questions: unknown, state: string, tokenizer: SkejjaTokenizer, profile: SkejjaProfile) {
   const rows = readQuestions(questions).map(([id, question]) =>
     prepareQuestion(id, question, state, tokenizer, profile)
   );
@@ -158,12 +192,17 @@ function prepareQuestions(questions, state, tokenizer, profile) {
   };
 }
 
-export function prepareSkejjaSystemOne(state, questions, tokenizer, profile = SKEJJA_INT8_PROFILE) {
+export function prepareSkejjaSystemOne(
+  state: unknown,
+  questions: unknown,
+  tokenizer: SkejjaTokenizer,
+  profile: SkejjaProfile = SKEJJA_INT8_PROFILE
+) {
   const stateText = asSkejjaText(state);
   return prepareQuestions(questions, stateText, tokenizer, profile);
 }
 
-export function prepareSkejjaDecision(request, tokenizer) {
+export function prepareSkejjaDecision(request: unknown, tokenizer: SkejjaTokenizer) {
   const requestFields = new Map(objectEntries(request, 'Skejja request'));
   if ([...requestFields.keys()].some((key) => key !== 'state' && key !== 'questions'))
     throw invalid('Skejja request has an unsupported field.');
@@ -200,7 +239,7 @@ export function prepareSkejjaDecision(request, tokenizer) {
   };
 }
 
-function softmax(logits, temperature) {
+function softmax(logits: number[], temperature: number): number[] {
   if (!Number.isFinite(temperature) || temperature <= 0) throw new TypeError('Invalid Skejja calibration temperature.');
   const scaled = logits.map((value) => value / temperature);
   const max = Math.max(...scaled);
@@ -209,16 +248,16 @@ function softmax(logits, temperature) {
   return exponents.map((value) => value / total);
 }
 
-function bestIndex(probabilities) {
+function bestIndex(probabilities: number[]): number {
   return probabilities.indexOf(Math.max(...probabilities));
 }
 
-function choiceConfidence(probabilities) {
+function choiceConfidence(probabilities: number[]): number {
   const count = probabilities.length;
   return (Math.max(...probabilities) - 1 / count) / (1 - 1 / count);
 }
 
-function scoreConfidence(probabilities) {
+function scoreConfidence(probabilities: number[]): number {
   const count = probabilities.length;
   const mode = bestIndex(probabilities);
   const meanUniformDistance =
@@ -233,14 +272,19 @@ function scoreConfidence(probabilities) {
   return Math.max(0, 1 - expectedDistance / meanUniformDistance);
 }
 
-function resultByOption(names, probabilities) {
+function resultByOption(names: string[], probabilities: number[]) {
   return Object.fromEntries(names.map((name, index) => [name, probabilities[index]]));
 }
 
-function finishTypedAnswer(question, logits, profile, calibration) {
+function finishTypedAnswer(
+  question: PreparedQuestion,
+  logits: number[],
+  profile: SkejjaProfile,
+  calibration: Calibration
+) {
   if (question.type === 'noul') {
     const coefficients = calibration.get(question.calibrationKey) ?? [profile.plattA, profile.plattB];
-    const scaled = coefficients[0] * logits[0] + coefficients[1];
+    const scaled = coefficients[0] * logits[0]! + coefficients[1];
     const probability = scaled >= 0 ? 1 / (1 + Math.exp(-scaled)) : Math.exp(scaled) / (1 + Math.exp(scaled));
     return {type: 'noul', noul: probability};
   }
@@ -268,11 +312,16 @@ function finishTypedAnswer(question, logits, profile, calibration) {
   };
 }
 
-export function finishSkejjaSystemOne(prepared, rows, profile, calibration) {
+export function finishSkejjaSystemOne(
+  prepared: PreparedSystem,
+  rows: number[][],
+  profile: SkejjaProfile,
+  calibration: Calibration
+) {
   if (rows.length !== prepared.questions.length) throw new TypeError('Skejja result rows are incomplete.');
   const answers = Object.fromEntries(
     rows.map((row, index) => {
-      const question = prepared.questions[index];
+      const question = prepared.questions[index]!;
       return [question.id, finishTypedAnswer(question, row, profile, calibration)];
     })
   );
@@ -284,10 +333,10 @@ export function finishSkejjaSystemOne(prepared, rows, profile, calibration) {
   };
 }
 
-export function finishSkejjaDecision(prepared, rows, profile) {
+export function finishSkejjaDecision(prepared: PreparedDecision, rows: number[][], profile: SkejjaProfile) {
   if (rows.length !== prepared.questions.length) throw new TypeError('Skejja result rows are incomplete.');
   const answers = prepared.questions.map((question, index) => {
-    const logits = rows[index];
+    const logits = rows[index]!;
     const probabilities = softmax(logits, profile.temperature);
     const selectedIndex = bestIndex(probabilities);
     return {

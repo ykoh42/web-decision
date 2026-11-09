@@ -183,7 +183,7 @@ export function createSkejjaSession({
           tokenizer: SkejjaTokenizer,
           selectedProfile: SkejjaProfile
         ) => unknown
-      )(snapshot, tokenizer!, profile) as SkejjaPreparedRequest;
+      )(snapshot, tokenizer!, profile) as ReturnType<typeof prepareSkejjaDecision>;
       const rows = await infer(prepared, signal);
       return finishSkejjaDecision(prepared, rows, profile as typeof SKEJJA_INT8_PROFILE);
     },
@@ -198,7 +198,7 @@ export function createSkejjaSession({
           inputTokenizer: SkejjaTokenizer,
           selectedProfile: SkejjaProfile
         ) => unknown
-      )(state, questions, tokenizer!, profile) as SkejjaPreparedRequest;
+      )(state, questions, tokenizer!, profile) as ReturnType<typeof prepareSkejjaSystemOne>;
       const rows = await infer(prepared, signal);
       return finishSkejjaSystemOne(prepared, rows, profile as typeof SKEJJA_INT8_PROFILE, questionCalibration);
     },
