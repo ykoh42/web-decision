@@ -86,8 +86,7 @@ export function validateManifest(manifest: unknown): KevAssetManifest {
   ) {
     throw error('The asset manifest does not match the supported Kev Q4 model.');
   }
-  const files = candidate.files as Record<string, unknown> | null | undefined;
-  if (!files || typeof files !== 'object') throw error('The asset manifest has no files.');
+  if (!candidate.files || typeof candidate.files !== 'object') throw error('The asset manifest has no files.');
   for (const name of [
     'model.wasm',
     'tokenizer.json',
@@ -95,9 +94,9 @@ export function validateManifest(manifest: unknown): KevAssetManifest {
     'model_config.json',
     'weights/tensor-cache.json'
   ]) {
-    if (!files[name]) throw error(`Missing asset: ${name}`);
+    if (!(candidate.files as Record<string, unknown>)[name]) throw error(`Missing asset: ${name}`);
   }
-  for (const [name, entry] of Object.entries(files)) {
+  for (const [name, entry] of Object.entries(candidate.files as Record<string, unknown>)) {
     const metadata = entry as AssetFileMetadata | null | undefined;
     if (
       !metadata ||
