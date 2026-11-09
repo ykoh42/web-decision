@@ -192,6 +192,26 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
   });
   assert.deepEqual(checked.modelIds, ['kev-0.6b-q4f16']);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
+
+  const unresolvedSpec = structuredClone(approvedSpec);
+  const unresolvedModel = unresolvedSpec.models[0];
+  assert.ok(unresolvedModel);
+  unresolvedModel.description.licenses.modelTerms = 'separate-review-required ';
+  await assert.rejects(
+    validateModelProvenance({
+      packageRoot,
+      workspaceRoot: temporaryRoot,
+      modelSpec: unresolvedSpec,
+      artifactLock,
+      artifactLockBytes,
+      manifestBytes,
+      expectedManifestSha256: sha256(manifestBytes),
+      expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+      allowTestFixture: false,
+      requireCommitted: false
+    }),
+    /catalog license terms remain unresolved/u
+  );
 });
 
 test('tampered committed evidence cannot match the manifest evidence digest', async () => {

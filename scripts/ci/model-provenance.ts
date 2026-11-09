@@ -52,6 +52,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isResolvedTerm(value: unknown): value is string {
+  return typeof value === 'string' && !UNKNOWN_TERMS.has(value.trim().toLowerCase());
+}
+
 function isPathWithin(root: string, target: string): boolean {
   const path = relative(resolve(root), resolve(target));
   return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
@@ -185,10 +189,7 @@ async function validateRightsEvidence(
       typeof item.subject === 'string' && item.subject.length > 0,
       `Rights subject ${index} for ${modelId} is required.`
     );
-    failUnless(
-      typeof item.license === 'string' && !UNKNOWN_TERMS.has(item.license.toLowerCase()),
-      `Rights license ${index} for ${modelId} is unresolved.`
-    );
+    failUnless(isResolvedTerm(item.license), `Rights license ${index} for ${modelId} is unresolved.`);
     failUnless(item.redistribution === 'permitted', `Redistribution rights ${index} for ${modelId} are not confirmed.`);
     await validateCommittedEvidenceReference(
       item.evidence,
@@ -376,10 +377,7 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     const spec = specModels.find((item) => item.modelId === entry.modelId);
     const licenses = spec?.description.licenses;
     failUnless(isRecord(licenses), `Approved model ${entry.modelId} must declare reviewed license terms.`);
-    failUnless(
-      typeof licenses.modelTerms === 'string' && !UNKNOWN_TERMS.has(licenses.modelTerms.toLowerCase()),
-      `Model ${entry.modelId} catalog license terms remain unresolved.`
-    );
+    failUnless(isResolvedTerm(licenses.modelTerms), `Model ${entry.modelId} catalog license terms remain unresolved.`);
     failUnless(isRecord(evidenceValue), `Approved provenance for ${entry.modelId} must be an object.`);
     failUnless(
       Array.isArray(evidenceValue.rights) &&
