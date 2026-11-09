@@ -77,7 +77,7 @@ test(
   'failed device destruction retains runtime and device without hiding cancellation',
   {skip: typeof registerHooks !== 'function'},
   async () => {
-    const moduleUrl = new URL('../src/runtime-lifecycle.js?retention-test', import.meta.url).href;
+    const moduleUrl = new URL('../src/runtime-lifecycle.ts?retention-test', import.meta.url).href;
     const fakeGuard = `data:text/javascript,${encodeURIComponent('export function retainStrandsResources(runtime, gpu) { globalThis.__failedLoadRetained = {runtime, gpu}; }')}`;
     const hooks = registerHooks!({
       resolve(specifier, context, nextResolve) {

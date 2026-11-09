@@ -80,7 +80,6 @@
     "packages/web-decision/src/parameter-upload.mjs",
     "packages/web-decision/src/pinned-text-loader.js",
     "packages/web-decision/src/request-fields.mjs",
-    "packages/web-decision/src/runtime-lifecycle.js",
     "packages/web-decision/src/safedecide/loader.mjs",
     "packages/web-decision/src/safedecide/protocol.mjs",
     "packages/web-decision/src/safedecide/runner.mjs",

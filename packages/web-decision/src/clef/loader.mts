@@ -56,7 +56,7 @@ interface ClefRuntimeOwner {
   fn: (...args: unknown[]) => TvmTensor;
   teardownObserver: unknown;
   teardownTimeoutMs: number;
-  lifecycle: {loss: boolean; disposed: boolean};
+  lifecycle: {loss: unknown; disposed: boolean};
   disposalGuard: {blocked: boolean; retain(): void};
   uncaptured: unknown[];
 }

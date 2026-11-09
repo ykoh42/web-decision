@@ -70,7 +70,7 @@ interface FlashOwner {
   device: unknown;
   gpu: FlashGpuDevice;
   fn: (...args: unknown[]) => FlashTensor;
-  lifecycle: {loss: boolean; disposed: boolean};
+  lifecycle: {loss: unknown; disposed: boolean};
   disposalGuard: {blocked: boolean; retain(): void};
   uncaptured: unknown[];
   teardownObserver: unknown;
