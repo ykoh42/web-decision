@@ -16,7 +16,7 @@ const coreTests = [
   'test/kanana-protocol.test.mjs',
   'test/kanana-scoring.test.mts',
   'test/kanana-candidates.test.mjs',
-  'test/kanana-chat-template.test.mjs',
+  'test/kanana-chat-template.test.mts',
   'test/kanana-truncation.test.mjs',
   'test/kanana-tokenizer.test.mjs',
   'test/kanana-image-ingress.test.mjs',

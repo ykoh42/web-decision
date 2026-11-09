@@ -5,7 +5,9 @@ import {chatTemplate, protocol} from './kanana-core-modules.mjs';
 const {renderKananaChatTemplate} = chatTemplate;
 const {prepareKananaSystemOne, renderKananaQueryInput, renderKananaQueryMessages} = protocol;
 
-const queryMessages = (userParts = [{type: 'text', text: 'State:\nhello\n\nTask:\nchoice'}]) => [
+const queryMessages = <T = {type: string; text: string}[],>(
+  userParts: T = [{type: 'text', text: 'State:\nhello\n\nTask:\nchoice'}] as T
+) => [
   {role: 'system', content: [{type: 'text', text: 'Represent the state for the specified task.'}]},
   {role: 'user', content: userParts}
 ];
@@ -63,7 +65,9 @@ test('preserves adjacent message text boundaries for upstream truncation', () =>
     questions: {route: {type: 'choice', criteria: {billing: 'Billing'}}}
   });
   const input = renderKananaQueryInput(prepared, 'route');
-  const editableParts = input.editableUserTextIndexes.map((index) => input.messages[1].content[index].text);
+  const editableParts = input.editableUserTextIndexes.map(
+    (index) => (input.messages[1].content[index] as {text: string}).text
+  );
 
   assert.deepEqual(editableParts, ['[user]\n', 'first segment', 'second segment']);
   assert.equal(
@@ -103,7 +107,7 @@ test('trims content with Python str.strip whitespace semantics', () => {
 
 test('rejects image parts in the system message', () => {
   const messages = queryMessages();
-  messages[0].content.push({type: 'image', image: 'system.png'});
+  (messages[0]!.content as {type: string; text?: string; image?: string}[]).push({type: 'image', image: 'system.png'});
 
   assert.throws(() => renderKananaChatTemplate(messages), /system messages cannot contain images/);
 });
@@ -137,5 +141,5 @@ test('is deterministic and does not mutate frozen inputs or depend on a signal',
   const expected = renderKananaChatTemplate(messages);
 
   assert.equal(renderKananaChatTemplate(messages), expected);
-  assert.equal(messages[1].content[0].text, 'State');
+  assert.equal(messages[1]!.content[0]!.text, 'State');
 });

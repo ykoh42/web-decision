@@ -43,7 +43,6 @@
     "packages/web-decision/test/imajev-source.test.mjs",
     "packages/web-decision/test/imajev-upload.test.mjs",
     "packages/web-decision/test/kanana-candidates.test.mjs",
-    "packages/web-decision/test/kanana-chat-template.test.mjs",
     "packages/web-decision/test/kanana-core-modules.mjs",
     "packages/web-decision/test/kanana-encoded-image.test.mjs",
     "packages/web-decision/test/kanana-image-ingress.test.mjs",
