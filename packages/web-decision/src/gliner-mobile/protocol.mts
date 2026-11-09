@@ -1,20 +1,88 @@
 import {WebDecisionError} from '../kev.js';
 import {GLINER_MAX_OPTIONS, GLINER_MAX_TOKENS, GLINER_MOBILE_MODEL} from './contract.mjs';
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
-const inference = (message) => new WebDecisionError('INFERENCE_ERROR', message);
+import type {createGlinerMobileTokenizer} from './tokenizer.mjs';
+
+type GlinerTokenizer = ReturnType<typeof createGlinerMobileTokenizer>;
+
+interface GlinerQuestionBase {
+  readonly id: string;
+  readonly instructions: string;
+  readonly labels: string[];
+  readonly descriptions: Array<string | null>;
+  markerOffset?: number;
+}
+
+interface GlinerChoiceQuestion extends GlinerQuestionBase {
+  readonly type: 'choice';
+}
+
+interface GlinerScoreQuestion extends GlinerQuestionBase {
+  readonly type: 'score';
+  readonly legend: string[];
+}
+
+interface GlinerNoulQuestion extends GlinerQuestionBase {
+  readonly type: 'noul';
+}
+
+type GlinerDraftQuestion = GlinerChoiceQuestion | GlinerScoreQuestion | GlinerNoulQuestion;
+type GlinerPreparedQuestion = GlinerDraftQuestion & {markerOffset: number};
+
+export interface PreparedGlinerMobileSystemOne {
+  readonly questions: GlinerPreparedQuestion[];
+  readonly inputIds: number[];
+  readonly markerPositions: number[];
+  readonly tokenCount: number;
+  readonly truncated: boolean;
+}
+
+interface GlinerChoiceAnswer {
+  readonly type: 'choice';
+  readonly choice: string;
+  readonly confidence: number;
+  readonly probabilities: Record<string, number>;
+}
+
+interface GlinerScoreAnswer {
+  readonly type: 'score';
+  readonly score: number;
+  readonly expected: number;
+  readonly confidence: number;
+  readonly legend: Record<string, string>;
+  readonly probabilities: Record<string, number>;
+}
+
+interface GlinerNoulAnswer {
+  readonly type: 'noul';
+  readonly noul: number;
+  readonly confidence: number;
+  readonly probabilities: {readonly true: number; readonly false: number};
+}
+
+type GlinerAnswer = GlinerChoiceAnswer | GlinerScoreAnswer | GlinerNoulAnswer;
+
+export interface GlinerMobileDecisionResult {
+  readonly model: string;
+  readonly tokenCount: number;
+  readonly truncated?: true;
+  readonly answers: Record<string, GlinerAnswer>;
+}
+
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
+const inference = (message: string): WebDecisionError => new WebDecisionError('INFERENCE_ERROR', message);
 const questionFields = new Set(['type', 'instructions', 'criteria']);
 const reservedTokens = ['[SEP_STRUCT]', '[SEP_TEXT]', '[P]', '[L]', '[DESCRIPTION]', '[PAD]'];
-const hasReservedToken = (text) => reservedTokens.some((token) => text.includes(token));
+const hasReservedToken = (text: string): boolean => reservedTokens.some((token) => text.includes(token));
 
-function ownValue(object, key, message) {
+function ownValue(object: object, key: PropertyKey, message: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(object, key);
   if (!descriptor || !Object.hasOwn(descriptor, 'value')) throw invalid(message);
   return descriptor.value;
 }
 
-function arrayValues(value, id, name) {
-  const values = [];
+function arrayValues(value: unknown[], id: string, name: string): unknown[] {
+  const values: unknown[] = [];
   for (let index = 0; index < value.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor || !Object.hasOwn(descriptor, 'value'))
@@ -24,14 +92,14 @@ function arrayValues(value, id, name) {
   return values;
 }
 
-function optionEntries(value, id) {
+function optionEntries(value: unknown, id: string): Array<[string, string | null]> {
   if (Array.isArray(value)) {
     if (value.length < 2 || value.length > GLINER_MAX_OPTIONS)
       throw invalid(`Question ${id} needs 2 to ${GLINER_MAX_OPTIONS} string options.`);
     const labels = arrayValues(value, id, 'options');
     if (labels.some((label) => typeof label !== 'string'))
       throw invalid(`Question ${id} needs 2 to ${GLINER_MAX_OPTIONS} string options.`);
-    return labels.map((label) => [label, null]);
+    return labels.map((label) => [label as string, null]);
   }
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw invalid(`Question ${id} criteria must be an option array or label-description object.`);
@@ -48,43 +116,43 @@ function optionEntries(value, id) {
       throw invalid(`Question ${id} descriptions must be strings or null.`);
     if (typeof description === 'string' && hasReservedToken(description))
       throw invalid(`Question ${id} descriptions cannot contain GLiNER protocol tokens.`);
-    return [label, description];
+    return [label, description as string | null];
   });
 }
 
-function validateText(value, id, field) {
+function validateText(value: unknown, id: string, field: string): string {
   if (typeof value !== 'string' || !value.trim()) throw invalid(`Question ${id} needs non-empty ${field} text.`);
   if (hasReservedToken(value)) throw invalid(`Question ${id} ${field} cannot contain GLiNER protocol tokens.`);
   return value;
 }
 
-function snapshotQuestionFields(id, source) {
+function snapshotQuestionFields(id: string, source: unknown): Record<string, unknown> {
   if (!source || typeof source !== 'object' || Array.isArray(source))
     throw invalid(`Question ${id} must be an object.`);
-  const question = Object.create(null);
+  const question: Record<string, unknown> = Object.create(null);
   for (const key of Reflect.ownKeys(source)) {
     if (typeof key !== 'string' || !questionFields.has(key)) throw invalid(`Question ${id} has an unsupported field.`);
     question[key] = ownValue(source, key, `Question ${id} cannot contain accessors.`);
   }
-  if (!['choice', 'score', 'noul'].includes(question.type))
+  if (!['choice', 'score', 'noul'].includes(question.type as string))
     throw invalid(`Question ${id} type must be choice, score, or noul.`);
   return question;
 }
 
-function validateChoiceLabels(labels, id) {
-  const invalidLabel = (label) => !label.trim() || hasReservedToken(label);
+function validateChoiceLabels(labels: string[], id: string): void {
+  const invalidLabel = (label: string): boolean => !label.trim() || hasReservedToken(label);
   if (labels.some(invalidLabel) || new Set(labels).size !== labels.length)
     throw invalid(`Question ${id} labels must be distinct non-empty strings.`);
 }
 
-function snapshotChoiceQuestion(id, instructions, criteria) {
+function snapshotChoiceQuestion(id: string, instructions: string, criteria: unknown): GlinerChoiceQuestion {
   const entries = optionEntries(criteria, id);
   const labels = entries.map(([label]) => label);
   validateChoiceLabels(labels, id);
   return {id, type: 'choice', instructions, labels, descriptions: entries.map(([, description]) => description)};
 }
 
-function snapshotScoreQuestion(id, instructions, criteria) {
+function snapshotScoreQuestion(id: string, instructions: string, criteria: unknown): GlinerScoreQuestion {
   if (!Array.isArray(criteria) || criteria.length < 2 || criteria.length > GLINER_MAX_OPTIONS)
     throw invalid(`Question ${id} score needs 2 to ${GLINER_MAX_OPTIONS} ordered levels.`);
   const legend = arrayValues(criteria, id, 'score levels').map((value) => validateText(value, id, 'score level'));
@@ -92,14 +160,14 @@ function snapshotScoreQuestion(id, instructions, criteria) {
   return {id, type: 'score', instructions, labels, descriptions: legend, legend};
 }
 
-function snapshotNoulQuestion(id, instructions, rawCriteria) {
+function snapshotNoulQuestion(id: string, instructions: string, rawCriteria: unknown): GlinerNoulQuestion {
   const criteria = rawCriteria ?? Object.create(null);
   if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria))
     throw invalid(`Question ${id} Noul criteria must contain true/false descriptions.`);
   const prototype = Object.getPrototypeOf(criteria);
   if (prototype !== Object.prototype && prototype !== null)
     throw invalid(`Question ${id} Noul criteria must be a plain object.`);
-  const descriptions = {yes: null, no: null};
+  const descriptions: {yes: string | null; no: string | null} = {yes: null, no: null};
   for (const key of Reflect.ownKeys(criteria)) {
     if (key !== 'true' && key !== 'false') throw invalid(`Question ${id} Noul criteria accepts true and false only.`);
     const value = ownValue(criteria, key, `Question ${id} Noul criteria cannot contain accessors.`);
@@ -107,12 +175,12 @@ function snapshotNoulQuestion(id, instructions, rawCriteria) {
       throw invalid(`Question ${id} Noul descriptions must be strings or null.`);
     if (typeof value === 'string' && hasReservedToken(value))
       throw invalid(`Question ${id} Noul descriptions cannot contain GLiNER protocol tokens.`);
-    descriptions[key === 'true' ? 'yes' : 'no'] = value;
+    descriptions[key === 'true' ? 'yes' : 'no'] = value as string | null;
   }
   return {id, type: 'noul', instructions, labels: ['yes', 'no'], descriptions: [descriptions.yes, descriptions.no]};
 }
 
-function snapshotQuestion(id, source) {
+function snapshotQuestion(id: string, source: unknown): GlinerDraftQuestion {
   const question = snapshotQuestionFields(id, source);
   const instructions = validateText(question.instructions, id, 'instructions');
   if (question.type === 'choice') return snapshotChoiceQuestion(id, instructions, question.criteria);
@@ -120,7 +188,7 @@ function snapshotQuestion(id, source) {
   return snapshotNoulQuestion(id, instructions, question.criteria);
 }
 
-function append(inputIds, values) {
+function append(inputIds: number[], values: number[]): void {
   for (const value of values) {
     if (inputIds.length >= GLINER_MAX_TOKENS)
       throw invalid(`GLiNER question schemas exceed the ${GLINER_MAX_TOKENS}-token context.`);
@@ -128,7 +196,12 @@ function append(inputIds, values) {
   }
 }
 
-function appendSchema(inputIds, markerPositions, question, tokenizer) {
+function appendSchema(
+  inputIds: number[],
+  markerPositions: number[],
+  question: GlinerDraftQuestion,
+  tokenizer: GlinerTokenizer
+): void {
   const {special} = tokenizer;
   append(inputIds, tokenizer.encode('('));
   append(inputIds, [special['[P]']]);
@@ -148,7 +221,11 @@ function appendSchema(inputIds, markerPositions, question, tokenizer) {
   append(inputIds, tokenizer.encode(')'));
 }
 
-export function prepareGlinerMobileSystemOne(state, questions, tokenizer) {
+export function prepareGlinerMobileSystemOne(
+  state: unknown,
+  questions: unknown,
+  tokenizer: GlinerTokenizer
+): PreparedGlinerMobileSystemOne {
   if (typeof state !== 'string') throw invalid('GLiNER state must be text.');
   if (hasReservedToken(state)) throw invalid('GLiNER state cannot contain GLiNER protocol tokens.');
   if (!questions || typeof questions !== 'object' || Array.isArray(questions))
@@ -157,13 +234,13 @@ export function prepareGlinerMobileSystemOne(state, questions, tokenizer) {
   if (ids.length < 1 || ids.some((id) => typeof id !== 'string'))
     throw invalid('GLiNER needs at least one named question with a string name.');
   const preparedQuestions = ids.map((id) =>
-    snapshotQuestion(id, ownValue(questions, id, `Question ${id} cannot be an accessor.`))
+    snapshotQuestion(id as string, ownValue(questions, id, `Question ${id as string} cannot be an accessor.`))
   );
-  const inputIds = [];
-  const markerPositions = [];
+  const inputIds: number[] = [];
+  const markerPositions: number[] = [];
   for (let index = 0; index < preparedQuestions.length; index++) {
     if (index > 0) append(inputIds, [tokenizer.special['[SEP_STRUCT]']]);
-    appendSchema(inputIds, markerPositions, preparedQuestions[index], tokenizer);
+    appendSchema(inputIds, markerPositions, preparedQuestions[index]!, tokenizer);
   }
   append(inputIds, [tokenizer.special['[SEP_TEXT]']]);
   if (inputIds.length > GLINER_MAX_TOKENS)
@@ -183,7 +260,7 @@ export function prepareGlinerMobileSystemOne(state, questions, tokenizer) {
   }
 
   return {
-    questions: preparedQuestions,
+    questions: preparedQuestions as GlinerPreparedQuestion[],
     inputIds,
     markerPositions,
     tokenCount: inputIds.length,
@@ -191,7 +268,7 @@ export function prepareGlinerMobileSystemOne(state, questions, tokenizer) {
   };
 }
 
-function softmax(logits) {
+function softmax(logits: number[]): number[] {
   if (!Array.isArray(logits) || logits.length < 2 || logits.some((value) => !Number.isFinite(value)))
     throw inference('GLiNER returned invalid classification logits.');
   const max = Math.max(...logits);
@@ -202,16 +279,18 @@ function softmax(logits) {
   return exponentials.map((value) => value / denominator);
 }
 
-function answerQuestion(question, logits) {
+function answerQuestion(question: GlinerPreparedQuestion, logits: number[]): GlinerAnswer {
   const probabilities = softmax(logits);
   let selectedIndex = 0;
   for (let index = 1; index < probabilities.length; index++)
-    if (probabilities[index] > probabilities[selectedIndex]) selectedIndex = index;
-  const confidence = probabilities[selectedIndex];
-  const distribution = Object.fromEntries(question.labels.map((label, index) => [label, probabilities[index]]));
+    if (probabilities[index]! > probabilities[selectedIndex]!) selectedIndex = index;
+  const confidence = probabilities[selectedIndex]!;
+  const distribution: Record<string, number> = Object.fromEntries(
+    question.labels.map((label, index) => [label, probabilities[index]!])
+  );
 
   if (question.type === 'choice')
-    return {type: 'choice', choice: question.labels[selectedIndex], confidence, probabilities: distribution};
+    return {type: 'choice', choice: question.labels[selectedIndex]!, confidence, probabilities: distribution};
   if (question.type === 'score') {
     const expected = probabilities.reduce((sum, probability, index) => sum + probability * index, 0);
     return {
@@ -225,20 +304,24 @@ function answerQuestion(question, logits) {
   }
   return {
     type: 'noul',
-    noul: probabilities[0],
+    noul: probabilities[0]!,
     confidence,
-    probabilities: {true: probabilities[0], false: probabilities[1]}
+    probabilities: {true: probabilities[0]!, false: probabilities[1]!}
   };
 }
 
-export function finishGlinerMobileSystemOne(prepared, logits, model = GLINER_MOBILE_MODEL) {
+export function finishGlinerMobileSystemOne(
+  prepared: PreparedGlinerMobileSystemOne,
+  logits: unknown,
+  model: string = GLINER_MOBILE_MODEL
+): GlinerMobileDecisionResult {
   if (!Array.isArray(logits) || logits.length !== prepared.markerPositions.length)
     throw inference('GLiNER logits do not match the input label markers.');
-  const answers = Object.create(null);
+  const answers: Record<string, GlinerAnswer> = Object.create(null);
   for (const question of prepared.questions) {
     const start = question.markerOffset;
     const end = start + question.labels.length;
-    answers[question.id] = answerQuestion(question, logits.slice(start, end));
+    answers[question.id] = answerQuestion(question, (logits as number[]).slice(start, end));
   }
   return {
     model,
