@@ -120,8 +120,6 @@
     "packages/web-decision/src/tinydecide/session.mjs",
     "packages/web-decision/src/verdict/loader.mjs",
     "packages/web-decision/src/verdict/protocol.mjs",
-    "packages/web-decision/src/verdict/runner.mjs",
-    "packages/web-decision/src/verdict/session.mjs",
     "packages/web-decision/test/asset-batch.test.mjs",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",
