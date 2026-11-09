@@ -4,10 +4,13 @@ import {createHash} from 'node:crypto';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import {fixedRotary, runtimeOwnership, makeUploadGuard} from '../src/nari/runtime.mjs';
 
+type Runtime = Parameters<ReturnType<typeof runtimeOwnership>['initialize']>[0];
+type Device = Parameters<ReturnType<typeof runtimeOwnership>['initialize']>[1];
+
 test('two separate rotary vectors have the recorded CPU float32 bytes', async () => {
   const r = await fixedRotary(),
-    a = r['body.rotary_emb.inv_freq'],
-    b = r['body.rotary_emb.original_inv_freq'];
+    a = r['body.rotary_emb.inv_freq']!,
+    b = r['body.rotary_emb.original_inv_freq']!;
   assert.equal(a.length, 32);
   assert.notEqual(a.buffer, b.buffer);
   assert.deepEqual([...a], [...b]);
@@ -21,8 +24,8 @@ test('two separate rotary vectors have the recorded CPU float32 bytes', async ()
 });
 
 test('rotary digest cancellation preserves the reason and observes late failure', async (t) => {
-  let rejectHash, entered;
-  const started = new Promise((resolve) => {
+  let rejectHash!: (reason?: unknown) => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   t.mock.method(crypto.subtle, 'digest', () => {
@@ -53,7 +56,7 @@ test('partial GPU runtime initialization retains runtime and device on failure',
       addEventListener() {
         if (failure === 'listener') throw Error('injected');
       }
-    };
+    } as unknown as Device;
     const runtime = {
       dispose() {
         disposed++;
@@ -76,7 +79,7 @@ test('partial GPU runtime initialization retains runtime and device on failure',
           }
         };
       }
-    };
+    } as unknown as Runtime;
     const ownership = runtimeOwnership();
     assert.throws(() => ownership.initialize(runtime, gpu), /injected/);
     ownership.fail(runtime, gpu);
@@ -95,12 +98,12 @@ test('before initialization, ordinary runtime and device cleanup still occurs', 
       dispose() {
         disposed++;
       }
-    },
+    } as unknown as Runtime,
     {
       destroy() {
         destroyed++;
       }
-    }
+    } as unknown as Device
   );
   assert.equal(disposed, 1);
   assert.equal(destroyed, 1);
@@ -113,12 +116,12 @@ test('failure before disposal guard registration also retains both resources', (
       dispose() {
         disposed++;
       }
-    },
+    } as unknown as Runtime,
     gpu = {
       destroy() {
         destroyed++;
       }
-    };
+    } as unknown as Device;
   const ownership = runtimeOwnership();
   assert.throws(() => ownership.initialize(runtime, gpu));
   ownership.fail(runtime, gpu);
@@ -135,7 +138,7 @@ test('failure after initialization retains the established owner', () => {
       destroyed++;
     },
     addEventListener() {}
-  };
+  } as unknown as Device;
   const runtime = {
     dispose() {
       disposed++;
@@ -152,7 +155,7 @@ test('failure after initialization retains the established owner', () => {
         }
       };
     }
-  };
+  } as unknown as Runtime;
   const ownership = runtimeOwnership(),
     owner = ownership.initialize(runtime, gpu);
   ownership.fail(runtime, gpu);
@@ -164,7 +167,7 @@ test('failure after initialization retains the established owner', () => {
 
 test('upload boundary checks use running phase at five-second intervals', async () => {
   let now = 0;
-  const calls = [];
+  const calls: string[] = [];
   const check = makeUploadGuard(
     async (phase) => calls.push(phase),
     undefined,
