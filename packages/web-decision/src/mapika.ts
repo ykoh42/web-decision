@@ -3,18 +3,38 @@
 // state-first text path is implemented here.
 import {WebDecisionError} from './kev.js';
 
+type MapikaTokenizer = {
+  encode(text: string, options: {add_special_tokens: false}): {ids?: Iterable<number>} | null | undefined;
+};
+type MapikaLabels = {
+  readonly names: readonly string[];
+  readonly ids: readonly number[];
+  readonly open: readonly number[];
+};
+type MapikaLimits = {
+  readonly maxStateTokens: number;
+  readonly maxInputTokens: number;
+  readonly controlIds: readonly number[];
+};
+type MapikaQuestion = {readonly instructions: string; readonly options: readonly string[]};
+type MapikaRequest = {readonly state: string; readonly questions: readonly MapikaQuestion[]};
+type PackedMapikaRequest = {
+  readonly ids: readonly number[];
+  readonly groups: readonly {readonly slot: number; readonly options: readonly string[]}[];
+};
+
 export const MAPIKA_MAX_OPTIONS = 255;
 
-function inputError(message) {
+function inputError(message: string) {
   return new WebDecisionError('INVALID_INPUT', message);
 }
 
-function assetError(message) {
+function assetError(message: string) {
   return new WebDecisionError('INVALID_ASSET', message);
 }
 
-function encode(tokenizer, text) {
-  const values = tokenizer.encode(text, {add_special_tokens: false})?.ids;
+function encode(tokenizer: unknown, text: string) {
+  const values = (tokenizer as MapikaTokenizer).encode(text, {add_special_tokens: false})?.ids;
   if (!values || typeof values[Symbol.iterator] !== 'function') throw assetError('Invalid tokenizer output.');
   const tokens = Array.from(values);
   if (tokens.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= 2 ** 31))
@@ -23,7 +43,7 @@ function encode(tokenizer, text) {
 }
 
 /** Build the first 255 single-token uppercase answer codes, as upstream does. */
-export function buildMapikaLabels(tokenizer) {
+export function buildMapikaLabels(tokenizer: unknown) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const candidates = [...alphabet];
   for (const first of alphabet) for (const second of alphabet) candidates.push(first + second);
@@ -33,7 +53,7 @@ export function buildMapikaLabels(tokenizer) {
     const tokens = encode(tokenizer, candidate);
     if (tokens.length === 1) {
       names.push(candidate);
-      ids.push(tokens[0]);
+      ids.push(tokens[0]!);
       if (ids.length === MAPIKA_MAX_OPTIONS) break;
     }
   }
@@ -43,7 +63,7 @@ export function buildMapikaLabels(tokenizer) {
   return {names, ids, open};
 }
 
-function validateText(tokenizer, value, controls) {
+function validateText(tokenizer: unknown, value: unknown, controls: Set<number>) {
   if (typeof value !== 'string') throw inputError('All request text must be a string.');
   // Do not let the tokenizer silently replace an isolated UTF-16 surrogate.
   for (let i = 0; i < value.length; i++) {
@@ -59,13 +79,13 @@ function validateText(tokenizer, value, controls) {
     throw inputError('Request text contains a model control token.');
 }
 
-function append(ids, tokens, maxTokens) {
+function append(ids: number[], tokens: readonly number[], maxTokens: number) {
   if (ids.length + tokens.length > maxTokens)
     throw inputError(`Packed input exceeds ${maxTokens} tokens; no truncation was applied.`);
   for (const token of tokens) ids.push(token);
 }
 
-function validateQuestion(tokenizer, question, controls, index) {
+function validateQuestion(tokenizer: unknown, question: MapikaQuestion, controls: Set<number>, index: number) {
   if (!question || typeof question.instructions !== 'string' || !question.instructions.trim())
     throw inputError(`Question ${index} needs non-empty instructions.`);
   if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > MAPIKA_MAX_OPTIONS)
@@ -78,7 +98,15 @@ function validateQuestion(tokenizer, question, controls, index) {
   for (const option of question.options) validateText(tokenizer, option, controls);
 }
 
-function appendQuestion(ids, tokenizer, labels, question, index, count, maxTokens) {
+function appendQuestion(
+  ids: number[],
+  tokenizer: unknown,
+  labels: MapikaLabels,
+  question: MapikaQuestion,
+  index: number,
+  count: number,
+  maxTokens: number
+) {
   const number = count > 1 ? ` ${index + 1}` : '';
   const head = `\n\nQuestion${number}: ${question.instructions}\nOptions:`;
   const tail = `\nAnswer${number}: (`;
@@ -90,13 +118,13 @@ function appendQuestion(ids, tokenizer, labels, question, index, count, maxToken
   append(ids, encode(tokenizer, head), maxTokens);
   for (const [j, option] of question.options.entries()) {
     append(ids, labels.open, maxTokens);
-    append(ids, [labels.ids[j]], maxTokens);
+    append(ids, [labels.ids[j]!], maxTokens);
     append(ids, encode(tokenizer, `) ${option}`), maxTokens);
   }
   append(ids, encode(tokenizer, tail), maxTokens);
 }
 
-function validateConfig(labels, limits) {
+function validateConfig(labels: MapikaLabels, limits: MapikaLimits) {
   if (
     !labels ||
     labels.names?.length !== MAPIKA_MAX_OPTIONS ||
@@ -120,7 +148,12 @@ function validateConfig(labels, limits) {
 }
 
 /** Pack the upstream joint text-choice path without truncation. */
-export function packMapikaRequest(tokenizer, labels, request, limits) {
+export function packMapikaRequest(
+  tokenizer: unknown,
+  labels: MapikaLabels,
+  request: MapikaRequest,
+  limits: MapikaLimits
+) {
   validateConfig(labels, limits);
   if (!request || typeof request !== 'object' || Array.isArray(request))
     throw inputError('A request object is required.');
@@ -130,8 +163,8 @@ export function packMapikaRequest(tokenizer, labels, request, limits) {
   validateText(tokenizer, request.state, controls);
   const state = encode(tokenizer, `Context:\n${request.state}`);
   if (state.length > limits.maxStateTokens) throw inputError(`The state exceeds ${limits.maxStateTokens} tokens.`);
-  const ids = [],
-    groups = [];
+  const ids: number[] = [],
+    groups: Array<{slot: number; options: string[]}> = [];
   append(ids, state, limits.maxInputTokens);
   for (const [index, question] of request.questions.entries()) {
     validateQuestion(tokenizer, question, controls, index);
@@ -142,32 +175,34 @@ export function packMapikaRequest(tokenizer, labels, request, limits) {
 }
 
 /** Convert one 255-label row per question into ordered, temperature-adjusted scores. */
-export function unpackMapikaScores(rows, packed, temperature) {
-  const isRow = (row) => Array.isArray(row) || (ArrayBuffer.isView(row) && !(row instanceof DataView));
+export function unpackMapikaScores(rows: unknown, packed: PackedMapikaRequest, temperature: unknown) {
+  const isRow = (row: unknown) => Array.isArray(row) || (ArrayBuffer.isView(row) && !(row instanceof DataView));
   if (
     !Number.isFinite(temperature) ||
-    temperature <= 0 ||
+    (temperature as number) <= 0 ||
     !Array.isArray(rows) ||
     rows.length !== packed.groups.length ||
-    rows.some((row) => !isRow(row) || row.length !== MAPIKA_MAX_OPTIONS || row.some((value) => !Number.isFinite(value)))
+    rows.some(
+      (row) => !isRow(row) || row.length !== MAPIKA_MAX_OPTIONS || row.some((value: unknown) => !Number.isFinite(value))
+    )
   )
     throw new WebDecisionError('INFERENCE_ERROR', 'The model returned invalid scores.');
   return {
     tokenCount: packed.ids.length,
     answers: packed.groups.map(({options}, i) => {
-      const logits = Array.from(rows[i].slice(0, options.length));
+      const logits = Array.from((rows[i] as number[]).slice(0, options.length));
       const max = Math.max(...logits);
-      const exps = logits.map((value) => Math.exp((value - max) / temperature));
+      const exps = logits.map((value) => Math.exp((value - max) / (temperature as number)));
       const total = exps.reduce((a, b) => a + b, 0);
       const probabilities = exps.map((value) => value / total);
       const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
       return {
-        selected: options[selectedIndex],
+        selected: options[selectedIndex]!,
         selectedIndex,
         probabilities: options.map((option, index) => ({
           option,
-          probability: probabilities[index],
-          logit: logits[index]
+          probability: probabilities[index]!,
+          logit: logits[index]!
         }))
       };
     })

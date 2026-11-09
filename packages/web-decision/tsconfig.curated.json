@@ -76,6 +76,7 @@
     "src/kev-deberta-reflexes-preview-registry.ts",
     "src/kev-preview-entry.ts",
     "src/deberta-single-preview-entry.ts",
+    "src/mapika.ts",
     "src/mapika/upload.ts",
     "src/stable-models.ts",
     "src/skejja-preview-registry.mts",

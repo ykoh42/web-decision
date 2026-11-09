@@ -84,7 +84,7 @@ export function createMapika4Session({tokenizer, labels, limits, runner}: Create
       validateDecisionFields(options);
       const checked = validateRequestFields(request, 255, Infinity, Infinity, MAPIKA4_MAX_OPTIONS);
       requireOpen();
-      const packed: PackedMapikaRequest = packMapikaRequest(tokenizer, labels, checked, limits);
+      const packed: PackedMapikaRequest = packMapikaRequest(tokenizer, labels!, checked, limits!);
       requireOpen();
       const schedule = () => {
         requireOpen();

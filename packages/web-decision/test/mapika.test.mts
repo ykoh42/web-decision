@@ -117,21 +117,21 @@ test('returns unscaled logits and temperature-adjusted probabilities for each op
   row.set([1, 3]);
   const result = unpackMapikaScores([row], packed, 2);
   assert.equal(result.tokenCount, packed.ids.length);
-  assert.equal(result.answers[0].selected, 'blue');
+  assert.equal(result.answers[0]!.selected, 'blue');
   assert.deepEqual(
-    result.answers[0].probabilities.map((entry: {logit: number}) => entry.logit),
+    result.answers[0]!.probabilities.map((entry: {logit: number}) => entry.logit),
     [1, 3]
   );
-  assert.ok(Math.abs(result.answers[0].probabilities[1].probability - 1 / (1 + Math.exp(-1))) < 1e-12);
+  assert.ok(Math.abs(result.answers[0]!.probabilities[1]!.probability - 1 / (1 + Math.exp(-1))) < 1e-12);
   row.set([0, 0]);
-  assert.equal(unpackMapikaScores([row], packed, 1).answers[0].selectedIndex, 0);
+  assert.equal(unpackMapikaScores([row], packed, 1).answers[0]!.selectedIndex, 0);
   // Preserve the original fixed-length fixture allocation.
   // oxlint-disable-next-line unicorn/no-new-array
   const extreme = new Array(255).fill(0);
   extreme[0] = -Number.MAX_VALUE;
   extreme[1] = Number.MAX_VALUE;
   assert.deepEqual(
-    unpackMapikaScores([extreme], packed, 1).answers[0].probabilities.map((p: {probability: number}) => p.probability),
+    unpackMapikaScores([extreme], packed, 1).answers[0]!.probabilities.map((p: {probability: number}) => p.probability),
     [0, 1]
   );
 });
