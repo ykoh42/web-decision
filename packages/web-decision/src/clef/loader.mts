@@ -1,5 +1,6 @@
 import {waitForAbort} from '../assets.js';
 import {initializeH2oRuntime} from '../h2o/owner.mjs';
+import type {H2oRuntime} from '../h2o/owner.mjs';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {WebDecisionError} from '../kev.js';
 import {watchLoadDeviceLoss} from '../load-device-loss.js';
@@ -49,8 +50,10 @@ interface ClefGpuApi {
   requestAdapter(): PromiseLike<ClefGpuAdapter | null>;
 }
 
+type ClefLoadRuntime = TvmRuntime & H2oRuntime;
+
 interface ClefRuntimeOwner {
-  runtime: TvmRuntime;
+  runtime: ClefLoadRuntime;
   device: unknown;
   gpu: ClefGpuDevice;
   fn: (...args: unknown[]) => TvmTensor;
@@ -77,8 +80,8 @@ interface ClefOrchestrationDeps {
   beforeDevice?: (() => unknown | PromiseLike<unknown>) | undefined;
   openSource(base: URL, options?: {signal?: AbortSignal | undefined}): Promise<ClefSource>;
   prepareTokenizer(data: unknown, config: unknown): ClefTokenizerBundle | PromiseLike<ClefTokenizerBundle>;
-  instantiate(wasm: Uint8Array): TvmRuntime | PromiseLike<TvmRuntime>;
-  initialize(runtime: TvmRuntime, gpu: ClefGpuDevice): ClefRuntimeOwner;
+  instantiate(wasm: Uint8Array): ClefLoadRuntime | PromiseLike<ClefLoadRuntime>;
+  initialize(runtime: ClefLoadRuntime, gpu: ClefGpuDevice): ClefRuntimeOwner;
   upload(owner: ClefRuntimeOwner, source: ClefSource, signal: AbortSignal): Promise<unknown[]>;
   runner(args: ClefRunnerArgs): ClefSessionRunner;
   session(args: ClefTokenizerBundle & {runner: ClefSessionRunner}): unknown;
@@ -91,7 +94,7 @@ interface ValidatedClefOptions {
 
 interface ClefCandidateDependencies {
   Tokenizer?: unknown;
-  instantiate?: (wasm: Uint8Array, wasi: unknown) => TvmRuntime | PromiseLike<TvmRuntime>;
+  instantiate?: (wasm: Uint8Array, wasi: unknown) => ClefLoadRuntime | PromiseLike<ClefLoadRuntime>;
   createPolyfillWASI?: () => unknown;
   gpu?: ClefGpuApi;
   beforeDevice?: () => unknown | PromiseLike<unknown>;
@@ -246,7 +249,7 @@ async function orchestrate({base, signal}: ValidatedClefOptions, deps: ClefOrche
   const gpuApi = deps.gpu;
   if (typeof gpuApi?.requestAdapter !== 'function') throw fail('UNSUPPORTED_ENVIRONMENT', 'WebGPU unavailable.');
   let gpu: ClefGpuDevice | undefined,
-    runtime: TvmRuntime | undefined,
+    runtime: ClefLoadRuntime | undefined,
     owner: ClefRuntimeOwner | undefined,
     watch: ReturnType<typeof watchLoadDeviceLoss> | undefined,
     initialized = false;
@@ -332,7 +335,7 @@ export function loadClefCandidate(
     openSource: openClefSource,
     prepareTokenizer: (data: unknown, config: unknown) => createClefTokenizer(Tokenizer, data, config),
     instantiate: (wasm: Uint8Array) => runtimeInstantiate(wasm, createWasi()),
-    initialize: initializeH2oRuntime,
+    initialize: initializeH2oRuntime as ClefOrchestrationDeps['initialize'],
     upload,
     runner: (args: ClefRunnerArgs) => new ClefTvmRunner(args),
     session: createClefSession

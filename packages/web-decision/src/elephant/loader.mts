@@ -1,5 +1,6 @@
 import {waitForAbort} from '../assets.js';
 import {initializeH2oRuntime} from '../h2o/owner.mjs';
+import type {H2oRuntime} from '../h2o/owner.mjs';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {WebDecisionError} from '../kev.js';
 import {watchLoadDeviceLoss} from '../load-device-loss.js';
@@ -68,7 +69,7 @@ interface ElephantTensor {
   toArray(): unknown;
 }
 
-interface ElephantTvmRuntime {
+interface ElephantTvmRuntime extends H2oRuntime {
   readonly lib?: {
     readonly webGPUContext?: {
       copyRawBytesToBuffer?: (bytes: Uint8Array, pointer: number, offset: number, length: number) => void;
@@ -334,7 +335,7 @@ export function loadElephantCandidate(
         wasm,
         (createPolyfillWASI as () => unknown)()
       ),
-    initialize: initializeH2oRuntime,
+    initialize: initializeH2oRuntime as ElephantOrchestrationDeps['initialize'],
     upload,
     runner: (args) => new ElephantTvmRunner(args),
     session: createElephantSession

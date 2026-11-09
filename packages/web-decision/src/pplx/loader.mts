@@ -1,5 +1,6 @@
 import {waitForAbort} from '../assets.js';
 import {initializeH2oRuntime} from '../h2o/owner.mjs';
+import type {H2oRuntime} from '../h2o/owner.mjs';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {WebDecisionError} from '../kev.js';
 import {watchLoadDeviceLoss} from '../load-device-loss.js';
@@ -65,8 +66,10 @@ interface FlashGpuApi {
   requestAdapter(): PromiseLike<FlashGpuAdapter | null>;
 }
 
+type FlashLoadRuntime = FlashTvmRuntime & H2oRuntime;
+
 interface FlashOwner {
-  runtime: FlashTvmRuntime;
+  runtime: FlashLoadRuntime;
   device: unknown;
   gpu: FlashGpuDevice;
   fn: (...args: unknown[]) => FlashTensor;
@@ -94,8 +97,8 @@ interface FlashOrchestrationDeps {
   retainResources?: ((runtime: unknown, gpu: unknown) => void) | undefined;
   openSource(base: URL, options?: {signal?: AbortSignal | undefined}): Promise<FlashSource>;
   prepareTokenizer(data: unknown, config: unknown): FlashTokenizerBundle;
-  instantiate(wasm: Uint8Array): FlashTvmRuntime | PromiseLike<FlashTvmRuntime>;
-  initialize(runtime: FlashTvmRuntime, gpu: FlashGpuDevice): FlashOwner;
+  instantiate(wasm: Uint8Array): FlashLoadRuntime | PromiseLike<FlashLoadRuntime>;
+  initialize(runtime: FlashLoadRuntime, gpu: FlashGpuDevice): FlashOwner;
   upload(owner: FlashOwner, source: FlashSource, signal: AbortSignal): Promise<unknown[]>;
   runner(args: FlashRunnerArgs): FlashSessionRunner;
   session(args: FlashTokenizerBundle & {runner: FlashSessionRunner}): unknown;
@@ -108,7 +111,7 @@ interface ValidatedFlashOptions {
 
 interface FlashCandidateDependencies {
   Tokenizer?: unknown;
-  instantiate?: (wasm: Uint8Array, wasi: unknown) => FlashTvmRuntime | PromiseLike<FlashTvmRuntime>;
+  instantiate?: (wasm: Uint8Array, wasi: unknown) => FlashLoadRuntime | PromiseLike<FlashLoadRuntime>;
   createPolyfillWASI?: () => unknown;
   gpu?: FlashGpuApi;
   beforeDevice?: () => unknown | PromiseLike<unknown>;
@@ -313,7 +316,7 @@ export function loadFlashCandidate(
     openSource: openFlashSource,
     prepareTokenizer: (data: unknown, config: unknown) => createFlashTokenizer(Tokenizer, data, config),
     instantiate: (wasm: Uint8Array) => runtimeInstantiate(wasm, createWasi()),
-    initialize: initializeH2oRuntime,
+    initialize: initializeH2oRuntime as FlashOrchestrationDeps['initialize'],
     upload,
     runner: (args: FlashRunnerArgs) => new FlashTvmRunner(args),
     session: createFlashSession
