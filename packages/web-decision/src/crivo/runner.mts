@@ -152,7 +152,7 @@ export function createCrivoRunner(ort: unknown, session: unknown): CrivoRunner {
         } finally {
           for (const tensor of Object.values(feeds.values)) tensor.dispose?.();
           for (const tensor of Object.values((output ?? {}) as Record<string, unknown>))
-            (tensor as {dispose?: () => unknown} | null | undefined)?.dispose?.();
+            (tensor as {dispose?: () => unknown}).dispose?.();
         }
         signal?.throwIfAborted();
       }
