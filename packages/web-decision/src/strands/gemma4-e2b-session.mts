@@ -4,64 +4,18 @@ import {validateDecisionFields, validateRequestFields} from '../request-fields.m
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {assertUsable} from './scope.mjs';
 import {packStrandsGemma4Request, unpackStrandsGemma4Scores} from './gemma4-protocol.mjs';
+import type {
+  Gemma4ChoiceAnswer,
+  Gemma4DecisionResult,
+  Gemma4InferenceResult,
+  Gemma4PackedRequest,
+  Gemma4PackedRow
+} from './gemma4-protocol.mjs';
 import {
   STRANDS_GEMMA4_E2B_CONTEXT,
   STRANDS_GEMMA4_E2B_DECISION_CONFIG,
   STRANDS_GEMMA4_E2B_MODEL
 } from './gemma4-e2b-contract.mjs';
-
-type Gemma4QuestionType = 'choice' | 'score' | 'noul';
-
-interface Gemma4PackedRow {
-  readonly name: string;
-  readonly type: Gemma4QuestionType;
-  readonly options: readonly string[];
-  readonly descriptions: readonly string[];
-  readonly inputIds: readonly number[];
-  readonly optionIndices: readonly number[];
-  readonly answerIndex: number;
-}
-
-interface Gemma4PackedRequest {
-  readonly rows: readonly Gemma4PackedRow[];
-  readonly tokenCount: number;
-}
-
-interface Gemma4ChoiceAnswer {
-  readonly type: 'choice';
-  readonly choice: string;
-  readonly probabilities: Readonly<Record<string, number>>;
-}
-
-interface Gemma4ScoreAnswer {
-  readonly type: 'score';
-  readonly score: number;
-  readonly legend: Readonly<Record<string, string>>;
-  readonly probabilities: Readonly<Record<string, number>>;
-  readonly confidence: number;
-}
-
-interface Gemma4NoulAnswer {
-  readonly type: 'noul';
-  readonly noul: number;
-}
-
-type Gemma4Answer = Gemma4ChoiceAnswer | Gemma4ScoreAnswer | Gemma4NoulAnswer;
-
-interface Gemma4InferenceResult {
-  readonly model: string;
-  readonly tokenCount: number;
-  readonly answers: Readonly<Record<string, Gemma4Answer>>;
-}
-
-interface Gemma4DecisionResult {
-  readonly tokenCount: number;
-  readonly answers: readonly {
-    readonly selected: string;
-    readonly selectedIndex: number;
-    readonly probabilities: readonly {readonly option: string; readonly probability: number; readonly logit: number}[];
-  }[];
-}
 
 interface Gemma4CheckedQuestion {
   readonly instructions: unknown;
