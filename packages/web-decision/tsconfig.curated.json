@@ -55,6 +55,7 @@
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
     "src/mapika/upload.ts",
+    "src/stable-models.ts",
     "src/mapika4b/tokenizer.mts",
     "src/mapika4b/runner.mts",
     "src/mapika4b/session.mts",
