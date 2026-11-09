@@ -58,7 +58,6 @@
     "packages/web-decision/src/h2o/source-entry.mjs",
     "packages/web-decision/src/h2o/source.mjs",
     "packages/web-decision/src/h2o/strict-json.mjs",
-    "packages/web-decision/src/h2o/teardown.mjs",
     "packages/web-decision/src/h2o/tokenizer-adapter.mjs",
     "packages/web-decision/src/h2o/tokenizer.mjs",
     "packages/web-decision/src/h2o/upload.mjs",
