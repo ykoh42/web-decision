@@ -88,6 +88,7 @@
     "src/kev-deberta-preview-registry.ts",
     "src/kev-deberta-reflexes-preview-registry.ts",
     "src/kev-preview-entry.ts",
+    "src/deberta/packing.mts",
     "src/deberta-single-preview-entry.ts",
     "src/kev08.ts",
     "src/kev08/loader.ts",

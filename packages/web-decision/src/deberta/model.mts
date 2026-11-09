@@ -51,8 +51,8 @@ type FinishSystemOne = (prepared: PreparedSystemOne, result: DecisionResult) => 
 const validateRequestFieldsForModel = validateRequestFields as ValidateRequestFields;
 const validateDecisionFieldsForModel = validateDecisionFields as ValidateDecisionFields;
 const waitForAbortOperation = waitForAbort as WaitForAbort;
-const packDebertaRequestForModel = packDebertaRequest as DebertaPacker;
-const unpackDebertaScoresForModel = unpackDebertaScores as DebertaUnpacker;
+const packDebertaRequestForModel: DebertaPacker = packDebertaRequest;
+const unpackDebertaScoresForModel: DebertaUnpacker = unpackDebertaScores;
 const prepareDebertaSystemOneForModel = prepareDebertaSystemOne as PrepareSystemOne;
 const finishDebertaSystemOneForModel = finishDebertaSystemOne as FinishSystemOne;
 
