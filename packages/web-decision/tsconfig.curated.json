@@ -42,6 +42,7 @@
     "test/mapika-q4-device.test.mts",
     "test/model-assets.test.mts",
     "test/nari-adapter.test.mts",
+    "test/nari-checkpoints.test.mts",
     "test/nari-session.test.mts",
     "src/nari/session.mts",
     "src/nari/protocol.mts",

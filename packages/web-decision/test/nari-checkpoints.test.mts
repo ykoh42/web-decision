@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runCheckpointedStages} from '../src/nari/checkpoints.mjs';
 
-function fixture(failingStage) {
-  const events = [],
-    scopes = [];
+type StageName = 'inputs' | 'graph' | 'head' | 'letter';
+type FakeStage = {submit(): string; sync(): Promise<void>};
+type StageError = {stage: string; cause: unknown};
+
+function fixture(failingStage?: string) {
+  const events: string[] = [],
+    scopes: Array<{name: string} | null> = [];
   let retained = 0;
   const gpu = {
-    pushErrorScope(kind) {
+    pushErrorScope(kind: 'validation') {
       assert.equal(kind, 'validation');
       scopes.push(null);
       events.push('push');
@@ -31,7 +35,7 @@ function fixture(failingStage) {
         }
       }
     ])
-  );
+  ) as Record<StageName, FakeStage>;
   return {
     gpu,
     stages,
@@ -73,7 +77,9 @@ for (const stage of ['inputs', 'graph', 'head', 'letter'])
     const f = fixture(stage);
     await assert.rejects(
       runCheckpointedStages(f),
-      (error) => error.stage === stage && error.cause.name === 'GPUValidationError'
+      (error) =>
+        (error as StageError).stage === stage &&
+        ((error as StageError).cause as {name: string}).name === 'GPUValidationError'
     );
     const index = ['inputs', 'graph', 'head', 'letter'].indexOf(stage);
     for (const next of ['inputs', 'graph', 'head', 'letter'].slice(index + 1))
@@ -87,7 +93,7 @@ test('a failed sync retains ownership and stops before the next readback', async
     f.events.push('sync:head');
     throw Error('unknown completion');
   };
-  await assert.rejects(runCheckpointedStages(f), (error) => error.stage === 'head');
+  await assert.rejects(runCheckpointedStages(f), (error) => (error as StageError).stage === 'head');
   assert.equal(f.retained(), 1);
   assert.equal(f.events.includes('submit:letter'), false);
 });
@@ -97,7 +103,7 @@ test('failed validation scope closure retains ownership and stops', async () => 
   f.gpu.popErrorScope = async () => {
     throw Error('scope state unknown');
   };
-  await assert.rejects(runCheckpointedStages(f), (error) => error.stage === 'inputs');
+  await assert.rejects(runCheckpointedStages(f), (error) => (error as StageError).stage === 'inputs');
   assert.equal(f.retained(), 1);
   assert.equal(f.events.includes('submit:head'), false);
 });
@@ -107,7 +113,7 @@ test('submit failure retains ownership even before sync', async () => {
   f.stages.inputs.submit = () => {
     throw Error('submission state unknown');
   };
-  await assert.rejects(runCheckpointedStages(f), (error) => error.stage === 'inputs');
+  await assert.rejects(runCheckpointedStages(f), (error) => (error as StageError).stage === 'inputs');
   assert.equal(f.retained(), 1);
   assert.equal(f.events.includes('sync:inputs'), false);
   assert.equal(f.events.includes('submit:head'), false);
@@ -119,7 +125,10 @@ test('falsy thrown values remain failures', async () => {
     f.stages.inputs.submit = () => {
       throw value;
     };
-    await assert.rejects(runCheckpointedStages(f), (error) => error.stage === 'inputs' && error.cause === value);
+    await assert.rejects(
+      runCheckpointedStages(f),
+      (error) => (error as StageError).stage === 'inputs' && (error as StageError).cause === value
+    );
     assert.equal(f.retained(), 1);
     assert.equal(f.events.includes('submit:head'), false);
   }

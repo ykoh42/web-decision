@@ -140,7 +140,6 @@
     "packages/web-decision/test/model-memory.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/model-source.test.mjs",
-    "packages/web-decision/test/nari-checkpoints.test.mjs",
     "packages/web-decision/test/nari-loader.test.mjs",
     "packages/web-decision/test/nari-runner.test.mjs",
     "packages/web-decision/test/nari-runtime.test.mjs",
