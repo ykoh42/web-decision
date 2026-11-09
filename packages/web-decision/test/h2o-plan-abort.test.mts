@@ -3,9 +3,9 @@ import test from 'node:test';
 import {prepareCandidatePlan} from '../src/h2o/plan.mjs';
 
 test('plan abort during the first digest stops before the next digest or metadata parsing', async (t) => {
-  let resolveDigest,
-    calls = 0;
-  const pendingDigest = new Promise((resolve) => {
+  let resolveDigest!: (value: ArrayBuffer) => void;
+  let calls = 0;
+  const pendingDigest = new Promise<ArrayBuffer>((resolve) => {
     resolveDigest = resolve;
   });
   t.mock.method(crypto.subtle, 'digest', () => {

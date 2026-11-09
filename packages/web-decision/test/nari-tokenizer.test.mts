@@ -8,13 +8,15 @@ names[2] = '<|im_end|>';
 names[24] = '<think>';
 names[25] = '</think>';
 const data = () => ({added_tokens: names.map((content, i) => ({id: 248044 + i, content}))});
-const bytes = (value) => new TextEncoder().encode(JSON.stringify(value));
+const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 const config = bytes({tokenizer_class: 'Qwen3_5Tokenizer'});
 class Tokenizer {
-  constructor(value) {
+  declare tokens: ReturnType<typeof data>['added_tokens'];
+
+  constructor(value: ReturnType<typeof data>) {
     this.tokens = value.added_tokens;
   }
-  encode(text) {
+  encode(text: string) {
     const token = this.tokens.find((entry) => text.includes(entry.content));
     return {ids: token ? [token.id] : []};
   }
@@ -31,10 +33,10 @@ test('rejects wrong tokenizer class, duplicate IDs and marker encoding', () => {
     code: 'INVALID_ASSET'
   });
   const duplicate = data();
-  duplicate.added_tokens[0].id = duplicate.added_tokens[1].id;
+  duplicate.added_tokens[0]!.id = duplicate.added_tokens[1]!.id;
   assert.throws(() => createNariTokenizer(Tokenizer, bytes(duplicate), config), {code: 'INVALID_ASSET'});
   class Broken extends Tokenizer {
-    encode() {
+    override encode() {
       return {ids: [0]};
     }
   }
