@@ -11,12 +11,17 @@ import {
   validateMapikaQ4WeightIndex
 } from '../src/mapika-q4/contract.js';
 
+interface MutableFixtureIndex {
+  records: {offset: number; shape: number[]; dtype: string}[];
+  shards: {path: string; nbytes: number}[];
+}
+
 const fixture = new URL('./fixtures/mapika-q4/', import.meta.url);
 
 async function assets() {
   const manifestBytes = await readFile(new URL('manifest.json', fixture));
-  const manifest = JSON.parse(manifestBytes),
-    index = JSON.parse(await readFile(new URL('index.json', fixture)));
+  const manifest = JSON.parse(manifestBytes as unknown as string),
+    index = JSON.parse((await readFile(new URL('index.json', fixture))) as unknown as string);
   return {manifestBytes, manifest, index};
 }
 
@@ -45,28 +50,28 @@ test('validates 510 ordered Q4 tensors, labels, tied embedding and bounded shard
   const {manifest, index} = await assets();
   assert.equal(validateMapikaQ4WeightIndex(manifest, index), index);
   for (const mutate of [
-    (item) => {
-      item.records[1].offset += 4;
+    (item: MutableFixtureIndex) => {
+      item.records[1]!.offset += 4;
     },
-    (item) => {
-      item.records[133].shape = [254];
+    (item: MutableFixtureIndex) => {
+      item.records[133]!.shape = [254];
     },
-    (item) => {
-      item.records[506].dtype = 'int32';
+    (item: MutableFixtureIndex) => {
+      item.records[506]!.dtype = 'int32';
     },
-    (item) => {
-      item.records[507].shape[1] = 31;
+    (item: MutableFixtureIndex) => {
+      item.records[507]!.shape[1] = 31;
     },
-    (item) => {
-      item.records[0].dtype = 'float64';
+    (item: MutableFixtureIndex) => {
+      item.records[0]!.dtype = 'float64';
     },
-    (item) => {
-      item.shards[1].path = '../other.bin';
+    (item: MutableFixtureIndex) => {
+      item.shards[1]!.path = '../other.bin';
     },
-    (item) => {
-      item.shards[1].nbytes += 4;
+    (item: MutableFixtureIndex) => {
+      item.shards[1]!.nbytes += 4;
     },
-    (item) => {
+    (item: MutableFixtureIndex) => {
       item.records.pop();
     }
   ]) {
