@@ -67,7 +67,9 @@ interface ValidatedDecisionRequest {
 }
 
 interface PreparedSystemOneQuestion {
+  readonly id: string;
   readonly instructions: string;
+  readonly labels: string[];
   readonly choices: string[];
   readonly type: DecimaInferenceKind;
   readonly outputType: DecimaInferenceKind;

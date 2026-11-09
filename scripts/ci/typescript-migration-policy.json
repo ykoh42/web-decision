@@ -13,8 +13,6 @@
     "packages/web-decision/src/deberta/packing.mjs",
     "packages/web-decision/src/deberta/typed.mjs",
     "packages/web-decision/src/decima-base-clean-preview-entry.mjs",
-    "packages/web-decision/src/decima/contract.mjs",
-    "packages/web-decision/src/decima/typed.mjs",
     "packages/web-decision/src/elephant/loader.mjs",
     "packages/web-decision/src/elephant/protocol.mjs",
     "packages/web-decision/src/elephant/runner.mjs",

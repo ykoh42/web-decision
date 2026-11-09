@@ -1,3 +1,35 @@
+import type {AssetSourceFile, ManifestSourceSpec} from '../asset-source-types.js';
+import type {DecimaInferenceKind} from './protocol.mjs';
+
+export interface DecimaModelSpec extends ManifestSourceSpec {
+  readonly model: string;
+  readonly repository: string;
+  readonly revision: string;
+  readonly files: Readonly<Record<string, AssetSourceFile>>;
+  readonly maxStateTokens: number;
+  readonly sourceMaxStateTokens: number;
+  readonly maxChoiceTokens: number;
+  readonly temperature: number;
+  readonly stateOverflow: 'truncate' | 'reject';
+  readonly choiceFit: boolean;
+  readonly typedQuestionTypes: readonly DecimaInferenceKind[];
+  readonly cpuWasmVerification: string;
+}
+
+interface ModelSpecOptions {
+  readonly model: string;
+  readonly repository: string;
+  readonly revision: string;
+  readonly files: Readonly<Record<string, AssetSourceFile>>;
+  readonly temperature: number;
+  readonly stateOverflow: 'truncate' | 'reject';
+  readonly choiceFit: boolean;
+  readonly maxStateTokens?: number | undefined;
+  readonly sourceMaxStateTokens?: number | undefined;
+  readonly typedQuestionTypes?: readonly DecimaInferenceKind[] | undefined;
+  readonly cpuWasmVerification?: string | undefined;
+}
+
 export const DECIMA_SMALL_MODEL = 'experimental-decima-small-int8';
 const DECIMA_SMALL_REPOSITORY = 'amyrmahdy/decima-small';
 const DECIMA_SMALL_REVISION = '480c4ea9e54f2946b947fb3ceb3c7cc7ece77522';
@@ -95,7 +127,7 @@ function modelSpec({
   sourceMaxStateTokens = maxStateTokens,
   typedQuestionTypes = ['choice', 'score', 'noul', 'rank'],
   cpuWasmVerification = 'verified'
-}) {
+}: ModelSpecOptions): DecimaModelSpec {
   const manifest = Object.freeze({files});
   return Object.freeze({
     model,
