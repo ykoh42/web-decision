@@ -24,7 +24,7 @@ const coreTests = [
   'test/kanana-image-processing.test.mjs',
   'test/kanana-magick-image.test.mjs',
   'test/kanana-pnm-image.test.mjs',
-  'test/kanana-tiff16-image.test.mjs'
+  'test/kanana-tiff16-image.test.mts'
 ];
 const tests = process.argv.includes('--core') ? coreTests : allTests;
 // These tests import emitted JS with external TypeScript source maps. Keep tsx
@@ -62,6 +62,7 @@ try {
     }
   );
   await copyFile(join(testDirectory, 'kanana-core-modules.mjs'), join(emittedTests, 'test', 'kanana-core-modules.mjs'));
+  await symlink(join(testDirectory, 'fixtures'), join(emittedTests, 'test', 'fixtures'), 'junction');
   const runTests = (files: string[], useTsx: boolean) => {
     const testArguments = [...(useTsx ? ['--import', 'tsx'] : []), '--test', ...files];
     if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');

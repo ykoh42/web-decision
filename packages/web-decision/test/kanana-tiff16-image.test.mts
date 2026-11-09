@@ -7,11 +7,11 @@ const {decodeKananaTiff16Image} = tiff16Image;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 
-async function fixture(name) {
+async function fixture(name: string) {
   return new Uint8Array(await readFile(new URL(name, fixtureDirectory)));
 }
 
-function setClassicTag(bytes, tag, value) {
+function setClassicTag(bytes: Uint8Array, tag: number, value: number) {
   const littleEndian = bytes[0] === 73;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const directory = view.getUint32(4, littleEndian);
@@ -28,14 +28,14 @@ function setClassicTag(bytes, tag, value) {
   throw new Error(`Missing TIFF tag ${tag}`);
 }
 
-async function assertFixture(name, width = 4, height = 2) {
+async function assertFixture(name: string, width = 4, height = 2) {
   const encoded = await fixture(`${name}.tif`);
   const expected = await fixture(`${name}.rgb`);
   const image = await decodeKananaTiff16Image(encoded);
 
-  assert.equal(image.width, width);
-  assert.equal(image.height, height);
-  assert.deepEqual(Buffer.from(image.rgb), Buffer.from(expected));
+  assert.equal(image!.width, width);
+  assert.equal(image!.height, height);
+  assert.deepEqual(Buffer.from(image!.rgb), Buffer.from(expected));
 }
 
 test('16-bit grayscale conversion matches Pillow around byte boundaries', async () => {
@@ -48,9 +48,9 @@ test('preserves iterable byte inputs accepted by the Uint8Array constructor', as
   const expected = await fixture('gray-16bit-le.rgb');
   const image = await decodeKananaTiff16Image(encoded.values());
 
-  assert.equal(image.width, 4);
-  assert.equal(image.height, 2);
-  assert.deepEqual(Buffer.from(image.rgb), Buffer.from(expected));
+  assert.equal(image!.width, 4);
+  assert.equal(image!.height, 2);
+  assert.deepEqual(Buffer.from(image!.rgb), Buffer.from(expected));
 });
 
 test('16-bit grayscale LZW decodes across TIFF code-width changes', async () => {
@@ -98,16 +98,16 @@ test('Pillow decompression-bomb boundaries are checked before TIFF pixel allocat
   const warning = await fixture('gray-16bit-le.tif');
   setClassicTag(warning, 256, 89_478_486);
   setClassicTag(warning, 257, 1);
-  const warnings = [];
+  const warnings: unknown[] = [];
   const previousWarn = globalThis.console.warn;
-  globalThis.console.warn = (message) => warnings.push(message);
+  globalThis.console.warn = (message: unknown) => warnings.push(message);
   try {
     await assert.rejects(decodeKananaTiff16Image(warning), /16-bit TIFF layout/);
   } finally {
     globalThis.console.warn = previousWarn;
   }
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /Pillow 12\.1\.1's warning limit of 89478485 pixels/);
+  assert.match(warnings[0] as string, /Pillow 12\.1\.1's warning limit of 89478485 pixels/);
 });
 
 test('compressed TIFF strips cannot expand past their declared dimensions', async () => {
