@@ -185,7 +185,6 @@
     "packages/web-decision/test/kev08.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/load-device-loss.test.mjs",
-    "packages/web-decision/test/mapika-contract.test.mjs",
     "packages/web-decision/test/mapika-device.test.mjs",
     "packages/web-decision/test/mapika-q4-contract.test.mjs",
     "packages/web-decision/test/mapika-q4-device.test.mjs",

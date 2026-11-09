@@ -25,6 +25,7 @@
     "test/bundler-notices.test.mts",
     "test/kev06-contract.test.mts",
     "test/mapika4b-tokenizer.test.mts",
+    "test/mapika-contract.test.mts",
     "test/model-assets.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",

@@ -18,7 +18,7 @@ function fixture() {
     offset += nbytes;
   }
   const shards = [],
-    files = {};
+    files: Record<string, {bytes: number}> = {};
   let remaining = MAPIKA_PARAMETER_BYTES;
   for (let i = 0; i < 180; i++) {
     const nbytes = Math.min(remaining, MAPIKA_MAX_SHARD_BYTES);
@@ -36,22 +36,22 @@ test('checks all parameter and shard boundaries before allocation', () => {
   const {manifest, index} = fixture();
   assert.equal(validateMapikaWeightIndex(manifest, index), index);
   for (const mutate of [
-    (value) => {
-      value.records[5].offset += 4;
+    (value: ReturnType<typeof fixture>['index']) => {
+      value.records[5]!.offset += 4;
     },
-    (value) => {
-      value.records[320].shape = [254];
+    (value: ReturnType<typeof fixture>['index']) => {
+      value.records[320]!.shape = [254];
     },
-    (value) => {
-      value.records[1].dtype = 'float64';
+    (value: ReturnType<typeof fixture>['index']) => {
+      value.records[1]!.dtype = 'float64';
     },
-    (value) => {
-      value.shards[1].path = '../other.bin';
+    (value: ReturnType<typeof fixture>['index']) => {
+      value.shards[1]!.path = '../other.bin';
     },
-    (value) => {
-      value.shards[1].nbytes += 4;
+    (value: ReturnType<typeof fixture>['index']) => {
+      value.shards[1]!.nbytes += 4;
     },
-    (value) => {
+    (value: ReturnType<typeof fixture>['index']) => {
       value.records.pop();
     }
   ]) {
