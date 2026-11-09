@@ -13,7 +13,6 @@
     "packages/web-decision/src/nari/scope.mjs",
     "packages/web-decision/src/pinned-text-loader.js",
     "packages/web-decision/src/request-fields.mjs",
-    "packages/web-decision/src/skejja/source.mjs",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",
     "packages/web-decision/test/cache-cancellation.test.mjs",

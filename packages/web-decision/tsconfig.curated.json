@@ -127,6 +127,7 @@
     "src/skejja/loader.mts",
     "src/skejja/session.mts",
     "src/skejja/protocol.mts",
+    "src/skejja/source.mts",
     "src/strands/loader.mts",
     "src/strands/fused-upload.mts",
     "src/strands/preflight.mts",
