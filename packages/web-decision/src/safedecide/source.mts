@@ -14,7 +14,7 @@ export async function openSafeDecideSource({
   let loadedBytes = 0;
   return {
     async read(name: string): Promise<ArrayBuffer> {
-      const options = {
+      const bytes = await readVerifiedAsset(base, spec.manifest, name, {
         cache,
         signal,
         offline,
@@ -23,8 +23,7 @@ export async function openSafeDecideSource({
           loadedBytes += count;
           onProgress?.({loadedBytes, totalBytes: spec.totalBytes, fraction: loadedBytes / spec.totalBytes});
         }
-      };
-      const bytes: ArrayBuffer = await readVerifiedAsset(base, spec.manifest, name, options);
+      });
       return bytes;
     }
   };

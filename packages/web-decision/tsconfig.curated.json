@@ -44,6 +44,7 @@
     "test/pplx-source.test.mts",
     "test/pplx-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",
+    "test/safedecide-source.test.mts",
     "test/strands-gemma4-runner.test.mts",
     "test/strands-gemma4-session.test.mts",
     "test/strands-loader-entry.test.mts",
@@ -71,6 +72,7 @@
     "src/strands/range-source.mts",
     "src/strands/session.mts",
     "src/strands/source-loader-internal.mts",
+    "src/safedecide/*.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]
