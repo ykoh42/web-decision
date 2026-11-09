@@ -9,7 +9,6 @@
     "packages/web-decision/src/h2o/runner.mjs",
     "packages/web-decision/src/h2o/sha256.mjs",
     "packages/web-decision/src/h2o/upload.mjs",
-    "packages/web-decision/src/imajev/candidate-loader.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",
     "packages/web-decision/src/model-registry.js",

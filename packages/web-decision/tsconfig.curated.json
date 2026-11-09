@@ -74,6 +74,7 @@
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
     "test/preview-entrypoints.test.mts",
+    "src/imajev/candidate-loader.mts",
     "src/imajev/upload.mts",
     "src/imajev/source.mts",
     "src/imajev/plan.mts",

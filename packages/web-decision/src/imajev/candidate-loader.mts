@@ -12,7 +12,34 @@ import {ImajevSession} from './session.mjs';
 import {openImajevSource} from './source.mjs';
 import {uploadImajevFromSource} from './upload.mjs';
 
-const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
+type ImajevSource = Awaited<ReturnType<typeof openImajevSource>>;
+type ImajevOwner = Parameters<typeof uploadImajevFromSource>[0] &
+  Omit<ConstructorParameters<typeof ImajevSession>[0], 'weights' | 'processor' | 'maxInputTokens'>;
+type ImajevProcessor = ReturnType<typeof createImajevResultProcessor>;
+type ImajevRuntime = {dispose(): unknown};
+type ImajevSessionArgs = ImajevOwner & {weights: unknown[]; processor: ImajevProcessor; maxInputTokens: number};
+interface Ownership {
+  initialize(runtime: ImajevRuntime, gpu: GPUDevice): ImajevOwner;
+  fail(runtime: ImajevRuntime | undefined, gpu: GPUDevice | undefined): unknown;
+}
+interface ImajevDependencies {
+  gpu: GPU | undefined;
+  ownership(): Ownership;
+  openSource(base: URL, options: {signal: AbortSignal | undefined}): Promise<ImajevSource>;
+  processor(assets: Uint8Array[], maxInputTokens: number): ImajevProcessor;
+  instantiate(wasm: Uint8Array): Promise<ImajevRuntime>;
+  upload(owner: ImajevOwner, source: ImajevSource, options: {signal: AbortSignal}): Promise<unknown[]>;
+  session(value: ImajevSessionArgs): unknown;
+}
+interface ImajevBindings {
+  Tokenizer?: new (data: unknown, config: unknown) => unknown;
+  instantiate?: (wasm: Uint8Array, wasi: unknown) => Promise<ImajevRuntime>;
+  createPolyfillWASI?: () => unknown;
+  gpu?: GPU | undefined;
+}
+
+const fail = (code: ConstructorParameters<typeof WebDecisionError>[0], message: string, cause?: unknown) =>
+  new WebDecisionError(code, message, cause ? {cause} : undefined);
 const KEYS = new Set([
   'model',
   'assetsUrl',
@@ -30,16 +57,17 @@ export const IMAJEV_LIMITS = Object.freeze({
   maxBufferSize: 134184960
 });
 
-export function validateImajevOptions(options) {
+export function validateImajevOptions(options: unknown) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw fail('INVALID_INPUT', 'Invalid Imajev options.');
   const prototype = Object.getPrototypeOf(options);
   if (
     prototype !== null &&
-    (Object.getPrototypeOf(prototype) !== null || Reflect.ownKeys(prototype).some((key) => !PROTOTYPE_KEYS.has(key)))
+    (Object.getPrototypeOf(prototype) !== null ||
+      Reflect.ownKeys(prototype).some((key) => !PROTOTYPE_KEYS.has(key as string)))
   )
     throw fail('INVALID_INPUT', 'Unsupported Imajev option prototype.');
-  const snapshot = Object.create(null);
+  const snapshot: Record<string, unknown> = Object.create(null);
   for (const key of Reflect.ownKeys(options)) {
     const field = Object.getOwnPropertyDescriptor(options, key);
     if (typeof key !== 'string' || !KEYS.has(key) || !field || !Object.hasOwn(field, 'value'))
@@ -67,20 +95,27 @@ export function validateImajevOptions(options) {
     throw fail('INVALID_INPUT', 'Invalid Imajev asset URL.');
   if (!base.pathname.endsWith('/')) base.pathname += '/';
   validateH2oSignal(snapshot.signal);
-  return {base, signal: snapshot.signal};
+  return {base, signal: snapshot.signal as AbortSignal | undefined};
 }
 
-function checkedImajevLimits(adapter) {
+function checkedImajevLimits(adapter: GPUAdapter | null) {
   if (!adapter?.features?.has('shader-f16') || typeof adapter.requestDevice !== 'function')
     throw fail('UNSUPPORTED_ENVIRONMENT', 'Imajev requires WebGPU shader-f16.');
   for (const [name, minimum] of Object.entries(IMAJEV_LIMITS))
-    if (!Number.isSafeInteger(adapter.limits?.[name]) || adapter.limits[name] < minimum)
+    if (
+      !Number.isSafeInteger((adapter.limits as unknown as Record<string, number>)?.[name]) ||
+      (adapter.limits as unknown as Record<string, number>)[name]! < minimum
+    )
       throw fail('UNSUPPORTED_ENVIRONMENT', `Imajev requires ${name} of at least ${minimum}.`);
   return IMAJEV_LIMITS;
 }
 
-function processorFromAssets(Tokenizer, assets, maxInputTokens) {
-  const json = (bytes) => parseStrictJson(bytes, {maxBytes: 16 * 1024 * 1024});
+function processorFromAssets(
+  Tokenizer: new (data: unknown, config: unknown) => unknown,
+  assets: Uint8Array[],
+  maxInputTokens: number
+) {
+  const json = (bytes: Uint8Array | undefined) => parseStrictJson(bytes, {maxBytes: 16 * 1024 * 1024});
   const tokenizer = new Tokenizer(json(assets[1]), json(assets[2]));
   return createImajevResultProcessor({
     tokenizer,
@@ -90,13 +125,17 @@ function processorFromAssets(Tokenizer, assets, maxInputTokens) {
   });
 }
 
-async function orchestrate({base, signal}, deps) {
+async function orchestrate({base, signal}: {base: URL; signal: AbortSignal | undefined}, deps: ImajevDependencies) {
   if (typeof deps.gpu?.requestAdapter !== 'function') throw fail('UNSUPPORTED_ENVIRONMENT', 'WebGPU unavailable.');
-  let source, gpu, runtime, owner, watch;
+  let source: ImajevSource | null | undefined,
+    gpu: GPUDevice | undefined,
+    runtime: ImajevRuntime | undefined,
+    owner: ImajevOwner | undefined,
+    watch: ReturnType<typeof watchLoadDeviceLoss> | null | undefined;
   const ownership = deps.ownership();
   try {
     signal?.throwIfAborted();
-    const adapter = await waitForAbort(() => deps.gpu.requestAdapter(), signal);
+    const adapter = await waitForAbort(() => deps.gpu!.requestAdapter(), signal);
     const limits = checkedImajevLimits(adapter);
     source = await waitForAbort(
       () => deps.openSource(base, {signal}),
@@ -107,7 +146,7 @@ async function orchestrate({base, signal}, deps) {
       () =>
         Promise.all(
           ['model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'decision_readout.json', 'calibration.json'].map(
-            (name) => source.readAsset(name, {signal})
+            (name) => source!.readAsset(name, {signal})
           )
         ),
       signal
@@ -115,7 +154,7 @@ async function orchestrate({base, signal}, deps) {
     signal?.throwIfAborted();
     const processor = deps.processor(assets, source.plan.maxInputTokens);
     gpu = await waitForAbort(
-      () => adapter.requestDevice({requiredFeatures: ['shader-f16'], requiredLimits: limits}),
+      () => adapter!.requestDevice({requiredFeatures: ['shader-f16'], requiredLimits: limits}),
       signal,
       (late) => {
         try {
@@ -128,7 +167,7 @@ async function orchestrate({base, signal}, deps) {
     signal?.throwIfAborted();
     watch = watchLoadDeviceLoss(gpu, signal);
     runtime = await waitForAbort(
-      () => deps.instantiate(assets[0]),
+      () => deps.instantiate(assets[0]!),
       watch.signal,
       (late) => {
         try {
@@ -164,15 +203,16 @@ async function orchestrate({base, signal}, deps) {
         retainStrandsResources(runtime, gpu);
       }
     signal?.throwIfAborted();
-    if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
+    if (cause instanceof WebDecisionError || (cause as {name?: unknown} | null | undefined)?.name === 'AbortError')
+      throw cause;
     throw fail('MODEL_LOAD_FAILED', 'Could not load Imajev candidate.', cause);
   }
 }
 
 /** Internal candidate only; the public model router does not yet expose it. */
 export function loadImajevCandidate(
-  options,
-  {Tokenizer, instantiate, createPolyfillWASI, gpu = globalThis.navigator?.gpu} = {}
+  options: unknown,
+  {Tokenizer, instantiate, createPolyfillWASI, gpu = globalThis.navigator?.gpu}: ImajevBindings = {}
 ) {
   const checked = validateImajevOptions(options);
   if (typeof Tokenizer !== 'function' || typeof instantiate !== 'function' || typeof createPolyfillWASI !== 'function')
@@ -183,12 +223,16 @@ export function loadImajevCandidate(
     openSource: openImajevSource,
     processor: (assets, max) => processorFromAssets(Tokenizer, assets, max),
     instantiate: (wasm) => instantiate(wasm, createPolyfillWASI()),
-    upload: (owner, source, context) => uploadImajevFromSource(owner, source, {...context, HashClass: Hash}),
+    upload: (owner, source, context) =>
+      uploadImajevFromSource(owner, source, {
+        ...context,
+        HashClass: Hash as unknown as NonNullable<Parameters<typeof uploadImajevFromSource>[2]>['HashClass']
+      }),
     session: (value) => new ImajevSession(value)
   });
 }
 
-export function loadFakeImajevCandidate(options, deps) {
+export function loadFakeImajevCandidate(options: unknown, deps: ImajevDependencies & {fake?: boolean}) {
   if (deps?.fake !== true) throw new TypeError('Fake dependencies required.');
   return orchestrate(validateImajevOptions(options), deps);
 }

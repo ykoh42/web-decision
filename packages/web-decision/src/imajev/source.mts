@@ -41,7 +41,7 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-function assetBase(value: string) {
+function assetBase(value: string | URL) {
   let base;
   try {
     base = new URL(value);
@@ -73,7 +73,10 @@ async function verifiedBytes(reader: ImajevReader, base: URL, entry: ImajevRange
 }
 
 /** Open only the locally pinned experimental metadata; hashes do not authenticate a publisher. */
-export async function openImajevSource(baseValue: string, {signal, reader = readVerifiedRange}: SourceOptions = {}) {
+export async function openImajevSource(
+  baseValue: string | URL,
+  {signal, reader = readVerifiedRange}: SourceOptions = {}
+) {
   if (typeof reader !== 'function') throw invalid();
   const base = assetBase(baseValue);
   const bytes = await verifiedBytes(
