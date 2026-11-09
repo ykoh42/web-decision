@@ -53,6 +53,15 @@ type UpstreamReferenceFixture = Readonly<{
 }>;
 type InferenceSnapshot = Omit<ObservedInference, 'probabilities'> & {probabilities: Answer['probabilities']};
 type BrowserDescriptor = Readonly<{modelId: string | null; backend: string | null; manifestSha256: string | null}>;
+type AggregateResourceObservation = Readonly<{
+  code: string;
+  message: string;
+  packedTokenCount: number;
+  questionCount: number;
+  branchTokenCounts: readonly number[];
+  attentionBufferBytes: number;
+  deviceAttentionLimit: number;
+}>;
 type OnlineResult = InferenceSnapshot & {
   adapterInfo: GPUAdapterInfo;
   adapterIsFallback: false;
@@ -64,6 +73,7 @@ type OnlineResult = InferenceSnapshot & {
   sourceReachedFullLength: boolean;
   verifiedFiles: VerifiedFile[];
   expandedInference: ExpandedInferenceObservation;
+  aggregateResource: AggregateResourceObservation;
 };
 type OfflineResult = InferenceSnapshot;
 type BrowserTypedQuestion =
@@ -74,6 +84,7 @@ interface BrowserOnlineOptions {
   expectedSourceBytes: number;
   representativeCases: readonly Readonly<{id: string; request: DecisionRequest}>[];
   typedProbe: Readonly<{id: string; state: string; questions: Readonly<Record<string, BrowserTypedQuestion>>}>;
+  aggregateBranchTokenTargets: readonly number[];
   expectedFiles: Record<string, AssetMetadata>;
 }
 
@@ -218,6 +229,7 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
       state: expandedFixture.typedSystemOne.state,
       questions: expandedFixture.typedSystemOne.questions as unknown as Readonly<Record<string, BrowserTypedQuestion>>
     },
+    aggregateBranchTokenTargets: [8191, 8191, 8191, 4097, 4098],
     expectedFiles: manifestFiles
   });
 
@@ -280,7 +292,15 @@ test('kev-0.6b-q4f16 loads pinned upstream weights and emits measured release ev
   expect(offline.backend).toBe('tvm-webgpu');
   expect(offline.assetManifestSha256).toBe(online.assetManifestSha256);
 
-  const onlineInference: ObservedInference = online;
+  const {aggregateResource, ...onlineInferenceResult} = online;
+  expect(aggregateResource.packedTokenCount).toBe(32769);
+  expect(aggregateResource.questionCount).toBe(5);
+  expect(aggregateResource.branchTokenCounts).toEqual([8191, 8191, 8191, 4097, 4098]);
+  expect(aggregateResource.branchTokenCounts.every((count) => count <= 8191)).toBe(true);
+  expect(aggregateResource.attentionBufferBytes).toBe(34_361_835_552);
+  expect(aggregateResource.attentionBufferBytes).toBeGreaterThan(aggregateResource.deviceAttentionLimit);
+  expect(aggregateResource.code).toBe('DEVICE_RESOURCE_LIMIT');
+  const onlineInference: ObservedInference = onlineInferenceResult;
   const offlineInference: ObservedInference = offline;
   const baselineExpected: ExpectedInference = {
     selected: baseline.selected,
@@ -382,6 +402,7 @@ async function runOnlineInference({
   expectedSourceBytes,
   representativeCases,
   typedProbe,
+  aggregateBranchTokenTargets,
   expectedFiles
 }: BrowserOnlineOptions): Promise<OnlineResult> {
   const reportProgress = (stage: string, details: Record<string, unknown> = {}) =>
@@ -412,6 +433,7 @@ async function runOnlineInference({
   try {
     const decision = await runDecisionCases(model, representativeCases, reportProgress);
     const typedSystemOne = await runTypedProbe(model, typedProbe, reportProgress);
+    const aggregateResource = await runAggregateResourceProbe(model, aggregateBranchTokenTargets, reportProgress);
     result = {
       modelId: model.description.modelId,
       backend: model.description.backend.name,
@@ -427,7 +449,8 @@ async function runOnlineInference({
       disposed: false,
       sourceReachedFullLength: sourceReachedFullLength(sourceProgress, expectedSourceBytes),
       verifiedFiles: [],
-      expandedInference: {decisionRuns: decision.runs, typedSystemOne}
+      expandedInference: {decisionRuns: decision.runs, typedSystemOne},
+      aggregateResource
     };
   } finally {
     reportProgress('dispose.started');
@@ -515,6 +538,82 @@ async function runOnlineInference({
       reportProgress('typed.single.completed', {question: name, tokenCount: single[name]!.tokenCount});
     }
     return {packed, single};
+  }
+
+  async function runAggregateResourceProbe(
+    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    branchTokenTargets: readonly number[],
+    reportProgress: (stage: string, details?: Record<string, unknown>) => void
+  ): Promise<AggregateResourceObservation> {
+    const kev06Model = activeModel as unknown as LoadedKev06DecisionModel & {
+      readonly tokenizer: {
+        encode(text: string, options: {add_special_tokens: false}): {ids: readonly number[]};
+      };
+      readonly gpu: GPUDevice | null;
+    };
+    const tokenizer = kev06Model.tokenizer;
+    const gpu = kev06Model.gpu;
+    if (!tokenizer || !gpu) throw new Error('The loaded Kev model did not expose its tokenizer and GPU device.');
+
+    const tokenLength = (text: string) => tokenizer.encode(text, {add_special_tokens: false}).ids.length;
+    const exactTokenText = (target: number) => {
+      const pieces = [' the', ' a', ' to', ' of', ' is', ' x', ' q', ' 0', ' yes', ' no', '. ', '! ', '\n'];
+      for (const piece of pieces) {
+        const candidate = piece.repeat(target);
+        if (tokenLength(candidate) === target) return candidate;
+      }
+      let text = '';
+      while (tokenLength(text) < target) {
+        const count = tokenLength(text);
+        const nextPiece = pieces.find((piece) => tokenLength(text + piece) === count + 1);
+        if (nextPiece === undefined) throw new Error(`Could not construct exactly ${target} tokenizer tokens.`);
+        text += nextPiece;
+      }
+      return text;
+    };
+
+    const stateMarkerTokens = 1;
+    const aggregateBaseline = await kev06Model.decide({
+      state: '',
+      questions: [{instructions: 'Choose.', options: ['no', 'yes']}]
+    });
+    const branchFixedTokens = aggregateBaseline.tokenCount - stateMarkerTokens - tokenLength('Choose.');
+    const branches = branchTokenTargets.map((target) => {
+      const instructions = exactTokenText(target - branchFixedTokens);
+      return {instructions, tokenCount: branchFixedTokens + tokenLength(instructions)};
+    });
+    const aggregateRequest: DecisionRequest = {
+      state: '',
+      questions: branches.map(({instructions}) => ({instructions, options: ['no', 'yes']}))
+    };
+    const branchTokenCounts = branches.map(({tokenCount}) => tokenCount);
+    const packedTokenCount = stateMarkerTokens + branchTokenCounts.reduce((sum, count) => sum + count, 0);
+    const attentionBufferBytes = packedTokenCount * packedTokenCount * 32;
+    const deviceAttentionLimit = Math.min(gpu.limits.maxBufferSize, gpu.limits.maxStorageBufferBindingSize);
+    if (attentionBufferBytes <= deviceAttentionLimit) {
+      throw new Error('The loaded WebGPU device can fit this request; aggregate resource preflight is not applicable.');
+    }
+    const resourceDetails = {
+      packedTokenCount,
+      questionCount: aggregateRequest.questions.length,
+      branchTokenCounts,
+      attentionBufferBytes,
+      deviceAttentionLimit
+    };
+    reportProgress('inference.aggregate-resource-preflight.started', resourceDetails);
+
+    let failure = {code: 'UNEXPECTED_SUCCESS', message: 'The oversized aggregate request unexpectedly succeeded.'};
+    try {
+      await kev06Model.decide(aggregateRequest);
+    } catch (error) {
+      const caught = error as {code?: string; name?: string; message?: string};
+      failure = {
+        code: caught.code ?? caught.name ?? 'UNKNOWN_ERROR',
+        message: caught.message ?? String(error)
+      };
+    }
+    reportProgress('inference.aggregate-resource-preflight.completed', {...failure, ...resourceDetails});
+    return {...failure, ...resourceDetails};
   }
 
   function adapterLimits(adapter: GPUAdapter): Readonly<Record<string, number>> {
