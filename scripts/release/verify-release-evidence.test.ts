@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {copyFile, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import test from 'node:test';
@@ -163,7 +163,7 @@ interface Fixture {
 }
 
 async function makeFixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), 'web-decision-release-evidence-'));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-release-evidence-')));
   const descriptors = [makeDescriptor('kev-0.6b-q4f16', 'a')];
   const {packageRoot, sourceRoot} = await putPackageTree(root, descriptors);
   const representativeFixturePath = join(root, POLICY.expandedInference.fixturePath);
