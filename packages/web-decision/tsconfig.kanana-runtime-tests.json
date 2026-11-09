@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.kanana-runtime.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "files": ["src/kanana/tvm-runtime.ts", "test/kanana-tvm-runtime.test.mts"]
+}

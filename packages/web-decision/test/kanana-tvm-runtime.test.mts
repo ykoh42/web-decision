@@ -5,6 +5,21 @@ import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import test, {after} from 'node:test';
+import type {
+  KananaTvmSetupOptions,
+  TvmRuntimeLike,
+  setupKananaTvmRuntime as setupKananaTvmRuntimeSource
+} from '../src/kanana/tvm-runtime.js';
+
+type MockVm = {readonly kind: 'mock-vm'};
+type MockWasi = {readonly kind: 'mock-wasi'};
+type MockRuntime = TvmRuntimeLike<MockVm>;
+type RuntimeEvent = string | readonly [string, unknown];
+type RuntimeSetupOptions = KananaTvmSetupOptions<MockWasi, MockRuntime>;
+
+interface MockInstantiateObserver {
+  (bytes: ArrayBuffer, wasi: MockWasi, logger: (message: string) => void): void;
+}
 
 const require = createRequire(import.meta.url);
 const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc');
@@ -34,32 +49,37 @@ try {
   throw error;
 }
 
-const runtimeModule = await import(pathToFileURL(join(outputDirectory, 'tvm-runtime.js')).href);
+const runtimeModule: {setupKananaTvmRuntime: typeof setupKananaTvmRuntimeSource} = await import(
+  pathToFileURL(join(outputDirectory, 'tvm-runtime.js')).href
+);
 const {setupKananaTvmRuntime} = runtimeModule;
 after(() => rm(outputDirectory, {recursive: true, force: true}));
 
 // These mocks test lifecycle ordering only. They do not emulate or validate WebGPU.
-function mockRuntime(events, overrides = {}) {
-  const vm = {kind: 'mock-vm'};
-  const runtime = {
-    initWebGPU(device) {
+function mockRuntime(
+  events: RuntimeEvent[],
+  overrides: Partial<MockRuntime> = {}
+): {readonly runtime: MockRuntime; readonly vm: MockVm} {
+  const vm: MockVm = {kind: 'mock-vm'};
+  const runtime: MockRuntime = {
+    initWebGPU(device: object): void {
       events.push(['initWebGPU', device]);
     },
-    beginScope() {
+    beginScope(): void {
       events.push('beginScope');
     },
-    webgpu() {
+    webgpu(): object {
       events.push('webgpu');
       return {kind: 'mock-webgpu-device'};
     },
-    createVirtualMachine(device) {
+    createVirtualMachine(device: object): MockVm {
       events.push(['createVirtualMachine', device]);
       return vm;
     },
-    endScope() {
+    endScope(): void {
       events.push('endScope');
     },
-    dispose() {
+    dispose(): void {
       events.push('dispose');
     },
     ...overrides
@@ -67,13 +87,17 @@ function mockRuntime(events, overrides = {}) {
   return {runtime, vm};
 }
 
-function mockDependencies(events, runtime, onInstantiate = () => {}) {
+function mockDependencies(
+  events: RuntimeEvent[],
+  runtime: MockRuntime,
+  onInstantiate: MockInstantiateObserver = () => {}
+): Pick<RuntimeSetupOptions, 'instantiate' | 'createPolyfillWASI'> {
   return {
-    createPolyfillWASI() {
+    createPolyfillWASI(): MockWasi {
       events.push('createPolyfillWASI');
       return {kind: 'mock-wasi'};
     },
-    async instantiate(bytes, wasi, logger) {
+    async instantiate(bytes: ArrayBuffer, wasi: MockWasi, logger: (message: string) => void): Promise<MockRuntime> {
       events.push('instantiate');
       onInstantiate(bytes, wasi, logger);
       return runtime;
@@ -82,7 +106,7 @@ function mockDependencies(events, runtime, onInstantiate = () => {}) {
 }
 
 test('mocked TVM runtime setup orders initialization and disposes once', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const device = {kind: 'mock-gpu-device'};
   const {runtime, vm} = mockRuntime(events);
   const bytes = Uint8Array.from([1, 2, 3]).buffer;
@@ -111,7 +135,7 @@ test('mocked TVM runtime setup orders initialization and disposes once', async (
 });
 
 test('mocked setup copies only a byte view subrange before instantiation', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const {runtime} = mockRuntime(events);
   const backing = Uint8Array.from([8, 4, 5, 9]);
   const bytes = backing.subarray(1, 3);
@@ -126,7 +150,7 @@ test('mocked setup copies only a byte view subrange before instantiation', async
 });
 
 test('mocked setup reuses a full byte view without copying its backing buffer', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const {runtime} = mockRuntime(events);
   const bytes = Uint8Array.from([4, 5]);
   const dependencies = mockDependencies(events, runtime, (providedBytes) => {
@@ -138,7 +162,7 @@ test('mocked setup reuses a full byte view without copying its backing buffer', 
 });
 
 test('mocked WebGPU initialization failure disposes the instantiated runtime', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const failure = new Error('mock initWebGPU failure');
   const {runtime} = mockRuntime(events, {
     initWebGPU() {
@@ -156,7 +180,7 @@ test('mocked WebGPU initialization failure disposes the instantiated runtime', a
 });
 
 test('mocked VM creation failure closes the scope and disposes the runtime', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const failure = new Error('mock VM creation failure');
   const {runtime} = mockRuntime(events, {
     createVirtualMachine() {
@@ -174,7 +198,7 @@ test('mocked VM creation failure closes the scope and disposes the runtime', asy
 });
 
 test('mocked disposal still releases the runtime when ending scope throws and remains idempotent', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const scopeFailure = new Error('mock endScope failure');
   const {runtime} = mockRuntime(events, {
     endScope() {
@@ -194,7 +218,7 @@ test('mocked disposal still releases the runtime when ending scope throws and re
 });
 
 test('mocked setup preserves setup and cleanup failures together', async () => {
-  const events = [];
+  const events: RuntimeEvent[] = [];
   const setupFailure = new Error('mock VM creation failure');
   const scopeFailure = new Error('mock scope cleanup failure');
   const runtimeFailure = new Error('mock runtime cleanup failure');
@@ -214,51 +238,68 @@ test('mocked setup preserves setup and cleanup failures together', async () => {
   });
   const dependencies = mockDependencies(events, runtime);
 
-  await assert.rejects(setupKananaTvmRuntime({...dependencies, device: {}, bytes: new ArrayBuffer(1)}), (error) => {
-    assert.ok(error instanceof Error);
-    assert.equal(error.cause, setupFailure);
-    assert.ok(error.cleanupError instanceof AggregateError);
-    assert.equal(error.cleanupError.cause, scopeFailure);
-    assert.deepEqual(error.cleanupError.errors, [scopeFailure, runtimeFailure]);
-    return true;
-  });
+  await assert.rejects(
+    setupKananaTvmRuntime({...dependencies, device: {}, bytes: new ArrayBuffer(1)}),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.cause, setupFailure);
+      assert.ok((error as Error & {cleanupError: unknown}).cleanupError instanceof AggregateError);
+      assert.equal((error as Error & {cleanupError: AggregateError}).cleanupError.cause, scopeFailure);
+      assert.deepEqual((error as Error & {cleanupError: AggregateError}).cleanupError.errors, [
+        scopeFailure,
+        runtimeFailure
+      ]);
+      return true;
+    }
+  );
   assert.deepEqual(events.slice(-3), ['createVirtualMachine failed', 'endScope failed', 'dispose failed']);
 });
 
 test('mocked argument and instantiation failures do not leak a runtime', async () => {
-  const noCalls = [];
+  const noCalls: RuntimeEvent[] = [];
   const dependencies = mockDependencies(noCalls, mockRuntime(noCalls).runtime);
+  // These calls deliberately pass malformed values to exercise the runtime guards.
   await assert.rejects(
-    setupKananaTvmRuntime({...dependencies, device: {}, bytes: null}),
+    setupKananaTvmRuntime({...dependencies, device: {}, bytes: null} as unknown as RuntimeSetupOptions),
     /ArrayBuffer or an ArrayBuffer view/
   );
   await assert.rejects(
-    setupKananaTvmRuntime({instantiate: null, createPolyfillWASI: () => ({}), device: {}, bytes: new ArrayBuffer(1)}),
+    setupKananaTvmRuntime({
+      instantiate: null,
+      createPolyfillWASI: () => ({}),
+      device: {},
+      bytes: new ArrayBuffer(1)
+    } as unknown as RuntimeSetupOptions),
     /TVM instantiate\(\) is required/
   );
   await assert.rejects(
-    setupKananaTvmRuntime({instantiate: () => {}, createPolyfillWASI: null, device: {}, bytes: new ArrayBuffer(1)}),
+    setupKananaTvmRuntime({
+      instantiate: () => {},
+      createPolyfillWASI: null,
+      device: {},
+      bytes: new ArrayBuffer(1)
+    } as unknown as RuntimeSetupOptions),
     /TVM createPolyfillWASI\(\) is required/
   );
   await assert.rejects(
-    setupKananaTvmRuntime({...dependencies, device: null, bytes: new ArrayBuffer(1)}),
+    setupKananaTvmRuntime({...dependencies, device: null, bytes: new ArrayBuffer(1)} as unknown as RuntimeSetupOptions),
     /A WebGPU device is required/
   );
 
   const failure = new Error('mock instantiate failure');
   const instantiateFailure = {
-    createPolyfillWASI() {
+    createPolyfillWASI(): MockWasi {
       noCalls.push('createPolyfillWASI');
-      return {};
+      return {} as unknown as MockWasi;
     },
-    async instantiate() {
+    async instantiate(): Promise<MockRuntime> {
       noCalls.push('instantiate failed');
       throw failure;
     }
   };
   await assert.rejects(
     setupKananaTvmRuntime({...instantiateFailure, device: {}, bytes: new ArrayBuffer(1)}),
-    (error) => error === failure
+    (error: unknown) => error === failure
   );
   assert.deepEqual(noCalls, ['createPolyfillWASI', 'instantiate failed']);
 });

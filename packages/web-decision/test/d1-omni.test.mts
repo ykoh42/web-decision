@@ -13,37 +13,74 @@ import {loadD1OmniModel, validateD1OmniLoadOptions} from '../src/d1-omni/loader.
 import {finishD1OmniSystemOne, prepareD1OmniSystemOne} from '../src/d1-omni/protocol.mjs';
 import {createD1OmniRunner, D1_OMNI_INPUT_NAMES} from '../src/d1-omni/runner.mjs';
 import {createD1OmniSession} from '../src/d1-omni/session.mjs';
+import type {D1OmniTokenizer} from '../src/d1-omni/tokenizer.mjs';
 
-function fakeTokenizer() {
-  const inputs = [];
+type FakeOnnxSession = NonNullable<Parameters<typeof createD1OmniRunner>[1]>;
+type FakeFeeds = Parameters<FakeOnnxSession['run']>[0];
+type FakeTensorData = Float32Array | BigInt64Array;
+
+interface FakeOrtCall {
+  readonly feeds: FakeFeeds;
+  readonly names: string[];
+}
+
+interface FakeTensor {
+  readonly type: string;
+  readonly data: FakeTensorData;
+  readonly dims: number[];
+  disposed?: boolean;
+  dispose?(): void;
+}
+
+interface FakeOrtSession extends FakeOnnxSession {
+  released: boolean;
+}
+
+interface FakeOrtRuntime {
+  readonly calls: FakeOrtCall[];
+  readonly session: FakeOrtSession;
+  readonly Tensor: new (type: string, data: FakeTensorData, dims: number[]) => FakeTensor;
+  readonly env: {readonly webgpu: Record<string, unknown>};
+  readonly InferenceSession: {create(): Promise<FakeOrtSession>};
+}
+
+function fakeTokenizer(): D1OmniTokenizer & {readonly inputs: string[]} {
+  const inputs: string[] = [];
   return {
     inputs,
     ids: {'<|startoftext|>': 1, '<|pad|>': 0, '<|mask|>': 16},
-    encode(text) {
+    encode(text: string) {
       inputs.push(text);
-      return Array.from(text, (character) => 100 + character.codePointAt(0));
+      return Array.from(text, (character) => 100 + character.codePointAt(0)!);
     }
   };
 }
 
-function fakeOrt() {
-  const calls = [];
-  class Tensor {
-    constructor(type, data, dims) {
+function fakeOrt(): FakeOrtRuntime {
+  const calls: FakeOrtCall[] = [];
+  class Tensor implements FakeTensor {
+    declare readonly type: string;
+    declare readonly data: FakeTensorData;
+    declare readonly dims: number[];
+    declare disposed: boolean;
+
+    constructor(type: string, data: FakeTensorData, dims: number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
     }
-    dispose() {
+
+    dispose(): void {
       this.disposed = true;
     }
   }
-  const session = {
+  const session: FakeOrtSession = {
     inputNames: [...D1_OMNI_INPUT_NAMES],
     outputNames: ['logits'],
-    async run(feeds, names) {
+    released: false,
+    async run(feeds: FakeFeeds, names: string[]): Promise<unknown> {
       calls.push({feeds, names});
-      const [batch, width] = feeds.marker_pos.dims;
+      const [batch, width] = (feeds.marker_pos as FakeTensor).dims as [number, number];
       const data = new Float32Array(batch * width);
       for (let row = 0; row < batch; row++) {
         for (let option = 0; option < width; option++) data[row * width + option] = option;
@@ -53,7 +90,7 @@ function fakeOrt() {
           type: 'float32',
           dims: [batch, width],
           data,
-          dispose() {
+          dispose(this: FakeTensor) {
             this.disposed = true;
           }
         }
@@ -88,7 +125,7 @@ test('d1-omni pins its source files and compact text Q8 asset set', () => {
     'onnx/model_quantized.onnx_data'
   ]);
   assert.equal(D1_OMNI_TOTAL_BYTES, 411_065_237);
-  assert.equal(D1_OMNI_FILES['onnx/model_quantized.onnx_data'].bytes, 405_883_392);
+  assert.equal(D1_OMNI_FILES['onnx/model_quantized.onnx_data']!.bytes, 405_883_392);
 });
 
 test('d1-omni preserves choice order, text escaping, and the model prompt structure', () => {
@@ -104,7 +141,7 @@ test('d1-omni preserves choice order, text escaping, and the model prompt struct
     },
     tokenizer
   );
-  const [row] = prepared.rows;
+  const [row] = prepared.rows as [NonNullable<(typeof prepared.rows)[number]>, ...typeof prepared.rows];
   assert.deepEqual(row.question.labels, ['billing', 'technical']);
   assert.deepEqual(row.question.options, ['billing: Invoices and refunds', 'technical']);
   assert.equal(row.question.qtype, 0);
@@ -132,11 +169,11 @@ test('d1-omni supports score endpoints and reverses Noul false/true logits to ye
     },
     tokenizer
   );
-  assert.equal(tokenizer.inputs[0], '');
-  assert.equal(prepared.rows[0].question.qtype, 1);
-  assert.equal(prepared.rows[1].question.options.length, 10);
-  assert.equal(prepared.rows[2].question.qtype, 2);
-  assert.deepEqual(prepared.rows[2].question.options, [
+  assert.equal(tokenizer.inputs[0]!, '');
+  assert.equal(prepared.rows[0]!.question.qtype, 1);
+  assert.equal(prepared.rows[1]!.question.options.length, 10);
+  assert.equal(prepared.rows[2]!.question.qtype, 2);
+  assert.deepEqual(prepared.rows[2]!.question.options, [
     'false: no, the statement does not hold',
     'true: yes, the statement holds'
   ]);
@@ -150,10 +187,19 @@ test('d1-omni supports score endpoints and reverses Noul false/true logits to ye
     ],
     D1_OMNI_TEMPERATURES
   );
-  assert.ok(result.answers.truth.noul > 0.5);
-  assert.ok(result.answers.truth.probabilities.true > result.answers.truth.probabilities.false);
-  assert.equal(result.answers.low.score, result.answers.low.expected);
-  assert.equal(result.answers.low.mostLikelyLevel, 1);
+  assert.ok((result.answers.truth as Extract<NonNullable<typeof result.answers.truth>, {type: 'noul'}>).noul > 0.5);
+  assert.ok(
+    (result.answers.truth as Extract<NonNullable<typeof result.answers.truth>, {type: 'noul'}>).probabilities.true! >
+      (result.answers.truth as Extract<NonNullable<typeof result.answers.truth>, {type: 'noul'}>).probabilities.false!
+  );
+  assert.equal(
+    (result.answers.low as Extract<NonNullable<typeof result.answers.low>, {type: 'score'}>).score,
+    (result.answers.low as Extract<NonNullable<typeof result.answers.low>, {type: 'score'}>).expected
+  );
+  assert.equal(
+    (result.answers.low as Extract<NonNullable<typeof result.answers.low>, {type: 'score'}>).mostLikelyLevel,
+    1
+  );
   assert.equal(result.outputTokenCount, 0);
   assert.equal(result.model, D1_OMNI_MODEL);
 });
@@ -167,13 +213,17 @@ test('d1-omni matches upstream choice-count temperature groups and marks state t
     128
   );
   assert.equal(prepared.truncated, true);
-  assert.equal(prepared.rows[0].ids.length, 128);
+  assert.equal(prepared.rows[0]!.ids.length, 128);
   const scaled = finishD1OmniSystemOne(
     prepareD1OmniSystemOne('x', {q: {type: 'choice', instructions: 'choose', criteria: ['a', 'b', 'c']}}, tokenizer),
     [[0, 0.5, 1]],
     D1_OMNI_TEMPERATURES
   );
-  assert.equal(scaled.answers.q.probabilities.a < scaled.answers.q.probabilities.c, true);
+  assert.equal(
+    (scaled.answers.q as Extract<NonNullable<typeof scaled.answers.q>, {type: 'choice'}>).probabilities.a! <
+      (scaled.answers.q as Extract<NonNullable<typeof scaled.answers.q>, {type: 'choice'}>).probabilities.c!,
+    true
+  );
 });
 
 test('d1-omni rejects unsupported typed input and model limits before inference', () => {
@@ -215,18 +265,19 @@ test('d1-omni accepts dynamic question and choice axes above 255', async () => {
 
   const generic = await session.decide({state: 'state', questions});
   assert.equal(generic.answers.length, 257);
-  assert.equal(generic.answers[0].probabilities.length, 256);
-  assert.equal(generic.answers[0].selectedIndex, 255);
-  assert.equal(generic.answers[0].selected, options[255]);
+  assert.equal(generic.answers[0]!.probabilities.length, 256);
+  assert.equal(generic.answers[0]!.selectedIndex, 255);
+  assert.equal(generic.answers[0]!.selected, options[255]!);
   assert.equal(ort.calls.length, 33);
   assert.deepEqual(
-    ort.calls.slice(0, 2).map((call) => call.feeds.input_ids.dims[0]),
+    ort.calls.slice(0, 2).map((call) => (call.feeds.input_ids as FakeTensor).dims[0]),
     [8, 8]
   );
-  assert.equal(ort.calls[0].feeds.marker_pos.dims[1], 256);
+  assert.equal((ort.calls[0]!.feeds.marker_pos as FakeTensor).dims[1], 256);
   assert.ok(
     ort.calls.every((call) => {
-      const [rows, tokens] = call.feeds.input_ids.dims;
+      const [rows, tokens] = (call.feeds.input_ids as FakeTensor).dims;
+      if (rows === undefined || tokens === undefined) return false;
       return rows <= 8 && rows * tokens <= 65536;
     })
   );
@@ -248,11 +299,16 @@ test('d1-omni accepts dynamic question and choice axes above 255', async () => {
   );
   const typed = await session.systemOne('state', typedQuestions);
   assert.equal(Object.keys(typed.answers).length, 257);
-  assert.equal(typed.answers['question-256'].choice, 'second');
+  assert.equal(
+    (typed.answers['question-256'] as Extract<NonNullable<(typeof typed.answers)['question-256']>, {type: 'choice'}>)
+      .choice,
+    'second'
+  );
   assert.equal(ort.calls.length, 66);
   assert.ok(
     ort.calls.slice(33).every((call) => {
-      const [rows, tokens] = call.feeds.input_ids.dims;
+      const [rows, tokens] = (call.feeds.input_ids as FakeTensor).dims;
+      if (rows === undefined || tokens === undefined) return false;
       return rows <= 8 && rows * tokens <= 65536;
     })
   );
@@ -281,14 +337,14 @@ test('d1-omni runner batches dynamic rows with explicit int64 inputs and preserv
   const rows = await runner.run(prepared.rows);
   assert.equal(rows.length, 10);
   assert.deepEqual(
-    ort.calls.map((call) => call.feeds.input_ids.dims[0]),
+    ort.calls.map((call) => (call.feeds.input_ids as FakeTensor).dims[0]),
     [8, 2]
   );
-  assert.deepEqual(ort.calls[0].names, ['logits']);
-  assert.equal(ort.calls[0].feeds.input_ids.type, 'int64');
-  assert.equal(ort.calls[0].feeds.marker_mask.type, 'int64');
-  assert.ok(ort.calls[0].feeds.attention_mask.data.every((value) => value === 1n));
-  assert.deepEqual(rows[0], [0, 1]);
+  assert.deepEqual(ort.calls[0]!.names, ['logits']);
+  assert.equal((ort.calls[0]!.feeds.input_ids as FakeTensor).type, 'int64');
+  assert.equal((ort.calls[0]!.feeds.marker_mask as FakeTensor).type, 'int64');
+  assert.ok(((ort.calls[0]!.feeds.attention_mask as FakeTensor).data as BigInt64Array).every((value) => value === 1n));
+  assert.deepEqual(rows[0]!, [0, 1]);
   await runner.dispose();
   assert.equal(session.released, true);
 });
@@ -312,7 +368,7 @@ test('d1-omni load validation rejects malformed URLs and unsupported loader opti
 
 test('d1-omni loader runs the declared WebGPU route and releases its ONNX session', async () => {
   const ort = fakeOrt();
-  const tokenizerIds = {
+  const tokenizerIds: Record<string, number> = {
     '<|startoftext|>': 1,
     '<|pad|>': 0,
     '<|mask|>': 16,
@@ -323,11 +379,11 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
     '<|reserved_11|>': 21
   };
   class Tokenizer {
-    token_to_id(token) {
+    token_to_id(token: string): number | undefined {
       return tokenizerIds[token];
     }
-    encode(text) {
-      return {ids: Array.from(text, (character) => 100 + character.codePointAt(0))};
+    encode(text: string): {ids: number[]} {
+      return {ids: Array.from(text, (character) => 100 + character.codePointAt(0)!)};
     }
   }
   const config = {
@@ -339,7 +395,7 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
     d1_omni: {max_length: 16384},
     temperatures: D1_OMNI_TEMPERATURES
   };
-  const values = {
+  const values: Record<string, unknown> = {
     'config.json': config,
     'tokenizer_config.json': {
       bos_token: '<|startoftext|>',
@@ -349,12 +405,14 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
     },
     'tokenizer.json': {model: {vocab: {}}}
   };
-  let sourceBase;
-  const openSource = async ({base}) => {
+  let sourceBase: string | undefined;
+  type D1OmniLoaderDependencies = NonNullable<Parameters<typeof loadD1OmniModel>[1]>;
+  const openSource: NonNullable<D1OmniLoaderDependencies['openSource']> = async ({base}) => {
     sourceBase = base.href;
     return {
-      async read(name) {
-        return new TextEncoder().encode(JSON.stringify(values[name] ?? {}));
+      async read(name: string): Promise<ArrayBuffer> {
+        // Preserve the JS fixture's byte-view return even though the production source type is ArrayBuffer.
+        return new TextEncoder().encode(JSON.stringify(values[name] ?? {})) as unknown as ArrayBuffer;
       }
     };
   };
@@ -362,7 +420,8 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
     {model: D1_OMNI_MODEL},
     {
       ort,
-      Tokenizer,
+      // The fake tokenizer only implements the methods this loader path consumes.
+      Tokenizer: Tokenizer as unknown as NonNullable<D1OmniLoaderDependencies['Tokenizer']>,
       openSource,
       gpuApi: {
         async requestAdapter() {
@@ -375,7 +434,10 @@ test('d1-omni loader runs the declared WebGPU route and releases its ONNX sessio
   const result = await model.systemOne('state', {
     team: {type: 'choice', instructions: 'Select a team', criteria: ['billing', 'technical']}
   });
-  assert.equal(result.answers.team.choice, 'technical');
+  assert.equal(
+    (result.answers.team as Extract<NonNullable<typeof result.answers.team>, {type: 'choice'}>).choice,
+    'technical'
+  );
   assert.equal(result.outputTokenCount, 0);
   await model.dispose();
   assert.equal(ort.session.released, true);

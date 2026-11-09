@@ -38,9 +38,10 @@
     "typecheck:kev": "tsc --project tsconfig.kev.json",
     "test": "node --import tsx ../../scripts/kanana/run-node-tests.mts",
     "test:kanana-core": "node --import tsx ../../scripts/kanana/run-node-tests.mts --core",
-    "test:kanana-runtime": "pnpm run typecheck:kanana-runtime && node --test test/kanana-tvm-runtime.test.mjs",
+    "test:kanana-runtime": "tsc --project tsconfig.kanana-runtime.json && tsc --project tsconfig.kanana-runtime-tests.json && node --import tsx --test test/kanana-tvm-runtime.test.mts",
     "typecheck:kanana-core": "tsc --project tsconfig.kanana-core.json",
     "typecheck:kanana-runtime": "tsc --project tsconfig.kanana-runtime.json",
+    "typecheck:kanana-runtime-tests": "tsc --project tsconfig.kanana-runtime-tests.json",
     "test:coverage": "c8 --all --src src --include=src/** --extension .js --extension .cjs --extension .mjs --extension .ts --extension .tsx --extension .jsx --extension .mts --extension .cts --exclude-after-remap --exclude=src/*.d.ts --exclude=src/**/*.d.ts --exclude=src/*.d.mts --exclude=src/**/*.d.mts --exclude=src/*.d.cts --exclude=src/**/*.d.cts --check-coverage --lines 85 --branches 80 --reporter=text --reporter=json-summary node --import tsx ../../scripts/kanana/run-node-tests.mts && node --import tsx ../../scripts/ci/check-uncovered.ts"
   },
   "dependencies": {
