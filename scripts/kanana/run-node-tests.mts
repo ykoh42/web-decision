@@ -19,7 +19,7 @@ const coreTests = [
   'test/kanana-chat-template.test.mts',
   'test/kanana-truncation.test.mts',
   'test/kanana-tokenizer.test.mts',
-  'test/kanana-image-ingress.test.mjs',
+  'test/kanana-image-ingress.test.mts',
   'test/kanana-encoded-image.test.mts',
   'test/kanana-image-processing.test.mts',
   'test/kanana-magick-image.test.mts',

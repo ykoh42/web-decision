@@ -8,20 +8,23 @@ const {decodeKananaImageSource} = browserImage;
 
 const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 
-async function fixture(name) {
+async function fixture(name: string) {
   return readFile(new URL(name, fixtureDirectory));
 }
 
-async function rgbFixture(name) {
+async function rgbFixture(name: string) {
   return Uint8Array.from(await fixture(name));
 }
 
-async function decode(source, options) {
+async function decode(
+  source: unknown,
+  options?: {signal?: AbortSignal; fetch?: (address: string | URL, options?: RequestInit) => Promise<unknown>}
+) {
   return decodeKananaImageSource(source, {
     createImageBitmap: () => assert.fail('encoded inputs must not use native decoding'),
     createCanvas: () => assert.fail('encoded inputs must not use canvas readback'),
     ...options
-  });
+  } as Parameters<typeof decodeKananaImageSource>[1]);
 }
 
 test('Blob and File inputs preserve encoded PNG mode conversion', async () => {
@@ -40,8 +43,8 @@ test('Blob and File inputs preserve encoded PNG mode conversion', async () => {
 test('URL objects, URL strings, and image data URLs fetch original bytes', async () => {
   const encoded = await fixture('palette-trns.png');
   const expected = await rgbFixture('palette-trns.rgb');
-  const addresses = [];
-  const fetch = async (address) => {
+  const addresses: (string | URL)[] = [];
+  const fetch = async (address: string | URL) => {
     addresses.push(address);
     return new Response(new Blob([encoded], {type: 'image/png'}), {status: 200});
   };
@@ -69,6 +72,8 @@ test('HTMLImageElement fetches currentSrc to recover the original bytes', async 
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'HTMLImageElement');
   Object.defineProperty(globalThis, 'HTMLImageElement', {
     value: class BrowserImageElement {
+      declare currentSrc: string;
+      declare src: string;
       constructor() {
         this.currentSrc = 'https://example.test/current.png';
         this.src = 'https://example.test/fallback.png';
@@ -82,7 +87,7 @@ test('HTMLImageElement fetches currentSrc to recover the original bytes', async 
     const source = new globalThis.HTMLImageElement();
     const encoded = await fixture('rgb-trns.png');
     const expected = await rgbFixture('rgb-trns.rgb');
-    const addresses = [];
+    const addresses: (string | URL)[] = [];
     const result = await decode(source, {
       fetch: async (address) => {
         addresses.push(address);
@@ -94,7 +99,7 @@ test('HTMLImageElement fetches currentSrc to recover the original bytes', async 
     assert.deepEqual(result.rgb, expected);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'HTMLImageElement', previous);
-    else delete globalThis.HTMLImageElement;
+    else delete (globalThis as {HTMLImageElement?: typeof HTMLImageElement}).HTMLImageElement;
   }
 });
 
@@ -119,7 +124,7 @@ test('HTMLImageElement CORS failures are reported as unreadable source bytes', a
     );
   } finally {
     if (previous) Object.defineProperty(globalThis, 'HTMLImageElement', previous);
-    else delete globalThis.HTMLImageElement;
+    else delete (globalThis as {HTMLImageElement?: typeof HTMLImageElement}).HTMLImageElement;
   }
 });
 
@@ -136,13 +141,16 @@ test('already-decoded ImageBitmap and canvas inputs are rejected explicitly', as
 
   try {
     for (const name of names) {
-      await assert.rejects(decode(new globalThis[name]()), /original image mode and orientation/);
+      await assert.rejects(
+        decode(new (globalThis as unknown as Record<string, new () => object>)[name]!()),
+        /original image mode and orientation/
+      );
     }
   } finally {
     for (const name of names) {
       const descriptor = previous.get(name);
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-      else delete globalThis[name];
+      else delete (globalThis as unknown as Record<string, unknown>)[name];
     }
   }
 });
@@ -154,7 +162,7 @@ test('unsupported encoded bytes fail without native decoder fallback', async () 
 
 test('URL reads preserve cancellation and reject opaque or failed responses', async () => {
   const signal = new AbortController().signal;
-  let receivedOptions;
+  let receivedOptions: RequestInit | undefined;
   const input = 'https://example.test/photo.png';
   const encoded = await fixture('rgba-alpha.png');
 
@@ -165,7 +173,7 @@ test('URL reads preserve cancellation and reject opaque or failed responses', as
       return new Response(new Blob([encoded]), {status: 200});
     }
   });
-  assert.strictEqual(receivedOptions.signal, signal);
+  assert.strictEqual(receivedOptions!.signal, signal);
   assert.deepEqual(result.rgb, await rgbFixture('rgba-alpha.rgb'));
 
   await assert.rejects(
@@ -199,37 +207,37 @@ test('pre-aborted signals stop URL, Blob, and drawable inputs before work starts
           fetch: async () => assert.fail('pre-aborted input must not be fetched'),
           createImageBitmap: async () => assert.fail('native decoding must not run'),
           createCanvas: () => assert.fail('canvas readback must not run')
-        }),
+        } as Parameters<typeof decodeKananaImageSource>[1]),
         {name: 'AbortError'}
       );
     }
   } finally {
     if (previous) Object.defineProperty(globalThis, 'HTMLCanvasElement', previous);
-    else delete globalThis.HTMLCanvasElement;
+    else delete (globalThis as {HTMLCanvasElement?: typeof HTMLCanvasElement}).HTMLCanvasElement;
   }
 });
 
 test('abort during URL fetch skips decoding response bytes', async () => {
   const controller = new AbortController();
-  let startFetch;
-  let finishFetch;
-  const fetchingStarted = new Promise((resolve) => {
+  let startFetch: (() => void) | undefined;
+  let finishFetch: ((response: Response) => void) | undefined;
+  const fetchingStarted = new Promise<void>((resolve) => {
     startFetch = resolve;
   });
   const task = decodeKananaImageSource('https://example.test/photo.png', {
     signal: controller.signal,
     fetch: () =>
-      new Promise((resolve) => {
+      new Promise<Response>((resolve) => {
         finishFetch = resolve;
-        startFetch();
+        startFetch!();
       }),
     createImageBitmap: async () => assert.fail('native decoding must not run'),
     createCanvas: () => assert.fail('canvas readback must not run')
-  });
+  } as Parameters<typeof decodeKananaImageSource>[1]);
 
   await fetchingStarted;
   controller.abort();
-  finishFetch(new Response(new Blob([await fixture('rgba-alpha.png')]), {status: 200}));
+  finishFetch!(new Response(new Blob([await fixture('rgba-alpha.png')]), {status: 200}));
 
   await assert.rejects(task, {name: 'AbortError'});
 });
