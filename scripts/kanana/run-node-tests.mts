@@ -14,6 +14,7 @@ const allTests = (await readdir(testDirectory))
   .map((file) => join('test', file));
 const coreTests = [
   'test/kanana-decision-session.test.mts',
+  'test/kanana-tvm-session.test.mjs',
   'test/kanana-source-tokenizer.test.mts',
   'test/kanana-protocol.test.mts',
   'test/kanana-scoring.test.mts',
@@ -77,7 +78,11 @@ try {
     if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');
     execFileSync(process.execPath, testArguments, {
       cwd: packageRoot,
-      env: {...process.env, KANANA_CORE_DIST: outputDirectory},
+      env: {
+        ...process.env,
+        KANANA_CORE_DIST: outputDirectory,
+        KANANA_TVM_SESSION_DIST: outputDirectory
+      },
       stdio: 'inherit'
     });
   };
