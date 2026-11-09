@@ -4,23 +4,29 @@ import {DecisionModel} from '../src/model.js';
 import {ExperimentalDebertaSession} from '../src/deberta/model.mjs';
 import {ExperimentalMapikaSession} from '../src/mapika/session.js';
 import {ExperimentalKev08Session} from '../src/kev08/session.js';
+type Family = 'kev' | 'deberta' | 'mapika' | 'kev08';
+type TestModel = {
+  run: () => Promise<unknown>;
+  decide(request: unknown, options?: unknown): Promise<unknown>;
+  dispose(): Promise<void>;
+};
 const deferred = () => {
-  let resolve, reject;
-  const promise = new Promise((a, b) => {
+  let resolve!: () => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<void>((a, b) => {
     resolve = a;
     reject = b;
   });
   return {promise, resolve, reject};
 };
 const tokenizer = {
-  encode(text) {
-    return {ids: text === '[STATE]' ? [128001] : Array.from(text, (c) => c.codePointAt(0) + 200)};
+  encode(text: string) {
+    return {ids: text === '[STATE]' ? [128001] : Array.from(text, (c: string) => c.codePointAt(0)! + 200)};
   }
 };
 const request = () => ({state: 'state', questions: [{instructions: 'choose', options: ['a', 'b']}]});
-function create(family) {
+function create(family: Family): {model: TestModel; events: string[]} {
   const lifecycle = {disposed: false, loss: null},
-    events = [];
+    events: string[] = [];
   const runtime = {
     endScope() {
       events.push('end');
@@ -46,20 +52,20 @@ function create(family) {
       limits: {maxStateTokens: 384, maxInputTokens: 1024, controlIds: [999999], temperature: 1.03},
       uncaptured: [],
       lifecycle
-    });
+    } as unknown as ConstructorParameters<typeof ExperimentalMapikaSession>[0]) as unknown as TestModel;
   let model;
   if (family === 'kev')
     model = new DecisionModel(
-      runtime,
-      {},
-      {},
-      null,
-      [],
-      tokenizer,
-      {maxStateTokens: 384, maxInputTokens: 1024},
-      [],
-      lifecycle
-    );
+      runtime as unknown as ConstructorParameters<typeof DecisionModel>[0],
+      {} as ConstructorParameters<typeof DecisionModel>[1],
+      {} as ConstructorParameters<typeof DecisionModel>[2],
+      null as unknown as ConstructorParameters<typeof DecisionModel>[3],
+      [] as ConstructorParameters<typeof DecisionModel>[4],
+      tokenizer as unknown as ConstructorParameters<typeof DecisionModel>[5],
+      {maxStateTokens: 384, maxInputTokens: 1024} as ConstructorParameters<typeof DecisionModel>[6],
+      [] as ConstructorParameters<typeof DecisionModel>[7],
+      lifecycle as ConstructorParameters<typeof DecisionModel>[8]
+    ) as unknown as TestModel;
   else if (family === 'mapika') model = mapika();
   else if (family === 'kev08')
     model = new ExperimentalKev08Session({
@@ -72,7 +78,7 @@ function create(family) {
       limits: {maxStateTokens: 384, maxInputTokens: 1024},
       uncaptured: [],
       lifecycle
-    });
+    } as unknown as ConstructorParameters<typeof ExperimentalKev08Session>[0]) as unknown as TestModel;
   else
     model = new ExperimentalDebertaSession({
       runtime,
@@ -85,10 +91,10 @@ function create(family) {
       tokenizer,
       uncaptured: [],
       lifecycle
-    });
+    } as unknown as ConstructorParameters<typeof ExperimentalDebertaSession>[0]) as unknown as TestModel;
   return {model, events};
 }
-for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
+for (const family of ['kev', 'deberta', 'mapika', 'kev08'] as const) {
   test(`${family}: already aborted request is not tokenized or enqueued`, async () => {
     const {model, events} = create(family),
       controller = new AbortController(),
@@ -98,7 +104,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
     model.run = async () => {
       runs++;
     };
-    await assert.rejects(model.decide(null, {signal: controller.signal}), (e) => e === reason);
+    await assert.rejects(model.decide(null, {signal: controller.signal}), (e: unknown) => e === reason);
     assert.equal(runs, 0);
     await model.dispose();
     assert.deepEqual(events, ['end', 'dispose']);
@@ -109,7 +115,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
       started = deferred(),
       controller = new AbortController(),
       reason = Error('cancel queued'),
-      runs = [];
+      runs: number[] = [];
     model.run = async () => {
       runs.push(runs.length + 1);
       if (runs.length === 1) {
@@ -123,7 +129,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
     const cancelled = model.decide(request(), {signal: controller.signal}),
       next = model.decide(request());
     controller.abort(reason);
-    await assert.rejects(cancelled, (e) => e === reason);
+    await assert.rejects(cancelled, (e: unknown) => e === reason);
     assert.deepEqual(runs, [1]);
     const closing = model.dispose();
     gate.resolve();
@@ -139,7 +145,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
       started = deferred(),
       controller = new AbortController(),
       reason = Error('cancel active'),
-      runs = [];
+      runs: number[] = [];
     model.run = async () => {
       const id = runs.length + 1;
       runs.push(id);
@@ -154,7 +160,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
     await started.promise;
     const next = model.decide(request());
     controller.abort(reason);
-    await assert.rejects(active, (e) => e === reason);
+    await assert.rejects(active, (e: unknown) => e === reason);
     const closing = model.dispose();
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(runs, [1]);
@@ -165,7 +171,7 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
     assert.deepEqual(events, ['end', 'dispose']);
   });
 }
-for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
+for (const family of ['kev', 'deberta', 'mapika', 'kev08'] as const) {
   test(`${family}: decision removes its abort listener after completion or cancellation`, async () => {
     for (const mode of ['success', 'cancel']) {
       const {model} = create(family),
@@ -176,11 +182,11 @@ for (const family of ['kev', 'deberta', 'mapika', 'kev08']) {
       const add = signal.addEventListener.bind(signal),
         remove = signal.removeEventListener.bind(signal);
       let listeners = 0;
-      signal.addEventListener = (...args) => {
+      signal.addEventListener = (...args: Parameters<AbortSignal['addEventListener']>) => {
         listeners++;
         return add(...args);
       };
-      signal.removeEventListener = (...args) => {
+      signal.removeEventListener = (...args: Parameters<AbortSignal['removeEventListener']>) => {
         listeners--;
         return remove(...args);
       };

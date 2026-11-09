@@ -1,20 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type {TestContext} from 'node:test';
 import {CACHE_NAME} from '../src/assets.js';
 import {prepareModelSource} from '../src/model-source.js';
 
 const assetsUrl = 'https://example.test/model';
-const globalsToRestore = new WeakMap();
+const globalsToRestore = new WeakMap<TestContext, Map<PropertyKey, PropertyDescriptor | undefined>>();
 
-function setGlobal(t, name, value) {
+function setGlobal(t: TestContext, name: PropertyKey, value: unknown) {
   let originals = globalsToRestore.get(t);
   if (!originals) {
     originals = new Map();
     globalsToRestore.set(t, originals);
     t.after(() => {
-      for (const [key, descriptor] of originals) {
+      for (const [key, descriptor] of originals!) {
         if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-        else delete globalThis[key];
+        else delete (globalThis as Record<PropertyKey, unknown>)[key];
       }
     });
   }
@@ -28,11 +29,14 @@ function setGlobal(t, name, value) {
   });
 }
 
-function gpuWith(features = ['shader-f16'], requestAdapter = async () => ({features: new Set(features)})) {
+function gpuWith(
+  features: string[] = ['shader-f16'],
+  requestAdapter: () => Promise<{features: Set<string>} | null> = async () => ({features: new Set(features)})
+) {
   return {requestAdapter};
 }
 
-function installEnvironment(t, options = {}) {
+function installEnvironment(t: TestContext, options: {gpu?: unknown; crypto?: unknown} = {}) {
   const gpu = Object.hasOwn(options, 'gpu') ? options.gpu : gpuWith();
   const crypto = Object.hasOwn(options, 'crypto') ? options.crypto : globalThis.crypto;
   setGlobal(t, 'navigator', {gpu});
@@ -40,7 +44,7 @@ function installEnvironment(t, options = {}) {
 }
 
 test('source options reject invalid values before checking browser support', async () => {
-  const invalidOptions = [
+  const invalidOptions: unknown[] = [
     undefined,
     {},
     {assetsUrl: ''},
@@ -50,7 +54,9 @@ test('source options reject invalid values before checking browser support', asy
     {assetsUrl, maxPrefetchBytes: 1.5}
   ];
   for (const options of invalidOptions) {
-    await assert.rejects(prepareModelSource(options, {}), {code: 'INVALID_INPUT'});
+    await assert.rejects(prepareModelSource(options as Parameters<typeof prepareModelSource>[0], {}), {
+      code: 'INVALID_INPUT'
+    });
   }
 });
 
@@ -63,7 +69,7 @@ test('model option validation runs before environment checks', async () => {
         validateModelOptions() {
           calls++;
           const error = Error('invalid model option');
-          error.code = 'INVALID_INPUT';
+          (error as Error & {code: string}).code = 'INVALID_INPUT';
           throw error;
         }
       }
@@ -73,7 +79,7 @@ test('model option validation runs before environment checks', async () => {
   assert.equal(calls, 1);
 });
 
-test('source validation rejects missing WebGPU and Web Crypto without fetching', async (t) => {
+test('source validation rejects missing WebGPU and Web Crypto without fetching', async (t: TestContext) => {
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     fetches++;
@@ -94,7 +100,7 @@ test('source validation rejects missing WebGPU and Web Crypto without fetching',
   assert.equal(fetches, 0);
 });
 
-test('source URL validation rejects malformed and non-directory origins before fetch', async (t) => {
+test('source URL validation rejects malformed and non-directory origins before fetch', async (t: TestContext) => {
   installEnvironment(t);
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async () => {
@@ -113,10 +119,10 @@ test('source URL validation rejects malformed and non-directory origins before f
   assert.equal(fetches, 0);
 });
 
-test('valid online source adds a directory slash and returns model options', async (t) => {
+test('valid online source adds a directory slash and returns model options', async (t: TestContext) => {
   installEnvironment(t);
-  const requests = [];
-  t.mock.method(globalThis, 'fetch', async (url, init) => {
+  const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
     requests.push([url, init]);
     return new Response('synthetic manifest');
   });
@@ -132,7 +138,7 @@ test('valid online source adds a directory slash and returns model options', asy
   assert.deepEqual(requests, [[prepared.manifestUrl, {signal: undefined, cache: 'no-cache'}]]);
 });
 
-test('adapter failures stop source loading before cache or fetch', async (t) => {
+test('adapter failures stop source loading before cache or fetch', async (t: TestContext) => {
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     fetches++;
@@ -153,21 +159,21 @@ test('adapter failures stop source loading before cache or fetch', async (t) => 
   assert.equal(fetches, 0);
 });
 
-test('online manifest fetch errors preserve their load error details', async (t) => {
+test('online manifest fetch errors preserve their load error details', async (t: TestContext) => {
   installEnvironment(t);
   const failure = Error('synthetic network failure');
   t.mock.method(globalThis, 'fetch', async () => {
     throw failure;
   });
-  await assert.rejects(prepareModelSource({assetsUrl, cache: false}, {}), (error) => {
-    assert.equal(error.code, 'ASSET_LOAD_FAILED');
-    assert.equal(error.message, 'Could not fetch manifest.json.');
-    assert.equal(error.cause, failure);
+  await assert.rejects(prepareModelSource({assetsUrl, cache: false}, {}), (error: unknown) => {
+    assert.equal((error as {code?: unknown}).code, 'ASSET_LOAD_FAILED');
+    assert.equal((error as {message?: unknown}).message, 'Could not fetch manifest.json.');
+    assert.equal((error as {cause?: unknown}).cause, failure);
     return true;
   });
 });
 
-test('online manifest HTTP errors cancel the body and report the status', async (t) => {
+test('online manifest HTTP errors cancel the body and report the status', async (t: TestContext) => {
   installEnvironment(t);
   let cancelled = 0;
   t.mock.method(globalThis, 'fetch', async () => ({
@@ -186,16 +192,16 @@ test('online manifest HTTP errors cancel the body and report the status', async 
   assert.equal(cancelled, 1);
 });
 
-test('offline source returns a cached manifest without network access', async (t) => {
+test('offline source returns a cached manifest without network access', async (t: TestContext) => {
   installEnvironment(t);
   let opened;
   let fetches = 0;
   const response = new Response('cached manifest');
   setGlobal(t, 'caches', {
-    async open(name) {
+    async open(name: string) {
       opened = name;
       return {
-        async match(url) {
+        async match(url: string) {
           assert.equal(url, 'https://example.test/model/manifest.json');
           return response;
         }
@@ -213,7 +219,7 @@ test('offline source returns a cached manifest without network access', async (t
   assert.equal(fetches, 0);
 });
 
-test('offline cache misses and failures are reported without fetching', async (t) => {
+test('offline cache misses and failures are reported without fetching', async (t: TestContext) => {
   installEnvironment(t);
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async () => {
@@ -244,16 +250,16 @@ test('offline cache misses and failures are reported without fetching', async (t
       };
     }
   });
-  await assert.rejects(prepareModelSource({assetsUrl, offline: true}, {}), (error) => {
-    assert.equal(error.code, 'ASSET_LOAD_FAILED');
-    assert.equal(error.message, 'Could not read the cached model manifest.');
-    assert.equal(error.cause, failure);
+  await assert.rejects(prepareModelSource({assetsUrl, offline: true}, {}), (error: unknown) => {
+    assert.equal((error as {code?: unknown}).code, 'ASSET_LOAD_FAILED');
+    assert.equal((error as {message?: unknown}).message, 'Could not read the cached model manifest.');
+    assert.equal((error as {cause?: unknown}).cause, failure);
     return true;
   });
   assert.equal(fetches, 0);
 });
 
-test('offline loading reports an unavailable cache', async (t) => {
+test('offline loading reports an unavailable cache', async (t: TestContext) => {
   installEnvironment(t);
   setGlobal(t, 'caches', undefined);
   await assert.rejects(prepareModelSource({assetsUrl, offline: true}, {}), {
@@ -262,7 +268,7 @@ test('offline loading reports an unavailable cache', async (t) => {
   });
 });
 
-test('caller cancellation before adapter setup is preserved', async (t) => {
+test('caller cancellation before adapter setup is preserved', async (t: TestContext) => {
   let adapterRequests = 0;
   installEnvironment(t, {
     gpu: gpuWith(['shader-f16'], async () => {
@@ -277,13 +283,13 @@ test('caller cancellation before adapter setup is preserved', async (t) => {
   assert.equal(adapterRequests, 0);
 });
 
-test('caller cancellation while opening the asset cache is preserved', async (t) => {
-  let openStarted;
-  let resolveOpen;
-  const started = new Promise((resolve) => {
+test('caller cancellation while opening the asset cache is preserved', async (t: TestContext) => {
+  let openStarted!: () => void;
+  let resolveOpen!: (value: {match: () => Promise<null>}) => void;
+  const started = new Promise<void>((resolve) => {
     openStarted = resolve;
   });
-  const pending = new Promise((resolve) => {
+  const pending = new Promise<{match: () => Promise<null>}>((resolve) => {
     resolveOpen = resolve;
   });
   let fetches = 0;
