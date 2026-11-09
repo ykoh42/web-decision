@@ -96,6 +96,7 @@
     "src/kev08/session.ts",
     "src/kev08/system-one.mts",
     "src/kev08/loader.ts",
+    "src/mapika/session.ts",
     "src/mapika/loader.ts",
     "src/mapika.ts",
     "src/mapika/upload.ts",

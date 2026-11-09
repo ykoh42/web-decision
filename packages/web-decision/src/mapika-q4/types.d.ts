@@ -71,6 +71,20 @@ export interface MapikaQ4Runtime {
   empty(shape: number[], dtype: string, device: unknown): MapikaQ4Tensor;
 }
 
+export interface MapikaQ4SessionTensor extends MapikaQ4Tensor {
+  copyFrom(value: unknown): MapikaQ4SessionTensor;
+  toArray(): unknown;
+}
+
+export interface MapikaQ4SessionRuntime extends MapikaQ4Runtime {
+  empty(shape: number[], dtype: string, device: unknown): MapikaQ4SessionTensor;
+  cpu(): unknown;
+  beginScope(): unknown;
+  endScope(): unknown;
+  dispose(): unknown;
+  getGlobalFunc(name: string): () => unknown;
+}
+
 export interface MapikaQ4Device {
   sync(): Promise<unknown>;
 }
@@ -94,7 +108,7 @@ export interface MapikaQ4UploadArgs {
 }
 
 export interface MapikaQ4SessionArgs extends MapikaQ4Extras {
-  runtime: MapikaQ4Runtime;
+  runtime: MapikaQ4SessionRuntime;
   device: MapikaQ4Device;
   gpu: GPUDevice;
   fn: (...args: unknown[]) => unknown;
