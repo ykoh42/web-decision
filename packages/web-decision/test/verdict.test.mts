@@ -18,16 +18,16 @@ import {createVerdictRunner, VERDICT_INPUT_NAMES} from '../src/verdict/runner.mj
 import {createVerdictSession} from '../src/verdict/session.mjs';
 
 function fakeTokenizer() {
-  const encoded = [];
+  const encoded: string[] = [];
   return {
     encoded,
     special: {cls: 50281, sep: 50282, pad: 50283, label: 50368, query: 50369},
-    encode(text) {
+    encode(text: string) {
       encoded.push(text);
-      const ids = [50281, ...Array.from(text, (character) => 100 + character.codePointAt(0)), 50282];
+      const ids = [50281, ...Array.from(text, (character) => 100 + character.codePointAt(0)!), 50282];
       return ids.length <= VERDICT_MAX_TOKENS
         ? {ids, truncated: false}
-        : {ids: [ids[0], ...ids.slice(1, VERDICT_MAX_TOKENS - 1), ids.at(-1)], truncated: true};
+        : {ids: [ids[0]!, ...ids.slice(1, VERDICT_MAX_TOKENS - 1), ids.at(-1)!], truncated: true};
     }
   };
 }
@@ -75,10 +75,12 @@ test('Verdict pins the six-file 151M FP16 bundle and its input limits', () => {
 
 test('Verdict tokenizer verifies special IDs and right-truncates while retaining boundary tokens', () => {
   class Tokenizer {
-    token_to_id(token) {
-      return {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '<<LABEL>>': 50368, '<<SEP>>': 50369}[token];
+    token_to_id(token: string) {
+      return (
+        {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '<<LABEL>>': 50368, '<<SEP>>': 50369} as Record<string, number>
+      )[token];
     }
-    encode(text) {
+    encode(text: string) {
       return {ids: [50281, ...Array.from({length: text.length}, (_, index) => index + 1), 50282]};
     }
   }
@@ -109,17 +111,17 @@ test('Verdict formats Choice, Score, and abstaining Noul as the pinned model exp
     tokenizer
   );
   assert.equal(prepared.rows.length, 3);
-  assert.equal(prepared.rows[0].candidateIds.join(','), 'billing,technical,__insufficient_evidence__');
+  assert.equal(prepared.rows[0]!.candidateIds.join(','), 'billing,technical,__insufficient_evidence__');
   assert.equal(
-    prepared.rows[0].labels.join(','),
+    prepared.rows[0]!.labels.join(','),
     'It is billing questions,It is technical support,insufficient evidence'
   );
   assert.equal(
-    prepared.rows[1].labels.join(','),
+    prepared.rows[1]!.labels.join(','),
     'low urgency (Value: 0),high urgency (Value: 10),insufficient evidence'
   );
   assert.equal(
-    prepared.rows[2].labels.join(','),
+    prepared.rows[2]!.labels.join(','),
     'true: The evidence supports an automated response.,false: not The evidence supports an automated response.,insufficient evidence'
   );
   assert.equal(
@@ -146,19 +148,23 @@ test('Verdict decodes calibrated probabilities, conditional scores, and explicit
   assert.equal(result.model, VERDICT_MODEL);
   assert.equal(result.outputTokenCount, 0);
   assert.equal(result.forwardPassCount, 1);
-  assert.equal(result.answers.route.type, 'choice');
-  assert.equal(result.answers.route.choice, 'billing');
-  assert.equal(result.answers.route.isAbstention, false);
-  assert.equal(result.answers.route.calibrationSource, 'per-cardinality');
-  assert.ok(
-    Math.abs(Object.values(result.answers.route.probabilities).reduce((sum, value) => sum + value, 0) - 1) < 1e-12
-  );
-  assert.equal(result.answers.severity.selectedLevelId, 'high');
-  assert.equal(result.answers.severity.selectedValue, 10);
-  assert.ok(Math.abs(result.answers.severity.expectedScore - 8.807970779778824) < 1e-12);
-  assert.equal(result.answers.supported.selectedOutcome, '__insufficient_evidence__');
-  assert.equal(result.answers.supported.pTrueGivenSufficientEvidence, null);
-  assert.ok(result.answers.supported.pInsufficientEvidence > 0.9);
+  const route = result.answers.route;
+  const severity = result.answers.severity;
+  const supported = result.answers.supported;
+  assert.ok(route?.type === 'choice');
+  assert.ok(severity?.type === 'score');
+  assert.ok(supported?.type === 'noul');
+  assert.equal(route.type, 'choice');
+  assert.equal(route.choice, 'billing');
+  assert.equal(route.isAbstention, false);
+  assert.equal(route.calibrationSource, 'per-cardinality');
+  assert.ok(Math.abs(Object.values(route.probabilities).reduce((sum, value) => sum + value, 0) - 1) < 1e-12);
+  assert.equal(severity.selectedLevelId, 'high');
+  assert.equal(severity.selectedValue, 10);
+  assert.ok(Math.abs(severity.expectedScore! - 8.807970779778824) < 1e-12);
+  assert.equal(supported.selectedOutcome, '__insufficient_evidence__');
+  assert.equal(supported.pTrueGivenSufficientEvidence, null);
+  assert.ok(supported.pInsufficientEvidence > 0.9);
 });
 
 test('Verdict uses per-cardinality calibration and the pinned global fallback', () => {
@@ -186,10 +192,10 @@ test('Verdict uses per-cardinality calibration and the pinned global fallback', 
       per_k: {3: 5.0069}
     }
   );
-  assert.equal(result.answers.two.calibrationSource, 'per-cardinality');
-  assert.equal(result.answers.two.calibrationTemperature, 5.0069);
-  assert.equal(result.answers.three.calibrationSource, 'global');
-  assert.equal(result.answers.three.calibrationTemperature, 2.8039);
+  assert.equal(result.answers.two!.calibrationSource, 'per-cardinality');
+  assert.equal(result.answers.two!.calibrationTemperature, 5.0069);
+  assert.equal(result.answers.three!.calibrationSource, 'global');
+  assert.equal(result.answers.three!.calibrationTemperature, 2.8039);
 });
 
 test('Verdict accepts the model capacity and rejects unsupported cardinality or invalid score semantics', () => {
@@ -202,7 +208,7 @@ test('Verdict accepts the model capacity and rejects unsupported cardinality or 
     {choice: {type: 'choice', instructions: 'Pick one.', criteria: atLimit}},
     tokenizer
   );
-  assert.equal(prepared.rows[0].candidateIds.length, VERDICT_MAX_LABELS);
+  assert.equal(prepared.rows[0]!.candidateIds.length, VERDICT_MAX_LABELS);
   assert.throws(
     () =>
       prepareVerdictSystemOne(
@@ -274,7 +280,7 @@ test('Verdict accepts large question sets and validates string context and quest
 
 test('Verdict generic decisions accept 257 questions without a request-wide count cap', async () => {
   const runner = {
-    async run(rows) {
+    async run(rows: unknown[]) {
       return rows.map(() => [2, 1, 0]);
     },
     async dispose() {}
@@ -286,14 +292,18 @@ test('Verdict generic decisions accept 257 questions without a request-wide coun
   }));
   const result = await model.decide({state: 'context', questions});
   assert.equal(result.answers.length, 257);
-  assert.equal(result.answers.at(-1).selected, 'billing');
+  assert.equal(result.answers.at(-1)!.selected, 'billing');
   await model.dispose();
 });
 
 test('Verdict runner pads dynamic rows and extracts each row only through its active candidate count', async () => {
-  const calls = [];
+  const calls: Array<{feeds: Record<string, Tensor>; outputNames: readonly string[]}> = [];
   class Tensor {
-    constructor(type, data, dims) {
+    declare type: string;
+    declare data: BigInt64Array;
+    declare dims: number[];
+    declare disposed: boolean;
+    constructor(type: string, data: BigInt64Array, dims: number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
@@ -305,9 +315,9 @@ test('Verdict runner pads dynamic rows and extracts each row only through its ac
   const session = {
     inputNames: [...VERDICT_INPUT_NAMES],
     outputNames: ['logits'],
-    async run(feeds, outputNames) {
+    async run(feeds: Record<string, Tensor>, outputNames: readonly string[]) {
       calls.push({feeds, outputNames});
-      const batch = feeds.input_ids.dims[0];
+      const batch = feeds.input_ids!.dims[0]!;
       const data = new Float32Array(batch * 25);
       for (let row = 0; row < batch; row++) data[row * 25] = row + 1;
       return {
@@ -316,13 +326,13 @@ test('Verdict runner pads dynamic rows and extracts each row only through its ac
           dims: [batch, 25],
           data,
           dispose() {
-            this.disposed = true;
+            Reflect.set(this, 'disposed', true);
           }
         }
       };
     },
     async release() {
-      this.released = true;
+      Reflect.set(this, 'released', true);
     }
   };
   const runner = createVerdictRunner({Tensor}, session);
@@ -334,18 +344,22 @@ test('Verdict runner pads dynamic rows and extracts each row only through its ac
     [1, 0, 0],
     [2, 0, 0]
   ]);
-  assert.deepEqual(Array.from(calls[0].feeds.input_ids.data), [101n, 102n, 103n, 201n, 202n, 50283n]);
-  assert.deepEqual(Array.from(calls[0].feeds.attention_mask.data), [1n, 1n, 1n, 1n, 1n, 0n]);
-  assert.deepEqual(calls[0].outputNames, ['logits']);
-  assert.equal(calls[0].feeds.input_ids.disposed, true);
+  assert.deepEqual(Array.from(calls[0]!.feeds.input_ids!.data), [101n, 102n, 103n, 201n, 202n, 50283n]);
+  assert.deepEqual(Array.from(calls[0]!.feeds.attention_mask!.data), [1n, 1n, 1n, 1n, 1n, 0n]);
+  assert.deepEqual(calls[0]!.outputNames, ['logits']);
+  assert.equal(calls[0]!.feeds.input_ids!.disposed, true);
   await runner.dispose();
-  assert.equal(session.released, true);
+  assert.equal(Reflect.get(session, 'released'), true);
 });
 
 test('Verdict runner chunks 257 rows under the per-dispatch limits', async () => {
-  const batches = [];
+  const batches: Array<[number, number]> = [];
   class Tensor {
-    constructor(type, data, dims) {
+    declare type: string;
+    declare data: BigInt64Array;
+    declare dims: number[];
+    declare disposed: boolean;
+    constructor(type: string, data: BigInt64Array, dims: number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
@@ -355,8 +369,8 @@ test('Verdict runner chunks 257 rows under the per-dispatch limits', async () =>
   const session = {
     inputNames: [...VERDICT_INPUT_NAMES],
     outputNames: ['logits'],
-    async run(feeds) {
-      const [batch, sequence] = feeds.input_ids.dims;
+    async run(feeds: Record<string, Tensor>) {
+      const [batch, sequence] = feeds.input_ids!.dims as [number, number];
       batches.push([batch, sequence]);
       const data = new Float32Array(batch * 25);
       for (let index = 0; index < batch; index++) data[index * 25] = 1;
@@ -381,7 +395,7 @@ test('Verdict runner chunks 257 rows under the per-dispatch limits', async () =>
 
 test('Verdict session preserves explicit abstention through the generic decision method', async () => {
   const runner = {
-    async run(rows) {
+    async run(rows: unknown[]) {
       return rows.map(() => [0, 0, 10]);
     },
     async dispose() {}
@@ -391,12 +405,12 @@ test('Verdict session preserves explicit abstention through the generic decision
     state: 'The context does not identify a matching route.',
     questions: [{instructions: 'Where should this go?', options: ['billing', 'technical']}]
   });
-  assert.equal(result.answers[0].selected, '__insufficient_evidence__');
-  assert.equal(result.answers[0].selectedIndex, -1);
-  assert.equal(result.answers[0].abstained, true);
-  assert.ok(result.answers[0].abstentionProbability > 0.9);
+  assert.equal(result.answers[0]!.selected, '__insufficient_evidence__');
+  assert.equal(result.answers[0]!.selectedIndex, -1);
+  assert.equal(result.answers[0]!.abstained, true);
+  assert.ok(result.answers[0]!.abstentionProbability > 0.9);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0]!.probabilities.map(({option}) => option),
     ['billing', 'technical', '__insufficient_evidence__']
   );
   await model.dispose();
@@ -444,8 +458,8 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
     model_input_names: ['input_ids', 'attention_mask']
   };
   const tokenizerData = {model: {type: 'BPE', vocab: {token: 1}}};
-  const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value));
-  const assets = {
+  const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+  const assets: Record<string, Uint8Array> = {
     'bundle_manifest.json': jsonBytes(bundle),
     'calibrator.json': jsonBytes(calibrator),
     'config.json': jsonBytes(config),
@@ -453,17 +467,23 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
     'tokenizer.json': jsonBytes(tokenizerData),
     'tokenizer_config.json': jsonBytes(tokenizerConfig)
   };
-  const reads = [];
+  const reads: string[] = [];
   class Tokenizer {
-    token_to_id(token) {
-      return {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '<<LABEL>>': 50368, '<<SEP>>': 50369}[token];
+    token_to_id(token: string) {
+      return (
+        {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '<<LABEL>>': 50368, '<<SEP>>': 50369} as Record<string, number>
+      )[token];
     }
     encode() {
       return {ids: [50281, 123, 50282]};
     }
   }
   class Tensor {
-    constructor(type, data, dims) {
+    declare type: string;
+    declare data: BigInt64Array;
+    declare dims: number[];
+    declare disposed: boolean;
+    constructor(type: string, data: BigInt64Array, dims: number[]) {
       this.type = type;
       this.data = data;
       this.dims = dims;
@@ -473,22 +493,22 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
   const session = {
     inputNames: ['input_ids', 'attention_mask'],
     outputNames: ['logits'],
-    async run(feeds) {
-      const batch = feeds.input_ids.dims[0];
+    async run(feeds: Record<string, Tensor>) {
+      const batch = feeds.input_ids!.dims[0]!;
       const data = new Float32Array(batch * 25);
       for (let row = 0; row < batch; row++) data[row * 25] = 2;
       return {logits: {type: 'float32', dims: [batch, 25], data, dispose() {}}};
     },
     async release() {
-      this.released = true;
+      Reflect.set(this, 'released', true);
     }
   };
   const adapter = {info: {isFallbackAdapter: false}};
   const ort = {
     Tensor,
-    env: {webgpu: {}},
+    env: {webgpu: {} as {adapter?: unknown; forceFallbackAdapter?: boolean}},
     InferenceSession: {
-      async create(bytes, options) {
+      async create(bytes: Uint8Array, options: {executionProviders: string[]; graphOptimizationLevel: string}) {
         assert.deepEqual(Array.from(bytes), [1, 2, 3]);
         assert.deepEqual(options.executionProviders, ['webgpu']);
         assert.equal(options.graphOptimizationLevel, 'all');
@@ -507,12 +527,12 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
         return {
           async read(name) {
             reads.push(name);
-            return assets[name];
+            return assets[name] as unknown as ArrayBuffer;
           }
         };
       },
       gpuApi: {
-        async requestAdapter(options) {
+        async requestAdapter(options: {powerPreference: 'high-performance'; forceFallbackAdapter: false}) {
           assert.deepEqual(options, {powerPreference: 'high-performance', forceFallbackAdapter: false});
           return adapter;
         }
@@ -526,7 +546,9 @@ test('Verdict loader pins its assets, strict WebGPU provider, and non-fallback a
   const result = await model.systemOne('context', {
     route: {type: 'choice', instructions: 'Where?', criteria: {billing: 'billing', technical: 'technical'}}
   });
-  assert.equal(result.answers.route.choice, 'billing');
+  const route = result.answers.route;
+  assert.ok(route?.type === 'choice');
+  assert.equal(route.choice, 'billing');
   await model.dispose();
-  assert.equal(session.released, true);
+  assert.equal(Reflect.get(session, 'released'), true);
 });
