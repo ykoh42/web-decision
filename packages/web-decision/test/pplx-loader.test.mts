@@ -4,34 +4,120 @@ import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from 'node:test';
 import {FLASH_LIMITS, FLASH_MODEL, loadFakeFlashCandidate, validateFlashOptions} from '../src/pplx/loader.mjs';
 import {uploadFlashParameters} from '../src/pplx/upload-parameters.mjs';
+import type {FlashQ4CandidateEntry, FlashTensor} from '../src/pplx/types.js';
 
-function fixture() {
-  const events = [];
-  const device = {
+type FakeDependencies = Parameters<typeof loadFakeFlashCandidate>[1];
+type FakeRuntime = Awaited<ReturnType<FakeDependencies['instantiate']>>;
+type FakeOwner = ReturnType<FakeDependencies['initialize']>;
+type FakeDevice = Parameters<FakeDependencies['initialize']>[1];
+type FakeGpu = NonNullable<FakeDependencies['gpu']>;
+interface FakeAdapterLimits extends Record<string, number> {
+  maxBufferSize: number;
+  maxStorageBufferBindingSize: number;
+  maxStorageBuffersPerShaderStage: number;
+}
+
+type FakeAdapter = {
+  features: Set<string>;
+  limits: FakeAdapterLimits;
+  isFallbackAdapter?: unknown;
+  requestDevice: NonNullable<Awaited<ReturnType<FakeGpu['requestAdapter']>>>['requestDevice'];
+};
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason?: unknown): void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return {promise, resolve, reject};
+}
+
+function fakeTensor(): FlashTensor {
+  return {
+    byteOffset: 0,
+    dtype: 'uint8',
+    shape: [],
+    copyFrom() {},
+    getDataPtr() {
+      return 1;
+    },
+    toArray() {
+      return [];
+    }
+  };
+}
+
+function fixture(): {
+  events: string[];
+  device: FakeDevice;
+  adapter: FakeAdapter;
+  owner: FakeOwner;
+  deps: FakeDependencies;
+  options: {model: typeof FLASH_MODEL; assetsUrl: string};
+} {
+  const events: string[] = [];
+  const device: FakeDevice = {
     lost: new Promise(() => {}),
     destroy() {
       events.push('destroy');
     }
   };
-  const adapter = {
+  const adapter: FakeAdapter = {
     features: new Set(['shader-f16']),
     limits: {...FLASH_LIMITS},
+    isFallbackAdapter: false,
     async requestDevice() {
       events.push('device');
       return device;
     }
   };
-  const owner = {
+  const tensor = fakeTensor();
+  const runtime: FakeRuntime = {
+    lib: {webGPUContext: {copyRawBytesToBuffer() {}}},
+    empty() {
+      return tensor;
+    },
+    cpu() {
+      return {};
+    },
+    dispose() {
+      events.push('dispose-runtime');
+    },
+    initWebGPU() {},
+    beginScope() {},
+    endScope() {},
+    webgpu() {
+      return {};
+    },
+    createVirtualMachine() {
+      return {getFunction: () => () => tensor};
+    }
+  };
+  const owner: FakeOwner = {
+    runtime,
+    device,
+    gpu: device,
+    fn: () => tensor,
     lifecycle: {loss: null, disposed: false},
-    uncaptured: [],
     disposalGuard: {
       blocked: false,
       retain() {
         events.push('retain');
       }
-    }
+    },
+    uncaptured: [],
+    teardownObserver: null,
+    teardownTimeoutMs: 100
   };
-  const deps = {
+  const deps: FakeDependencies = {
     fake: true,
     gpu: {
       async requestAdapter() {
@@ -41,19 +127,26 @@ function fixture() {
     },
     async openSource() {
       events.push('source');
-      return {wasm: Uint8Array.of(1), tokenizer: {}, tokenizerConfig: {}};
+      return {
+        manifest: {state: 'pplx-q4-joint-assets-pending', entries: []},
+        wasm: Uint8Array.of(1),
+        tokenizer: {},
+        tokenizerConfig: {},
+        async readRange() {
+          return new ArrayBuffer(0);
+        }
+      };
     },
     prepareTokenizer() {
       events.push('tokenizer');
-      return {tokenizer: {}, config: {}};
+      return {
+        tokenizer: {encode: () => ({ids: []})},
+        config: {codes: [], markerId: 0, escapedTokens: [], addedTokens: [], addedTokenIds: [], maxInputTokens: 1}
+      };
     },
     async instantiate() {
       events.push('instantiate');
-      return {
-        dispose() {
-          events.push('dispose-runtime');
-        }
-      };
+      return runtime;
     },
     initialize() {
       events.push('initialize');
@@ -65,7 +158,12 @@ function fixture() {
     },
     runner(value) {
       events.push('runner');
-      return value;
+      return {
+        ...value,
+        run: async () => [],
+        dispose() {},
+        releaseCachedMemory() {}
+      };
     },
     session(value) {
       events.push('session');
@@ -85,7 +183,7 @@ function fixture() {
 test('loads verified metadata, device and ordered weights before creating the session', async () => {
   const f = fixture();
   const value = await loadFakeFlashCandidate(f.options, f.deps);
-  assert.deepEqual(value.runner.weights, ['weight']);
+  assert.deepEqual((value as {runner: {weights: unknown[]}}).runner.weights, ['weight']);
   assert.deepEqual(f.events, [
     'adapter',
     'source',
@@ -131,18 +229,19 @@ test('rejects unsupported options and adapters before opening assets', async () 
 
 test('aborting a pending device request destroys the device when it resolves', async () => {
   const f = fixture(),
-    controller = new AbortController();
-  let resolveDevice;
-  f.adapter.requestDevice = () =>
-    new Promise((resolve) => {
-      resolveDevice = resolve;
-    });
+    controller = new AbortController(),
+    request = deferred<FakeDevice>();
+  let requestStarted = false;
+  f.adapter.requestDevice = () => {
+    requestStarted = true;
+    return request.promise;
+  };
   const pending = loadFakeFlashCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!resolveDevice) await nextTurn();
+  while (!requestStarted) await nextTurn();
   controller.abort();
   await assert.rejects(pending, {name: 'AbortError'});
   assert.ok(!f.events.includes('destroy'));
-  resolveDevice(f.device);
+  request.resolve(f.device);
   await nextTurn();
   assert.ok(f.events.includes('destroy'));
   assert.ok(!f.events.includes('initialize'));
@@ -152,20 +251,24 @@ test('a late device whose destruction fails remains retained after cancellation'
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('cancelled while requesting device'),
-    retained = [];
-  let resolveDevice,
+    retained: Array<{runtime: unknown; device: unknown}> = [],
+    request = deferred<FakeDevice>();
+  let requestStarted = false,
     destroys = 0;
   f.deps.retainResources = (runtime, device) => retained.push({runtime, device});
   f.device.destroy = () => {
     destroys++;
     throw new Error('device destruction failed');
   };
-  f.adapter.requestDevice = () => new Promise((resolve) => (resolveDevice = resolve));
+  f.adapter.requestDevice = () => {
+    requestStarted = true;
+    return request.promise;
+  };
   const pending = loadFakeFlashCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!resolveDevice) await nextTurn();
+  while (!requestStarted) await nextTurn();
   controller.abort(reason);
   await assert.rejects(pending, (error) => error === reason);
-  resolveDevice(f.device);
+  request.resolve(f.device);
   await nextTurn();
   assert.equal(destroys, 1);
   assert.deepEqual(retained, [{runtime: undefined, device: f.device}]);
@@ -174,7 +277,7 @@ test('a late device whose destruction fails remains retained after cancellation'
 
 test('failed device destruction after a load error retains the device', async () => {
   const f = fixture(),
-    retained = [];
+    retained: Array<{runtime: unknown; device: unknown}> = [];
   let destroys = 0;
   f.deps.retainResources = (runtime, device) => retained.push({runtime, device});
   f.device.destroy = () => {
@@ -193,35 +296,35 @@ test('failed device destruction after a load error retains the device', async ()
 test('a late device request rejection is observed after cancellation', async () => {
   const f = fixture(),
     controller = new AbortController(),
-    reason = new Error('cancelled while requesting device');
-  let rejectDevice;
-  f.adapter.requestDevice = () => new Promise((_resolve, reject) => (rejectDevice = reject));
+    reason = new Error('cancelled while requesting device'),
+    request = deferred<FakeDevice>();
+  let requestStarted = false;
+  f.adapter.requestDevice = () => {
+    requestStarted = true;
+    return request.promise;
+  };
   const pending = loadFakeFlashCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!rejectDevice) await nextTurn();
+  while (!requestStarted) await nextTurn();
   controller.abort(reason);
   await assert.rejects(pending, (error) => error === reason);
-  rejectDevice(new Error('late request failure'));
+  request.reject(new Error('late request failure'));
   await nextTurn();
   assert.ok(!f.events.includes('initialize'));
 });
 
 test('device loss during upload retains the initialized runtime', async () => {
   const f = fixture();
-  let lose, entered;
-  f.device.lost = new Promise((resolve) => {
-    lose = resolve;
-  });
-  const started = new Promise((resolve) => {
-    entered = resolve;
-  });
+  const loss = deferred<unknown>(),
+    started = deferred<void>();
+  Object.assign(f.device, {lost: loss.promise});
   f.deps.upload = async (_owner, _source, signal) =>
-    new Promise((_resolve, reject) => {
+    new Promise<unknown[]>((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), {once: true});
-      entered();
+      started.resolve(undefined);
     });
   const pending = loadFakeFlashCandidate(f.options, f.deps);
-  await started;
-  lose({reason: 'unknown'});
+  await started.promise;
+  loss.resolve({reason: 'unknown'});
   await assert.rejects(pending, {code: 'MODEL_LOAD_FAILED'});
   assert.ok(f.events.includes('retain'));
   assert.ok(!f.events.includes('session'));
@@ -231,30 +334,29 @@ test('abort during the real upload hash retains the owner and observes late fail
   const f = fixture();
   const bytes = Uint8Array.of(1, 2, 3, 4);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const entries = Array.from({length: 682}, (_, index) => ({
+  const entries: FlashQ4CandidateEntry[] = Array.from({length: 682}, (_, index) => ({
     position: index + 5,
     shape: [1],
     dtype: 'uint32',
     bindingKind: 'q4-candidate',
+    outputPath: `weight-${index}`,
     outputBytes: 4,
+    sourceOffset: index * 4,
+    conversion: 'none',
     ranges: [{offset: 0, bytes: 4, sha256}]
   }));
-  let entered, rejectHash;
-  const started = new Promise((resolve) => {
-    entered = resolve;
-  });
+  const started = deferred<void>(),
+    digest = deferred<ArrayBuffer>();
   t.mock.method(crypto.subtle, 'digest', () => {
-    entered();
-    return new Promise((_resolve, reject) => {
-      rejectHash = reject;
-    });
+    started.resolve(undefined);
+    return digest.promise;
   });
   f.deps.upload = (_owner, _source, signal) =>
     uploadFlashParameters(
       {state: 'pplx-q4-joint-assets-pending', entries},
       {
         signal,
-        createTensor: () => ({}),
+        createTensor: () => fakeTensor(),
         readRange: () => bytes.slice().buffer,
         writeRange: () => f.events.push('write')
       }
@@ -262,12 +364,12 @@ test('abort during the real upload hash retains the owner and observes late fail
   const controller = new AbortController();
   const reason = Error('cancel upload hash');
   const job = loadFakeFlashCandidate({...f.options, signal: controller.signal}, f.deps);
-  await started;
+  await started.promise;
   controller.abort(reason);
   await assert.rejects(job, (error) => error === reason);
   assert.ok(f.events.includes('retain'));
   assert.equal(f.events.includes('write'), false);
   assert.equal(f.events.includes('session'), false);
-  rejectHash(Error('late digest failure'));
+  digest.reject(Error('late digest failure'));
   await nextTurn();
 });

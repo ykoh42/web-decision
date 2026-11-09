@@ -17,24 +17,90 @@ const server = await createServer({
 const {Instance} = await server.ssrLoadModule('/.toolchains/apache-tvm-src/web/src/runtime.ts');
 after(() => server.close());
 
-globalThis.GPUBufferUsage = {MAP_READ: 1, COPY_DST: 2};
-globalThis.GPUMapMode = {READ: 1};
+Object.assign(globalThis, {
+  GPUBufferUsage: {MAP_READ: 1, COPY_DST: 2},
+  GPUMapMode: {READ: 1}
+});
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((yes, no) => {
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason?: unknown): void;
+}
+
+function deferred<T = void>(): Deferred<T> {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
   });
   return {promise, resolve, reject};
 }
 
-function fixture({deferOnLoss = false} = {}) {
-  const lost = deferred(),
-    map = deferred(),
-    events = [];
+interface FakeGpuContext {
+  bufferTable: Array<{size: number}>;
+  deviceCopyFromGPU(...args: number[]): void;
+  pendingGPUToCPUCopy: Promise<unknown> | null | undefined;
+}
+
+interface FakeDevice {
+  lost: PromiseLike<unknown>;
+  addEventListener(): void;
+  pushErrorScope(): void;
+  popErrorScope(): Promise<null>;
+  createBuffer(descriptor: {size: number}): {
+    size: number;
+    mapAsync(): Promise<void>;
+    getMappedRange(): ArrayBuffer;
+    unmap(): void;
+    destroy(): void;
+  };
+  createCommandEncoder(): {
+    copyBufferToBuffer(): void;
+    finish(): Record<string, never>;
+  };
+  queue: {
+    submit(): void;
+    writeBuffer(): void;
+    onSubmittedWorkDone(): Promise<void>;
+  };
+}
+
+interface RuntimeUnderTest {
+  dispose(...args: unknown[]): unknown;
+  cacheState: {dispose(): void};
+  ctx: {dispose(): void};
+  lib: {dispose(): void; webGPUContext?: FakeGpuContext};
+  memory: {storeRawBytes(): void};
+  registerFunc(): void;
+  registerAsyncServerFunc(): void;
+  asyncifyHandler: {enabled(): boolean};
+  initWebGPU(device: FakeDevice): void;
+}
+
+type Guard = ReturnType<typeof guardStrandsDisposal>;
+
+interface Fixture {
+  runtime: RuntimeUnderTest;
+  lifecycle: ReturnType<typeof trackRuntime>;
+  device: FakeDevice;
+  lost: Deferred<{reason: string}>;
+  map: Deferred<void>;
+  events: string[];
+  guard: Guard | null;
+}
+
+type GuardedFixture = Omit<Fixture, 'guard'> & {guard: Guard};
+
+function fixture(options: {deferOnLoss: true}): GuardedFixture;
+function fixture(options?: {deferOnLoss?: false}): Fixture;
+function fixture({deferOnLoss = false}: {deferOnLoss?: boolean} = {}): Fixture {
+  const lost = deferred<{reason: string}>(),
+    map = deferred<void>(),
+    events: string[] = [];
   let freed = false;
-  const device = {
+  const device: FakeDevice = {
     lost: lost.promise,
     addEventListener() {},
     pushErrorScope() {},
@@ -62,7 +128,7 @@ function fixture({deferOnLoss = false} = {}) {
   };
   // Call the actual pinned prototype methods with fake infrastructure. In particular,
   // fake ctx/lib disposal records rather than actually freeing WASM or GPU resources.
-  const runtime = Object.create(Instance.prototype);
+  const runtime = Object.create(Instance.prototype) as RuntimeUnderTest;
   runtime.cacheState = {
     dispose() {
       events.push('cache-dispose');
@@ -93,20 +159,22 @@ function fixture({deferOnLoss = false} = {}) {
   return {runtime, lifecycle, device, lost, map, events, guard};
 }
 
-function submitReadback(f) {
+function submitReadback(f: Fixture): Promise<unknown> {
   const context = f.runtime.lib.webGPUContext;
+  if (!context) throw new Error('Expected the pinned WebGPU context.');
   context.bufferTable.push({size: 64});
   context.deviceCopyFromGPU(1, 0, 20, 4);
+  if (!context.pendingGPUToCPUCopy) throw new Error('Expected a pending GPU readback.');
   return context.pendingGPUToCPUCopy;
 }
 
-async function fireLoss(f) {
+async function fireLoss(f: Fixture): Promise<void> {
   // The real pinned callback logs loss; suppress only that expected fixture log.
   const original = console.error;
   console.error = () => {};
   try {
     f.lost.resolve({reason: 'fixture-loss'});
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(resolve));
   } finally {
     console.error = original;
   }
@@ -153,7 +221,7 @@ test('normal disposal remains idempotent after the resulting device loss', async
 
 test('a reentrant dispose cannot recursively invoke tracked disposal', () => {
   const lost = deferred(),
-    events = [];
+    events: string[] = [];
   const runtime = {
     dispose() {
       events.push('dispose');
