@@ -3,7 +3,7 @@ import test from 'node:test';
 import {parseGemma4ShardPlan} from '../src/strands/gemma4-manifest.mjs';
 import {uploadGemma4Shard} from '../src/strands/gemma4-upload.mjs';
 
-const sha = (character) => character.repeat(64);
+const sha = (character: string) => character.repeat(64);
 
 function fixture() {
   const expected = {
@@ -19,7 +19,7 @@ function fixture() {
     sourceMapSha256: sha('e'),
     sourceMapBytes: 200
   };
-  const inputSpecs = Array.from({length: 1248}, (_, index) => ({
+  const inputSpecs: {kind: string; target: string | null; arg: string}[] = Array.from({length: 1248}, (_, index) => ({
     kind: index < 1207 ? 'InputKind.PARAMETER' : index === 1207 ? 'InputKind.CONSTANT_TENSOR' : 'InputKind.BUFFER',
     target: index === 1207 ? 'torso.embed_tokens.embed_scale' : `target_${index}`,
     arg: `argument_${index}`
@@ -30,7 +30,7 @@ function fixture() {
   const sourceMap = Array.from({length: 1248}, (_, index) => ({
     name: `param_${index}`,
     target: index === 1207 ? 'torso.embed_tokens.embed_scale' : `target_${index}`,
-    shape: index === 1207 ? [] : [1],
+    shape: index === 1207 ? [] : [1]!,
     dtype: 'float16',
     nbytes: 2,
     sourceSha256: sha('f'),
@@ -51,7 +51,7 @@ function fixture() {
     nbytes: indices.length * 2,
     records: indices.map((index, offset) => ({
       name: `param_${index}`,
-      shape: index === 1207 ? [] : [1],
+      shape: index === 1207 ? [] : [1]!,
       dtype: 'float16',
       format: 'raw',
       nbytes: 2,
@@ -105,14 +105,14 @@ test('builds an immutable ABI-ordered plan for physically reordered shards', () 
   const plan = parseGemma4ShardPlan(input);
   assert.equal(plan.shards.length, 2);
   assert.equal(plan.expectedParameters.length, 1248);
-  assert.equal(plan.shards[0].expectedParameters[0].index, 1);
-  assert.equal(plan.shards[1].expectedParameters.at(-1).index, 0);
-  assert.deepEqual(plan.expectedParameters[1207].shape, []);
-  input.sourceMap[1].shape[0] = 8;
-  input.cacheIndex.records[0].records[0].byteOffset = 99;
-  assert.deepEqual(plan.expectedParameters[1].shape, [1]);
-  assert.equal(plan.shards[0].records[0].byteOffset, 0);
-  assert.throws(() => plan.shards[0].records[0].shape.push(5), TypeError);
+  assert.equal(plan.shards[0]!.expectedParameters[0]!.index, 1);
+  assert.equal(plan.shards[1]!.expectedParameters.at(-1)!.index, 0);
+  assert.deepEqual(plan.expectedParameters[1207]!.shape, []);
+  input.sourceMap[1]!.shape[0]! = 8;
+  input.cacheIndex.records[0]!.records[0]!.byteOffset = 99;
+  assert.deepEqual(plan.expectedParameters[1]!.shape, [1]);
+  assert.equal(plan.shards[0]!.records[0]!.byteOffset, 0);
+  assert.throws(() => (plan.shards[0]!.records[0]!.shape as number[]).push(5), TypeError);
 });
 
 test('pins the v26 graph argument inventory and embedded scalar constant index', () => {
@@ -125,8 +125,8 @@ test('pins the v26 graph argument inventory and embedded scalar constant index',
     inputSpecs.slice(1248).map(({arg}) => arg),
     ['token_ids', 'answer_index', 'option_indices']
   );
-  assert.equal(inputSpecs[1207].target, 'torso.embed_tokens.embed_scale');
-  assert.deepEqual(sourceMap[1207], {
+  assert.equal(inputSpecs[1207]!.target, 'torso.embed_tokens.embed_scale');
+  assert.deepEqual(sourceMap[1207]!, {
     name: 'param_1207',
     target: 'torso.embed_tokens.embed_scale',
     shape: [],
@@ -142,7 +142,7 @@ test('pins the v26 graph argument inventory and embedded scalar constant index',
 });
 
 test('plan shard records and expectations connect to the existing uploader', async () => {
-  const shard = parseGemma4ShardPlan(fixture()).shards[0];
+  const shard = parseGemma4ShardPlan(fixture()).shards[0]!;
   let writes = 0,
     syncs = 0;
   const uploaded = await uploadGemma4Shard({
@@ -165,7 +165,7 @@ test('plan shard records and expectations connect to the existing uploader', asy
 });
 
 test('rejects mismatched identities, graph hashes and independently verified metadata hashes', () => {
-  const changes = [
+  const changes: ((f: ReturnType<typeof fixture>) => void)[] = [
     (f) => {
       f.cacheManifest.model = 'other';
     },
@@ -202,48 +202,48 @@ test('rejects mismatched identities, graph hashes and independently verified met
 });
 
 test('rejects wrong or incomplete graph, source map and parameter metadata', () => {
-  const changes = [
+  const changes: ((f: ReturnType<typeof fixture>) => void)[] = [
     (f) => {
       f.inputSpecs.pop();
     },
     (f) => {
-      f.inputSpecs[1248].arg = 'answer_index';
+      f.inputSpecs[1248]!.arg = 'answer_index';
     },
     (f) => {
-      f.inputSpecs[0].kind = 'InputKind.USER_INPUT';
+      f.inputSpecs[0]!.kind = 'InputKind.USER_INPUT';
     },
     (f) => {
-      f.inputSpecs[0].target = f.inputSpecs[1].target;
+      f.inputSpecs[0]!.target = f.inputSpecs[1]!.target;
     },
     (f) => {
-      f.inputSpecs[0].arg = f.inputSpecs[1].arg;
+      f.inputSpecs[0]!.arg = f.inputSpecs[1]!.arg;
     },
     (f) => {
-      f.sourceMap[0].name = 'param_1';
+      f.sourceMap[0]!.name = 'param_1';
     },
     (f) => {
-      f.sourceMap[0].target = 'other';
+      f.sourceMap[0]!.target = 'other';
     },
     (f) => {
-      f.sourceMap[0].sourceSha256 = 'bad';
+      f.sourceMap[0]!.sourceSha256 = 'bad';
     },
     (f) => {
-      f.sourceMap[1].shape = [0];
+      f.sourceMap[1]!.shape = [0]!;
     },
     (f) => {
-      f.sourceMap[1].shape = [Number.MAX_SAFE_INTEGER, 3];
+      f.sourceMap[1]!.shape = [Number.MAX_SAFE_INTEGER, 3];
     },
     (f) => {
-      f.cacheIndex.records[0].records[0].dtype = 'float32';
+      f.cacheIndex.records[0]!.records[0]!.dtype = 'float32';
     },
     (f) => {
-      f.cacheIndex.records[0].records[0].shape = [];
+      f.cacheIndex.records[0]!.records[0]!.shape = [];
     },
     (f) => {
-      f.cacheIndex.records[0].records[1].name = 'param_1';
+      f.cacheIndex.records[0]!.records[1]!.name = 'param_1';
     },
     (f) => {
-      f.cacheIndex.records[0].records.pop();
+      f.cacheIndex.records[0]!.records.pop();
     }
   ];
   for (const change of changes) {
@@ -254,39 +254,39 @@ test('rejects wrong or incomplete graph, source map and parameter metadata', () 
 });
 
 test('rejects unsafe shard paths, sizes, hashes, overlap and missing bytes', () => {
-  const changes = [
+  const changes: ((f: ReturnType<typeof fixture>) => void)[] = [
     (f) => {
-      f.cacheManifest.files[0].path = '../params_shard_0.bin';
+      f.cacheManifest.files[0]!.path = '../params_shard_0.bin';
     },
     (f) => {
-      f.cacheManifest.files[0].sha256 = 'bad';
+      f.cacheManifest.files[0]!.sha256 = 'bad';
     },
     (f) => {
-      f.cacheManifest.files[1].sha256 = f.cacheManifest.files[0].sha256;
+      f.cacheManifest.files[1]!.sha256 = f.cacheManifest.files[0]!.sha256;
     },
     (f) => {
-      f.cacheManifest.files[0].bytes = Number.MAX_SAFE_INTEGER + 1;
+      f.cacheManifest.files[0]!.bytes = Number.MAX_SAFE_INTEGER + 1;
     },
     (f) => {
-      f.cacheManifest.files.push({...f.cacheManifest.files[0]});
+      f.cacheManifest.files.push({...f.cacheManifest.files[0]!});
     },
     (f) => {
       f.cacheManifest.files.push({path: 'params_shard_2.bin', bytes: 2, sha256: sha('3')});
     },
     (f) => {
-      f.cacheIndex.records[1].dataPath = f.cacheIndex.records[0].dataPath;
+      f.cacheIndex.records[1]!.dataPath = f.cacheIndex.records[0]!.dataPath;
     },
     (f) => {
-      f.cacheIndex.records[0].nbytes++;
+      f.cacheIndex.records[0]!.nbytes++;
     },
     (f) => {
-      f.cacheIndex.records[0].records[1].byteOffset = 1;
+      f.cacheIndex.records[0]!.records[1]!.byteOffset = 1;
     },
     (f) => {
-      f.cacheIndex.records[0].records[1].byteOffset = 3;
+      f.cacheIndex.records[0]!.records[1]!.byteOffset = 3;
     },
     (f) => {
-      f.cacheIndex.records[0].records[0].byteOffset = Number.MAX_SAFE_INTEGER;
+      f.cacheIndex.records[0]!.records[0]!.byteOffset = Number.MAX_SAFE_INTEGER;
     }
   ];
   for (const change of changes) {

@@ -41,7 +41,6 @@
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/strands-device-loss.test.mjs",
     "packages/web-decision/test/strands-gemma4-loader.test.mjs",
-    "packages/web-decision/test/strands-gemma4-manifest.test.mjs",
     "packages/web-decision/test/strands-gemma4-upload.test.mjs",
     "packages/web-decision/test/strands-input-snapshot.test.mjs",
     "packages/web-decision/test/strands-range-cache.test.mjs",
