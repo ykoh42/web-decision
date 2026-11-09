@@ -26,11 +26,6 @@
   ],
   "findings": [
     {
-      "file": "packages/web-decision/src/tamev/loader.mjs",
-      "identity": "module/function:validateTamevLoadOptions",
-      "score": 17
-    },
-    {
       "file": "releases/web-decision-0.1.0/prepare-asset-pack.mjs",
       "identity": "module/function:prepareAssetPack",
       "score": 16

@@ -47,6 +47,7 @@
     "test/runtime-lifecycle.test.mts",
     "test/safedecide-source.test.mts",
     "test/safedecide-tokenizer.test.mts",
+    "test/tamev-loader-options.test.mts",
     "test/strands-gemma4-runner.test.mts",
     "test/strands-gemma4-session.test.mts",
     "test/strands-loader-entry.test.mts",
@@ -79,6 +80,7 @@
     "src/strands/session.mts",
     "src/strands/source-loader-internal.mts",
     "src/safedecide/*.mts",
+    "src/tamev/loader.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]
