@@ -30,7 +30,7 @@ const fixtureSkip = requiredFixtures.every(existsSync)
   ? false
   : 'Local H2O model metadata and graph fixtures are not included.';
 
-function assertNoAbsolutePaths(value) {
+function assertNoAbsolutePaths(value: unknown): void {
   if (typeof value === 'string') assert.doesNotMatch(value, /^(?:\/|[A-Za-z]:\\)/);
   else if (value && typeof value === 'object') {
     for (const [key, item] of Object.entries(value)) {
@@ -59,12 +59,12 @@ test(
       execFileSync('tar', ['-xzf', join(temp, output[0].filename), '-C', installed, '--strip-components=1']);
       const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8'));
       assert.deepEqual(Object.keys(manifest.exports), ['.']);
-      const {openH2oAssetSource} = await import(pathToFileURL(join(installed, 'src/h2o/source-entry.mjs')));
+      const {openH2oAssetSource} = await import(pathToFileURL(join(installed, 'src/h2o/source-entry.mjs')).href);
       const inventory = new Uint8Array(await readFile(inventoryPath));
       const {prepareCandidatePlan, preparePublicCandidatePlan} = await import(
-        pathToFileURL(join(installed, 'src/h2o/plan.mjs'))
+        pathToFileURL(join(installed, 'src/h2o/plan.mjs')).href
       );
-      const manifestBytes = new Uint8Array(await readFile(assets.get('manifest.pending.json')));
+      const manifestBytes = new Uint8Array(await readFile(assets.get('manifest.pending.json')!));
       const publicBytes = new Uint8Array(await readFile(publicMetadata));
       const oldPlan = await prepareCandidatePlan(new Uint8Array(await readFile(originalStage)), manifestBytes);
       assert.deepEqual(await preparePublicCandidatePlan(publicBytes, manifestBytes), oldPlan);
@@ -78,20 +78,20 @@ test(
         tamperMetadata = false;
       globalThis.fetch = async (url, options) => {
         calls++;
-        const pathname = new URL(url).pathname;
+        const pathname = new URL(url instanceof Request ? url.url : url).pathname;
         assert.ok(pathname.startsWith('/assets/'));
         const name = pathname.slice('/assets/'.length);
         const path = assets.get(name);
         assert.ok(path, `unexpected asset: ${name}`);
         const data = await readFile(path);
-        const match = /^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);
+        const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(options?.headers).get('Range') ?? '');
         assert.ok(match);
         const start = Number(match[1]),
           end = Number(match[2]);
         const range = Uint8Array.from(data.subarray(start, end + 1));
-        if (tamperWeight && name === 'tensor-0415-retained.pending') range[0] ^= 1;
-        if (tamperEvidence && name === 'evidence/inventory.json') range[0] ^= 1;
-        if (tamperMetadata && name === 'h2o-public-metadata.json') range[0] ^= 1;
+        if (tamperWeight && name === 'tensor-0415-retained.pending') range[0] = range[0]! ^ 1;
+        if (tamperEvidence && name === 'evidence/inventory.json') range[0] = range[0]! ^ 1;
+        if (tamperMetadata && name === 'h2o-public-metadata.json') range[0] = range[0]! ^ 1;
         return new Response(range, {
           status: 206,
           headers: {
@@ -101,7 +101,7 @@ test(
         });
       };
       const changed = Uint8Array.from(inventory);
-      changed[0] ^= 1;
+      changed[0] = changed[0]! ^ 1;
       await assert.rejects(
         openH2oAssetSource({assetsUrl: 'https://example.invalid/assets/', inventoryBytes: changed}),
         {
@@ -120,7 +120,7 @@ test(
       const path = 'tensor-0415-retained.pending';
       const range = {path, totalBytes: 64, ...source.inventory[path][0]};
       const actual = await source.readRange('https://example.invalid/assets/', range);
-      assert.deepEqual(new Uint8Array(actual.bytes), new Uint8Array(await readFile(assets.get(path))));
+      assert.deepEqual(new Uint8Array(actual.bytes), new Uint8Array(await readFile(assets.get(path)!)));
       await assert.rejects(source.readRange('https://example.invalid/assets/', {...range, sha256: '0'.repeat(64)}), {
         code: 'INVALID_ASSET'
       });
@@ -132,7 +132,7 @@ test(
 
       // Exercise the real source, plan, tokenizer and session in the installed
       // loader. Only the device/runtime, upload and model runner are simulated.
-      const loader = await import(pathToFileURL(join(installed, 'src/h2o/loader.mjs')));
+      const loader = await import(pathToFileURL(join(installed, 'src/h2o/loader.mjs')).href);
       await assert.rejects(
         loader.loadH2oCandidate(
           {assetsUrl: 'https://example.invalid/assets/'},
@@ -140,7 +140,7 @@ test(
         ),
         {code: 'UNSUPPORTED_ENVIRONMENT'}
       );
-      const events = [];
+      const events: string[] = [];
       const fakeDevice = {
         lost: new Promise(() => {}),
         destroy() {
@@ -160,7 +160,7 @@ test(
         }
       };
       const runner = {
-        async run(inputs) {
+        async run(inputs: unknown[]) {
           events.push('run');
           assert.equal(inputs.length, 5);
           return new Float32Array(255);
@@ -189,9 +189,24 @@ test(
           events.push('guard');
         },
         initialize: () => ({}),
-        async upload({plan, inventory, base, readRange, makeHasher}) {
+        async upload({
+          plan,
+          inventory,
+          base,
+          readRange,
+          makeHasher
+        }: {
+          plan: {parameters: unknown[]};
+          inventory: Record<string, {offset: number; length: number; sha256: string}[]>;
+          base: string;
+          readRange: (
+            base: string,
+            spec: {path: string; totalBytes: number; offset: number; length: number; sha256: string}
+          ) => Promise<{bytes: ArrayBuffer}>;
+          makeHasher: () => {update(bytes: Uint8Array): void; digest(): string};
+        }) {
           assert.equal(plan.parameters.length, 682);
-          const spec = {path, totalBytes: 64, ...inventory[path][0]};
+          const spec = {path, totalBytes: 64, ...inventory[path]![0]!};
           const bytes = new Uint8Array((await readRange(base, spec)).bytes);
           const hash = makeHasher();
           hash.update(bytes);
