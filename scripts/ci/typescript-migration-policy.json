@@ -215,7 +215,6 @@
     "packages/web-decision/test/strands-gemma4-session.test.mjs",
     "packages/web-decision/test/strands-gemma4-upload.test.mjs",
     "packages/web-decision/test/strands-input-snapshot.test.mjs",
-    "packages/web-decision/test/strands-manifest.test.mjs",
     "packages/web-decision/test/strands-options.test.mjs",
     "packages/web-decision/test/strands-range-cache.test.mjs",
     "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
