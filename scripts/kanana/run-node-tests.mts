@@ -1,5 +1,5 @@
 import {execFileSync} from 'node:child_process';
-import {mkdir, mkdtemp, readdir, rm, symlink, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, mkdtemp, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -14,7 +14,7 @@ const allTests = (await readdir(testDirectory))
   .map((file) => join('test', file));
 const coreTests = [
   'test/kanana-protocol.test.mjs',
-  'test/kanana-scoring.test.mjs',
+  'test/kanana-scoring.test.mts',
   'test/kanana-candidates.test.mjs',
   'test/kanana-chat-template.test.mjs',
   'test/kanana-truncation.test.mjs',
@@ -50,6 +50,18 @@ try {
     ],
     {cwd: packageRoot, stdio: 'inherit'}
   );
+  // Emit TypeScript core tests separately so tsx never rewrites the compiled
+  // Kanana source maps used by the coverage gate.
+  const emittedTests = join(outputDirectory, 'core-tests');
+  execFileSync(
+    process.execPath,
+    [compiler, '--project', join(packageRoot, 'tsconfig.kanana-tests.json'), '--outDir', emittedTests],
+    {
+      cwd: packageRoot,
+      stdio: 'inherit'
+    }
+  );
+  await copyFile(join(testDirectory, 'kanana-core-modules.mjs'), join(emittedTests, 'test', 'kanana-core-modules.mjs'));
   const runTests = (files: string[], useTsx: boolean) => {
     const testArguments = [...(useTsx ? ['--import', 'tsx'] : []), '--test', ...files];
     if (process.env.NODE_V8_COVERAGE) testArguments.unshift('--enable-source-maps');
@@ -61,7 +73,11 @@ try {
   };
   const compiledTests = tests.filter((file) => compiledSourceMapTests.has(file));
   const tsxTests = tests.filter((file) => !compiledSourceMapTests.has(file));
-  if (compiledTests.length > 0) runTests(compiledTests, false);
+  if (compiledTests.length > 0)
+    runTests(
+      compiledTests.map((file) => (file.endsWith('.mts') ? join(emittedTests, file.replace(/\.mts$/u, '.mjs')) : file)),
+      false
+    );
   if (tsxTests.length > 0) runTests(tsxTests, true);
 } finally {
   await rm(outputDirectory, {recursive: true, force: true});
