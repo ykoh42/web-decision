@@ -48,7 +48,6 @@
     "packages/web-decision/test/kanana-magick-image.test.mjs",
     "packages/web-decision/test/kanana-pnm-image.test.mjs",
     "packages/web-decision/test/kanana-protocol.test.mjs",
-    "packages/web-decision/test/kanana-truncation.test.mjs",
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/kev-gpu.test.mjs",
     "packages/web-decision/test/kev-systemone.test.mjs",

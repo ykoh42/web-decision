@@ -22,17 +22,17 @@ TOKENS_BY_ID.set(BOS_ID, '<|bos|>');
 
 function charTokenizer() {
   return {
-    encode(text, options = {}) {
+    encode(text: string, options: {add_special_tokens?: boolean} = {}) {
       const ids = [];
       for (let offset = 0; offset < text.length;) {
         const special = SPECIAL_TOKENS.find((token) => text.startsWith(token, offset));
         if (special) {
-          ids.push(SPECIAL_IDS.get(special));
+          ids.push(SPECIAL_IDS.get(special)!);
           offset += special.length;
           continue;
         }
 
-        const codePoint = text.codePointAt(offset);
+        const codePoint = text.codePointAt(offset)!;
         const character = String.fromCodePoint(codePoint);
         ids.push(CHAR_ID_OFFSET + codePoint);
         offset += character.length;
@@ -40,29 +40,29 @@ function charTokenizer() {
       if (options.add_special_tokens !== false) ids.unshift(BOS_ID);
       return {ids};
     },
-    decode(ids) {
+    decode(ids: number[]) {
       return ids.map((id) => TOKENS_BY_ID.get(id) ?? String.fromCodePoint(id - CHAR_ID_OFFSET)).join('');
     }
   };
 }
 
 function boundaryTokenizer() {
-  const tokens = new Map([...SPECIAL_IDS, [100, '[u]\n'], [101, 'xb'], [102, 'ab']]);
+  const tokens = new Map<string | number, string | number>([...SPECIAL_IDS, [100, '[u]\n'], [101, 'xb'], [102, 'ab']]);
   const tokensByValue = new Map([...tokens].map(([id, token]) => [token, id]));
   const boundaryTokens = ['[u]\n', 'xb', 'ab'];
 
   return {
-    encode(text, options = {}) {
+    encode(text: string, options: {add_special_tokens?: boolean} = {}) {
       const ids = [];
       for (let offset = 0; offset < text.length;) {
         const token = [...boundaryTokens, ...SPECIAL_TOKENS].find((value) => text.startsWith(value, offset));
         if (token) {
-          ids.push(tokensByValue.get(token) ?? SPECIAL_IDS.get(token));
+          ids.push((tokensByValue.get(token) ?? SPECIAL_IDS.get(token)) as number);
           offset += token.length;
           continue;
         }
 
-        const codePoint = text.codePointAt(offset);
+        const codePoint = text.codePointAt(offset)!;
         const character = String.fromCodePoint(codePoint);
         ids.push(CHAR_ID_OFFSET + codePoint);
         offset += character.length;
@@ -70,13 +70,17 @@ function boundaryTokenizer() {
       if (options.add_special_tokens !== false) ids.unshift(BOS_ID);
       return {ids};
     },
-    decode(ids) {
+    decode(ids: number[]) {
       return ids.map((id) => tokens.get(id) ?? String.fromCodePoint(id - CHAR_ID_OFFSET)).join('');
     }
   };
 }
 
-function queryInput({state = '', images = [], instructions = 'Select a route'} = {}) {
+function queryInput({
+  state = '',
+  images = [],
+  instructions = 'Select a route'
+}: {state?: string; images?: string[]; instructions?: string} = {}) {
   const prepared = prepareKananaSystemOne({
     state,
     images,
@@ -94,7 +98,11 @@ function queryInput({state = '', images = [], instructions = 'Select a route'} =
   return renderKananaQueryInput(prepared, 'route');
 }
 
-function candidateRequest({state = '', candidate, images = []} = {}) {
+function candidateRequest({
+  state = '',
+  candidate,
+  images = []
+}: {state?: string; candidate?: unknown; images?: string[]} = {}) {
   return prepareKananaSystemOne({
     state,
     images,
@@ -111,15 +119,20 @@ function candidateRequest({state = '', candidate, images = []} = {}) {
   });
 }
 
-function fit(input, tokenizer, imageTokenThw = [], options = {}) {
+function fit(
+  input: ReturnType<typeof queryInput>,
+  tokenizer: ReturnType<typeof charTokenizer>,
+  imageTokenThw: number[][] = [],
+  options: Parameters<typeof truncateKananaQuery>[3] = {}
+) {
   return truncateKananaQuery(tokenizer, input.messages, imageTokenThw, {
     editableUserTextIndexes: input.editableUserTextIndexes,
     ...options
   });
 }
 
-function stateText(result, index) {
-  return result.messages[1].content[index].text;
+function stateText(result: ReturnType<typeof truncateKananaQuery>, index: number | undefined) {
+  return (result.messages[1]!.content as {text: string}[])[index!]!.text;
 }
 
 test('accepts an exact model-length query without changing its state', () => {
@@ -168,9 +181,9 @@ test('truncates adjacent message text parts using their original token boundarie
   });
   const input = renderKananaQueryInput(prepared, 'route');
   const editable = input.editableUserTextIndexes;
-  const editableText = editable.map((index) => input.messages[1].content[index].text);
+  const editableText = editable.map((index) => (input.messages[1].content[index] as {text: string}).text);
   const emptyMessages = structuredClone(input.messages);
-  for (const index of editable) emptyMessages[1].content[index].text = '';
+  for (const index of editable) (emptyMessages[1].content[index] as {text: string}).text = '';
   const protectedTokens = encodeKananaQuery(tokenizer, emptyMessages).tokenCount;
   const original = encodeKananaQuery(tokenizer, input.messages);
 
@@ -185,7 +198,7 @@ test('truncates adjacent message text parts using their original token boundarie
   assert.equal(result.tokenCount, protectedTokens + 2);
   assert.equal(result.retainedStateTokens, 3);
   assert.deepEqual(
-    editable.map((index) => result.messages[1].content[index].text),
+    editable.map((index) => (result.messages[1]!.content as {text: string}[])[index]!.text),
     ['[u]\n', 'x', '', 'b']
   );
   assert.ok(result.prompt.includes('[u]\nxb'));
@@ -200,8 +213,8 @@ test('rejects an overlength prompt when pinned truncation is disabled', () => {
   assert.throws(
     () => fit(input, tokenizer, [], {truncateInputs: false}),
     (error) => {
-      assert.deepEqual(Object.keys(error), ['name', 'code', 'maxLength', 'tokenCount']);
-      assert.equal(error.code, 'input_too_long');
+      assert.deepEqual(Object.keys(error as object), ['name', 'code', 'maxLength', 'tokenCount']);
+      assert.equal((error as {code: string}).code, 'input_too_long');
       return true;
     }
   );
@@ -218,7 +231,7 @@ test('preserves every expanded image token while trimming state text', () => {
   assert.equal(result.tokenCount, KANANA_MAX_LENGTH);
   assert.equal(result.inputIds.filter((id) => id === SPECIAL_IDS.get(IMAGE_TOKEN)).length, 4);
   assert.equal(result.prompt.includes(`${IMAGE_TOKEN.repeat(4)}`), true);
-  assert.equal(result.messages[1].content.filter((part) => part.type === 'image').length, 1);
+  assert.equal((result.messages[1]!.content as {type: string}[]).filter((part) => part.type === 'image').length, 1);
 });
 
 test('errors when protected options and images exceed the limit after state is removed', () => {
@@ -333,8 +346,8 @@ test('accepts an exact-length candidate document unchanged', () => {
 
   assert.equal(exact.tokenCount, original.tokenCount);
   assert.equal(exact.truncated, false);
-  assert.equal(exact.messages[0].content[0].text, KANANA_DOCUMENT_INSTRUCTION);
-  assert.equal(exact.messages[1].content[0].text, 'A candidate document');
+  assert.equal((exact.messages[0]!.content as {text: string}[])[0]!.text, KANANA_DOCUMENT_INSTRUCTION);
+  assert.equal((exact.messages[1]!.content as {text: string}[])[0]!.text, 'A candidate document');
 });
 
 test('truncates an overlength candidate document to its longest fitting prefix', () => {
@@ -345,8 +358,8 @@ test('truncates an overlength candidate document to its longest fitting prefix',
 
   assert.equal(result.tokenCount, KANANA_MAX_LENGTH);
   assert.equal(result.truncated, true);
-  assert.equal(result.messages[1].content[0].text, value.slice(0, -1));
-  assert.equal(result.messages[0].content[0].text, KANANA_DOCUMENT_INSTRUCTION);
+  assert.equal((result.messages[1]!.content as {text: string}[])[0]!.text, value.slice(0, -1));
+  assert.equal((result.messages[0]!.content as {text: string}[])[0]!.text, KANANA_DOCUMENT_INSTRUCTION);
 });
 
 test('candidate documents preserve the protected instruction and honor configured limits', () => {
@@ -362,7 +375,7 @@ test('candidate documents preserve the protected instruction and honor configure
   });
   const value = 'd'.repeat(25_000);
   const result = truncateKananaDocument(tokenizer, value, [], {maxLength: 30_000});
-  assert.equal(result.messages[1].content[0].text, value);
+  assert.equal((result.messages[1]!.content as {text: string}[])[0]!.text, value);
   assert.equal(result.truncated, false);
   assert.ok(result.tokenCount > KANANA_MAX_LENGTH);
 });
