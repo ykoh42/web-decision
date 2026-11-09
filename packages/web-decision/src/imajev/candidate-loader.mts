@@ -5,6 +5,7 @@ import {Hash} from '../h2o/sha256.mjs';
 import {WebDecisionError} from '../kev.js';
 import {watchLoadDeviceLoss} from '../load-device-loss.js';
 import {runtimeOwnership} from '../nari/runtime.mjs';
+import type {NariRuntimeOwner, NariTvmRuntime} from '../nari/runtime.mjs';
 import {retainStrandsResources} from '../strands/disposal-guard.mjs';
 import {IMAJEV_MODEL} from './contract.mjs';
 import {createImajevResultProcessor} from './result-processor.mjs';
@@ -13,10 +14,9 @@ import {openImajevSource} from './source.mjs';
 import {uploadImajevFromSource} from './upload.mjs';
 
 type ImajevSource = Awaited<ReturnType<typeof openImajevSource>>;
-type ImajevOwner = Parameters<typeof uploadImajevFromSource>[0] &
-  Omit<ConstructorParameters<typeof ImajevSession>[0], 'weights' | 'processor' | 'maxInputTokens'>;
+type ImajevOwner = NariRuntimeOwner;
 type ImajevProcessor = ReturnType<typeof createImajevResultProcessor>;
-type ImajevRuntime = {dispose(): unknown};
+type ImajevRuntime = NariTvmRuntime;
 type ImajevSessionArgs = ImajevOwner & {weights: unknown[]; processor: ImajevProcessor; maxInputTokens: number};
 interface Ownership {
   initialize(runtime: ImajevRuntime, gpu: GPUDevice): ImajevOwner;

@@ -41,12 +41,18 @@ interface ImajevTensor {
 }
 interface ImajevRuntimeOwner extends UploadOwner {
   runtime: {
-    lib?: {
-      webGPUContext?: {
-        copyRawBytesToBuffer(bytes: Uint8Array, pointer: unknown, offset: number, length: number): unknown;
-        gpuBufferFromPtr(pointer: unknown): {size: number};
-      };
-    };
+    lib?:
+      | {
+          webGPUContext?:
+            | {
+                copyRawBytesToBuffer(bytes: Uint8Array, pointer: unknown, offset: number, length: number): unknown;
+                gpuBufferFromPtr(pointer: unknown): {readonly size?: unknown} | null | undefined;
+              }
+            | null
+            | undefined;
+        }
+      | null
+      | undefined;
     empty(shape: number[], dtype: string, device: unknown): ImajevTensor;
   };
   device: unknown;
@@ -247,8 +253,8 @@ export function uploadImajevFromSource(
       if (typeof tensor.getDataPtr !== 'function' || !Number.isSafeInteger(tensor.byteOffset) || tensor.byteOffset % 4)
         invalid();
       const buffer = context.gpuBufferFromPtr(tensor.getDataPtr());
-      if (!Number.isSafeInteger(buffer?.size) || buffer.size < tensor.byteOffset + needed) invalid();
-      return {tensor, capacityBytes: buffer.size - tensor.byteOffset};
+      if (!Number.isSafeInteger(buffer?.size) || (buffer!.size as number) < tensor.byteOffset + needed) invalid();
+      return {tensor, capacityBytes: (buffer!.size as number) - tensor.byteOffset};
     },
     async writeAndSettle(tensor, offset, bytes) {
       await withNariScope(
