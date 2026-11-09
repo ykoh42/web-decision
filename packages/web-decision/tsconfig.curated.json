@@ -29,11 +29,15 @@
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
     "test/runtime-lifecycle.test.mts",
+    "test/strands-loader-entry.test.mts",
     "test/strands-preflight.test.mts",
+    "test/strands-source-loader-internal.test.mts",
     "src/mapika4b/tokenizer.mts",
     "src/opendecider-nano/gpu-compat.mts",
     "src/opendecider-nano/tokenizer.mts",
+    "src/strands/loader.mts",
     "src/strands/preflight.mts",
+    "src/strands/source-loader-internal.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]
