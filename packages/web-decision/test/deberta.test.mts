@@ -9,7 +9,7 @@ import {readDebertaManifestResponse, validateDebertaManifest} from '../src/deber
 import {responseFromReader} from './stream-helpers.mjs';
 
 const tokenizer = {
-  encode(text) {
+  encode(text: string) {
     return {
       ids:
         text === '[STATE]'
@@ -31,7 +31,7 @@ const request = () => ({
 });
 
 test('selects explicit model families and preserves the Kev default', () => {
-  assert.equal(selectModelFamily({assetsUrl: '/kev'}), 'kev');
+  assert.equal(selectModelFamily({assetsUrl: '/kev'} as unknown as {model?: unknown}), 'kev');
   assert.equal(selectModelFamily({model: 'kev-0.6b-q4f16'}), 'kev');
   assert.equal(selectModelFamily({model: 'open-jev-deberta-v3-large-q4f16'}), 'deberta');
   for (const value of [null, '', 'other', 42])
@@ -41,16 +41,16 @@ test('selects explicit model families and preserves the Kev default', () => {
 test('packs multiple questions, snapshots options and applies the model temperature', () => {
   const submitted = request(),
     packed = packDebertaRequest(tokenizer, submitted);
-  submitted.questions[0].options[0] = 'changed';
+  submitted.questions[0]!.options[0] = 'changed';
   assert.equal(packed.pairs, 5);
   assert.equal(packed.chunks.length, 2);
-  assert.equal(packed.optionGroups[0][0], 'red');
+  assert.equal(packed.optionGroups[0]![0], 'red');
   const result = unpackDebertaScores(packed, [1, 0, 0, 1, 2]);
-  assert.equal(result.answers[0].selected, 'red');
-  assert.equal(result.answers[1].selected, 'center');
+  assert.equal(result.answers[0]!.selected, 'red');
+  assert.equal(result.answers[1]!.selected, 'center');
   assert.ok(
     Math.abs(
-      result.answers[0].probabilities[0].probability / result.answers[0].probabilities[1].probability -
+      result.answers[0]!.probabilities[0]!.probability / result.answers[0]!.probabilities[1]!.probability -
         Math.exp(1 / 1.05)
     ) < 1e-12
   );
@@ -61,13 +61,13 @@ test('rejects reserved markers, duplicate options and excess input without trunc
   reserved.state = '[STATE]';
   assert.throws(() => packDebertaRequest(tokenizer, reserved), /reserved/);
   const duplicate = request();
-  duplicate.questions[0].options[1] = 'red';
+  duplicate.questions[0]!.options[1] = 'red';
   assert.throws(() => packDebertaRequest(tokenizer, duplicate), /duplicate/);
   const longState = request();
   longState.state = 'token '.repeat(257);
   assert.throws(() => packDebertaRequest(tokenizer, longState), /state exceeds/);
   const longQuestion = request();
-  longQuestion.questions[0].instructions = 'token '.repeat(512);
+  longQuestion.questions[0]!.instructions = 'token '.repeat(512);
   assert.throws(() => packDebertaRequest(tokenizer, longQuestion), /Packed input exceeds/);
 });
 
@@ -78,8 +78,8 @@ test('uses the packed-token budget for large question and pair requests', async 
   }));
   const x = session();
   await assert.rejects(x.model.decide({state: '', questions}), (error) => {
-    assert.equal(error.code, 'INVALID_INPUT');
-    assert.match(error.cause?.message ?? '', /Packed input exceeds 512 tokens/);
+    assert.equal((error as {code: string}).code, 'INVALID_INPUT');
+    assert.match((error as {cause?: {message: string}}).cause?.message ?? '', /Packed input exceeds 512 tokens/);
     return true;
   });
 
@@ -95,7 +95,7 @@ test('uses the packed-token budget for large question and pair requests', async 
   assert.equal(pairs.realTokens, 512);
   assert.equal(pairs.pairs, 253);
   assert.equal(pairs.chunks.length, 85);
-  assert.equal(pairs.chunks.at(-1).count, 1);
+  assert.equal(pairs.chunks.at(-1)!.count, 1);
 
   assert.throws(
     () =>
@@ -130,8 +130,8 @@ test('pins the DeBERTa manifest and stops waiting on a cancelled body', async ()
   const altered = structuredClone(pinned);
   altered.files['model.wasm'].sha256 = '0'.repeat(64);
   assert.throws(() => validateDebertaManifest(altered), {code: 'INVALID_ASSET'});
-  let rejectBody, started;
-  const begun = new Promise((resolve) => {
+  let rejectBody!: (reason?: unknown) => void, started!: () => void;
+  const begun = new Promise<void>((resolve) => {
     started = resolve;
   });
   const controller = new AbortController(),
@@ -142,7 +142,7 @@ test('pins the DeBERTa manifest and stops waiting on a cancelled body', async ()
       return new Promise((_, reject) => {
         rejectBody = reject;
       });
-    }),
+    }) as unknown as Response,
     controller.signal
   );
   await begun;
@@ -153,9 +153,9 @@ test('pins the DeBERTa manifest and stops waiting on a cancelled body', async ()
 });
 
 function session() {
-  let scopes = 1,
-    releaseGate;
-  const events = [],
+  let scopes = 1;
+  let releaseGate: Promise<unknown> | undefined;
+  const events: string[] = [],
     lifecycle = {disposed: false, loss: null};
   const runtime = {
     beginScope() {
@@ -207,14 +207,14 @@ function session() {
     tokenizer,
     uncaptured: [],
     lifecycle
-  });
+  } as unknown as ConstructorParameters<typeof ExperimentalDebertaSession>[0]);
   return {
     model,
     events,
     get scopes() {
       return scopes;
     },
-    hold(promise) {
+    hold(promise: Promise<unknown>) {
       releaseGate = promise;
     }
   };
@@ -222,15 +222,15 @@ function session() {
 
 test('serializes decisions, pool release and disposal using submitted snapshots', async () => {
   const x = session();
-  let resume;
+  let resume!: () => void;
   x.hold(
-    new Promise((resolve) => {
+    new Promise<void>((resolve) => {
       resume = resolve;
     })
   );
   const r = request(),
     first = x.model.decide(r);
-  r.questions[0].options[0] = 'changed';
+  r.questions[0]!.options[0] = 'changed';
   const release = x.model.releaseCachedMemory(),
     dispose = x.model.dispose();
   await assert.rejects(x.model.decide(request()), {code: 'SESSION_CLOSED'});
@@ -238,7 +238,7 @@ test('serializes decisions, pool release and disposal using submitted snapshots'
   assert.deepEqual(x.events, []);
   resume();
   const [answer] = await Promise.all([first, release, dispose]);
-  assert.equal(answer.answers[0].probabilities[0].option, 'red');
+  assert.equal(answer.answers[0]!.probabilities[0]!.option, 'red');
   assert.deepEqual(x.events, ['clear', 'disposed']);
   assert.equal(x.scopes, 0);
 });
