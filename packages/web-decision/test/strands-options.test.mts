@@ -3,8 +3,10 @@ import test from 'node:test';
 import {createSourceLoader} from '../src/strands/source-loader-internal.mjs';
 import {selectModelFamily} from '../src/model-family.js';
 
+type OpenSourceResult = Awaited<ReturnType<Parameters<typeof createSourceLoader>[0]['openSource']>>;
+
 function fixture() {
-  const calls = [];
+  const calls: string[] = [];
   const adapter = {
     features: new Set(['shader-f16']),
     limits: {maxBufferSize: 1017118720, maxStorageBufferBindingSize: 1017118720, maxStorageBuffersPerShaderStage: 8}
@@ -18,11 +20,11 @@ function fixture() {
   const load = createSourceLoader({
     async openCache() {
       calls.push('cache');
-      return {};
+      return {} as Cache;
     },
     async openSource() {
       calls.push('source');
-      return {bytes: {}, transaction: {read() {}, commit() {}}};
+      return {bytes: {}, transaction: {read() {}, commit() {}}} as unknown as OpenSourceResult;
     },
     async loadBytes(_options, dependencies) {
       calls.push('load');
@@ -36,7 +38,7 @@ function fixture() {
 test('Strands prefetch rejects unsupported values before adapter, cache or source', async () => {
   for (const value of [1, 1024, -1, NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1, null, '0']) {
     const {calls, load, gpuApi} = fixture();
-    await assert.rejects(load({assetsUrl: 'https://example.test/assets/', gpuApi, maxPrefetchBytes: value}), {
+    await assert.rejects(load({assetsUrl: 'https://example.test/assets/', gpuApi, maxPrefetchBytes: value as number}), {
       code: 'INVALID_INPUT'
     });
     assert.deepEqual(calls, []);

@@ -47,6 +47,7 @@
     "test/strands-gemma4-session.test.mts",
     "test/strands-loader-entry.test.mts",
     "test/strands-manifest.test.mts",
+    "test/strands-options.test.mts",
     "test/strands-preflight.test.mts",
     "test/strands-fused-upload.test.mts",
     "test/strands-range-source.test.mts",

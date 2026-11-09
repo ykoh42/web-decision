@@ -12,7 +12,7 @@ export interface StrandsSourceOptions {
   readonly createRuntime?: (wasm: Uint8Array) => unknown;
   readonly gpuApi?: {requestAdapter(): PromiseLike<unknown>};
   readonly onProgress?: (progress: ModelProgress) => void;
-  readonly maxPrefetchBytes?: number;
+  readonly maxPrefetchBytes?: number | undefined;
 }
 
 interface RangeSpec {

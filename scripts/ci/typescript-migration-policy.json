@@ -204,7 +204,6 @@
     "packages/web-decision/test/strands-gemma4-protocol.test.mjs",
     "packages/web-decision/test/strands-gemma4-upload.test.mjs",
     "packages/web-decision/test/strands-input-snapshot.test.mjs",
-    "packages/web-decision/test/strands-options.test.mjs",
     "packages/web-decision/test/strands-range-cache.test.mjs",
     "packages/web-decision/test/strands-runtime-cancellation.test.mjs",
     "packages/web-decision/test/strands-sync-unsettled.test.mjs",
