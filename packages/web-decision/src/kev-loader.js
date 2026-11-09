@@ -20,6 +20,9 @@ import {
   readExperimentalKevManifest
 } from './kev06/upstream-source.mjs';
 
+// Kev question branches reuse the position range from this pinned Qwen3 config.
+const KEV_POSITION_EMBEDDINGS = 32_768;
+
 function unsupported(message) {
   return new WebDecisionError('UNSUPPORTED_ENVIRONMENT', message);
 }
@@ -132,6 +135,8 @@ async function loadKevModel(options, description, readManifest, uploadHeads, sou
       signal
     );
     const modelConfig = parseJson(modelConfigBytes, 'model_config.json');
+    if (modelConfig.max_position_embeddings !== KEV_POSITION_EMBEDDINGS)
+      throw new WebDecisionError('INVALID_ASSET', 'Unexpected Kev position embedding metadata.');
     for (const [name, id] of Object.entries(KEV_DELIMITERS)) {
       if (modelConfig.kev?.delimiter_ids?.[name] !== id)
         throw new WebDecisionError('INVALID_ASSET', 'Unexpected model delimiter IDs.');

@@ -142,7 +142,7 @@ test('a state-heavy row accepts 8,192 packed tokens and rejects 8,193', () => {
   );
 });
 
-test('multiple native-size branches have no fixed aggregate cap by default', () => {
+test('multiple native-size branches have no fixed aggregate token cap', () => {
   const tok = tokenizer();
   const question = {instructions: 'i'.repeat(8187), options: ['']};
   const packed = packKevRequest(tok, {state: '', questions: [question, question]}, limits, {
@@ -150,6 +150,13 @@ test('multiple native-size branches have no fixed aggregate cap by default', () 
   });
   assert.equal(packed.ids.length, 16_383);
   assert.ok(packed.ids.length > 2_048);
+});
+
+test('packed input can exceed the position table size when question branches reuse positions', () => {
+  const instructions = [8187, 8187, 8187, 4092, 4096].map((length) => 'i'.repeat(length));
+  const request = {state: '', questions: instructions.map((value) => ({instructions: value, options: ['']}))};
+  const packed = packKevRequest(tokenizer(), request, limits, {allowEmptyOptions: true});
+  assert.equal(packed.ids.length, 32_770);
 });
 
 test('accepts 255 distinct options in their original order and rejects 256', () => {

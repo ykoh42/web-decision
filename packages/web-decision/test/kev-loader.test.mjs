@@ -285,7 +285,7 @@ function setup(t) {
       maxStateTokens: 8192,
       maxBranchTokens: 8192
     },
-    modelConfig: {kev: {delimiter_ids: KEV_DELIMITERS}},
+    modelConfig: {max_position_embeddings: 32768, kev: {delimiter_ids: KEV_DELIMITERS}},
     cacheManifest: {
       metadata: {numParams: 394},
       records: [{dataPath: 'shard.bin', format: 'raw-shard', nbytes: 394 * 4, records}]
@@ -360,6 +360,21 @@ test('Kev loader transfers a successful runtime to the model', {skip: !supportsH
 });
 
 test(
+  'Kev loader rejects model config with different pinned position embedding metadata',
+  {skip: !supportsHooks},
+  async (t) => {
+    const f = setup(t);
+    f.fake.modelConfig.max_position_embeddings = 32_767;
+    await assert.rejects(loadDecisionModel({}), {
+      code: 'INVALID_ASSET',
+      message: 'Unexpected Kev position embedding metadata.'
+    });
+    assert.equal(f.state.initialized, 0);
+    assert.equal(f.fake.uploads, 0);
+  }
+);
+
+test(
   'experimental upstream Kev imports its immutable data URLs lazily after prepare on a cache miss',
   {skip: !supportsHooks},
   async (t) => {
@@ -421,15 +436,19 @@ test(
   }
 );
 
-test('Kev accepts an optional caller-selected aggregate token cap', {skip: !supportsHooks}, async (t) => {
-  const f = setup(t);
-  const loading = loadDecisionModel({maxInputTokens: 2048});
-  await f.started;
-  f.resolveRuntime(f.runtime);
-  const model = await loading;
-  assert.equal(model.limits.maxInputTokens, 2048);
-  model.dispose();
-});
+test(
+  'Kev accepts a caller-selected aggregate token cap above the position table size',
+  {skip: !supportsHooks},
+  async (t) => {
+    const f = setup(t);
+    const loading = loadDecisionModel({maxInputTokens: 32_769});
+    await f.started;
+    f.resolveRuntime(f.runtime);
+    const model = await loading;
+    assert.equal(model.limits.maxInputTokens, 32_769);
+    model.dispose();
+  }
+);
 
 test(
   'Kev rejects invalid caller-selected aggregate token caps before loading assets',

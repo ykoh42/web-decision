@@ -37,6 +37,10 @@ test('stable shards and reused bundle metadata match their pinned manifest', asy
   const map = JSON.parse(mapBytes.toString('utf8'));
   assert.equal(sha256(mapBytes), EXPERIMENTAL_KEV_UPSTREAM_MAP_SHA256);
   assert.equal(map.source.sha256, EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256);
+  const modelConfig = JSON.parse(
+    (await readFile(new URL('../assets/experimental-kev-upstream/model_config.json', import.meta.url))).toString('utf8')
+  );
+  assert.equal(modelConfig.max_position_embeddings, 32768);
   for (const shard of map.target.shards)
     assert.deepEqual(manifest.files[shard.path], {bytes: shard.bytes, sha256: shard.sha256}, shard.path);
 });
