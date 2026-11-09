@@ -4,14 +4,15 @@ import {WebDecisionError, decodeFloat16} from '../kev.js';
 import {DEBERTA_MAX_OPTIONS, packDebertaRequest, unpackDebertaScores} from './packing.mjs';
 import {finishDebertaSystemOne, prepareDebertaSystemOne} from './typed.mjs';
 import {waitForAbort} from '../assets.js';
-import type {DecisionRequest, DecisionResult, KevQuestion, KevValue} from '../curated/types.js';
+import type {DecisionRequest, DecisionResult} from '../curated/types.js';
+import type {DebertaSystemOneQuestion, DebertaSystemOneResult} from '../deberta-single-preview.js';
 import type {KevTokenizer} from '../kev.js';
 import type {DLDevice, Instance, PackedFunc, Tensor} from '../runtime/tvm.js';
 import type {DebertaChunk, ValidatedDebertaTensors} from './validate.mjs';
 
 const noFailure = Symbol('no failure');
 
-type DecisionOptions = Readonly<{signal?: AbortSignal | undefined; [key: string]: unknown}>;
+type DecisionOptions = Readonly<{signal?: AbortSignal | undefined}>;
 type RuntimeLifecycle = Readonly<{
   loss: unknown;
   disposed: boolean;
@@ -30,22 +31,7 @@ type DebertaDevice = DLDevice & {sync(): Promise<void>};
 type PackedDebertaRequest = ValidatedDebertaTensors & {readonly optionGroups: readonly (readonly string[])[]};
 type DebertaQuestion = Readonly<{name: string; type: 'choice' | 'score' | 'noul'; options: readonly string[]}>;
 type PreparedSystemOne = Readonly<{request: unknown; metadata: readonly DebertaQuestion[]}>;
-type DebertaSystemOneAnswer =
-  | Readonly<{type: 'choice'; choice: string; confidence: number; probabilities: Readonly<Record<string, number>>}>
-  | Readonly<{
-      type: 'score';
-      score: number;
-      legend: Readonly<Record<string, string>>;
-      probabilities: Readonly<Record<string, number>>;
-      confidence: number;
-    }>
-  | Readonly<{type: 'noul'; noul: number; probabilities: Readonly<{false: number; true: number}>; confidence: number}>;
-type DebertaSystemOneResult = Readonly<{
-  model: string;
-  tokenCount: number;
-  answers: Readonly<Record<string, DebertaSystemOneAnswer>>;
-}>;
-type NamedQuestions = Readonly<Record<string, KevQuestion>> | Map<string, KevQuestion>;
+type NamedQuestions = Readonly<Record<string, DebertaSystemOneQuestion>>;
 type ValidateRequestFields = (
   request: unknown,
   maxQuestions?: number,
@@ -59,7 +45,7 @@ type ValidateDecisionFields = (options: unknown) => void;
 type WaitForAbort = <Value>(operation: () => Value | Promise<Value>, signal?: AbortSignal) => Promise<Value>;
 type DebertaPacker = (tokenizer: KevTokenizer, request: DecisionRequest) => PackedDebertaRequest;
 type DebertaUnpacker = (packed: PackedDebertaRequest, scores: number[]) => DecisionResult;
-type PrepareSystemOne = (state: KevValue, questions: NamedQuestions) => PreparedSystemOne;
+type PrepareSystemOne = (state: string, questions: NamedQuestions) => PreparedSystemOne;
 type FinishSystemOne = (prepared: PreparedSystemOne, result: DecisionResult) => DebertaSystemOneResult;
 
 const validateRequestFieldsForModel = validateRequestFields as ValidateRequestFields;
@@ -250,7 +236,7 @@ export class ExperimentalDebertaSession {
   }
 
   async systemOne(
-    state: KevValue,
+    state: string,
     questions: NamedQuestions,
     options: DecisionOptions | null = {}
   ): Promise<DebertaSystemOneResult> {

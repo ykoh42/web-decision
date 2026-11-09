@@ -5,36 +5,73 @@ import * as decima from '../src/decima-base-clean-preview-entry.mjs';
 import * as skejja from '../src/skejja-preview-entry.mjs';
 import * as tinydecide from '../src/tinydecide-preview-entry.js';
 
-const entrypoints = [decima, skejja, tinydecide];
+type PreviewEntrypoint = {
+  listDecisionModels: () => readonly unknown[];
+  isDecisionModel: (value: unknown) => boolean;
+  describeModel: (model: unknown) => {readonly model: unknown};
+  loadDecisionModel: (options: object) => Promise<unknown>;
+  clearModelCache: () => Promise<boolean>;
+};
 
-const supportsHooks = typeof nodeModule.registerHooks === 'function';
-let isolatedEntrypoints = [];
+type ResolveContext = Readonly<{parentURL?: string}>;
+type ResolveResult = Readonly<{url: string; shortCircuit?: boolean}>;
+type ModuleWithSynchronousHooks = typeof nodeModule & {
+  registerHooks?: (hooks: {
+    resolve: (
+      specifier: string,
+      context: ResolveContext,
+      nextResolve: (specifier: string, context: ResolveContext) => ResolveResult
+    ) => ResolveResult;
+  }) => {deregister: () => void};
+};
+type CacheHost = Omit<typeof globalThis, 'caches'> & {caches?: CacheStorage};
+
+function asPreviewEntrypoint(value: unknown): PreviewEntrypoint {
+  return value as PreviewEntrypoint;
+}
+
+const entrypoints = [decima, skejja, tinydecide].map((entry) => asPreviewEntrypoint(entry));
+
+const moduleHooks = nodeModule as ModuleWithSynchronousHooks;
+const cacheHost = globalThis as CacheHost;
+// Node 20 lacks synchronous module hooks; recent Node 22 and Node 24 isolate the preview routes here.
+const supportsHooks = typeof moduleHooks.registerHooks === 'function';
+let isolatedEntrypoints: PreviewEntrypoint[] = [];
 if (supportsHooks) {
+  const hookedImports = new Set<string>();
   const wrapperUrls = new Set([
-    new URL('../src/deberta-single-preview-entry.js', import.meta.url).href,
-    new URL('../src/kev-preview-entry.js', import.meta.url).href,
+    new URL('../src/deberta-single-preview-entry.ts', import.meta.url).href,
+    new URL('../src/kev-preview-entry.ts', import.meta.url).href,
     new URL('../src/kev-deberta-preview-entry.js', import.meta.url).href,
     new URL('../src/kev-deberta-reflexes-preview-entry.js', import.meta.url).href
   ]);
-  const fakeModules = {
+  const fakeModules: Readonly<Record<string, string>> = {
     './deberta/loader.mjs': `data:text/javascript,${encodeURIComponent('export async function loadExperimentalDeberta() { throw new Error("unexpected DeBERTa load"); }')}`,
     './kev-loader.js': `data:text/javascript,${encodeURIComponent('export async function loadKev06DecisionModel() { throw new Error("unexpected Kev load"); } export async function loadKevDecisionModel() { throw new Error("unexpected Reflexes load"); }')}`
   };
-  const hooks = nodeModule.registerHooks({
+  const hooks = moduleHooks.registerHooks!({
     resolve(specifier, context, nextResolve) {
-      if (wrapperUrls.has(context.parentURL) && fakeModules[specifier]) {
+      if (context.parentURL && wrapperUrls.has(context.parentURL) && fakeModules[specifier]) {
+        hookedImports.add(`${context.parentURL}\n${specifier}`);
         return {url: fakeModules[specifier], shortCircuit: true};
       }
       return nextResolve(specifier, context);
     }
   });
   try {
-    isolatedEntrypoints = await Promise.all([
+    const entries = await Promise.all([
       import('../src/kev-preview-entry.js'),
       import('../src/deberta-single-preview-entry.js'),
       import('../src/kev-deberta-preview-entry.js'),
       import('../src/kev-deberta-reflexes-preview-entry.js')
     ]);
+    isolatedEntrypoints = entries.map((entry) => asPreviewEntrypoint(entry));
+    assert.ok(
+      hookedImports.has(
+        `${new URL('../src/deberta-single-preview-entry.ts', import.meta.url).href}\n./deberta/loader.mjs`
+      )
+    );
+    assert.ok(hookedImports.has(`${new URL('../src/kev-preview-entry.ts', import.meta.url).href}\n./kev-loader.js`));
   } finally {
     hooks.deregister();
   }
@@ -61,6 +98,7 @@ test('preview entrypoints expose matching model descriptions and reject unsuppor
   await assert.rejects(skejja.loadDecisionModel({model: 'unsupported-model'}), {code: 'INVALID_INPUT'});
   await assert.rejects(tinydecide.loadDecisionModel({model: 'unsupported-model'}), {code: 'INVALID_INPUT'});
   if (supportsHooks) {
+    assert.ok(kev && deberta && kevDeberta && kevReflexes);
     await assert.rejects(kev.loadDecisionModel({debertaReadback: true}), {code: 'INVALID_INPUT'});
     await assert.rejects(deberta.loadDecisionModel({model: 'unsupported-model'}), {code: 'INVALID_INPUT'});
     await assert.rejects(kevDeberta.loadDecisionModel({model: 'kev-0.6b-q4f16', debertaReadback: true}), {
@@ -75,15 +113,15 @@ test('preview entrypoints expose matching model descriptions and reject unsuppor
 test('preview entrypoints clear only the current-origin asset cache when available', async () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'caches');
   try {
-    delete globalThis.caches;
+    delete cacheHost.caches;
     for (const entry of allEntrypoints) assert.equal(await entry.clearModelCache(), false);
 
-    const removed = [];
+    const removed: string[] = [];
     Object.defineProperty(globalThis, 'caches', {
       configurable: true,
       writable: true,
       value: {
-        async delete(name) {
+        async delete(name: string) {
           removed.push(name);
           return true;
         }
@@ -94,6 +132,6 @@ test('preview entrypoints clear only the current-origin asset cache when availab
     assert.ok(removed.every((name) => typeof name === 'string'));
   } finally {
     if (previous) Object.defineProperty(globalThis, 'caches', previous);
-    else delete globalThis.caches;
+    else delete cacheHost.caches;
   }
 });

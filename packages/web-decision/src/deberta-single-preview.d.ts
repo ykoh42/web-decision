@@ -23,21 +23,21 @@ export interface DecisionRequest {
 }
 
 export interface OptionScore {
-  option: string;
-  probability: number;
-  logit: number;
+  readonly option: string;
+  readonly probability: number;
+  readonly logit: number;
 }
 
 export interface DecisionAnswer {
-  selected: string;
-  selectedIndex: number;
-  probabilities: OptionScore[];
+  readonly selected: string;
+  readonly selectedIndex: number;
+  readonly probabilities: readonly OptionScore[];
 }
 
 export interface DecisionResult {
-  tokenCount: number;
-  truncated?: boolean;
-  answers: DecisionAnswer[];
+  readonly tokenCount: number;
+  readonly truncated?: boolean;
+  readonly answers: readonly DecisionAnswer[];
 }
 
 export interface DecisionOptions {
