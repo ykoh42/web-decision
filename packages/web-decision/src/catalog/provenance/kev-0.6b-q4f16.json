@@ -13,23 +13,56 @@
     {
       "url": "https://huggingface.co/onnx-community/kev-0.6b-ONNX/blob/5a827091b3d58fe4fdfc02a5a5b2ce364047d678/README.md",
       "sha256": "c1e475f5e8642ed37005c58b15b09f7e5a92d20a91ab37e96e4e683126c7d214",
-      "scope": "publisher declaration; not proof of exact conversion inputs"
+      "scope": "identifies source repository and declares Apache-2.0; does not pin conversion inputs or tools"
     },
     {
-      "url": "https://huggingface.co/jaredpalmer/kev-0.6b/blob/ac5bda89ec391ee5fe0c17dd44cae01815dbffcd/README.md",
-      "sha256": "8d5642bb152900d912d4e822e7fdf910a8879f42383505b1458fc01fd96aa0c2",
-      "scope": "published model card; not proof of exact conversion inputs"
+      "url": "https://huggingface.co/jaredpalmer/kev-0.6b/commit/93994937d1f83a06c801f7469b6793ec4c29edd5",
+      "sha256": "c1fcfa094b0dca091b499870035a697ad627069d32d001280e38368ef51b7fb9",
+      "scope": "latest source repository snapshot before the ONNX upload by commit timestamps; a candidate, not an ONNX source attestation"
+    },
+    {
+      "url": "https://huggingface.co/jaredpalmer/kev-0.6b/resolve/abe7110dedfd68a185839550079bcf7c26f561ac/training_config.json",
+      "sha256": "ab20e55cbb832f409de9daf42f868b69be1eb59e51720302b166bc560fd8d240",
+      "scope": "source training configuration; pins the training base revision but not the ONNX conversion inputs"
+    },
+    {
+      "url": "https://huggingface.co/jaredpalmer/kev-0.6b/resolve/abe7110dedfd68a185839550079bcf7c26f561ac/provenance.json",
+      "sha256": "321bc9db7427b490ad943fa33576c7e01f5da4c20da1036fcbfee996f4b28f10",
+      "scope": "source training code and training environment record; not ONNX conversion provenance"
     },
     {
       "url": "https://huggingface.co/Qwen/Qwen3-0.6B-Base/blob/da87bfb608c14b7cf20ba1ce41287e8de496c0cd/LICENSE",
       "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
-      "scope": "base model license file; not proof of exact conversion inputs"
+      "scope": "base model license file; the source training manifest pins this revision, but the ONNX upload does not attest to it"
     }
   ],
+  "sourceCandidate": {
+    "repository": "jaredpalmer/kev-0.6b",
+    "revision": "93994937d1f83a06c801f7469b6793ec4c29edd5",
+    "basis": "latest public source revision before the ONNX commit by timestamps; inferred, not attested by the converter",
+    "checkpointRevision": "abe7110dedfd68a185839550079bcf7c26f561ac",
+    "checkpointFiles": [
+      {
+        "path": "adapter_model.safetensors",
+        "bytes": 40419816,
+        "sha256": "deaab63b61f95d628503831e8b336e1c3e334b9a42d3530d979a5149b429c492"
+      },
+      {
+        "path": "head.pt",
+        "bytes": 2102399,
+        "sha256": "ce6cd9ffc54db41c179b65a33d60973dc8280c29e886218eb3ec07dc28d6f28b"
+      }
+    ],
+    "trainingCodeCommit": "37cb2f6155afec1054de2cc78dfd7c7dd24a956d",
+    "baseModel": {
+      "repository": "Qwen/Qwen3-0.6B-Base",
+      "revision": "da87bfb608c14b7cf20ba1ce41287e8de496c0cd"
+    }
+  },
   "unresolved": [
-    "Exact Kev adapter source revision used to create the pinned ONNX conversion is not established.",
-    "Exact Qwen3-0.6B base revision used by that conversion is not established.",
-    "The conversion recipe, configuration, and tool revisions are not pinned as committed evidence.",
-    "Redistribution rights for the exact converted and embedded artifacts have not been approved."
+    "Exact Kev adapter source revision loaded by the ONNX conversion is not attested; the public source revision is only a chronological candidate.",
+    "Exact Qwen3-0.6B base revision loaded by the ONNX conversion is not attested; the source training manifest does not bind the ONNX conversion.",
+    "The ONNX export and quantization recipe, configuration, and exact tool revisions are not pinned as committed evidence.",
+    "Redistribution rights and required notices for the exact converted artifact, including third-party training-data obligations, have not been approved."
   ]
 }

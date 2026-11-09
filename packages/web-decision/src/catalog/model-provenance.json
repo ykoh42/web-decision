@@ -7,7 +7,7 @@
       "artifactLockSha256": "8ee05a3babbd3ec82aae5203d960a904e4156b67fc622c2a72965f1a12d020bf",
       "evidence": {
         "path": "src/catalog/provenance/kev-0.6b-q4f16.json",
-        "sha256": "859ffa258a87cf470c02de18cc555d6c786cded91202e1f62a0dff9c43df461a"
+        "sha256": "cb2a90c9b346643a85e09e2b7b092407d02aa26e5464f83bcae39cba978942a3"
       }
     }
   ]
