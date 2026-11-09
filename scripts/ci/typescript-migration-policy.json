@@ -6,7 +6,6 @@
     "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/deberta/packing.mjs",
     "packages/web-decision/src/deberta/typed.mjs",
-    "packages/web-decision/src/gpu-session-utils.js",
     "packages/web-decision/src/h2o/loader.mjs",
     "packages/web-decision/src/h2o/owner.mjs",
     "packages/web-decision/src/h2o/plan.mjs",
