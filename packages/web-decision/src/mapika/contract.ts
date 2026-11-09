@@ -8,13 +8,16 @@ export const MAPIKA_PARAMETER_BYTES = 1504787324;
 export const MAPIKA_MAX_SHARD_BYTES = 8 * 1024 * 1024;
 export const MAPIKA_LARGEST_BUFFER = 508559360;
 
-function invalid(message) {
+function invalid(message: string): never {
   throw new WebDecisionError('INVALID_ASSET', message);
 }
 
 /** Only accept the exact experimental graph, tokenizer and weights checked together. */
-export async function readMapikaManifestResponse(response, signal) {
-  const manifest = await readPinnedManifest(response, signal, MAPIKA_MANIFEST_SHA256, 'Mapika');
+export async function readMapikaManifestResponse(response: Pick<Response, 'body'>, signal?: AbortSignal | null) {
+  const manifest = (await readPinnedManifest(response, signal, MAPIKA_MANIFEST_SHA256, 'Mapika')) as Record<
+    string,
+    unknown
+  >;
   if (
     manifest.model !== MAPIKA_MODEL ||
     manifest.backend !== 'tvm-webgpu' ||
@@ -31,14 +34,14 @@ export async function readMapikaManifestResponse(response, signal) {
 }
 
 /** Validate the ordered tensors and the tokenizer-label parameter. */
-export function validateMapikaWeightIndex(manifest, index) {
+export function validateMapikaWeightIndex(manifest: unknown, index: unknown): unknown {
   validateTensorIndex(manifest, index, {
     parameterCount: 323,
     totalBytes: MAPIKA_PARAMETER_BYTES,
     shardCount: 180,
     maxShardBytes: MAPIKA_MAX_SHARD_BYTES
   });
-  const labels = index.records[320];
+  const labels = (index as {records: Array<{dtype: string; shape: number[]}>}).records[320]!;
   if (labels.dtype !== 'int32' || labels.shape.length !== 1 || labels.shape[0] !== 255)
     invalid('Invalid Mapika label parameter.');
   return index;

@@ -8,11 +8,11 @@ export const KEV08_MANIFEST_SHA256 = '6e4a19e49a8d3fbee4d7effc16e2778b8b7272d79a
 export const KEV08_PARAMETER_BYTES = 1506885504;
 export const KEV08_LARGEST_BUFFER = 508559360;
 
-function invalid(message) {
+function invalid(message: string): never {
   throw new WebDecisionError('INVALID_ASSET', message);
 }
 
-export function validateKev08TokenizerData(data) {
+export function validateKev08TokenizerData(data: unknown): void {
   const expected = {
     '<|fim_prefix|>': KEV08_MARKERS.state,
     '<|fim_middle|>': KEV08_MARKERS.question,
@@ -20,15 +20,21 @@ export function validateKev08TokenizerData(data) {
     '<|box_end|>': KEV08_MARKERS.close,
     '<|fim_suffix|>': KEV08_MARKERS.decide
   };
-  if (!Array.isArray(data?.added_tokens)) invalid('Missing Kev 0.8B markers.');
+  if (!Array.isArray((data as {added_tokens?: unknown} | null | undefined)?.added_tokens))
+    invalid('Missing Kev 0.8B markers.');
   for (const [content, id] of Object.entries(expected)) {
-    const matches = data.added_tokens.filter((entry) => entry?.content === content);
-    if (matches.length !== 1 || matches[0].id !== id) invalid('Unexpected Kev 0.8B tokenizer markers.');
+    const matches = (data as {added_tokens: Array<{content?: unknown; id?: unknown}>}).added_tokens.filter(
+      (entry) => entry?.content === content
+    );
+    if (matches.length !== 1 || matches[0]!.id !== id) invalid('Unexpected Kev 0.8B tokenizer markers.');
   }
 }
 
-export async function readKev08ManifestResponse(response, signal) {
-  const manifest = await readPinnedManifest(response, signal, KEV08_MANIFEST_SHA256, 'Kev 0.8B');
+export async function readKev08ManifestResponse(response: Pick<Response, 'body'>, signal?: AbortSignal | null) {
+  const manifest = (await readPinnedManifest(response, signal, KEV08_MANIFEST_SHA256, 'Kev 0.8B')) as Record<
+    string,
+    unknown
+  >;
   if (
     manifest.model !== KEV08_MODEL ||
     manifest.backend !== 'tvm-webgpu' ||
@@ -45,7 +51,7 @@ export async function readKev08ManifestResponse(response, signal) {
   return manifest;
 }
 
-export function validateKev08WeightIndex(manifest, index) {
+export function validateKev08WeightIndex(manifest: unknown, index: unknown): unknown {
   validateTensorIndex(manifest, index, {
     parameterCount: 326,
     totalBytes: KEV08_PARAMETER_BYTES,
@@ -57,8 +63,8 @@ export function validateKev08WeightIndex(manifest, index) {
     [321, [256]],
     [322, [256, 1024]],
     [323, [256]]
-  ]) {
-    const record = index.records[i];
+  ] as Array<[number, number[]]>) {
+    const record = (index as {records: Array<{dtype: string; shape: number[]}>}).records[i]!;
     if (record.dtype !== 'float32' || JSON.stringify(record.shape) !== JSON.stringify(shape))
       invalid('Invalid Kev 0.8B pointer head.');
   }
