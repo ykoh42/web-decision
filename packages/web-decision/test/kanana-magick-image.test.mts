@@ -4,6 +4,8 @@ import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {browserImage, magickImage} from './kanana-core-modules.mjs';
 
+type DecodedImage = {rgb: Uint8Array; width: number; height: number};
+
 const {decodeKananaImageSource} = browserImage;
 const {decodeKananaMagickImage} = magickImage;
 
@@ -11,15 +13,15 @@ const fixtureDirectory = new URL('./fixtures/kanana-image/', import.meta.url);
 const wasmPath = fileURLToPath(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'));
 const wasm = await readFile(wasmPath);
 
-function encoded(base64) {
+function encoded(base64: string): Buffer {
   return Buffer.from(base64, 'base64');
 }
 
-function rgbHex(image) {
+function rgbHex(image: DecodedImage): string {
   return Buffer.from(image.rgb).toString('hex');
 }
 
-function oversizedTiffHeader() {
+function oversizedTiffHeader(): Buffer {
   const bytes = encoded(
     'SUkqAAgAAAAKAAABBAABAAAABAAAAAEBBAABAAAAAwAAAAIBAwADAAAAhgAAAAMBAwABAAAAAQAAAAYBAwABAAAAAgAAABEBBAABAAAAjAAAABUBAwABAAAAAwAAABYBBAABAAAAAwAAABcBBAABAAAAJAAAABwBAwABAAAAAQAAAAAAAAAIAAgACAAeUHgeUHgeUHgeUHgeUHgeUHgeUHgeUHgeUHgeUHgeUHgeUHg='
   );
@@ -33,7 +35,7 @@ function oversizedTiffHeader() {
   return bytes;
 }
 
-function bigTiffRgb() {
+function bigTiffRgb(): Buffer {
   const ifdOffset = 16;
   const entryCount = 10;
   const entrySize = 20;
@@ -45,7 +47,7 @@ function bigTiffRgb() {
   bytes.writeBigUInt64LE(BigInt(ifdOffset), 8);
   bytes.writeBigUInt64LE(BigInt(entryCount), ifdOffset);
 
-  const entries = [
+  const entries: [tag: number, type: number, count: number, value: number | number[]][] = [
     [256, 4, 1, 1],
     [257, 4, 1, 1],
     [258, 3, 3, [8, 8, 8]],
@@ -59,7 +61,7 @@ function bigTiffRgb() {
   ];
 
   for (let index = 0; index < entries.length; index++) {
-    const [tag, type, count, value] = entries[index];
+    const [tag, type, count, value] = entries[index]!;
     const offset = ifdOffset + 8 + index * entrySize;
     bytes.writeUInt16LE(tag, offset);
     bytes.writeUInt16LE(type, offset + 2);
@@ -80,7 +82,7 @@ function bigTiffRgb() {
   return bytes;
 }
 
-async function decode(bytes) {
+async function decode(bytes: Uint8Array): Promise<DecodedImage> {
   return decodeKananaMagickImage(bytes, {wasm});
 }
 

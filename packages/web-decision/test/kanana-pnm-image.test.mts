@@ -2,17 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {pnmImage} from './kanana-core-modules.mjs';
 
+type DecodedImage = {rgb: Uint8Array; width: number; height: number};
+
 const {decodeKananaPnmImage} = pnmImage;
 
-function image(header, rasterHex) {
+function image(header: string, rasterHex: string): Buffer {
   return Buffer.concat([Buffer.from(header, 'ascii'), Buffer.from(rasterHex, 'hex')]);
 }
 
-function rgbHex(image) {
+function rgbHex(image: DecodedImage): string {
   return Buffer.from(image.rgb).toString('hex');
 }
 
-function makePfm(scale, values, littleEndian) {
+function makePfm(scale: string, values: number[], littleEndian: boolean): Buffer {
   const raster = Buffer.alloc(values.length * 4);
   values.forEach((value, index) => {
     if (littleEndian) raster.writeFloatLE(value, index * 4);
@@ -21,7 +23,7 @@ function makePfm(scale, values, littleEndian) {
   return Buffer.concat([Buffer.from(`Pf\n2 2\n${scale}\n`, 'ascii'), raster]);
 }
 
-function pnmHeader(magic, width) {
+function pnmHeader(magic: string, width: number): Buffer {
   const sampleHeader = magic === 'P1' || magic === 'P4' ? '' : magic === 'Pf' ? '-1.0\n' : '255\n';
   return Buffer.from(`${magic}\n${width} 1\n${sampleHeader}`, 'ascii');
 }
@@ -120,18 +122,18 @@ test('P1 reads compact bits and skips whitespace and comments between samples', 
 
 test('Pillow PNM pixel limits warn at the boundary and reject above twice the limit', () => {
   const originalWarn = console.warn;
-  const warnings = [];
-  console.warn = (message) => warnings.push(message);
+  const warnings: string[] = [];
+  console.warn = (message: string) => warnings.push(message);
 
   try {
     assert.throws(() => decodeKananaPnmImage(pnmHeader('P6', 89_478_485)), /raster is truncated/);
     assert.equal(warnings.length, 0);
 
     assert.throws(() => decodeKananaPnmImage(pnmHeader('P6', 89_478_486)), /raster is truncated/);
-    assert.match(warnings[0], /warning limit of 89478485 pixels/);
+    assert.match(warnings[0]!, /warning limit of 89478485 pixels/);
 
     assert.throws(() => decodeKananaPnmImage(pnmHeader('P6', 178_956_970)), /raster is truncated/);
-    assert.match(warnings[1], /warning limit of 89478485 pixels/);
+    assert.match(warnings[1]!, /warning limit of 89478485 pixels/);
 
     for (const magic of ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'Pf']) {
       assert.throws(() => decodeKananaPnmImage(pnmHeader(magic, 178_956_971)), {

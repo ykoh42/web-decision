@@ -21,9 +21,9 @@ const coreTests = [
   'test/kanana-tokenizer.test.mts',
   'test/kanana-image-ingress.test.mjs',
   'test/kanana-encoded-image.test.mts',
-  'test/kanana-image-processing.test.mjs',
-  'test/kanana-magick-image.test.mjs',
-  'test/kanana-pnm-image.test.mjs',
+  'test/kanana-image-processing.test.mts',
+  'test/kanana-magick-image.test.mts',
+  'test/kanana-pnm-image.test.mts',
   'test/kanana-tiff16-image.test.mts'
 ];
 const tests = process.argv.includes('--core') ? coreTests : allTests;

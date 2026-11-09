@@ -11,7 +11,12 @@ const {
   smartResize
 } = imageProcessing;
 
-function makeRgb(width, height, pattern, seed = 0x12345678) {
+function makeRgb(
+  width: number,
+  height: number,
+  pattern: 'highfreq' | 'checker' | 'random',
+  seed = 0x12345678
+): Uint8Array {
   const pixels = new Uint8Array(width * height * 3);
   let state = seed;
 
@@ -38,7 +43,7 @@ function makeRgb(width, height, pattern, seed = 0x12345678) {
   return pixels;
 }
 
-function hash(value) {
+function hash(value: Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 

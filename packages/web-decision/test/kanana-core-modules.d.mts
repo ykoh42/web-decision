@@ -1,9 +1,12 @@
 export const scoring: typeof import('../src/kanana/scoring.js');
+export const imageProcessing: typeof import('../src/kanana/image-processing.js');
+export const browserImage: typeof import('../src/kanana/browser-image.js');
+export const magickImage: typeof import('../src/kanana/magick-image.js');
+export const pnmImage: typeof import('../src/kanana/pnm-image.js');
 export const tiff16Image: typeof import('../src/kanana/tiff16-image.js');
 export const chatTemplate: typeof import('../src/kanana/chat-template.js');
 export const protocol: typeof import('../src/kanana/protocol.js');
 export const tokenizer: typeof import('../src/kanana/tokenizer.js');
-export const imageProcessing: typeof import('../src/kanana/image-processing.js');
 export const encodedImage: typeof import('../src/kanana/encoded-image.js');
 export const truncation: typeof import('../src/kanana/truncation.js');
 export const candidates: typeof import('../src/kanana/candidates.js');

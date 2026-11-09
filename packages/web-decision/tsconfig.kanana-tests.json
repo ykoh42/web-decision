@@ -7,7 +7,21 @@
     "checkJs": false,
     "sourceMap": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "files": ["src/kanana/magick-wasm-url.d.ts", "test/kanana-scoring.test.mts", "test/kanana-chat-template.test.mts", "test/kanana-tokenizer.test.mts", "test/kanana-truncation.test.mts", "test/kanana-candidates.test.mts", "test/kanana-encoded-image.test.mts", "test/kanana-tiff16-image.test.mts"]
+  "files": [
+    "src/kanana/magick-wasm-url.d.ts",
+    "test/kanana-scoring.test.mts",
+    "test/kanana-chat-template.test.mts",
+    "test/kanana-tokenizer.test.mts",
+    "test/kanana-truncation.test.mts",
+    "test/kanana-candidates.test.mts",
+    "test/kanana-encoded-image.test.mts",
+    "test/kanana-tiff16-image.test.mts",
+    "test/kanana-image-processing.test.mts",
+    "test/kanana-magick-image.test.mts",
+    "test/kanana-pnm-image.test.mts"
+  ]
 }
