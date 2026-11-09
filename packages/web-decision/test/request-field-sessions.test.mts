@@ -29,6 +29,11 @@ import {createH2oSession} from '../src/h2o/session.mjs';
 import {MAX_H2O_OPTIONS} from '../src/h2o/protocol.mjs';
 import {readFile} from 'node:fs/promises';
 
+type TestSession = {
+  decide(request: unknown, options?: unknown): Promise<unknown>;
+  dispose?: (() => Promise<unknown>) | undefined;
+};
+
 const classes = [
   DecisionModel,
   ExperimentalMapikaSession,
@@ -119,11 +124,13 @@ test('sparse own question and option entries fail before any tokenization', asyn
         calls++;
       }
     });
+    // oxlint-disable-next-line unicorn/no-new-array -- The sparse fixture detects inherited indexed values.
     const choices = new Array(3);
     choices[0] = 'A';
     choices[2] = 'C';
     const optionProto = Object.assign(Object.create(Array.prototype), {1: 'B'});
     Object.setPrototypeOf(choices, optionProto);
+    // oxlint-disable-next-line unicorn/no-new-array -- The sparse fixture detects inherited indexed values.
     const questions = new Array(2);
     questions[0] = request().questions[0];
     const questionProto = Object.assign(Object.create(Array.prototype), {1: request().questions[0]});
@@ -282,32 +289,87 @@ test('native option caps reject before reading caller option entries', async () 
     async dispose() {},
     async releaseCachedMemory() {}
   };
-  const constructors = [
-    ['GLiNER mobile', GLINER_MAX_OPTIONS, () => createGlinerMobileSession({tokenizer, runner})],
-    ['Skejja', SKEJJA_INT8_PROFILE.maxChoices, () => createSkejjaSession({runner, tokenizer})],
+  const constructors: [string, number, () => unknown][] = [
+    [
+      'GLiNER mobile',
+      GLINER_MAX_OPTIONS,
+      () => createGlinerMobileSession({tokenizer, runner} as unknown as Parameters<typeof createGlinerMobileSession>[0])
+    ],
+    [
+      'Skejja',
+      SKEJJA_INT8_PROFILE.maxChoices,
+      () => createSkejjaSession({runner, tokenizer} as unknown as Parameters<typeof createSkejjaSession>[0])
+    ],
     [
       'Laya',
       LAYA_MAX_OPTIONS,
-      () => createLayaSession({runner, tokenizer, temperatures: {byType: [1, 1, 1], byOptions: {}}})
+      () =>
+        createLayaSession({
+          runner,
+          tokenizer,
+          temperatures: {byType: [1, 1, 1], byOptions: {}}
+        } as unknown as Parameters<typeof createLayaSession>[0])
     ],
-    ['Nari', 64, () => createNariSession({tokenizer, controlIds: [1], runner})],
-    ['Ettin', ETTIN_MAX_OPTIONS, () => createEttinSession({runner, tokenizer})],
-    ['Clef', CLEF_MAX_OPTIONS, () => createClefSession({tokenizer, controlIds: [1], runner})],
-    ['PPLX', FLASH_MAX_OPTIONS, () => createFlashSession({tokenizer, config: {}, runner})],
-    ['Mapika 4B', MAPIKA4_MAX_OPTIONS, () => createMapika4Session({tokenizer, labels: {}, limits: {}, runner})],
-    ['Verdict', VERDICT_MAX_CANDIDATES, () => createVerdictSession({runner, tokenizer, calibrator: {}})],
-    ['TinyDecide', TINYDECIDE_MAX_CHOICES, () => createTinyDecideSession({engine: {}})]
+    [
+      'Nari',
+      64,
+      () =>
+        createNariSession({tokenizer, controlIds: [1], runner} as unknown as Parameters<typeof createNariSession>[0])
+    ],
+    [
+      'Ettin',
+      ETTIN_MAX_OPTIONS,
+      () => createEttinSession({runner, tokenizer} as unknown as Parameters<typeof createEttinSession>[0])
+    ],
+    [
+      'Clef',
+      CLEF_MAX_OPTIONS,
+      () =>
+        createClefSession({tokenizer, controlIds: [1], runner} as unknown as Parameters<typeof createClefSession>[0])
+    ],
+    [
+      'PPLX',
+      FLASH_MAX_OPTIONS,
+      () => createFlashSession({tokenizer, config: {}, runner} as unknown as Parameters<typeof createFlashSession>[0])
+    ],
+    [
+      'Mapika 4B',
+      MAPIKA4_MAX_OPTIONS,
+      () =>
+        createMapika4Session({tokenizer, labels: {}, limits: {}, runner} as unknown as Parameters<
+          typeof createMapika4Session
+        >[0])
+    ],
+    [
+      'Verdict',
+      VERDICT_MAX_CANDIDATES,
+      () =>
+        createVerdictSession({runner, tokenizer, calibrator: {}} as unknown as Parameters<
+          typeof createVerdictSession
+        >[0])
+    ],
+    [
+      'TinyDecide',
+      TINYDECIDE_MAX_CHOICES,
+      () => createTinyDecideSession({engine: {}} as unknown as Parameters<typeof createTinyDecideSession>[0])
+    ]
   ];
 
-  const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url)));
+  const plan = JSON.parse(
+    (await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url))) as unknown as string
+  );
   constructors.push([
     'H2O',
     MAX_H2O_OPTIONS,
-    async () => createH2oSession({tokenizer, plan, addedTokens: ['<reserved>'], runner})
+    async () =>
+      createH2oSession({tokenizer, plan, addedTokens: ['<reserved>'], runner} as unknown as Parameters<
+        typeof createH2oSession
+      >[0])
   ]);
 
   for (const [name, maxOptions, createSession] of constructors) {
-    const session = await createSession();
+    const session = (await createSession()) as TestSession;
+    // oxlint-disable-next-line unicorn/no-new-array -- This array tests the exact native option boundary.
     const atLimit = new Array(maxOptions);
     let boundaryReads = 0;
     const boundaryError = Error('boundary option getter invoked');
@@ -319,7 +381,7 @@ test('native option caps reject before reading caller option entries', async () 
     });
     await assert.rejects(
       session.decide({state: 'state', questions: [{instructions: 'Choose', options: atLimit}]}),
-      (error) => error === boundaryError,
+      (error: unknown) => error === boundaryError,
       name
     );
     assert.equal(boundaryReads, 1, name);
@@ -359,9 +421,11 @@ test('Tamev accepts 78 data options and rejects accessor-backed options before r
     }
   };
   const runner = {
-    async run(_contextIds, optionRows) {
+    async run(_contextIds: readonly number[], optionRows: readonly (readonly number[])[]) {
       counts.runner++;
-      const probabilities = optionRows.map((_, index) => (index === optionRows.length - 1 ? 1 : 0));
+      const probabilities = optionRows.map((_: readonly number[], index: number) =>
+        index === optionRows.length - 1 ? 1 : 0
+      );
       return {logits: probabilities, probabilities};
     },
     async dispose() {},
@@ -370,7 +434,7 @@ test('Tamev accepts 78 data options and rejects accessor-backed options before r
   const session = createTamevSession({runner, tokenizer, config: {calibration_by_k: {}}});
   const options = Array.from({length: 78}, (_, index) => `option ${index}`);
   const result = await session.decide({state: 'state', questions: [{instructions: 'Choose', options}]});
-  assert.equal(result.answers[0].selected, options.at(-1));
+  assert.equal(result.answers[0]!.selected, options.at(-1));
   assert.equal(counts.runner, 1);
 
   const accessorOptions = [...options];
@@ -411,20 +475,26 @@ test('request-wide option caps reject before reading any option entries', async 
     async dispose() {},
     async releaseCachedMemory() {}
   };
-  const cases = [
+  const cases: Array<{
+    name: string;
+    totalLimit: number;
+    exactCounts: number[];
+    overCounts: number[];
+    createSession: () => TestSession;
+  }> = [
     {
       name: 'Nari',
       totalLimit: 64,
       exactCounts: [32, 32],
       overCounts: [32, 33],
-      createSession: () => createNariSession({tokenizer, controlIds: [1], runner})
+      createSession: () => createNariSession({tokenizer, controlIds: [1], runner}) as TestSession
     },
     {
       name: 'Clef',
       totalLimit: CLEF_MAX_OPTIONS,
       exactCounts: [32, 32],
       overCounts: [32, 33],
-      createSession: () => createClefSession({tokenizer, controlIds: [1], runner})
+      createSession: () => createClefSession({tokenizer, controlIds: [1], runner}) as TestSession
     }
   ];
 
@@ -440,7 +510,7 @@ test('request-wide option caps reject before reading any option entries', async 
       name
     );
     const session = await createSession();
-    const optionsFor = (count, error, reads) => {
+    const optionsFor = (count: number, error: Error, reads: {count: number}) => {
       const options = Array.from({length: count}, (_, index) => `option-${index}`);
       Object.defineProperty(options, '0', {
         get() {
@@ -450,9 +520,9 @@ test('request-wide option caps reject before reading any option entries', async 
       });
       return options;
     };
-    const makeRequest = (optionCounts, error, reads) => ({
+    const makeRequest = (optionCounts: number[], error: Error, reads: {count: number}) => ({
       state: 'state',
-      questions: optionCounts.map((count, index) => ({
+      questions: optionCounts.map((count: number, index: number) => ({
         instructions: `q${index}`,
         options: optionsFor(count, error, reads)
       }))
@@ -461,7 +531,7 @@ test('request-wide option caps reject before reading any option entries', async 
     const atLimitReads = {count: 0};
     await assert.rejects(
       session.decide(makeRequest(exactCounts, atLimitError, atLimitReads)),
-      (error) => error === atLimitError,
+      (error: unknown) => error === atLimitError,
       name
     );
     assert.equal(atLimitReads.count, 1, name);
@@ -478,6 +548,6 @@ test('request-wide option caps reject before reading any option entries', async 
     assert.equal(overLimitReads.count, 0, name);
     assert.equal(counts.tokenizer, 0, name);
     assert.equal(counts.runner, 0, name);
-    await session.dispose();
+    await session.dispose!();
   }
 });

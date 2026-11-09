@@ -7,8 +7,11 @@ import {packKev08Request} from '../src/kev08.js';
 import {packMapikaRequest} from '../src/mapika.js';
 import {packDebertaRequest} from '../src/deberta/packing.mjs';
 import {snapshotChoiceQuestion} from '../src/strands/protocol.mjs';
+import type {KevTokenizer} from '../src/kev.js';
 
-const makeRequest = () => ({state: 'text', questions: [{instructions: 'Choose', options: ['A', 'B']}]});
+type TestQuestion = {instructions: string; options: string[]; [field: string]: unknown};
+type TestRequest = {state: string; questions: TestQuestion[]; [field: string]: unknown};
+const makeRequest = (): TestRequest => ({state: 'text', questions: [{instructions: 'Choose', options: ['A', 'B']}]});
 const isInvalid = {code: 'INVALID_INPUT'};
 
 test('documented ordinary, frozen, null-prototype and cross-realm requests remain accepted', () => {
@@ -33,7 +36,7 @@ test('unsupported request, question, and decision fields are rejected before eva
     });
     assert.throws(() => validateRequestFields(req), isInvalid);
     const q = makeRequest();
-    Object.defineProperty(q.questions[0], key, {
+    Object.defineProperty(q.questions[0]!, key, {
       get() {
         throw Error('getter invoked');
       },
@@ -43,15 +46,15 @@ test('unsupported request, question, and decision fields are rejected before eva
     assert.throws(() => validateDecisionFields({[key]: true}), isInvalid);
   }
   const symbol = makeRequest();
-  symbol.questions[0][Symbol('ignored')] = 1;
+  (symbol.questions[0] as Record<PropertyKey, unknown>)[Symbol('ignored')] = 1;
   assert.throws(() => validateRequestFields(symbol), isInvalid);
   const inherited = makeRequest();
-  inherited.questions[0] = Object.assign(Object.create({type: 'score'}), inherited.questions[0]);
+  inherited.questions[0] = Object.assign(Object.create({type: 'score'}), inherited.questions[0]!);
   assert.throws(() => validateRequestFields(inherited), isInvalid);
   const hidden = makeRequest();
   const proto = {};
   Object.defineProperty(proto, 'criteria', {value: 'x'});
-  hidden.questions[0] = Object.assign(Object.create(proto), hidden.questions[0]);
+  hidden.questions[0] = Object.assign(Object.create(proto), hidden.questions[0]!);
   assert.throws(() => validateRequestFields(hidden), isInvalid);
   const sparse = makeRequest();
   sparse.questions.length = 2;
@@ -69,7 +72,7 @@ test('checked questions and option arrays are snapshotted before the packer read
     }
   };
   const checked = validateRequestFields(request);
-  first[0].options[0] = 'changed';
+  first[0]!.options[0] = 'changed';
   assert.equal(reads, 1);
   assert.deepEqual(checked, {state: 'text', questions: [{instructions: 'Choose', options: ['A', 'B']}]});
 });
@@ -182,7 +185,7 @@ test('data-only snapshots reject symbols, accessors, missing descriptors, and cy
     isInvalid
   );
 
-  let cyclicPrototype;
+  let cyclicPrototype: object;
   cyclicPrototype = new Proxy({}, {getPrototypeOf: () => cyclicPrototype});
   const cyclicRequest = Object.assign(Object.create(cyclicPrototype), request);
   assert.throws(
@@ -212,8 +215,9 @@ test('data-only preflight enforces exact token, character, option, and question 
     2,
     validation
   );
-  assert.equal(exact.questions[0].options.length, 2);
+  assert.equal(exact.questions[0]!.options.length, 2);
 
+  // oxlint-disable-next-line unicorn/no-new-array -- Preserve sparse entries for the validation fixture.
   const options = new Array(3);
   let optionReads = 0;
   Object.defineProperty(options, '0', {
@@ -333,7 +337,7 @@ test('Kev does not apply a fixed question count or aggregate token cap', () => {
   const request = {state: '', questions};
   const checked = validateRequestFields(request, Infinity, Infinity, Infinity, KEV_MAX_OPTIONS);
   const packed = packKevRequest(
-    {encode: () => ({ids: []})},
+    {encode: () => ({ids: []})} as unknown as KevTokenizer,
     checked,
     {maxStateTokens: 8192},
     {
@@ -353,11 +357,11 @@ test('Kev applies an explicitly configured character safety cap before tokenizat
   };
   const checked = validateRequestFields(request, Infinity, maxInputCharacters, Infinity, KEV_MAX_OPTIONS);
   assert.equal(
-    checked.state.length + checked.questions[0].instructions.length + checked.questions[0].options[0].length,
+    checked.state.length + checked.questions[0]!.instructions.length + checked.questions[0]!.options[0]!.length,
     maxInputCharacters
   );
 
-  request.questions[0].options[0] = '😀';
+  request.questions[0]!.options[0] = '😀';
   assert.throws(
     () => validateRequestFields(request, Infinity, maxInputCharacters, Infinity, KEV_MAX_OPTIONS),
     isInvalid
@@ -393,12 +397,12 @@ test('Kev preserves the upstream 255-option limit and checks packed marker budge
   const request = {state: '', questions: [question]};
   const checked = validateRequestFields(request, Infinity, Infinity, 1024, KEV_MAX_OPTIONS);
   const packed = packKevRequest(
-    {encode: () => ({ids: []})},
+    {encode: () => ({ids: []})} as unknown as KevTokenizer,
     checked,
     {maxStateTokens: 8192, maxBranchTokens: 8192, maxInputTokens: 1024, maxOptions: KEV_MAX_OPTIONS},
     {allowEmptyInstructions: true, allowEmptyOptions: true, allowDuplicateOptionsFor: new Set([0])}
   );
-  assert.equal(packed.groups[0].options.length, KEV_MAX_OPTIONS);
+  assert.equal(packed.groups[0]!.options.length, KEV_MAX_OPTIONS);
   assert.equal(packed.ids.length, 3 + KEV_MAX_OPTIONS * 2);
 
   const tooMany = {
@@ -406,7 +410,7 @@ test('Kev preserves the upstream 255-option limit and checks packed marker budge
     questions: [{instructions: '', options: Array.from({length: KEV_MAX_OPTIONS + 1}, () => '')}]
   };
   let reads = 0;
-  Object.defineProperty(tooMany.questions[0].options, '0', {
+  Object.defineProperty(tooMany.questions[0]!.options, '0', {
     get() {
       reads++;
       throw Error('option getter invoked');
@@ -424,9 +428,10 @@ test('Kev does not impose a character cap unless the caller configures one', () 
 
 test('sparse option entries are rejected even if Array.prototype supplies a value', () => {
   const request = makeRequest();
-  request.questions[0].options = new Array(3);
-  request.questions[0].options[0] = 'A';
-  request.questions[0].options[2] = 'C';
+  // oxlint-disable-next-line unicorn/no-new-array -- Preserve sparse entries for the validation fixture.
+  request.questions[0]!.options = new Array(3);
+  request.questions[0]!.options[0] = 'A';
+  request.questions[0]!.options[2] = 'C';
   const previous = Object.getOwnPropertyDescriptor(Array.prototype, '1');
   try {
     Object.defineProperty(Array.prototype, '1', {configurable: true, writable: true, value: 'B'});
@@ -441,7 +446,7 @@ test('model-specific option limits are checked before reading entries', () => {
   for (const count of [2, 255]) {
     const choices = Array.from({length: count}, (_, i) => `option ${i}`);
     const request = makeRequest();
-    request.questions[0].options = choices;
+    request.questions[0]!.options = choices;
     const checked = validateRequestFields(request, Infinity, Infinity, Infinity, 255);
     assert.deepEqual(checked.questions[0].options, choices);
     assert.notEqual(checked.questions[0].options, choices);
@@ -455,7 +460,7 @@ test('model-specific option limits are checked before reading entries', () => {
     }
   });
   const request = makeRequest();
-  request.questions[0].options = choices;
+  request.questions[0]!.options = choices;
   assert.throws(() => validateRequestFields(request, Infinity, Infinity, Infinity, 255), isInvalid);
   assert.equal(reads, 0);
 });
@@ -463,14 +468,14 @@ test('model-specific option limits are checked before reading entries', () => {
 test('the shared request snapshot does not impose an option cap when a model declares none', () => {
   const options = Array.from({length: 256}, (_, index) => `option ${index}`);
   const request = makeRequest();
-  request.questions[0].options = options;
-  assert.equal(validateRequestFields(request).questions[0].options.length, 256);
+  request.questions[0]!.options = options;
+  assert.equal(validateRequestFields(request).questions[0]!.options.length, 256);
 });
 
 test('guarded existing packers keep ordinary packed output unchanged; unsupported fields fail before tokenizer', () => {
   let calls = 0;
   const tokenizer = {
-    encode(text) {
+    encode(text: string) {
       calls++;
       return {ids: [text === 'A' ? 3 : text === 'B' ? 4 : 5]};
     }
@@ -480,13 +485,15 @@ test('guarded existing packers keep ordinary packed output unchanged; unsupporte
     ids: Array.from({length: 255}, (_, i) => i + 10),
     open: [1]
   };
-  const packers = [
-    (request) => packKevRequest(tokenizer, request, {maxStateTokens: 384, maxInputTokens: 1024}),
-    (request) => packKev08Request(tokenizer, request, {maxStateTokens: 128, maxInputTokens: 128}),
+  const packers: Array<(request: TestRequest) => unknown> = [
+    (request) =>
+      packKevRequest(tokenizer as unknown as KevTokenizer, request, {maxStateTokens: 384, maxInputTokens: 1024}),
+    (request) =>
+      packKev08Request(tokenizer as unknown as KevTokenizer, request, {maxStateTokens: 128, maxInputTokens: 128}),
     (request) =>
       packMapikaRequest(tokenizer, labels, request, {maxStateTokens: 512, maxInputTokens: 512, controlIds: [999]}),
     (request) => packDebertaRequest(tokenizer, request),
-    (request) => snapshotChoiceQuestion(request.questions[0])
+    (request) => snapshotChoiceQuestion(request.questions[0]!)
   ];
   for (const pack of packers) {
     const request = makeRequest(),
@@ -495,7 +502,7 @@ test('guarded existing packers keep ordinary packed output unchanged; unsupporte
     assert.deepEqual(pack(snapshot), before);
     for (const bad of [
       {...request, image: 'ignored'},
-      {...request, questions: [{...request.questions[0], type: 'score', criteria: 'x'}]}
+      {...request, questions: [{...request.questions[0]!, type: 'score', criteria: 'x'}]}
     ]) {
       const count = calls;
       assert.throws(() => {
