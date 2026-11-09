@@ -20,7 +20,7 @@ const coreTests = [
   'test/kanana-truncation.test.mjs',
   'test/kanana-tokenizer.test.mts',
   'test/kanana-image-ingress.test.mjs',
-  'test/kanana-encoded-image.test.mjs',
+  'test/kanana-encoded-image.test.mts',
   'test/kanana-image-processing.test.mjs',
   'test/kanana-magick-image.test.mjs',
   'test/kanana-pnm-image.test.mjs',

@@ -14,21 +14,21 @@ const jpegWasmPath = require.resolve('@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm')
 const magickWasmPath = fileURLToPath(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'));
 const magickWasm = await readFile(magickWasmPath);
 
-async function fixture(name) {
+async function fixture(name: string) {
   return readFile(new URL(name, fixtureDirectory));
 }
 
-async function expectedRgb(name) {
+async function expectedRgb(name: string) {
   return Uint8Array.from(await fixture(name));
 }
 
-function writeUint32(bytes, offset, value) {
+function writeUint32(bytes: Uint8Array, offset: number, value: number) {
   for (let index = 0; index < 4; index++) {
     bytes[offset + index] = Math.floor(value / 2 ** (24 - index * 8)) & 0xff;
   }
 }
 
-function setClassicTiffTag(bytes, tag, value) {
+function setClassicTiffTag(bytes: Uint8Array, tag: number, value: number) {
   const littleEndian = bytes[0] === 73;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const directory = view.getUint32(4, littleEndian);
@@ -45,7 +45,7 @@ function setClassicTiffTag(bytes, tag, value) {
   throw new Error(`Missing TIFF tag ${tag}`);
 }
 
-function pngHeader(width, height) {
+function pngHeader(width: number, height: number) {
   const bytes = new Uint8Array(24);
   bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
   bytes.set([0, 0, 0, 13, 73, 72, 68, 82], 8);
@@ -54,7 +54,7 @@ function pngHeader(width, height) {
   return bytes;
 }
 
-function jpegHeader(width, height) {
+function jpegHeader(width: number, height: number) {
   return Uint8Array.from([
     0xff,
     0xd8,
@@ -74,8 +74,14 @@ function jpegHeader(width, height) {
   ]);
 }
 
-async function assertPixels(source, golden, width, height, options) {
-  if (source instanceof Uint8Array) source = new Blob([source]);
+async function assertPixels(
+  source: unknown,
+  golden: string,
+  width: number,
+  height: number,
+  options?: Parameters<typeof decodeKananaEncodedImageSource>[1]
+) {
+  if (source instanceof Uint8Array) source = new Blob([source as Uint8Array<ArrayBuffer>]);
   const result = await decodeKananaEncodedImageSource(source, options);
   assert.equal(result.width, width);
   assert.equal(result.height, height);
@@ -107,8 +113,8 @@ test('encoded PNG entry point rejects an oversized IHDR before invoking the PNG 
 
 test('Pillow warning-range PNG and JPEG headers pass preflight', () => {
   const originalWarn = console.warn;
-  const warnings = [];
-  console.warn = (message) => warnings.push(message);
+  const warnings: unknown[] = [];
+  console.warn = (message: unknown) => warnings.push(message);
 
   try {
     assert.deepEqual(preflightKananaImageHeader(pngHeader(89_478_486, 1)), {
@@ -127,8 +133,8 @@ test('Pillow warning-range PNG and JPEG headers pass preflight', () => {
   }
 
   assert.equal(warnings.length, 2);
-  assert.match(warnings[0], /exceeds Pillow 12\.1\.1's warning limit of 89478485 pixels/);
-  assert.match(warnings[1], /exceeds Pillow 12\.1\.1's warning limit of 89478485 pixels/);
+  assert.match(warnings[0] as string, /exceeds Pillow 12\.1\.1's warning limit of 89478485 pixels/);
+  assert.match(warnings[1] as string, /exceeds Pillow 12\.1\.1's warning limit of 89478485 pixels/);
 });
 
 test('PNG RGBA uses Pillow white compositing and preserves byte rounding', async () => {
@@ -195,13 +201,13 @@ test('URL string input uses the encoded decoder path', async () => {
 test('HTMLImageElement input fetches currentSrc and reports unreadable CORS', async () => {
   const previousImageElement = globalThis.HTMLImageElement;
   class MockImageElement {}
-  globalThis.HTMLImageElement = MockImageElement;
+  globalThis.HTMLImageElement = MockImageElement as unknown as typeof HTMLImageElement;
   const image = Object.assign(new MockImageElement(), {
     currentSrc: 'https://images.example/current.png',
     src: 'https://images.example/fallback.png'
   });
   const encoded = await fixture('rgba-alpha.png');
-  let fetchedUrl;
+  let fetchedUrl: unknown;
 
   try {
     await assertPixels(image, 'rgba-alpha.rgb', 6, 1, {
@@ -220,7 +226,8 @@ test('HTMLImageElement input fetches currentSrc and reports unreadable CORS', as
       /readable CORS response/
     );
   } finally {
-    if (previousImageElement === undefined) delete globalThis.HTMLImageElement;
+    if (previousImageElement === undefined)
+      delete (globalThis as {HTMLImageElement?: typeof HTMLImageElement}).HTMLImageElement;
     else globalThis.HTMLImageElement = previousImageElement;
   }
 });
@@ -264,7 +271,7 @@ test('unsupported encoded formats fail explicitly', async () => {
 
 test('PNG with a corrupt chunk CRC is rejected', async () => {
   const encoded = await fixture('rgba-alpha.png');
-  encoded[encoded.length - 1] ^= 1;
+  encoded[encoded.length - 1]! ^= 1;
   await assert.rejects(decodeKananaEncodedImageSource(new Blob([encoded])), /CRC mismatch/);
 });
 
@@ -286,7 +293,7 @@ test('abort after URL fetch prevents decoding response bytes', async () => {
     decodeKananaEncodedImageSource('https://images.example/image.png', {
       signal: controller.signal,
       fetch: async (_url, options) => {
-        assert.equal(options.signal, controller.signal);
+        assert.equal(options!.signal, controller.signal);
         controller.abort();
         return new Response(new Blob([encoded]), {status: 200});
       }

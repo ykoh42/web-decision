@@ -4,3 +4,4 @@ export const chatTemplate: typeof import('../src/kanana/chat-template.js');
 export const protocol: typeof import('../src/kanana/protocol.js');
 export const tokenizer: typeof import('../src/kanana/tokenizer.js');
 export const imageProcessing: typeof import('../src/kanana/image-processing.js');
+export const encodedImage: typeof import('../src/kanana/encoded-image.js');
