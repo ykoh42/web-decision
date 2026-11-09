@@ -4,6 +4,7 @@ import {WebDecisionError} from '../kev.js';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {VERDICT_ABSTENTION_ID, VERDICT_MAX_CANDIDATES, VERDICT_MODEL} from './contract.mjs';
 import {finishVerdictSystemOne, prepareVerdictSystemOne} from './protocol.mjs';
+import type {PreparedVerdictSystemOne} from './protocol.mjs';
 import type {createVerdictTokenizer} from './tokenizer.mjs';
 
 type VerdictTokenizer = ReturnType<typeof createVerdictTokenizer>;
@@ -75,13 +76,6 @@ interface VerdictSystemOneResult {
   readonly truncated?: true;
   readonly truncatedQuestions?: string[];
   readonly answers: Record<string, VerdictAnswer>;
-}
-
-interface PreparedVerdictSystemOne {
-  readonly model: string;
-  readonly rows: unknown[];
-  readonly tokenCount: number;
-  readonly truncatedQuestions: string[];
 }
 
 interface VerdictGenericResult {
