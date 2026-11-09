@@ -4,15 +4,70 @@ import test from 'node:test';
 import {IMAJEV_MODEL} from '../src/imajev/contract.mjs';
 import {IMAJEV_LIMITS, loadFakeImajevCandidate, validateImajevOptions} from '../src/imajev/candidate-loader.mjs';
 
-function fixture() {
-  const events = [];
-  const device = {
+type FakeDependencies = Parameters<typeof loadFakeImajevCandidate>[1];
+type FakeRuntime = Awaited<ReturnType<FakeDependencies['instantiate']>>;
+type FakeSource = Awaited<ReturnType<FakeDependencies['openSource']>>;
+type FakeOwner = ReturnType<ReturnType<FakeDependencies['ownership']>['initialize']>;
+type FakeProcessor = ReturnType<FakeDependencies['processor']>;
+type MutableOwner = Omit<FakeOwner, 'blocked' | 'lost'> & {blocked: boolean; lost: unknown};
+type FixtureDependencies = Omit<FakeDependencies, 'gpu'> & {gpu: GPU | undefined};
+
+interface FakeGpuDevice {
+  lost: Promise<unknown>;
+  destroy(): void;
+}
+
+interface FakeGpuAdapter {
+  features: Set<string>;
+  limits: {
+    maxStorageBuffersPerShaderStage: number;
+    maxStorageBufferBindingSize: number;
+    maxBufferSize: number;
+  };
+  requestDevice(): Promise<FakeGpuDevice>;
+}
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason?: unknown): void;
+}
+
+function deferred<T = void>(): Deferred<T> {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return {promise, resolve, reject};
+}
+
+function asGpuDeviceApi(device: FakeGpuDevice): GPUDevice {
+  return device as unknown as GPUDevice;
+}
+
+function asGpuAdapterApi(adapter: FakeGpuAdapter): GPUAdapter {
+  return adapter as unknown as GPUAdapter;
+}
+
+function fixture(): {
+  events: string[];
+  device: FakeGpuDevice;
+  adapter: FakeGpuAdapter;
+  source: FakeSource;
+  owner: MutableOwner;
+  deps: FixtureDependencies;
+  options: {model: typeof IMAJEV_MODEL; assetsUrl: string};
+} {
+  const events: string[] = [];
+  const device: FakeGpuDevice = {
     lost: new Promise(() => {}),
     destroy() {
       events.push('destroy');
     }
   };
-  const adapter = {
+  const adapter: FakeGpuAdapter = {
     features: new Set(['shader-f16']),
     limits: {...IMAJEV_LIMITS},
     async requestDevice() {
@@ -20,8 +75,35 @@ function fixture() {
       return device;
     }
   };
-  const source = {
-    plan: {bindings: Array.from({length: 1082}, () => ({})), maxInputTokens: 128},
+  const sourceHash = '0'.repeat(64);
+  const bindings: FakeSource['plan']['bindings'] = Array.from({length: 1082}, (_, index) => {
+    const argument = `argument-${index}`;
+    if (index < 1080)
+      return {
+        argument,
+        target: `target-${index}`,
+        dtype: 'float32',
+        shape: [1],
+        bytes: 4,
+        offset: 0,
+        path: 'fixture.pending',
+        fileSha256: sourceHash,
+        rangeSha256: sourceHash,
+        fileBytes: 4,
+        chunks: [{offset: 0, bytes: 4, sha256: sourceHash}]
+      };
+    return {
+      argument,
+      target: index === 1080 ? 'body.rotary_emb.inv_freq' : 'body.rotary_emb.original_inv_freq',
+      dtype: 'float32',
+      shape: [32],
+      sha256: 'ef51962de52263845c53966465eb225b734f9bf294e3e382229ec4630404077f',
+      bytesHex: '0'.repeat(256)
+    };
+  });
+  const source: FakeSource = {
+    plan: {bindings, maxInputTokens: 128},
+    readRange: async () => Uint8Array.of(1),
     async readAsset(name) {
       events.push(name);
       return Uint8Array.of(1);
@@ -30,23 +112,66 @@ function fixture() {
       events.push('close');
     }
   };
-  const owner = {
+  const tensor = {
+    byteOffset: 0,
+    dtype: 'float32',
+    shape: [],
+    getDataPtr() {
+      return 1;
+    }
+  };
+  const runtime: FakeRuntime = {
+    dispose() {
+      events.push('late-dispose');
+    },
+    initWebGPU() {},
+    beginScope() {},
+    webgpu() {
+      return {deviceType: 0, deviceId: 0, sync() {}};
+    },
+    createVirtualMachine() {
+      return {getFunction: () => () => tensor};
+    },
+    empty() {
+      return tensor;
+    }
+  };
+  const owner: MutableOwner = {
+    runtime,
+    gpu: asGpuDeviceApi(device),
+    device: {deviceType: 0, deviceId: 0, sync() {}},
+    fn: () => tensor,
+    lifecycle: {disposed: false, loss: null},
+    uncaptured: [],
+    disposalGuard: {blocked: false, retain() {}},
+    teardownObserver: {beforeDispose: async () => {}, afterDispose: async () => {}},
+    teardownTimeoutMs: 1,
     phase: 'prepared',
     blocked: false,
     lost: false,
-    uncaptured: [],
+    resources: [],
     retain() {
       events.push('retain');
+    },
+    hold() {
+      return {release() {}};
     }
   };
-  const deps = {
+  const processor: FakeProcessor = {
+    prepare: () => ({tokenCount: 0, questions: []}),
+    finish: () => ({tokenCount: 0, answers: []})
+  };
+  const gpu: GPU = Object.assign(new EventTarget(), {
+    wgslLanguageFeatures: new Set<string>(),
+    getPreferredCanvasFormat: () => 'rgba8unorm' as GPUTextureFormat,
+    async requestAdapter() {
+      events.push('adapter');
+      return asGpuAdapterApi(adapter);
+    }
+  });
+  const deps: FixtureDependencies = {
     fake: true,
-    gpu: {
-      async requestAdapter() {
-        events.push('adapter');
-        return adapter;
-      }
-    },
+    gpu,
     ownership: () => ({
       initialize() {
         events.push('initialize');
@@ -64,15 +189,11 @@ function fixture() {
     },
     processor() {
       events.push('processor');
-      return {};
+      return processor;
     },
     async instantiate() {
       events.push('instantiate');
-      return {
-        dispose() {
-          events.push('late-dispose');
-        }
-      };
+      return runtime;
     },
     async upload() {
       events.push('upload');
@@ -97,8 +218,9 @@ function fixture() {
 test('candidate orchestrates verified source, device, upload and session in order', async () => {
   const f = fixture();
   const result = await loadFakeImajevCandidate(f.options, f.deps);
-  assert.equal(result.maxInputTokens, 128);
-  assert.deepEqual(result.weights, ['weights']);
+  const session = result as {maxInputTokens: number; weights: unknown[]};
+  assert.equal(session.maxInputTokens, 128);
+  assert.deepEqual(session.weights, ['weights']);
   assert.ok(f.events.indexOf('processor') < f.events.indexOf('device'));
   assert.ok(f.events.indexOf('initialize') < f.events.indexOf('upload'));
   assert.ok(f.events.indexOf('upload') < f.events.indexOf('session'));
@@ -148,9 +270,9 @@ test('rejects unsupported GPUs before opening assets', async () => {
   for (const change of ['no-gpu', 'no-adapter', 'no-f16', 'missing-limit']) {
     const f = fixture();
     if (change === 'no-gpu') f.deps.gpu = undefined;
-    if (change === 'no-adapter') f.deps.gpu.requestAdapter = async () => null;
+    if (change === 'no-adapter') f.deps.gpu!.requestAdapter = async () => null;
     if (change === 'no-f16') f.adapter.features.clear();
-    if (change === 'missing-limit') delete f.adapter.limits.maxBufferSize;
+    if (change === 'missing-limit') Reflect.deleteProperty(f.adapter.limits, 'maxBufferSize');
     await assert.rejects(loadFakeImajevCandidate(f.options, f.deps), {code: 'UNSUPPORTED_ENVIRONMENT'});
     assert.equal(f.events.includes('source'), false);
   }
@@ -178,8 +300,9 @@ test('closes the source and preserves the failure when loading cannot complete',
         throw failure;
       };
     await assert.rejects(loadFakeImajevCandidate(f.options, f.deps), (error) => {
-      assert.equal(error.code, 'MODEL_LOAD_FAILED');
-      if (stage !== 'blocked') assert.equal(error.cause, failure);
+      const failureRecord = error as {code?: unknown; cause?: unknown};
+      assert.equal(failureRecord.code, 'MODEL_LOAD_FAILED');
+      if (stage !== 'blocked') assert.equal(failureRecord.cause, failure);
       return true;
     });
     assert.ok(f.events.includes('close'));
@@ -190,19 +313,20 @@ test('closes the source and preserves the failure when loading cannot complete',
 
 test('abort while device request is pending destroys the late device and closes source', async () => {
   const f = fixture(),
-    controller = new AbortController();
-  let resolveDevice;
-  f.adapter.requestDevice = () =>
-    new Promise((resolve) => {
-      resolveDevice = resolve;
-    });
+    controller = new AbortController(),
+    request = deferred<FakeGpuDevice>();
+  let requestStarted = false;
+  f.adapter.requestDevice = () => {
+    requestStarted = true;
+    return request.promise;
+  };
   const result = loadFakeImajevCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!resolveDevice) await nextTurn();
+  while (!requestStarted) await nextTurn();
   controller.abort();
   await assert.rejects(result, {name: 'AbortError'});
   assert.ok(f.events.includes('close'));
   assert.equal(f.events.includes('destroy'), false);
-  resolveDevice(f.device);
+  request.resolve(f.device);
   await nextTurn();
   assert.ok(f.events.includes('destroy'));
   assert.ok(f.events.includes('close'));
@@ -212,28 +336,30 @@ test('abort during device request observes a late rejection', async () => {
   const f = fixture();
   const controller = new AbortController();
   const reason = Error('cancel device request');
-  let rejectDevice;
-  f.adapter.requestDevice = () =>
-    new Promise((_resolve, reject) => {
-      rejectDevice = reject;
-    });
+  const request = deferred<FakeGpuDevice>();
+  let requestStarted = false;
+  f.adapter.requestDevice = () => {
+    requestStarted = true;
+    return request.promise;
+  };
   const result = loadFakeImajevCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!rejectDevice) await nextTurn();
+  while (!requestStarted) await nextTurn();
   controller.abort(reason);
   await assert.rejects(result, (error) => error === reason);
   assert.ok(f.events.includes('close'));
-  rejectDevice(Error('late device failure'));
+  request.reject(Error('late device failure'));
   await nextTurn();
   assert.equal(f.events.includes('instantiate'), false);
 });
 
 test('abort during small asset reads closes the source and observes late failures', async () => {
   const f = fixture();
-  const reads = [];
-  f.source.readAsset = () =>
-    new Promise((resolve, reject) => {
-      reads.push({resolve, reject});
-    });
+  const reads: Deferred<Uint8Array<ArrayBuffer>>[] = [];
+  f.source.readAsset = () => {
+    const read = deferred<Uint8Array<ArrayBuffer>>();
+    reads.push(read);
+    return read.promise;
+  };
   const controller = new AbortController();
   const reason = Error('cancel asset reads');
   const job = loadFakeImajevCandidate({...f.options, signal: controller.signal}, f.deps);
@@ -243,28 +369,24 @@ test('abort during small asset reads closes the source and observes late failure
   assert.ok(f.events.includes('close'));
   assert.ok(f.events.includes('fail'));
   assert.equal(f.events.includes('device'), false);
-  reads[0].resolve(Uint8Array.of(1));
+  reads[0]!.resolve(Uint8Array.of(1));
   for (const read of reads.slice(1)) read.reject(Error('late asset failure'));
   await nextTurn();
 });
 
 test('device loss during upload aborts loading and retains initialized resources', async () => {
   const f = fixture();
-  let lose, entered;
-  f.device.lost = new Promise((resolve) => {
-    lose = resolve;
-  });
-  const started = new Promise((resolve) => {
-    entered = resolve;
-  });
+  const loss = deferred<unknown>(),
+    started = deferred<void>();
+  f.device.lost = loss.promise;
   f.deps.upload = async (_owner, _source, {signal}) =>
-    new Promise((_resolve, reject) => {
+    new Promise<unknown[]>((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), {once: true});
-      entered();
+      started.resolve(undefined);
     });
   const result = loadFakeImajevCandidate(f.options, f.deps);
-  await started;
-  lose({reason: 'unknown'});
+  await started.promise;
+  loss.resolve({reason: 'unknown'});
   await assert.rejects(result, {code: 'MODEL_LOAD_FAILED'});
   assert.ok(f.events.includes('retain'));
   assert.ok(f.events.includes('close'));

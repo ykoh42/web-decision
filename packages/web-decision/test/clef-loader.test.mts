@@ -3,44 +3,119 @@ import assert from 'node:assert/strict';
 import {loadFakeClefCandidate, validateClefOptions, validateClefAdapter} from '../src/clef/loader.mjs';
 import {CLEF_LIMITS, CLEF_MODEL} from '../src/clef/contract.mjs';
 import {uploadFakeClefParameters} from '../src/clef/upload.mjs';
+import type {ClefTensorEntry} from '../src/clef/types.js';
 
 const options = () => ({model: CLEF_MODEL, assetsUrl: 'https://example.test/assets'});
-const deferred = () => {
-  let resolve;
-  const promise = new Promise((done) => {
-    resolve = done;
+type FakeDependencies = Parameters<typeof loadFakeClefCandidate>[1];
+type FakeGpuApi = NonNullable<FakeDependencies['gpu']>;
+type FakeAdapter = NonNullable<Awaited<ReturnType<FakeGpuApi['requestAdapter']>>>;
+type FakeGpuDevice = Awaited<ReturnType<FakeAdapter['requestDevice']>>;
+type FakeRuntime = Awaited<ReturnType<FakeDependencies['instantiate']>>;
+type FakeSource = Awaited<ReturnType<FakeDependencies['openSource']>>;
+type FakeOwner = ReturnType<FakeDependencies['initialize']>;
+type FakeTokenizerBundle = Awaited<ReturnType<FakeDependencies['prepareTokenizer']>>;
+type FakeSessionRunner = ReturnType<FakeDependencies['runner']>;
+type FixtureDependencies = FakeDependencies & {gpu: FakeGpuApi};
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason?: unknown): void;
+}
+
+function deferred<T = void>(): Deferred<T> {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
   });
-  return {promise, resolve};
-};
-const tick = () => new Promise((resolve) => setImmediate(resolve));
-function fixture() {
+  return {promise, resolve, reject};
+}
+
+const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+function fixture(): {
+  deps: FixtureDependencies;
+  owner: FakeOwner;
+  runtime: FakeRuntime;
+  gpuDevice: FakeGpuDevice;
+  loss: Deferred<unknown>;
+  events: string[];
+} {
   const loss = deferred(),
-    events = [];
-  const gpuDevice = {
+    events: string[] = [];
+  const gpuDevice: FakeGpuDevice = {
     lost: loss.promise,
     destroy() {
       events.push('gpu.destroy');
     }
   };
-  const owner = {
-    lifecycle: {},
+  const tensor = {
+    byteOffset: 0,
+    dtype: 'float32',
+    shape: [],
+    copyFrom() {},
+    getDataPtr() {
+      return 1;
+    },
+    toArray() {
+      return [];
+    }
+  };
+  const runtime: FakeRuntime = {
+    lib: {webGPUContext: {}},
+    empty() {
+      return tensor;
+    },
+    cpu() {
+      return {};
+    },
+    dispose() {
+      events.push('runtime.dispose');
+    },
+    initWebGPU() {},
+    beginScope() {},
+    endScope() {},
+    webgpu() {
+      return {};
+    },
+    createVirtualMachine() {
+      return {getFunction: () => () => tensor};
+    }
+  };
+  const owner: FakeOwner = {
+    runtime,
+    device: {},
+    gpu: gpuDevice,
+    fn: () => tensor,
+    teardownObserver: null,
+    teardownTimeoutMs: 1,
+    lifecycle: {loss: null, disposed: false},
     disposalGuard: {
+      blocked: false,
       retain() {
         events.push('retain');
       }
     },
     uncaptured: []
   };
-  const runtime = {
-    dispose() {
-      events.push('runtime.dispose');
+  const source: FakeSource = {
+    wasm: new Uint8Array(),
+    tokenizer: {},
+    tokenizerConfig: {},
+    entries: [],
+    inputBanks: [],
+    outputBanks: [],
+    async readRange() {
+      return new ArrayBuffer(0);
     }
   };
-  const deps = {
+  const deps: FixtureDependencies = {
     fake: true,
     gpu: {
       async requestAdapter() {
-        return {
+        const adapter: FakeAdapter = {
           features: new Set(['shader-f16']),
           info: {isFallbackAdapter: false},
           limits: CLEF_LIMITS,
@@ -48,13 +123,15 @@ function fixture() {
             return gpuDevice;
           }
         };
+        return adapter;
       }
     },
     async openSource() {
-      return {wasm: new Uint8Array(), tokenizer: {}, tokenizerConfig: {}};
+      return source;
     },
     async prepareTokenizer() {
-      return {};
+      const bundle: FakeTokenizerBundle = {tokenizer: {encode: () => ({ids: []})}, controlIds: []};
+      return bundle;
     },
     async instantiate() {
       return runtime;
@@ -66,7 +143,7 @@ function fixture() {
       return [];
     },
     runner() {
-      return {};
+      return {} as FakeSessionRunner;
     },
     session() {
       return {ok: true};
@@ -91,22 +168,26 @@ test('successful fake load attaches the session and abort before device prevents
   const {deps} = fixture();
   assert.deepEqual(await loadFakeClefCandidate(options(), deps), {ok: true});
   const abort = new AbortController(),
-    waiting = deferred(),
-    entered = deferred(),
+    waiting = deferred<void>(),
+    entered = deferred<void>(),
     next = fixture();
   let requested = false;
   next.deps.beforeDevice = async () => {
     entered.resolve();
     await waiting.promise;
   };
-  next.deps.gpu.requestAdapter = async () => ({
-    features: new Set(['shader-f16']),
-    info: {isFallbackAdapter: false},
-    limits: CLEF_LIMITS,
-    requestDevice() {
-      requested = true;
-    }
-  });
+  next.deps.gpu.requestAdapter = async () => {
+    const adapter: FakeAdapter = {
+      features: new Set(['shader-f16']),
+      info: {isFallbackAdapter: false},
+      limits: CLEF_LIMITS,
+      requestDevice() {
+        requested = true;
+        return Promise.resolve(next.gpuDevice);
+      }
+    };
+    return adapter;
+  };
   const result = loadFakeClefCandidate({...options(), signal: abort.signal}, next.deps);
   await entered.promise;
   abort.abort();
@@ -117,8 +198,8 @@ test('successful fake load attaches the session and abort before device prevents
 
 test('late device after cancellation is destroyed and upload abort retains initialized owner', async () => {
   const abort = new AbortController(),
-    waiting = deferred(),
-    entered = deferred(),
+    waiting = deferred<FakeGpuDevice>(),
+    entered = deferred<void>(),
     next = fixture();
   next.deps.gpu.requestAdapter = async () => ({
     features: new Set(['shader-f16']),
@@ -158,7 +239,7 @@ test('late device after cancellation is destroyed and upload abort retains initi
 test('abort during upload hashing retains the initialized owner without issuing a write', async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
   const entered = deferred(),
-    hash = deferred(),
+    hash = deferred<ArrayBuffer>(),
     current = fixture(),
     controller = new AbortController();
   const reason = Error('hash cancelled'),
@@ -175,13 +256,17 @@ test('abort during upload hashing retains the initialized owner without issuing 
       }
     }
   });
-  t.after(() => (original ? Object.defineProperty(globalThis, 'crypto', original) : delete globalThis.crypto));
-  const entry = {
+  t.after(() =>
+    original ? Object.defineProperty(globalThis, 'crypto', original) : Reflect.deleteProperty(globalThis, 'crypto')
+  );
+  const entry: ClefTensorEntry = {
     position: 17,
     target: 'x',
+    path: 'fixture.pending',
     dtype: 'float16',
     shape: [2],
     bytes: 4,
+    sha256: '00'.repeat(32),
     chunks: [{offset: 0, length: 4, sha256: '00'.repeat(32)}]
   };
   current.deps.upload = (_owner, _source, signal) =>
@@ -189,7 +274,7 @@ test('abort during upload hashing retains the initialized owner without issuing 
       fake: true,
       signal,
       createTensor: () => ({}),
-      readRange: () => bytes,
+      readRange: async () => bytes,
       writeRange: () => {
         writes++;
       }
