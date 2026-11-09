@@ -1,5 +1,46 @@
 import {bytesFor} from '../nari/upload-plan.mjs';
 
+interface ImajevChunk {
+  offset: number;
+  bytes: number;
+  sha256: string;
+}
+interface ImajevFile {
+  path: string;
+  bytes: number;
+  sha256: string;
+  chunks: ImajevChunk[];
+}
+interface ImajevBindingBase {
+  argument: string;
+  target: string;
+  dtype: string;
+  shape: number[];
+}
+interface ImajevRotaryBinding extends ImajevBindingBase {
+  sha256: string;
+  bytesHex: string;
+}
+interface ImajevFileBinding extends ImajevBindingBase {
+  bytes: number;
+  offset: number;
+  path: string;
+  fileSha256: string;
+  rangeSha256: string;
+  fileBytes: number;
+  chunks: ImajevChunk[];
+}
+type ImajevBinding = ImajevRotaryBinding | ImajevFileBinding;
+interface ImajevMetadata {
+  format: string;
+  provenanceSigned: boolean;
+  bindingSha256: string;
+  maxInputTokens: number;
+  bindings: ImajevBinding[];
+  assets: ImajevFile[];
+}
+type ImajevFileMap = Map<string, {bytes: number; chunks: Map<string, string>}>;
+
 const SHA = /^[a-f0-9]{64}$/;
 const PATH = /^[A-Za-z0-9_.-]+$/;
 const MAX_CHUNK = 4 * 1024 * 1024;
@@ -7,12 +48,12 @@ const MAX_TENSOR = 134184960;
 const ROTARY_HASH = 'ef51962de52263845c53966465eb225b734f9bf294e3e382229ec4630404077f';
 const ROTARY = ['model.rotary_emb.inv_freq', 'model.rotary_emb.original_inv_freq'];
 const ASSETS = ['model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'decision_readout.json', 'calibration.json'];
-const invalid = () => {
+const invalid: () => never = () => {
   throw Error('Invalid Imajev inventory.');
 };
-const positive = (n) => Number.isSafeInteger(n) && n > 0;
+const positive = (n: number) => Number.isSafeInteger(n) && n > 0;
 
-function addChunk(files, path, total, chunk) {
+function addChunk(files: ImajevFileMap, path: string, total: number, chunk: ImajevChunk) {
   if (
     typeof path !== 'string' ||
     !PATH.test(path) ||
@@ -35,7 +76,14 @@ function addChunk(files, path, total, chunk) {
   file.chunks.set(key, chunk.sha256);
 }
 
-function checkChunks(files, path, total, chunks, offset, size) {
+function checkChunks(
+  files: ImajevFileMap,
+  path: string,
+  total: number,
+  chunks: ImajevChunk[],
+  offset: number,
+  size: number
+) {
   if (!Array.isArray(chunks) || chunks.length < 1 || !Number.isSafeInteger(offset) || offset < 0) invalid();
   let position = offset;
   for (const chunk of chunks) {
@@ -47,7 +95,7 @@ function checkChunks(files, path, total, chunks, offset, size) {
   if (position !== offset + size) invalid();
 }
 
-function checkRotary(row, index) {
+function checkRotary(row: ImajevRotaryBinding, index: number) {
   if (
     row.target !== ROTARY[index] ||
     row.dtype !== 'float32' ||
@@ -60,7 +108,7 @@ function checkRotary(row, index) {
     invalid();
 }
 
-function checkFileRow(row, size, files, fileHashes) {
+function checkFileRow(row: ImajevFileBinding, size: number, files: ImajevFileMap, fileHashes: Map<string, string>) {
   if (
     row.bytes !== size ||
     !Number.isSafeInteger(row.offset) ||
@@ -78,11 +126,11 @@ function checkFileRow(row, size, files, fileHashes) {
   checkChunks(files, row.path, row.fileBytes, row.chunks, row.offset, size);
 }
 
-function checkBindings(rows, files) {
+function checkBindings(rows: ImajevBinding[], files: ImajevFileMap) {
   if (!Array.isArray(rows) || rows.length !== 1082) invalid();
-  const names = new Set(),
-    targets = new Set(),
-    fileHashes = new Map();
+  const names = new Set<string>(),
+    targets = new Set<string>(),
+    fileHashes = new Map<string, string>();
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     if (
@@ -102,13 +150,13 @@ function checkBindings(rows, files) {
     if (size > MAX_TENSOR) invalid();
     if (index >= 1080) {
       if (Object.hasOwn(row, 'path')) invalid();
-      checkRotary(row, index - 1080);
-    } else checkFileRow(row, size, files, fileHashes);
+      checkRotary(row as ImajevRotaryBinding, index - 1080);
+    } else checkFileRow(row as ImajevFileBinding, size, files, fileHashes);
   }
   if (files.size !== 677) invalid();
 }
 
-function checkAssets(assets, files) {
+function checkAssets(assets: ImajevFile[], files: ImajevFileMap) {
   if (!Array.isArray(assets) || assets.length !== ASSETS.length) invalid();
   for (const [index, asset] of assets.entries()) {
     if (
@@ -126,7 +174,7 @@ function checkAssets(assets, files) {
 }
 
 /** Validate the shape and range plan after its exact metadata bytes are pinned. */
-export function prepareImajevPlan(metadata) {
+export function prepareImajevPlan(metadata: ImajevMetadata) {
   if (
     metadata?.format !== 'web-decision-imajev-q4-dlight-local-v1' ||
     metadata.provenanceSigned !== false ||
@@ -134,7 +182,7 @@ export function prepareImajevPlan(metadata) {
     metadata.maxInputTokens !== 128
   )
     invalid();
-  const files = new Map();
+  const files: ImajevFileMap = new Map();
   checkBindings(metadata.bindings, files);
   checkAssets(metadata.assets, files);
   return {files, bindings: metadata.bindings, assets: metadata.assets, maxInputTokens: 128};

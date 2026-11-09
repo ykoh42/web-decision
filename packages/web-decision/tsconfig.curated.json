@@ -70,6 +70,7 @@
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
     "test/preview-entrypoints.test.mts",
+    "src/imajev/plan.mts",
     "src/imajev/fixture-session.mts",
     "src/imajev/protocol.mts",
     "src/imajev/session.mts",
