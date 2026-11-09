@@ -53,34 +53,13 @@ interface SafeDecideChoiceAnswer extends SafeDecideAnswerFields {
   readonly choice: string;
 }
 
-interface SafeDecideScoreAnswer extends SafeDecideAnswerFields {
-  readonly type: 'score';
-  readonly choice: string;
-  readonly score: number;
-}
-
-interface SafeDecideNoulAnswer extends SafeDecideAnswerFields {
-  readonly type: 'noul';
-  readonly noul: number;
-}
-
-type SafeDecideAnswer = SafeDecideChoiceAnswer | SafeDecideScoreAnswer | SafeDecideNoulAnswer;
-
 interface SafeDecideGuarantee {
   readonly alpha: SafeDecideAlpha;
   readonly delta: number;
   readonly statement: string;
 }
 
-interface SafeDecideSystemOneResult {
-  readonly model: string;
-  readonly tokenCount: number;
-  readonly outputTokenCount: number;
-  readonly truncated?: true;
-  readonly truncatedQuestions?: string[];
-  readonly guarantee: SafeDecideGuarantee;
-  readonly answers: Record<string, SafeDecideAnswer>;
-}
+type SafeDecideSystemOneResult = ReturnType<typeof finishSafeDecideSystemOne>;
 
 interface SafeDecideChoiceResult extends Omit<SafeDecideSystemOneResult, 'answers'> {
   readonly answers: Record<string, SafeDecideChoiceAnswer>;
@@ -101,11 +80,7 @@ interface SafeDecideDecisionResult {
   }>;
 }
 
-interface SafeDecidePrepared {
-  readonly rows: unknown[];
-  readonly tokenCount: number;
-  readonly truncatedQuestions: string[];
-}
+type SafeDecidePrepared = ReturnType<typeof prepareSafeDecideSystemOne>;
 
 interface SafeDecideInference {
   readonly logits: number[];
