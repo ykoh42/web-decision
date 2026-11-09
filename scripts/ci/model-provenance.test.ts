@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
@@ -45,7 +45,7 @@ async function validateTemporaryManifest(
   manifestBytes: Buffer,
   options: {expectedSha256?: string; evidenceBytes?: Buffer} = {}
 ): Promise<void> {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), 'web-decision-model-provenance-'));
+  const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-model-provenance-')));
   try {
     const packageRoot = join(temporaryRoot, 'package');
     const evidenceRoot = join(packageRoot, MODEL_PROVENANCE_EVIDENCE_ROOT);
@@ -96,7 +96,7 @@ test('changing only pending to approved cannot bypass the fixed provenance hash'
 });
 
 test('approved provenance requires immutable lineage, pinned conversion, rights, and review evidence', async (t) => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), 'web-decision-approved-provenance-'));
+  const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-approved-provenance-')));
   t.after(() => rm(temporaryRoot, {recursive: true, force: true}));
   const packageRoot = join(temporaryRoot, 'packages/web-decision');
   const provenanceRoot = join(packageRoot, MODEL_PROVENANCE_EVIDENCE_ROOT);
@@ -281,7 +281,7 @@ test('tampered committed evidence cannot match the manifest evidence digest', as
 });
 
 test('an evidence file must match its committed HEAD bytes even when its hash is updated', async (t) => {
-  const workspaceRoot = await mkdtemp(join(tmpdir(), 'web-decision-committed-provenance-'));
+  const workspaceRoot = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-committed-provenance-')));
   t.after(() => rm(workspaceRoot, {recursive: true, force: true}));
   const packageRoot = join(workspaceRoot, 'packages/web-decision');
   const catalogRoot = join(packageRoot, 'src/catalog');
