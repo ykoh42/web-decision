@@ -1,5 +1,6 @@
 import {waitForAbort} from '../assets.js';
 import {initializeH2oRuntime} from '../h2o/owner.mjs';
+import type {H2oGpu, H2oRuntime, H2oTensor} from '../h2o/owner.mjs';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {WebDecisionError} from '../kev.js';
 import type {ErrorCode} from '../curated/types.js';
@@ -24,23 +25,20 @@ interface Mapika4OptionsSnapshot {
   readonly model: Mapika4Model;
 }
 
-interface Mapika4Tensor {
-  readonly byteOffset?: unknown;
-  getDataPtr(): unknown;
+interface Mapika4Tensor extends H2oTensor {
+  copyFrom(value: unknown): unknown;
 }
 
 interface Mapika4WebGpuContext {
   readonly copyRawBytesToBuffer?: unknown;
 }
 
-interface Mapika4Runtime {
+interface Mapika4Runtime extends H2oRuntime {
   readonly lib?: {readonly webGPUContext?: Mapika4WebGpuContext | null | undefined} | null | undefined;
   empty(shape: number[], dtype: string, device: unknown): Mapika4Tensor;
-  dispose(): unknown;
 }
 
-interface Mapika4GpuDevice {
-  readonly lost: PromiseLike<unknown>;
+interface Mapika4GpuDevice extends H2oGpu {
   destroy(): unknown;
 }
 

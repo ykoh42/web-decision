@@ -77,9 +77,9 @@ export type H2oOpenedSource = {
   tokenizerContract: Uint8Array;
   inventory: Record<string, RangeChunk[]>;
   readRange(
-    requestBase: string | URL,
+    requestBase: unknown,
     spec: RangeSpec,
-    options?: {cache?: false; offline?: false; signal?: AbortSignal | undefined}
+    options?: {cache?: false; offline?: false; signal?: AbortSignal | null | undefined}
   ): Promise<{bytes: ArrayBuffer; cachedByHash: false}>;
   close(): void;
 };

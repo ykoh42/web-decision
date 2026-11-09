@@ -4,10 +4,8 @@
   "managedJavaScript": [
     "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/h2o/loader.mjs",
-    "packages/web-decision/src/h2o/owner.mjs",
     "packages/web-decision/src/h2o/plan.mjs",
     "packages/web-decision/src/h2o/runner.mjs",
-    "packages/web-decision/src/h2o/upload.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev/system-one.mjs",
     "packages/web-decision/src/model-registry.js",

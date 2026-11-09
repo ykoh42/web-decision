@@ -138,6 +138,8 @@
     "src/h2o/tokenizer-adapter.mts",
     "src/h2o/source.mts",
     "src/h2o/source-entry.mts",
+    "src/h2o/owner.mts",
+    "src/h2o/upload.mts",
     "src/h2o/protocol.mts",
     "src/h2o/session.mts",
     "src/safedecide/*.mts",
