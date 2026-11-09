@@ -89,6 +89,7 @@
     "src/strands/session.mts",
     "src/strands/source-loader-internal.mts",
     "src/safedecide/*.mts",
+    "src/tamev/contract.mts",
     "src/tamev/loader.mts",
     "src/tamev/protocol.mts",
     "src/tamev/runner.mts",
