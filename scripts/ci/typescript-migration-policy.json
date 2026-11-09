@@ -61,7 +61,6 @@
     "packages/web-decision/src/skejja/source.mjs",
     "packages/web-decision/src/strands/choice.mjs",
     "packages/web-decision/src/strands/gemma4-e2b-loader.mjs",
-    "packages/web-decision/src/strands/gemma4-manifest.mjs",
     "packages/web-decision/src/strands/gemma4-upload.mjs",
     "packages/web-decision/src/strands/loader-core.mjs",
     "packages/web-decision/src/strands/manifest.mjs",
