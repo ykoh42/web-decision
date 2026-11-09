@@ -43,8 +43,10 @@
     "src/strands/loader.mts",
     "src/strands/fused-upload.mts",
     "src/strands/preflight.mts",
+    "src/strands/runner.mts",
     "src/strands/range-cache.mts",
     "src/strands/range-source.mts",
+    "src/strands/session.mts",
     "src/strands/source-loader-internal.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"

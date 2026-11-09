@@ -51,6 +51,7 @@ type FakeRuntime = {
   beginScope(): void;
   endScope(): void;
   cpu(): 'cpu';
+  getGlobalFunc(name: string): () => unknown;
   empty(shape: number[], dtype: 'int32' | 'float32', target: FakeDevice | 'cpu'): FakeTensor;
   dispose(): void;
 };
@@ -61,14 +62,17 @@ type DecisionRequest = {
 };
 
 type FixtureSession = {
-  decide(request: DecisionRequest, options?: {signal?: AbortSignal}): Promise<{answers: Array<{selected: string}>}>;
+  decide(
+    request: DecisionRequest,
+    options?: {signal?: AbortSignal}
+  ): Promise<{readonly answers: readonly {readonly selected: string}[]}>;
   releaseCachedMemory(): Promise<void>;
   dispose(): Promise<void>;
 };
 
 type StrandsFixture = {
   session: FixtureSession;
-  runner: {lifecycle: {loss: unknown | null}};
+  runner: {lifecycle: {loss: unknown | null} | null};
   firstReadback: Deferred;
   firstSync: Deferred;
   scopes: FixtureScope[];
@@ -124,6 +128,9 @@ function fixture({
     },
     cpu() {
       return 'cpu';
+    },
+    getGlobalFunc() {
+      return () => undefined;
     },
     empty(_shape, _dtype, target) {
       const owner = scope;
@@ -220,7 +227,7 @@ function firstScope(fixture: StrandsFixture): FixtureScope {
   return scope;
 }
 
-function firstSelectedAnswer(result: {answers: Array<{selected: string}>}): string {
+function firstSelectedAnswer(result: {readonly answers: readonly {readonly selected: string}[]}): string {
   const answer = result.answers[0];
   assert.ok(answer, 'the fixture should return an answer');
   return answer.selected;
@@ -364,7 +371,7 @@ test('device loss while readback is pending prevents this helper from closing th
   const f = fixture({fallbackFails: false});
   const first = f.session.decide(request);
   await f.firstSync.promise;
-  f.runner.lifecycle.loss = {reason: 'fixture-loss'};
+  f.runner.lifecycle!.loss = {reason: 'fixture-loss'};
   f.firstReadback.resolve();
   await assert.rejects(first, {code: 'INFERENCE_ERROR'});
   assert.equal(firstScope(f).closed, false);
