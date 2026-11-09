@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {access, readFile} from 'node:fs/promises';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import test from 'node:test';
+import type {H2oRuntime} from '../src/h2o/owner.mjs';
 import {
   ELEPHANT_LIMITS,
   ELEPHANT_MODEL,
@@ -11,13 +12,77 @@ import {
   validateElephantAdapter,
   validateElephantOptions
 } from '../src/elephant/loader.mjs';
+import {ElephantTvmRunner} from '../src/elephant/runner.mjs';
 import {SLOT_LABELS} from '../src/elephant/protocol.mjs';
 import {indexElephantFiles, openElephantSource} from '../src/elephant/source.mjs';
 import {createElephantTokenizer} from '../src/elephant/tokenizer.mjs';
+import {createElephantSession} from '../src/elephant/session.mjs';
 import {uploadParameterEntries} from '../src/parameter-upload.mjs';
 
+type FakeDependencies = Parameters<typeof loadFakeElephantCandidate>[1];
+type ElephantSource = Awaited<ReturnType<typeof openElephantSource>>;
+type TestTensor = {
+  readonly dtype: string;
+  readonly shape: number[];
+  readonly byteOffset: number;
+  copyFrom(value: unknown): unknown;
+  getDataPtr(): number;
+  toArray(): unknown;
+};
+type TestRuntime = H2oRuntime & {
+  readonly lib?: {readonly webGPUContext?: {copyRawBytesToBuffer?(): void}};
+  empty(shape: number[], dtype: string, device: unknown): TestTensor;
+  cpu(): unknown;
+};
+type TestDevice = {lost: Promise<unknown>; destroy(): void};
+type TestAdapter = {
+  features: Set<string>;
+  limits: Record<string, number>;
+  info?: {isFallbackAdapter?: boolean};
+  requestDevice(): Promise<TestDevice>;
+};
+type MutableInventory = {state: unknown; parameters: Array<Record<string, unknown>>};
+
+function requestUrl(input: RequestInfo | URL): URL {
+  if (input instanceof Request) return new URL(input.url);
+  return input instanceof URL ? input : new URL(input);
+}
+
+function deferredValue<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return {promise, resolve};
+}
+
+function createRuntime(events: string[], disposeEvent = 'dispose'): TestRuntime {
+  return {
+    lib: {webGPUContext: {copyRawBytesToBuffer() {}}},
+    dispose() {
+      events.push(disposeEvent);
+    },
+    initWebGPU() {},
+    beginScope() {},
+    endScope() {},
+    webgpu: () => ({}),
+    createVirtualMachine: () => ({getFunction: () => () => {}}),
+    empty(shape, dtype) {
+      return {
+        dtype,
+        shape,
+        byteOffset: 0,
+        copyFrom() {},
+        getDataPtr: () => 0,
+        toArray: () => new Float32Array(0)
+      };
+    },
+    cpu: () => 'cpu'
+  };
+}
+
 const root = new URL('../../../models/elephant-integration-20261030/', import.meta.url);
-const paths = {
+const paths: Record<string, string> = {
   'inventory.json': 'connected-meta-gpu-stage-20261101-v1/range-inventory.pending.json',
   'model.wasm': 'dlight-meta-gpu-stage-20261101-v1/model.patched.pending.wasm',
   'tokenizer.json': 'source/tokenizer.json',
@@ -34,12 +99,12 @@ test('the local Elephant inventory validates all 684 entries and authenticates t
     t.skip('Local Elephant model assets are not available');
     return;
   }
-  const inventoryBytes = await readFile(new URL(paths['inventory.json'], root));
+  const inventoryBytes = await readFile(new URL(paths['inventory.json']!, root));
   assert.equal(
-    createHash('sha256').update(inventoryBytes).digest('hex'),
+    createHash('sha256').update(new Uint8Array(inventoryBytes)).digest('hex'),
     'd68385516ef60ec2feafd5d7996534356ed7531de8491c45c2fd00073831366b'
   );
-  const inventory = JSON.parse(inventoryBytes);
+  const inventory = JSON.parse(inventoryBytes.toString());
   const entries = indexElephantFiles(inventory);
   const reachedCreation = new Error('all entries validated');
   await assert.rejects(
@@ -48,21 +113,24 @@ test('the local Elephant inventory validates all 684 entries and authenticates t
       createTensor() {
         throw reachedCreation;
       },
-      readRange() {},
+      async readRange() {
+        return new ArrayBuffer(0);
+      },
       writeRange() {}
     }),
     (error) => error === reachedCreation
   );
 
-  t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
-    const name = new URL(url).pathname.slice(1);
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, options: RequestInit = {}) => {
+    const name = requestUrl(input).pathname.slice(1);
     assert.ok(Object.hasOwn(paths, name), `Unexpected request: ${name}`);
-    const data = await readFile(new URL(paths[name], root));
-    if (!options.headers?.Range) return new Response(data);
-    const match = /^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);
+    const data = await readFile(new URL(paths[name]!, root));
+    const range = new Headers(options.headers).get('Range');
+    if (!range) return new Response(data);
+    const match = /^bytes=(\d+)-(\d+)$/.exec(range);
     assert.ok(match);
-    const start = Number(match[1]);
-    const end = Number(match[2]);
+    const start = Number(match[1]!);
+    const end = Number(match[2]!);
     return new Response(data.subarray(start, end + 1), {
       status: 206,
       headers: {'Content-Range': `bytes ${start}-${end}/${data.length}`}
@@ -71,14 +139,14 @@ test('the local Elephant inventory validates all 684 entries and authenticates t
   const source = await openElephantSource(new URL('https://assets.example/'));
   assert.equal(source.entries.length, 684);
   for (const index of [0, 683]) {
-    const entry = source.entries[index];
-    const part = entry.ranges[0];
+    const entry = source.entries[index]!;
+    const part = entry.ranges[0]!;
     const bytes = await source.readRange(entry, 0, part);
     assert.equal(bytes.byteLength, part.bytes);
     assert.equal(createHash('sha256').update(new Uint8Array(bytes)).digest('hex'), part.sha256);
   }
-  const entry = source.entries[0];
-  await assert.rejects(source.readRange(entry, 0, {...entry.ranges[0]}), {code: 'INVALID_ASSET'});
+  const entry = source.entries[0]!;
+  await assert.rejects(source.readRange(entry, 0, {...entry.ranges[0]!}), {code: 'INVALID_ASSET'});
 });
 
 test('a corrupted last parameter is rejected before it is uploaded', async () => {
@@ -98,7 +166,7 @@ test('a corrupted last parameter is rejected before it is uploaded', async () =>
       ranges: [{offset: 0, bytes: 4, sha256}]
     }))
   };
-  const written = [];
+  const written: number[] = [];
   await assert.rejects(
     uploadParameterEntries(indexElephantFiles(inventory), {
       expectedCount: 684,
@@ -113,64 +181,89 @@ test('a corrupted last parameter is rejected before it is uploaded', async () =>
 });
 
 function loadFixture() {
-  const events = [];
-  const device = {lost: new Promise(() => {}), destroy: () => events.push('destroy')};
-  const adapter = {
+  const events: string[] = [];
+  const device: TestDevice = {lost: new Promise(() => {}), destroy: () => events.push('destroy')};
+  const adapter: TestAdapter = {
     features: new Set(['shader-f16']),
     limits: {...ELEPHANT_LIMITS},
     requestDevice: async () => device
   };
-  const owner = {
-    lifecycle: {loss: null, disposed: false},
-    uncaptured: [],
-    disposalGuard: {blocked: false, retain: () => events.push('retain')}
+  const source: ElephantSource = {
+    wasm: new Uint8Array(),
+    tokenizer: {},
+    tokenizerConfig: {},
+    entries: [],
+    async readRange() {
+      return new ArrayBuffer(0);
+    }
+  };
+  const deps: FakeDependencies = {
+    fake: true,
+    gpu: {requestAdapter: async () => adapter},
+    openSource: async () => source,
+    prepareTokenizer: async () => ({
+      tokenizer: {
+        encode: (_text: string, _options: {readonly add_special_tokens: false}) => ({ids: []}),
+        decode: (_ids: number[], _options: {readonly skip_special_tokens: false}) => ''
+      },
+      addedTokens: []
+    }),
+    instantiate: async () => createRuntime(events),
+    initialize: (runtime, gpu) => ({
+      runtime,
+      gpu,
+      device: {},
+      fn: () => undefined,
+      lifecycle: {loss: null, disposed: false},
+      disposalGuard: {blocked: false, retain: () => events.push('retain')},
+      uncaptured: [],
+      teardownObserver: {beforeDispose() {}, afterDispose() {}},
+      teardownTimeoutMs: 100
+    }),
+    upload: async () => [],
+    runner: () => ({}) as unknown as InstanceType<typeof ElephantTvmRunner>,
+    session: () => ({}) as ReturnType<typeof createElephantSession>
   };
   return {
     events,
     device,
     adapter,
     options: {model: ELEPHANT_MODEL, assetsUrl: 'https://assets.example/'},
-    deps: {
-      fake: true,
-      gpu: {requestAdapter: async () => adapter},
-      openSource: async () => ({wasm: new Uint8Array(), tokenizer: {}, tokenizerConfig: {}}),
-      prepareTokenizer: () => ({}),
-      instantiate: async () => ({dispose: () => events.push('dispose')}),
-      initialize: () => owner,
-      upload: async () => [],
-      runner: () => ({}),
-      session: () => ({})
-    }
+    deps
   };
 }
 
 test('a device returned after load cancellation is destroyed', async () => {
   const f = loadFixture();
   const controller = new AbortController();
-  let resolveDevice;
-  f.adapter.requestDevice = () => new Promise((resolve) => (resolveDevice = resolve));
+  let requested = false;
+  const deviceRequest = deferredValue<TestDevice>();
+  f.adapter.requestDevice = () => {
+    requested = true;
+    return deviceRequest.promise;
+  };
   const pending = loadFakeElephantCandidate({...f.options, signal: controller.signal}, f.deps);
-  while (!resolveDevice) await nextTurn();
+  while (!requested) await nextTurn();
   controller.abort();
   await assert.rejects(pending, {name: 'AbortError'});
-  resolveDevice(f.device);
+  deviceRequest.resolve(f.device);
   await nextTurn();
   assert.deepEqual(f.events, ['destroy']);
 });
 
 test('device loss during upload retains the initialized runtime', async () => {
   const f = loadFixture();
-  let lose, entered;
-  f.device.lost = new Promise((resolve) => (lose = resolve));
-  const started = new Promise((resolve) => (entered = resolve));
+  const loss = deferredValue<unknown>();
+  const started = deferredValue<void>();
+  f.device.lost = loss.promise;
   f.deps.upload = async (_owner, _source, signal) =>
-    new Promise((_resolve, reject) => {
+    new Promise<unknown[]>((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), {once: true});
-      entered();
+      started.resolve();
     });
   const pending = loadFakeElephantCandidate(f.options, f.deps);
-  await started;
-  lose({reason: 'unknown'});
+  await started.promise;
+  loss.resolve({reason: 'unknown'});
   await assert.rejects(pending, {code: 'MODEL_LOAD_FAILED'});
   assert.deepEqual(f.events, ['retain']);
 });
@@ -206,20 +299,29 @@ test('invalid load options are rejected without evaluating user getters', () => 
   assert.equal(accessed, false);
   assert.equal(validateElephantOptions(options).base.href, 'https://assets.example/');
   assert.throws(() => loadElephantCandidate(options), /runtime bindings/);
-  assert.throws(() => loadFakeElephantCandidate(options, {}), /Fake dependencies/);
+  assert.throws(() => loadFakeElephantCandidate(options, {} as unknown as FakeDependencies), /Fake dependencies/);
 });
 
 test('unsupported adapters fail before loading model assets', async () => {
   for (const change of ['missing', 'f16', 'fallback', 'limits']) {
     const f = loadFixture();
     let opened = false;
-    f.deps.openSource = () => {
+    f.deps.openSource = async () => {
       opened = true;
+      return {
+        wasm: new Uint8Array(),
+        tokenizer: {},
+        tokenizerConfig: {},
+        entries: [],
+        async readRange() {
+          return new ArrayBuffer(0);
+        }
+      };
     };
     if (change === 'missing') f.deps.gpu = null;
     if (change === 'f16') f.adapter.features.clear();
     if (change === 'fallback') f.adapter.info = {isFallbackAdapter: true};
-    if (change === 'limits') f.adapter.limits.maxStorageBufferBindingSize--;
+    if (change === 'limits') f.adapter.limits.maxStorageBufferBindingSize!--;
     await assert.rejects(loadFakeElephantCandidate(f.options, f.deps), {code: 'UNSUPPORTED_ENVIRONMENT'});
     assert.equal(opened, false);
   }
@@ -227,7 +329,7 @@ test('unsupported adapters fail before loading model assets', async () => {
 });
 
 test('malformed inventory metadata cannot bind parameters to the graph', () => {
-  const makeInventory = () => ({
+  const makeInventory = (): MutableInventory => ({
     state: 'local-ranges-pending-review',
     parameters: Array.from({length: 684}, (_, index) => ({
       position: index + 5,
@@ -242,16 +344,16 @@ test('malformed inventory metadata cannot bind parameters to the graph', () => {
     }))
   });
   for (const mutate of [
-    (value) => (value.state = 'unverified'),
-    (value) => value.parameters.pop(),
-    (value) => (value.parameters[1].position = 5),
-    (value) => (value.parameters[1].target = value.parameters[0].target),
-    (value) => (value.parameters[1].kind = 'rotary'),
-    (value) => (value.parameters[1].path = '../weight'),
-    (value) => (value.parameters[1].fileOffset = 4),
-    (value) => (value.parameters[1].shape = [0]),
-    (value) => (value.parameters[1].bytes = -1),
-    (value) => (value.parameters[1].ranges = null)
+    (value: MutableInventory) => (value.state = 'unverified'),
+    (value: MutableInventory) => value.parameters.pop(),
+    (value: MutableInventory) => (value.parameters[1]!.position = 5),
+    (value: MutableInventory) => (value.parameters[1]!.target = value.parameters[0]!.target),
+    (value: MutableInventory) => (value.parameters[1]!.kind = 'rotary'),
+    (value: MutableInventory) => (value.parameters[1]!.path = '../weight'),
+    (value: MutableInventory) => (value.parameters[1]!.fileOffset = 4),
+    (value: MutableInventory) => (value.parameters[1]!.shape = [0]),
+    (value: MutableInventory) => (value.parameters[1]!.bytes = -1),
+    (value: MutableInventory) => (value.parameters[1]!.ranges = null)
   ]) {
     const inventory = makeInventory();
     mutate(inventory);
@@ -263,14 +365,14 @@ test('the tokenizer rejects invalid metadata and incompatible answer slots', asy
   const data = {normalizer: {type: 'NFC'}, added_tokens: [{content: '<reserved>'}]};
   const config = {tokenizer_class: 'Qwen3_5Tokenizer'};
   class SyntheticTokenizer {
-    encode(label) {
+    encode(label: string) {
       return {ids: [SLOT_LABELS.indexOf(label)]};
     }
-    decode(ids) {
-      return SLOT_LABELS[ids[0]];
+    decode(ids: number[]) {
+      return SLOT_LABELS[ids[0]!]!;
     }
   }
-  for (const [Tokenizer, tokens, settings] of [
+  const invalidCases: Array<[unknown, unknown, unknown]> = [
     [null, data, config],
     [SyntheticTokenizer, data, {tokenizer_class: 'other'}],
     [SyntheticTokenizer, {...data, normalizer: {type: 'NFD'}}, config],
@@ -286,7 +388,8 @@ test('the tokenizer rejects invalid metadata and incompatible answer slots', asy
       config
     ],
     [SyntheticTokenizer, data, config]
-  ]) {
+  ];
+  for (const [Tokenizer, tokens, settings] of invalidCases) {
     await assert.rejects(createElephantTokenizer(Tokenizer, tokens, settings), {code: 'INVALID_ASSET'});
   }
 });
@@ -315,8 +418,8 @@ test('source rejects HTTP errors, truncated metadata and an exact-size corrupt i
   await assert.rejects(openElephantSource(base), {code: 'ASSET_LOAD_FAILED'});
   fetchMock.mock.mockImplementation(async () => new Response(new Uint8Array(2)));
   await assert.rejects(openElephantSource(base), {code: 'ASSET_LOAD_FAILED'});
-  fetchMock.mock.mockImplementation((url) =>
-    new URL(url).pathname === '/inventory.json'
+  fetchMock.mock.mockImplementation((input: RequestInfo | URL) =>
+    requestUrl(input).pathname === '/inventory.json'
       ? Promise.resolve(new Response(new Uint8Array(431398)))
       : new Promise(() => {})
   );
@@ -341,8 +444,8 @@ test('successful loader transfers ordered weights into a session after the pre-d
     return f.device;
   };
   f.deps.upload = async () => ['first', 'last'];
-  f.deps.runner = (owner) => owner.weights;
-  f.deps.session = ({runner}) => runner;
+  f.deps.runner = (args) => args.weights as unknown as InstanceType<typeof ElephantTvmRunner>;
+  f.deps.session = ({runner}) => runner as ReturnType<typeof createElephantSession>;
   assert.deepEqual(await loadFakeElephantCandidate(f.options, f.deps), ['first', 'last']);
   assert.deepEqual(events, ['guard', 'device']);
 });
@@ -363,15 +466,20 @@ test('pre-device failure stops loading before requesting a device', async () => 
 
 test('device loss while instantiation is pending disposes a late runtime', async () => {
   const f = loadFixture();
-  let lose, resolveRuntime;
-  f.device.lost = new Promise((resolve) => (lose = resolve));
-  f.deps.instantiate = () => new Promise((resolve) => (resolveRuntime = resolve));
+  const loss = deferredValue<unknown>();
+  const lateRuntime = deferredValue<TestRuntime>();
+  let instantiateStarted = false;
+  f.device.lost = loss.promise;
+  f.deps.instantiate = () => {
+    instantiateStarted = true;
+    return lateRuntime.promise;
+  };
   const pending = loadFakeElephantCandidate(f.options, f.deps);
-  while (!resolveRuntime) await nextTurn();
-  lose({reason: 'unknown'});
+  while (!instantiateStarted) await nextTurn();
+  loss.resolve({reason: 'unknown'});
   await assert.rejects(pending, {code: 'MODEL_LOAD_FAILED'});
   assert.deepEqual(f.events, ['destroy']);
-  resolveRuntime({dispose: () => f.events.push('late-dispose')});
+  lateRuntime.resolve(createRuntime(f.events, 'late-dispose'));
   await nextTurn();
   assert.deepEqual(f.events, ['destroy', 'late-dispose']);
 });

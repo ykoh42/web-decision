@@ -5,8 +5,6 @@
     "packages/web-decision/test/crivo.test.mjs",
     "packages/web-decision/test/d1-omni.test.mjs",
     "packages/web-decision/test/decima.test.mjs",
-    "packages/web-decision/test/elephant-cancellation.test.mjs",
-    "packages/web-decision/test/elephant-loader-review.test.mjs",
     "packages/web-decision/test/ettin.test.mjs",
     "packages/web-decision/test/h2o-adapter.test.mjs",
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",

@@ -2,20 +2,40 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ElephantTvmRunner} from '../src/elephant/runner.mjs';
 import {createElephantSession} from '../src/elephant/session.mjs';
+import type {ElephantPackedRequest} from '../src/elephant/protocol.mjs';
+
+type ElephantRunnerArgs = ConstructorParameters<typeof ElephantTvmRunner>[0];
+type ElephantTensor = ReturnType<ElephantRunnerArgs['runtime']['empty']>;
 
 function deferred() {
-  let resolve;
-  const promise = new Promise((done) => {
-    resolve = done;
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = () => done();
   });
   return {promise, resolve};
 }
 
+function graphTensor(dtype: string, shape: number[]): ElephantTensor {
+  return {
+    dtype,
+    shape,
+    byteOffset: 0,
+    copyFrom() {
+      return this;
+    },
+    getDataPtr: () => 0,
+    toArray: () => new Float32Array(256)
+  };
+}
+
 test('aborting an in-flight branch drains its readback and skips remaining branches before disposal', async () => {
-  const events = [],
+  const events: string[] = [],
     started = deferred(),
     readback = deferred();
-  const context = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+  const context: {pendingGPUToCPUCopy: Promise<void> | null; copyRawBytesToBuffer(): void} = {
+    pendingGPUToCPUCopy: null,
+    copyRawBytesToBuffer() {}
+  };
   const device = {
     async sync() {
       events.push('sync');
@@ -37,7 +57,7 @@ test('aborting an in-flight branch drains its readback and skips remaining branc
     dispose() {
       events.push('dispose');
     },
-    empty(shape, dtype, where) {
+    empty(shape: number[], dtype: string, where: unknown) {
       return {
         shape,
         dtype,
@@ -50,6 +70,10 @@ test('aborting an in-flight branch drains its readback and skips remaining branc
         toArray: () => new Float32Array(256)
       };
     }
+  } satisfies ElephantRunnerArgs['runtime'] & {
+    beginScope(): void;
+    endScope(): void;
+    dispose(): void;
   };
   const runner = new ElephantTvmRunner({
     runtime,
@@ -62,7 +86,7 @@ test('aborting an in-flight branch drains its readback and skips remaining branc
     },
     fn() {
       events.push('graph');
-      return {dtype: 'float32', shape: [1, 256]};
+      return graphTensor('float32', [1, 256]);
     },
     weights: Array.from({length: 684}, () => ({})),
     lifecycle: {},
@@ -72,7 +96,7 @@ test('aborting an in-flight branch drains its readback and skips remaining branc
     teardownTimeoutMs: 100
   });
   const tokenizer = {
-    encode: (text) => ({
+    encode: (text: string) => ({
       ids: [...text].filter((char) => char === '<' || char === 'Q').map((char) => char.charCodeAt(0))
     })
   };
@@ -101,14 +125,18 @@ test('aborting an in-flight branch drains its readback and skips remaining branc
 });
 
 const simpleTokenizer = {
-  encode: (text) => ({ids: [...text].filter((char) => char === '<' || char === 'Q').map((char) => char.charCodeAt(0))})
+  encode: (text: string) => ({
+    ids: [...text].filter((char) => char === '<' || char === 'Q').map((char) => char.charCodeAt(0))
+  })
 };
-const characterTokenizer = {encode: (text) => ({ids: Array.from(text, (character) => character.codePointAt(0))})};
+const characterTokenizer = {
+  encode: (text: string) => ({ids: Array.from(text, (character) => character.codePointAt(0)!)})
+};
 const input = () => ({state: 'state', questions: [{instructions: 'choose', options: ['a', 'b']}]});
 
 test('invalid score rows surface as inference errors and do not poison the session queue', async () => {
-  const outputs = [null, [], [[1]], [[NaN, 0]], [[0, 2]]];
-  const events = [];
+  const outputs: unknown[] = [null, [], [[1]], [[NaN, 0]], [[0, 2]]];
+  const events: string[] = [];
   const session = createElephantSession({
     tokenizer: simpleTokenizer,
     addedTokens: ['<reserved>'],
@@ -127,7 +155,7 @@ test('invalid score rows surface as inference errors and do not poison the sessi
   });
   for (let i = 0; i < 4; i++) await assert.rejects(session.decide(input()), {code: 'INFERENCE_ERROR'});
   const result = await session.decide(input());
-  assert.equal(result.answers[0].selected, 'b');
+  assert.equal(result.answers[0]!.selected, 'b');
   await session.releaseCachedMemory();
   await session.dispose();
   await assert.rejects(session.decide(input()), {code: 'SESSION_CLOSED'});
@@ -146,18 +174,24 @@ test('unsafe token boundaries and invalid requests fail before the runner is cal
     async dispose() {}
   };
   const broken = createElephantSession({
-    tokenizer: {encode: (text) => ({ids: [text.length]})},
+    tokenizer: {encode: (text: string) => ({ids: [text.length]})},
     addedTokens: [],
     runner
   });
   await assert.rejects(
     broken.decide(input()),
-    (error) => error.code === 'INVALID_INPUT' && /Unsafe token boundary/.test(error.cause.message)
+    (error) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'INVALID_INPUT' &&
+      'cause' in error &&
+      /Unsafe token boundary/.test(String(error.cause))
   );
   await broken.dispose();
   const session = createElephantSession({tokenizer: simpleTokenizer, addedTokens: ['<reserved>'], runner});
   await assert.rejects(session.decide({...input(), state: '<reserved>'}), {code: 'INVALID_INPUT'});
-  await assert.rejects(session.decide(input(), {temperature: 1}), {code: 'INVALID_INPUT'});
+  const unsupportedOptions = {temperature: 1} as unknown as Parameters<typeof session.decide>[1];
+  await assert.rejects(session.decide(input(), unsupportedOptions), {code: 'INVALID_INPUT'});
   assert.equal(calls, 0);
   await session.dispose();
 });
@@ -175,9 +209,9 @@ test('the 255-option cap rejects before snapshotting an oversized array or token
     },
     addedTokens: [],
     runner: {
-      async run(packed) {
+      async run(packed: ElephantPackedRequest) {
         runnerCalls++;
-        return packed.branches.map((branch) => new Array(branch.options.length).fill(0));
+        return packed.branches.map((branch) => Array.from({length: branch.options.length}, () => 0));
       },
       async releaseCachedMemory() {},
       async dispose() {}
@@ -185,8 +219,8 @@ test('the 255-option cap rejects before snapshotting an oversized array or token
   });
   const options = Array.from({length: 255}, (_, index) => `option ${index}`);
   const accepted = await session.decide({state: '', questions: [{instructions: 'Pick', options}]});
-  assert.equal(accepted.answers[0].probabilities.length, 255);
-  assert.equal(accepted.answers[0].selected, options[0]);
+  assert.equal(accepted.answers[0]!.probabilities.length, 255);
+  assert.equal(accepted.answers[0]!.selected, options[0]);
 
   const tokenizersBeforeReject = tokenizerCalls;
   const runsBeforeReject = runnerCalls;
@@ -208,14 +242,14 @@ test('the 255-option cap rejects before snapshotting an oversized array or token
 
 test('accepts more than 16,384 aggregate tokens when every branch fits its graph limit', async () => {
   let runnerCalls = 0,
-    requestTokens;
+    requestTokens: number | undefined;
   const questions = Array.from({length: 160}, () => ({instructions: 'Choose', options: ['a', 'b']}));
   const session = createElephantSession({
     tokenizer: characterTokenizer,
     addedTokens: [],
     maxBranchTokens: 512,
     runner: {
-      async run(packed) {
+      async run(packed: ElephantPackedRequest) {
         runnerCalls++;
         requestTokens = packed.tokenCount;
         assert.ok(packed.branches.every((branch) => branch.ids.length <= 512));
@@ -226,7 +260,7 @@ test('accepts more than 16,384 aggregate tokens when every branch fits its graph
     }
   });
   const result = await session.decide({state: 's'.repeat(32), questions});
-  assert.ok(requestTokens > 16_384);
+  assert.ok((requestTokens ?? 0) > 16_384);
   assert.equal(result.answers.length, 160);
   assert.equal(runnerCalls, 1);
   await session.dispose();
@@ -234,13 +268,13 @@ test('accepts more than 16,384 aggregate tokens when every branch fits its graph
 
 test('accepts more than 16,384 small questions without a request-wide count cap', async () => {
   let runnerCalls = 0,
-    requestTokens;
+    requestTokens: number | undefined;
   const questions = Array.from({length: 16_385}, () => ({instructions: 'Pick', options: ['a', 'b']}));
   const session = createElephantSession({
     tokenizer: simpleTokenizer,
     addedTokens: [],
     runner: {
-      async run(packed) {
+      async run(packed: ElephantPackedRequest) {
         runnerCalls++;
         requestTokens = packed.tokenCount;
         assert.equal(packed.branches.length, 16_385);
@@ -252,7 +286,7 @@ test('accepts more than 16,384 small questions without a request-wide count cap'
     }
   });
   const result = await session.decide({state: '', questions});
-  assert.ok(requestTokens > 16_384);
+  assert.ok((requestTokens ?? 0) > 16_384);
   assert.equal(result.answers.length, 16_385);
   assert.equal(runnerCalls, 1);
   await session.dispose();
@@ -261,7 +295,7 @@ test('accepts more than 16,384 small questions without a request-wide count cap'
 test('a cancelled queued decision never runs and prior work completes before disposal', async () => {
   const gate = deferred(),
     started = deferred(),
-    events = [];
+    events: string[] = [];
   const session = createElephantSession({
     tokenizer: simpleTokenizer,
     addedTokens: [],
@@ -290,7 +324,7 @@ test('a cancelled queued decision never runs and prior work completes before dis
   const disposal = session.dispose();
   assert.deepEqual(events, ['run']);
   gate.resolve();
-  assert.equal((await first).answers[0].selected, 'a');
+  assert.equal((await first).answers[0]!.selected, 'a');
   await release;
   await disposal;
   assert.deepEqual(events, ['run', 'release', 'dispose']);
@@ -299,7 +333,10 @@ test('a cancelled queued decision never runs and prior work completes before dis
 test('invalid graph inputs, output shapes, and readbacks fail as inference errors', async () => {
   for (const mode of ['input', 'shape', 'dtype', 'nan', 'length']) {
     let calls = 0;
-    const context = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+    const context: {pendingGPUToCPUCopy: Promise<void> | null; copyRawBytesToBuffer(): void} = {
+      pendingGPUToCPUCopy: null,
+      copyRawBytesToBuffer() {}
+    };
     const device = {
       async sync() {
         const pending = context.pendingGPUToCPUCopy;
@@ -313,7 +350,7 @@ test('invalid graph inputs, output shapes, and readbacks fail as inference error
       beginScope() {},
       endScope() {},
       dispose() {},
-      empty(shape, dtype, where) {
+      empty(shape: number[], dtype: string, where: unknown) {
         return {
           shape,
           dtype,
@@ -330,6 +367,10 @@ test('invalid graph inputs, output shapes, and readbacks fail as inference error
           }
         };
       }
+    } satisfies ElephantRunnerArgs['runtime'] & {
+      beginScope(): void;
+      endScope(): void;
+      dispose(): void;
     };
     const runner = new ElephantTvmRunner({
       runtime,
@@ -342,7 +383,7 @@ test('invalid graph inputs, output shapes, and readbacks fail as inference error
       },
       fn() {
         calls++;
-        return {dtype: mode === 'dtype' ? 'float16' : 'float32', shape: mode === 'shape' ? [1, 255] : [1, 256]};
+        return graphTensor(mode === 'dtype' ? 'float16' : 'float32', mode === 'shape' ? [1, 255] : [1, 256]);
       },
       weights: Array.from({length: 684}, () => ({})),
       lifecycle: {},
@@ -353,7 +394,11 @@ test('invalid graph inputs, output shapes, and readbacks fail as inference error
     });
     const ids = mode === 'input' ? [1, 2, -1, 4] : [1, 2, 3, 4];
     await assert.rejects(
-      runner.run({prefixIds: [1], branches: [{ids, options: ['a', 'b']}]}),
+      runner.run({
+        prefixIds: [1],
+        branches: [{ids, options: ['a', 'b'], suffix: '', prompt: '', suffixIds: []}],
+        tokenCount: ids.length + 1
+      }),
       {code: 'INFERENCE_ERROR'},
       mode
     );
