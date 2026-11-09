@@ -15,15 +15,17 @@ export interface ElephantRequest {
   readonly questions: ElephantQuestion[];
 }
 
+export interface ElephantPackedBranch {
+  readonly options: string[];
+  readonly suffix: string;
+  readonly prompt: string;
+  readonly ids: number[];
+  readonly suffixIds: number[];
+}
+
 export interface ElephantPackedRequest {
   readonly prefixIds: number[];
-  readonly branches: Array<{
-    readonly options: string[];
-    readonly suffix: string;
-    readonly prompt: string;
-    readonly ids: number[];
-    readonly suffixIds: number[];
-  }>;
+  readonly branches: ElephantPackedBranch[];
   readonly tokenCount: number;
 }
 
