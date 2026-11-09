@@ -15,13 +15,12 @@ function attended(value: unknown): boolean {
   throw new TypeError('attentionMask values must be boolean or 0/1.');
 }
 
-/** Pool each row at the pinned last-attended token and return L2-normalized FP32 vectors. */
-export function poolKananaHiddenStates(
+function validatePoolInputs(
   hiddenStates: ArrayLike<number>,
   attentionMask: ArrayLike<unknown>,
   shape: HiddenStateShape,
   embeddingDimension: number
-): PooledVectors {
+): {batchSize: number; sequenceLength: number; hiddenDimension: number} {
   if (!Array.isArray(shape) || shape.length !== 3 || !shape.every(isPositiveDimension))
     throw new RangeError('hidden-state shape must contain positive batch, sequence, and hidden dimensions.');
   const [batchSize, sequenceLength, hiddenDimension] = shape;
@@ -33,7 +32,10 @@ export function poolKananaHiddenStates(
     throw new RangeError('hidden-state data length does not match its shape.');
   if (!Number.isSafeInteger(maskLength) || attentionMask.length !== maskLength)
     throw new RangeError('attentionMask length does not match the batch and sequence dimensions.');
+  return {batchSize, sequenceLength, hiddenDimension};
+}
 
+function lastAttendedPositions(attentionMask: ArrayLike<unknown>, batchSize: number, sequenceLength: number) {
   const finalPositions = new Int32Array(batchSize);
   for (let batch = 0; batch < batchSize; batch++) {
     const maskOffset = batch * sequenceLength;
@@ -44,27 +46,50 @@ export function poolKananaHiddenStates(
     if (finalPosition === -1) throw new RangeError('every prompt must contain an attended token.');
     finalPositions[batch] = finalPosition;
   }
+  return finalPositions;
+}
 
-  const vectors = new Float32Array(batchSize * embeddingDimension);
-  const epsilon = Math.fround(1e-12);
+function writeNormalizedVector(
+  hiddenStates: ArrayLike<number>,
+  hiddenOffset: number,
+  dimension: number,
+  output: Float32Array,
+  outputOffset: number
+): void {
+  let normSquared = 0;
+  for (let index = 0; index < dimension; index++) {
+    const value = Math.fround(hiddenStates[hiddenOffset + index]!);
+    normSquared = Math.fround(normSquared + Math.fround(value * value));
+  }
+  const norm = Math.fround(Math.sqrt(normSquared));
+  const denominator = Math.max(norm, Math.fround(1e-12));
+  for (let index = 0; index < dimension; index++) {
+    const value = Math.fround(hiddenStates[hiddenOffset + index]!);
+    output[outputOffset + index] = Math.fround(value / denominator);
+  }
+}
+
+/** Pool each row at the pinned last-attended token and return L2-normalized FP32 vectors. */
+export function poolKananaHiddenStates(
+  hiddenStates: ArrayLike<number>,
+  attentionMask: ArrayLike<unknown>,
+  shape: HiddenStateShape,
+  embeddingDimension: number
+): PooledVectors {
+  const {batchSize, sequenceLength, hiddenDimension} = validatePoolInputs(
+    hiddenStates,
+    attentionMask,
+    shape,
+    embeddingDimension
+  );
+  const finalPositions = lastAttendedPositions(attentionMask, batchSize, sequenceLength);
+  const values = new Float32Array(batchSize * embeddingDimension);
   for (let batch = 0; batch < batchSize; batch++) {
-    const position = finalPositions[batch]!;
-    const hiddenOffset = (batch * sequenceLength + position) * hiddenDimension;
-    let normSquared = 0;
-    for (let dimension = 0; dimension < embeddingDimension; dimension++) {
-      const value = Math.fround(hiddenStates[hiddenOffset + dimension]!);
-      normSquared = Math.fround(normSquared + Math.fround(value * value));
-    }
-    const norm = Math.fround(Math.sqrt(normSquared));
-    const denominator = Math.max(norm, epsilon);
-    const outputOffset = batch * embeddingDimension;
-    for (let dimension = 0; dimension < embeddingDimension; dimension++) {
-      const value = Math.fround(hiddenStates[hiddenOffset + dimension]!);
-      vectors[outputOffset + dimension] = Math.fround(value / denominator);
-    }
+    const hiddenOffset = (batch * sequenceLength + finalPositions[batch]!) * hiddenDimension;
+    writeNormalizedVector(hiddenStates, hiddenOffset, embeddingDimension, values, batch * embeddingDimension);
   }
 
-  return {values: vectors, shape: [batchSize, embeddingDimension]};
+  return {values, shape: [batchSize, embeddingDimension]};
 }
 
 function isNumberArray(values: unknown): values is ArrayLike<unknown> & Iterable<unknown> {
