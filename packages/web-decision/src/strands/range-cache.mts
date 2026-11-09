@@ -1,11 +1,63 @@
 import {assetUrl, commitCachedManifest, waitForAbort} from '../assets.js';
+import type {AssetCache} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
-import {readVerifiedRange} from './range-reader.mjs';
+import {readVerifiedRange as readVerifiedRangeRuntime} from './range-reader.mjs';
 
 const MAX_RANGE = 8 * 1024 * 1024;
-const invalid = (message) => new WebDecisionError('INVALID_ASSET', message);
+const invalid = (message: string) => new WebDecisionError('INVALID_ASSET', message);
 
-function keyOf(spec) {
+export interface RangeCacheSpec {
+  readonly path: string;
+  readonly totalBytes: number;
+  readonly offset: number;
+  readonly length: number;
+  readonly sha256: string;
+}
+
+export interface RangeCacheReadOptions {
+  readonly signal?: AbortSignal | null | undefined;
+}
+
+export interface RangeCacheReadResult {
+  readonly bytes: ArrayBuffer;
+  readonly cachedByHash: boolean;
+}
+
+interface RangeTransactionOptions {
+  readonly base: URL;
+  readonly cache?: AssetCache | null | undefined;
+  readonly offline?: boolean | undefined;
+  readonly signal?: AbortSignal | null | undefined;
+  readonly markerId: string;
+}
+
+interface CancellableBody {
+  cancel(): unknown;
+}
+
+interface CombinedSignals {
+  readonly signal: AbortSignal | null | undefined;
+  close(): void;
+}
+
+interface OfflineMarker {
+  readonly format?: unknown;
+  readonly markerId?: unknown;
+}
+
+interface ReadVerifiedRangeOptions {
+  readonly cache: AssetCache | null | undefined;
+  readonly offline: boolean;
+  readonly signal: AbortSignal | null | undefined;
+}
+
+const readVerifiedRange: (
+  base: URL,
+  spec: RangeCacheSpec,
+  options: ReadVerifiedRangeOptions
+) => Promise<RangeCacheReadResult> = readVerifiedRangeRuntime;
+
+function keyOf(spec: RangeCacheSpec): string {
   if (
     !spec ||
     typeof spec.path !== 'string' ||
@@ -24,13 +76,16 @@ function keyOf(spec) {
   return JSON.stringify([spec.path, spec.totalBytes, spec.offset, spec.length, spec.sha256]);
 }
 
-function cancelBody(body) {
+function cancelBody(body: CancellableBody | null | undefined): void {
   try {
     Promise.resolve(body?.cancel()).catch(() => {});
   } catch {}
 }
 
-function combineSignals(first, second) {
+function combineSignals(
+  first: AbortSignal | null | undefined,
+  second: AbortSignal | null | undefined
+): CombinedSignals {
   if (!first || !second || first === second) return {signal: first || second, close() {}};
   const controller = new AbortController();
   const abortFirst = () => controller.abort(first.reason),
@@ -48,14 +103,14 @@ function combineSignals(first, second) {
   };
 }
 
-async function readMarker(response, signal) {
+async function readMarker(response: Response, signal: AbortSignal | null | undefined): Promise<unknown> {
   if (signal?.aborted) {
     cancelBody(response?.body);
     signal.throwIfAborted();
   }
   const reader = response.body?.getReader();
   if (!reader) throw invalid('Offline completion marker has no body.');
-  const chunks = [];
+  const chunks: Uint8Array[] = [];
   let size = 0;
   try {
     for (;;) {
@@ -71,7 +126,7 @@ async function readMarker(response, signal) {
       bytes.set(chunk, offset);
       offset += chunk.length;
     }
-    return JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
+    return JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes)) as unknown;
   } finally {
     cancelBody(reader);
   }
@@ -79,18 +134,18 @@ async function readMarker(response, signal) {
 
 /** Track the exact expected ranges before publishing an offline-complete marker. */
 export class RangeCacheTransaction {
-  #base;
-  #cache;
-  #offline;
-  #signal;
-  #marker;
-  #markerUrl;
-  #required = new Set();
-  #cached = new Set();
+  #base: URL;
+  #cache: AssetCache | null | undefined;
+  #offline: boolean;
+  #signal: AbortSignal | null | undefined;
+  #marker: Readonly<{format: 1; markerId: string}>;
+  #markerUrl: string;
+  #required = new Set<string>();
+  #cached = new Set<string>();
   #sealed = false;
   #ready = false;
 
-  constructor({base, cache, offline = false, signal, markerId}) {
+  constructor({base, cache, offline = false, signal, markerId}: RangeTransactionOptions) {
     if (!(base instanceof URL) || typeof markerId !== 'string' || !markerId || typeof offline !== 'boolean')
       throw invalid('Invalid range cache transaction options.');
     if (offline && !cache) throw new WebDecisionError('ASSET_LOAD_FAILED', 'Offline range cache is unavailable.');
@@ -102,14 +157,14 @@ export class RangeCacheTransaction {
     this.#markerUrl = assetUrl(base, 'strands-offline-complete-v1.json');
   }
 
-  async open() {
+  async open(): Promise<void> {
     this.#signal?.throwIfAborted();
     if (this.#ready) return;
     if (this.#offline) {
-      let marker;
+      let marker: OfflineMarker | null | undefined;
       try {
         const response = await waitForAbort(
-          () => this.#cache.match(this.#markerUrl),
+          () => this.#cache!.match(this.#markerUrl),
           this.#signal,
           (value) => cancelBody(value?.body)
         );
@@ -117,7 +172,7 @@ export class RangeCacheTransaction {
           cancelBody(response?.body);
           this.#signal.throwIfAborted();
         }
-        if (response) marker = await readMarker(response, this.#signal);
+        if (response) marker = (await readMarker(response, this.#signal)) as OfflineMarker;
       } catch (cause) {
         this.#signal?.throwIfAborted();
         throw new WebDecisionError('ASSET_LOAD_FAILED', 'Could not read the offline completion marker.', {cause});
@@ -134,7 +189,7 @@ export class RangeCacheTransaction {
     this.#ready = true;
   }
 
-  require(specs) {
+  require(specs: readonly RangeCacheSpec[]): void {
     if (this.#sealed) throw invalid('Range requirements are already sealed.');
     for (const spec of specs) {
       assetUrl(this.#base, spec.path);
@@ -142,12 +197,12 @@ export class RangeCacheTransaction {
     }
   }
 
-  seal() {
+  seal(): void {
     if (!this.#ready || !this.#required.size) throw invalid('Cannot seal an empty or unopened range transaction.');
     this.#sealed = true;
   }
 
-  async read(base, spec, {signal} = {}) {
+  async read(base: URL, spec: RangeCacheSpec, {signal}: RangeCacheReadOptions = {}): Promise<RangeCacheReadResult> {
     if (!this.#ready || base.href !== this.#base.href) throw invalid('Unexpected range transaction base.');
     const key = keyOf(spec);
     if (!this.#required.has(key)) throw invalid('The requested range is not in the verified requirements.');
@@ -168,7 +223,7 @@ export class RangeCacheTransaction {
     }
   }
 
-  async commit({signal} = {}) {
+  async commit({signal}: RangeCacheReadOptions = {}): Promise<boolean> {
     const combined = combineSignals(this.#signal, signal);
     try {
       combined.signal?.throwIfAborted();

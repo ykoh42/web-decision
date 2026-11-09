@@ -102,7 +102,6 @@
     "packages/web-decision/src/strands/loader-core.mjs",
     "packages/web-decision/src/strands/manifest.mjs",
     "packages/web-decision/src/strands/protocol.mjs",
-    "packages/web-decision/src/strands/range-cache.mjs",
     "packages/web-decision/src/strands/range-reader.mjs",
     "packages/web-decision/src/strands/runner.mjs",
     "packages/web-decision/src/strands/scope.mjs",

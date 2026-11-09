@@ -11,6 +11,7 @@ import {
   WASM_SHA256
 } from './manifest.mjs';
 import {RangeCacheTransaction} from './range-cache.mjs';
+import type {RangeCacheSpec} from './range-cache.mjs';
 
 const MAX_SMALL = 20 * 1024 * 1024;
 const invalid = (message: string) => new WebDecisionError('INVALID_ASSET', message);
@@ -31,14 +32,6 @@ interface SmallFile {
   readonly chunks: readonly SmallRange[];
 }
 
-interface RangeSpec {
-  readonly path: string;
-  readonly totalBytes: number;
-  readonly offset: number;
-  readonly length: number;
-  readonly sha256: string;
-}
-
 interface WeightRecord {
   readonly sourcePath: string;
   readonly sourceFileBytes: number;
@@ -48,23 +41,6 @@ interface WeightRecord {
     readonly bytes: number;
     readonly sha256: string;
   }[];
-}
-
-interface RangeReadResult {
-  readonly bytes: ArrayBuffer;
-  readonly cachedByHash: boolean;
-}
-
-interface TransactionOptions {
-  readonly signal?: AbortSignal | null | undefined;
-}
-
-interface RangedSourceTransaction {
-  open(): PromiseLike<unknown>;
-  require(specs: readonly RangeSpec[]): void;
-  read(base: URL, spec: RangeSpec, options?: TransactionOptions): PromiseLike<RangeReadResult>;
-  seal(): void;
-  commit(options?: TransactionOptions): PromiseLike<boolean>;
 }
 
 export interface PinnedRangeSourceOptions {
@@ -94,7 +70,7 @@ interface RangedSourceBytes {
 interface RangedSourceResult {
   readonly bytes: RangedSourceBytes;
   readonly manifest: unknown;
-  readonly transaction: RangedSourceTransaction;
+  readonly transaction: RangeCacheTransaction;
 }
 
 const range = (offset: number, length: number, sha256: string): SmallRange => Object.freeze({offset, length, sha256});
@@ -134,7 +110,7 @@ const PINNED_SMALL_FILES: readonly SmallFile[] = Object.freeze([
   })
 ]);
 
-function smallRanges(files: readonly SmallFile[]): RangeSpec[] {
+function smallRanges(files: readonly SmallFile[]): RangeCacheSpec[] {
   if (
     !Array.isArray(files) ||
     files.length !== 4 ||
@@ -142,7 +118,7 @@ function smallRanges(files: readonly SmallFile[]): RangeSpec[] {
     !['manifest', 'wasm', 'tokenizer', 'tokenizerConfig'].every((id) => files.some((file) => file.id === id))
   )
     throw invalid('Unexpected small-asset set.');
-  const specs: RangeSpec[] = [];
+  const specs: RangeCacheSpec[] = [];
   for (const file of files) {
     if (
       !Number.isSafeInteger(file.bytes) ||
@@ -164,7 +140,7 @@ function smallRanges(files: readonly SmallFile[]): RangeSpec[] {
   return specs;
 }
 
-function weightRanges(manifest: unknown): RangeSpec[] {
+function weightRanges(manifest: unknown): RangeCacheSpec[] {
   if (!Array.isArray((manifest as {readonly records?: unknown} | null | undefined)?.records))
     throw invalid('Model manifest has no tensor records.');
   const records = (manifest as {readonly records: readonly WeightRecord[]}).records;
@@ -190,7 +166,7 @@ async function openRangedSource({
   parseManifest
 }: OpenRangedSourceOptions): Promise<RangedSourceResult> {
   const small = smallRanges(files),
-    transaction: RangedSourceTransaction = new RangeCacheTransaction({base, cache, offline, signal, markerId});
+    transaction = new RangeCacheTransaction({base, cache, offline, signal, markerId});
   await transaction.open();
   transaction.require(small);
   const bytes: Partial<Record<SmallFileId, Uint8Array>> = {};
