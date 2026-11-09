@@ -51,6 +51,7 @@
     "src/nari/runtime.mts",
     "src/nari/runner.mts",
     "src/nari/scope.mts",
+    "src/kev/system-one.mts",
     "src/nari/upload.mts",
     "src/nari/upload-plan.mts",
     "src/nari/session.mts",

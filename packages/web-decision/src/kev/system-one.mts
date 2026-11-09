@@ -1,20 +1,81 @@
 import {KEV_MAX_OPTIONS, WebDecisionError} from '../kev.js';
+import type {KevScoreResult} from '../kev.js';
+import type {KevAnswer, KevResult} from '../curated/types.js';
+
+interface TextBudget {
+  max: number;
+  used: number;
+}
+
+type StringEntry = [string, unknown];
+
+interface RenderFrame {
+  readonly value: unknown;
+  readonly indent: number;
+  readonly arrayItem?: boolean | undefined;
+  entered: boolean;
+  container?: boolean | undefined;
+  lines?: string[] | undefined;
+  index?: number | undefined;
+  kind?: 'array' | 'object' | undefined;
+  children?: unknown[] | StringEntry[] | undefined;
+}
+
+interface QuestionFields {
+  readonly type?: unknown;
+  readonly instructions?: unknown;
+  readonly criteria?: unknown;
+  readonly [key: string]: unknown;
+}
+
+interface SystemOneOption {
+  readonly key: string;
+  readonly label: string;
+}
+
+interface SystemOneMetadata {
+  readonly name: string;
+  readonly type: 'choice' | 'score' | 'noul';
+  readonly options: SystemOneOption[];
+}
+
+interface SystemOneRequestQuestion {
+  readonly instructions: string;
+  readonly options: string[];
+}
+
+interface PreparedQuestion {
+  readonly metadata: SystemOneMetadata;
+  readonly request: SystemOneRequestQuestion;
+  readonly allowDuplicateOptions?: boolean | undefined;
+  readonly index?: number | undefined;
+}
+
+interface PreparedSystemOne {
+  readonly request: {readonly state: string; readonly questions: SystemOneRequestQuestion[]};
+  readonly metadata: SystemOneMetadata[];
+  readonly packing: {
+    readonly allowEmptyInstructions: boolean;
+    readonly allowEmptyOptions: boolean;
+    readonly allowDuplicateOptionsFor: Set<number>;
+  };
+}
 
 const MODEL_ID = 'kev-0.6b-q4f16';
 const containerValue = Symbol('container value');
 const roundingBuffer = new ArrayBuffer(8);
 const roundingView = new DataView(roundingBuffer);
-const invalid = (message) => {
+const invalid = (message: string): never => {
   throw new WebDecisionError('INVALID_INPUT', message);
 };
 
-function addToBudget(budget, characters) {
+function addToBudget(budget: TextBudget | null | undefined, characters: number): void {
   if (!budget) return;
   budget.used += characters;
   if (budget.used > budget.max) invalid('Kev input exceeds its supported text size.');
 }
 
-function checkBigIntBudget(value, budget) {
+function checkBigIntBudget(value: bigint, budget: TextBudget | null | undefined): void {
   if (!budget || value === 0n) return;
   const negative = value < 0n;
   const maxDigits = budget.max - budget.used - (negative ? 1 : 0);
@@ -27,66 +88,80 @@ function checkBigIntBudget(value, budget) {
   if (magnitude >> minimumOverflowBits !== 0n) invalid('Kev input exceeds its supported text size.');
 }
 
-function isMap(value) {
+function isMap(value: unknown): value is Map<unknown, unknown> {
   try {
-    Map.prototype.entries.call(value);
+    Map.prototype.entries.call(value as Map<unknown, unknown>);
     return true;
   } catch {
     return false;
   }
 }
 
-function validateRecord(value, label) {
+function validateRecord(value: unknown, label: string): asserts value is object {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(`${label} must be an object.`);
   if (isMap(value)) return;
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== null && Object.getPrototypeOf(prototype) !== null) invalid(`${label} must be a plain object.`);
 }
 
-function recordEntries(value, label, maxEntries = Infinity, budget) {
+function recordEntries(
+  value: unknown,
+  label: string,
+  maxEntries = Infinity,
+  budget?: TextBudget | null
+): StringEntry[] {
   validateRecord(value, label);
   if (isMap(value)) {
-    const entries = [];
-    for (const [key, item] of Map.prototype.entries.call(value)) {
+    const entries: StringEntry[] = [];
+    for (const [key, item] of Map.prototype.entries.call(value as Map<unknown, unknown>) as Iterable<
+      [unknown, unknown]
+    >) {
       if (entries.length >= maxEntries) invalid(`${label} exceeds its supported number of entries.`);
       if (typeof key !== 'string') invalid(`${label} must contain string keys.`);
-      addToBudget(budget, key.length);
-      entries.push([key, item]);
+      addToBudget(budget, (key as string).length);
+      entries.push([key as string, item]);
     }
     return entries;
   }
 
   const keys = Reflect.ownKeys(value);
   if (keys.length > maxEntries) invalid(`${label} exceeds its supported number of entries.`);
-  const entries = [];
+  const entries: StringEntry[] = [];
   for (const key of keys) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
       invalid(`${label} must contain enumerable string data properties.`);
-    addToBudget(budget, key.length);
-    entries.push([key, descriptor.value]);
+    addToBudget(budget, (key as string).length);
+    entries.push([key as string, descriptor!.value as unknown]);
   }
   return entries;
 }
 
-function arrayValues(value, label, maxValues = Infinity) {
+function arrayValues(value: unknown, label: string, maxValues = Infinity): unknown[] {
   if (!Array.isArray(value)) invalid(`${label} must be an array.`);
-  if (value.length > maxValues) invalid(`${label} exceeds its supported number of entries.`);
-  const keys = Reflect.ownKeys(value);
+  if ((value as unknown[]).length > maxValues) invalid(`${label} exceeds its supported number of entries.`);
+  const keys = Reflect.ownKeys(value as object);
   if (keys.length > maxValues + 1) invalid(`${label} cannot have extra properties.`);
   const values = [];
-  for (let index = 0; index < value.length; index++) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < (value as unknown[]).length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value as object, String(index));
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) invalid(`${label} must be a dense data array.`);
-    values.push(descriptor.value);
+    values.push(descriptor!.value as unknown);
   }
   for (const key of keys)
-    if (key !== 'length' && (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length))
+    if (
+      key !== 'length' &&
+      (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= (value as unknown[]).length)
+    )
       invalid(`${label} cannot have extra properties.`);
   return values;
 }
 
-function primitiveText(value, budget, arrayItem) {
+function primitiveText(
+  value: unknown,
+  budget: TextBudget | null | undefined,
+  arrayItem?: boolean
+): string | typeof containerValue {
   if (value === null) return '';
   if (typeof value === 'string') {
     const trimmed = arrayItem ? pythonWhitespacePrefixLength(value) : 0;
@@ -116,9 +191,14 @@ function primitiveText(value, budget, arrayItem) {
   return containerValue;
 }
 
-function enterContainer(frame, value, budget, ancestors) {
-  if (ancestors.has(value)) invalid('JSON values cannot contain cycles.');
-  ancestors.add(value);
+function enterContainer(
+  frame: RenderFrame,
+  value: unknown,
+  budget: TextBudget | null | undefined,
+  ancestors: Set<object>
+): void {
+  if (ancestors.has(value as object)) invalid('JSON values cannot contain cycles.');
+  ancestors.add(value as object);
   frame.container = true;
   frame.entered = true;
   frame.lines = [];
@@ -132,8 +212,8 @@ function enterContainer(frame, value, budget, ancestors) {
   }
 }
 
-function appendRenderedChild(parent, text, budget) {
-  const index = parent.index - 1;
+function appendRenderedChild(parent: RenderFrame, text: string, budget: TextBudget | null | undefined): void {
+  const index = parent.index! - 1;
   const padLength = parent.indent * 2;
   if (parent.kind === 'array') {
     const leading = pythonWhitespacePrefixLength(text);
@@ -141,22 +221,22 @@ function appendRenderedChild(parent, text, budget) {
     addToBudget(budget, padLength + 2 - trimmedPad);
     const pad = ' '.repeat(padLength);
     const rendered = text.slice(leading);
-    parent.lines.push(`${pad}- ${rendered}`);
+    parent.lines!.push(`${pad}- ${rendered}`);
     return;
   }
 
-  const [key, item] = parent.children[index];
+  const [key, item] = parent.children![index] as StringEntry;
   const separator = item && typeof item === 'object' ? ':\n' : ': ';
   const trimmedPrefix = parent.arrayItem && index === 0 ? padLength + pythonWhitespacePrefixLength(key) : 0;
   addToBudget(budget, padLength + key.length + separator.length - trimmedPrefix);
   const pad = ' '.repeat(padLength);
-  parent.lines.push(`${pad}${key}${separator}${text}`);
+  parent.lines!.push(`${pad}${key}${separator}${text}`);
 }
 
-function pythonWhitespacePrefixLength(text) {
+function pythonWhitespacePrefixLength(text: string): number {
   let length = 0;
   for (const character of text) {
-    const codePoint = character.codePointAt(0);
+    const codePoint = character.codePointAt(0)!;
     const whitespace =
       (codePoint >= 0x09 && codePoint <= 0x0d) ||
       (codePoint >= 0x1c && codePoint <= 0x20) ||
@@ -175,30 +255,31 @@ function pythonWhitespacePrefixLength(text) {
   return length;
 }
 
-function pushChildFrame(frames, parent) {
-  const childIndex = parent.index++;
-  const child = parent.kind === 'array' ? parent.children[childIndex] : parent.children[childIndex][1];
+function pushChildFrame(frames: RenderFrame[], parent: RenderFrame): void {
+  const childIndex = parent.index!++;
+  const child =
+    parent.kind === 'array' ? parent.children![childIndex] : (parent.children![childIndex] as StringEntry)[1];
   const arrayItem = parent.kind === 'array';
   frames.push({value: child, indent: parent.indent + 1, entered: false, arrayItem});
 }
 
-function render(value, budget) {
-  const ancestors = new Set();
-  const frames = [{value, indent: 0, entered: false}];
-  let result;
+function render(value: unknown, budget: TextBudget | null | undefined): string {
+  const ancestors = new Set<object>();
+  const frames: RenderFrame[] = [{value, indent: 0, entered: false}];
+  let result!: string;
 
-  function finish(text) {
-    const finished = frames.pop();
-    if (finished.container) ancestors.delete(finished.value);
+  function finish(text: string): void {
+    const finished = frames.pop()!;
+    if (finished.container) ancestors.delete(finished.value as object);
     if (frames.length === 0) {
       result = text;
       return;
     }
-    appendRenderedChild(frames.at(-1), text, budget);
+    appendRenderedChild(frames.at(-1)!, text, budget);
   }
 
   while (frames.length > 0) {
-    const frame = frames.at(-1);
+    const frame = frames.at(-1)!;
     if (!frame.entered) {
       const text = primitiveText(frame.value, budget, frame.arrayItem);
       if (text !== containerValue) finish(text);
@@ -206,19 +287,24 @@ function render(value, budget) {
       continue;
     }
 
-    if (frame.index < frame.children.length) {
+    if (frame.index! < frame.children!.length) {
       pushChildFrame(frames, frame);
       continue;
     }
 
-    addToBudget(budget, Math.max(0, frame.lines.length - 1));
-    finish(frame.lines.join('\n'));
+    addToBudget(budget, Math.max(0, frame.lines!.length - 1));
+    finish(frame.lines!.join('\n'));
   }
 
   return result;
 }
 
-function optionText(name, description, budget, nameAlreadyCounted = false) {
+function optionText(
+  name: string,
+  description: unknown,
+  budget: TextBudget | null | undefined,
+  nameAlreadyCounted = false
+): string {
   if (!nameAlreadyCounted) addToBudget(budget, name.length);
   if (description === null || description === '') return name;
   const rendered = render(description, budget);
@@ -226,22 +312,27 @@ function optionText(name, description, budget, nameAlreadyCounted = false) {
   return `${name}: ${rendered}`;
 }
 
-function questionFields(question, name) {
+function questionFields(question: unknown, name: string): QuestionFields {
   validateRecord(question, `Question ${name}`);
-  const fields = {};
+  const fields: Record<string, unknown> = {};
   for (const key of Reflect.ownKeys(question)) {
     if (typeof key !== 'string' || !['type', 'instructions', 'criteria'].includes(key)) continue;
     const descriptor = Object.getOwnPropertyDescriptor(question, key);
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
       invalid(`Question ${name} fields must be enumerable data properties.`);
-    fields[key] = descriptor.value;
+    fields[key] = descriptor!.value as unknown;
   }
   if (fields.instructions === undefined && Object.hasOwn(fields, 'instructions'))
     invalid(`Question ${name} instructions must be a JSON value.`);
   return fields;
 }
 
-function choiceQuestion(name, fields, index, budget) {
+function choiceQuestion(
+  name: string,
+  fields: QuestionFields,
+  index: number,
+  budget: TextBudget | null
+): PreparedQuestion {
   const entries = recordEntries(fields.criteria, `Question ${name} criteria`, KEV_MAX_OPTIONS, budget);
   if (entries.length < 1 || entries.length > KEV_MAX_OPTIONS)
     invalid(`Question ${name} needs 1 to ${KEV_MAX_OPTIONS} options.`);
@@ -257,7 +348,12 @@ function choiceQuestion(name, fields, index, budget) {
   };
 }
 
-function scoreQuestion(name, fields, index, budget) {
+function scoreQuestion(
+  name: string,
+  fields: QuestionFields,
+  index: number,
+  budget: TextBudget | null
+): PreparedQuestion {
   const levels = arrayValues(fields.criteria, `Question ${name} criteria`, KEV_MAX_OPTIONS);
   if (levels.length < 1 || levels.length > KEV_MAX_OPTIONS)
     invalid(`Question ${name} needs 1 to ${KEV_MAX_OPTIONS} score levels.`);
@@ -270,21 +366,21 @@ function scoreQuestion(name, fields, index, budget) {
   };
 }
 
-function noulCriteriaValue(criteria, key, name) {
+function noulCriteriaValue(criteria: unknown, key: string, name: string): unknown {
   if (isMap(criteria)) {
     if (!Map.prototype.has.call(criteria, key)) return null;
-    return Map.prototype.get.call(criteria, key);
+    return Map.prototype.get.call(criteria as Map<unknown, unknown>, key);
   }
 
-  const descriptor = Object.getOwnPropertyDescriptor(criteria, key);
+  const descriptor = Object.getOwnPropertyDescriptor(criteria as object, key);
   if (!descriptor) return null;
   if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))
     invalid(`Question ${name} criteria must contain enumerable string data properties.`);
   return descriptor.value;
 }
 
-function noulQuestion(name, fields, budget) {
-  const descriptions = {true: null, false: null};
+function noulQuestion(name: string, fields: QuestionFields, budget: TextBudget | null): PreparedQuestion {
+  const descriptions: {true: unknown; false: unknown} = {true: null, false: null};
   if (Object.hasOwn(fields, 'criteria') && fields.criteria !== null) {
     const criteria = fields.criteria;
     validateRecord(criteria, `Question ${name} criteria`);
@@ -297,26 +393,30 @@ function noulQuestion(name, fields, budget) {
       name,
       type: 'noul',
       options: [
-        {key: 'false', label: options[0]},
-        {key: 'true', label: options[1]}
+        {key: 'false', label: options[0]!},
+        {key: 'true', label: options[1]!}
       ]
     },
     request: {instructions: render(fields.instructions ?? null, budget), options}
   };
 }
 
-export function prepareKevSystemOne(state, questions, maxInputCharacters = Infinity) {
+export function prepareKevSystemOne(
+  state: unknown,
+  questions: unknown,
+  maxInputCharacters = Infinity
+): PreparedSystemOne {
   const budget = Number.isSafeInteger(maxInputCharacters) ? {max: maxInputCharacters, used: 0} : null;
   const entries = recordEntries(questions, 'Questions');
   if (entries.length < 1) invalid('Provide at least one named question.');
-  const metadata = [];
-  const requestQuestions = [];
-  const allowDuplicateOptionsFor = new Set();
+  const metadata: SystemOneMetadata[] = [];
+  const requestQuestions: SystemOneRequestQuestion[] = [];
+  const allowDuplicateOptionsFor = new Set<number>();
 
   for (const [name, value] of entries) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) invalid(`Question ${name} must be an object.`);
     const fields = questionFields(value, name);
-    let prepared;
+    let prepared!: PreparedQuestion;
     if (fields.type === 'choice') prepared = choiceQuestion(name, fields, requestQuestions.length, budget);
     else if (fields.type === 'score') prepared = scoreQuestion(name, fields, requestQuestions.length, budget);
     else if (fields.type === 'noul') prepared = noulQuestion(name, fields, budget);
@@ -324,7 +424,7 @@ export function prepareKevSystemOne(state, questions, maxInputCharacters = Infin
 
     metadata.push(prepared.metadata);
     requestQuestions.push(prepared.request);
-    if (prepared.allowDuplicateOptions) allowDuplicateOptionsFor.add(prepared.index);
+    if (prepared.allowDuplicateOptions) allowDuplicateOptionsFor.add(prepared.index!);
   }
 
   return {
@@ -334,7 +434,7 @@ export function prepareKevSystemOne(state, questions, maxInputCharacters = Infin
   };
 }
 
-function normalizedProbabilities(probabilities) {
+function normalizedProbabilities(probabilities: readonly number[]): number[] {
   const total = probabilities.reduce((sum, probability) => sum + probability, 0);
   if (!Number.isFinite(total) || probabilities.some((probability) => !Number.isFinite(probability) || probability < 0))
     throw new WebDecisionError('INFERENCE_ERROR', 'The model returned invalid probabilities.');
@@ -342,19 +442,19 @@ function normalizedProbabilities(probabilities) {
   return probabilities.map((probability) => probability / total);
 }
 
-function choiceConfidence(probabilities) {
+function choiceConfidence(probabilities: readonly number[]): number {
   const count = probabilities.length;
   if (count === 1) return 1;
   const normalized = normalizedProbabilities(probabilities);
   return (Math.max(...normalized) - 1 / count) / (1 - 1 / count);
 }
 
-function scoreConfidence(probabilities) {
+function scoreConfidence(probabilities: readonly number[]): number {
   const levels = probabilities.length;
   if (levels === 1) return 1;
   const normalized = normalizedProbabilities(probabilities);
   let mode = 0;
-  for (let index = 1; index < levels; index++) if (normalized[index] > normalized[mode]) mode = index;
+  for (let index = 1; index < levels; index++) if (normalized[index]! > normalized[mode]!) mode = index;
   const expectedDistance = normalized.reduce(
     (sum, probability, index) => sum + probability * Math.abs(index - mode),
     0
@@ -365,7 +465,7 @@ function scoreConfidence(probabilities) {
   return Math.max(0, 1 - expectedDistance / meanAbsoluteDeviation);
 }
 
-function roundFourDecimals(value) {
+function roundFourDecimals(value: number): number {
   if (value === 0) return value;
   // Match Python round(value, 4) for Kev's JSON response fields.
   roundingView.setFloat64(0, value, false);
@@ -388,22 +488,27 @@ function roundFourDecimals(value) {
   return (negative ? -Number(units) : Number(units)) / 10000;
 }
 
-function finishAnswer(metadata, answer) {
+function finishAnswer(metadata: SystemOneMetadata, answer: KevScoreResult['answers'][number]): KevAnswer {
   const probabilities = answer.probabilities.map(({probability}) => probability);
   if (metadata.type === 'choice') {
-    const probabilityEntries = metadata.options.map(({key}, index) => [key, roundFourDecimals(probabilities[index])]);
-    const roundedProbabilities = Object.fromEntries(probabilityEntries);
+    const probabilityEntries: [string, number][] = metadata.options.map(({key}, index) => [
+      key,
+      roundFourDecimals(probabilities[index]!)
+    ]);
+    const roundedProbabilities: Record<string, number> = Object.fromEntries(probabilityEntries);
     return {
       type: 'choice',
-      choice: metadata.options[answer.selectedIndex].key,
+      choice: metadata.options[answer.selectedIndex]!.key,
       confidence: roundFourDecimals(choiceConfidence(probabilities)),
       probabilities: roundedProbabilities,
       probabilityEntries
     };
   }
   if (metadata.type === 'score') {
-    const legend = Object.fromEntries(metadata.options.map(({label}, index) => [String(index), label]));
-    const probabilityEntries = probabilities.map((probability, index) => [
+    const legend: Record<string, string> = Object.fromEntries(
+      metadata.options.map(({label}, index) => [String(index), label])
+    );
+    const probabilityEntries: [string, number][] = probabilities.map((probability, index) => [
       String(index),
       roundFourDecimals(probability)
     ]);
@@ -418,14 +523,18 @@ function finishAnswer(metadata, answer) {
       confidence: roundFourDecimals(scoreConfidence(probabilities))
     };
   }
-  return {type: 'noul', noul: roundFourDecimals(probabilities[1])};
+  return {type: 'noul', noul: roundFourDecimals(probabilities[1]!)};
 }
 
-export function finishKevSystemOne(prepared, result, model = MODEL_ID) {
-  const answerEntries = prepared.metadata.map((metadata, index) => [
+export function finishKevSystemOne(
+  prepared: PreparedSystemOne,
+  result: KevScoreResult,
+  model: string = MODEL_ID
+): KevResult {
+  const answerEntries: [string, KevAnswer][] = prepared.metadata.map((metadata, index) => [
     metadata.name,
-    finishAnswer(metadata, result.answers[index])
+    finishAnswer(metadata, result.answers[index]!)
   ]);
-  const answers = Object.fromEntries(answerEntries);
-  return {model, tokenCount: result.tokenCount, answers, answerEntries};
+  const answers: Record<string, KevAnswer> = Object.fromEntries(answerEntries);
+  return {model: model as KevResult['model'], tokenCount: result.tokenCount, answers, answerEntries};
 }
