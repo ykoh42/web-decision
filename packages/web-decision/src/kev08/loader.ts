@@ -5,7 +5,7 @@ import {requestKev08Device} from './device.js';
 import {ExperimentalKev08Session} from './session.js';
 
 /** Load the verified FP16 text-only Kev 0.8B prototype. */
-export function loadExperimentalKev08(options) {
+export function loadExperimentalKev08(options: Parameters<typeof loadPinnedTextModel>[0]) {
   return loadPinnedTextModel(options, {
     name: 'Kev 0.8B',
     offlineMissingMessage: 'The Kev 0.8B manifest is not available offline. Load the model online first.',
@@ -14,11 +14,17 @@ export function loadExperimentalKev08(options) {
     requestDevice: requestKev08Device,
     prepare(data, _tokenizer, manifest) {
       validateKev08TokenizerData(data);
-      return {limits: {maxInputTokens: manifest.maxInputTokens, maxStateTokens: manifest.maxStateTokens}};
+      return {
+        limits: {
+          maxInputTokens: (manifest as {maxInputTokens: number}).maxInputTokens,
+          maxStateTokens: (manifest as {maxStateTokens: number}).maxStateTokens
+        }
+      };
     },
     upload(args) {
-      return uploadTensorShards(args);
+      return uploadTensorShards(args as Parameters<typeof uploadTensorShards>[0]);
     },
-    createSession: (args) => new ExperimentalKev08Session(args)
+    createSession: (args) =>
+      new ExperimentalKev08Session(args as ConstructorParameters<typeof ExperimentalKev08Session>[0])
   });
 }
