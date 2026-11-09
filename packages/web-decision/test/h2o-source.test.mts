@@ -7,10 +7,10 @@ import {readVerifiedRange} from '../src/strands/range-reader.mjs';
 import {Hash} from '../src/h2o/sha256.mjs';
 import {parseStrictJson} from '../src/h2o/strict-json.mjs';
 
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const encode = (text) => new TextEncoder().encode(text);
-const desc = (path, bytes) => ({path, bytes: bytes.length, sha256: digest(bytes)});
-const pieces = (path, data, cuts) => ({
+const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const encode = (text: string) => new TextEncoder().encode(text);
+const desc = (path: string, bytes: Uint8Array) => ({path, bytes: bytes.length, sha256: digest(bytes)});
+const pieces = (path: string, data: Uint8Array, cuts: [number, number][]) => ({
   ...desc(path, data),
   chunks: cuts.map(([offset, length]) => ({offset, length, sha256: digest(data.slice(offset, offset + length))}))
 });
@@ -56,11 +56,21 @@ function fixture() {
     ['a.pending', Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8)],
     ['b.pending', Uint8Array.of(9, 10, 11, 12)]
   ]);
-  const field = (name) => desc(name, blobs.get(name));
+  const field = (name: string) => desc(name, blobs.get(name)!);
   const stage = field('h2o-stage.log'),
     manifest = field('manifest.pending.json'),
     token = field('tokenizer/tokenizer.json');
-  const policy = {
+  const policy: {
+    stage: ReturnType<typeof desc>;
+    manifest: ReturnType<typeof desc>;
+    manifestSha256: string;
+    wasm: ReturnType<typeof desc>;
+    tokenizer: ReturnType<typeof desc>;
+    tokenizerConfig: ReturnType<typeof desc>;
+    tokenizerContract: ReturnType<typeof desc>;
+    weightCount: number;
+    preparePlan: (...args: unknown[]) => Promise<unknown>;
+  } = {
     stage,
     manifest,
     manifestSha256: manifest.sha256,
@@ -75,12 +85,12 @@ function fixture() {
       };
     }
   };
-  const first = pieces('a.pending', blobs.get('a.pending'), [
+  const first = pieces('a.pending', blobs.get('a.pending')!, [
       [0, 4],
       [4, 4]
     ]),
-    second = pieces('b.pending', blobs.get('b.pending'), [[0, 4]]),
-    tokenizer = pieces(token.path, blobs.get(token.path), [
+    second = pieces('b.pending', blobs.get('b.pending')!, [[0, 4]]),
+    tokenizer = pieces(token.path, blobs.get(token.path)!, [
       [0, 4],
       [4, 5]
     ]);
@@ -94,17 +104,17 @@ function fixture() {
   return {blobs, policy, data, receipt};
 }
 
-function fakeFetch(f, mode = 'valid') {
+function fakeFetch(f: ReturnType<typeof fixture>, mode = 'valid'): typeof fetch {
   return async (url, options) => {
-    const name = new URL(url).pathname.slice('/assets/'.length),
+    const name = new URL(url instanceof Request ? url.url : url).pathname.slice('/assets/'.length),
       data = f.blobs.get(name);
     assert.ok(data, `unexpected path ${name}`);
-    const range = /^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);
+    const range = /^bytes=(\d+)-(\d+)$/.exec(new Headers(options?.headers).get('Range') ?? '');
     assert.ok(range);
     const start = Number(range[1]),
       end = Number(range[2]);
     const bytes = data.slice(start, end + 1);
-    if (mode === 'tamper') bytes[0] ^= 1;
+    if (mode === 'tamper') bytes[0] = bytes[0]! ^ 1;
     return new Response(bytes, {
       status: mode === 'full' ? 200 : 206,
       headers: {
@@ -115,7 +125,7 @@ function fakeFetch(f, mode = 'valid') {
   };
 }
 
-async function openFixture(f, data = f.data, extra = {}) {
+async function openFixture(f: ReturnType<typeof fixture>, data = f.data, extra: Record<string, unknown> = {}) {
   const raw = encode(JSON.stringify(data));
   return openFakeH2oSource({
     fake: true,
@@ -123,7 +133,7 @@ async function openFixture(f, data = f.data, extra = {}) {
     inventoryBytes: raw,
     inventorySha256: digest(raw),
     auditReceiptSha256: f.receipt,
-    policy: f.policy,
+    policy: f.policy as unknown as Parameters<typeof openFakeH2oSource>[0]['policy'],
     reader: readVerifiedRange,
     makeHasher: () => createIncrementalSha256(Hash),
     ...extra
@@ -136,21 +146,22 @@ test('source plan cancellation rejects promptly and observes a late failure', as
     controller = new AbortController(),
     reason = new Error('synthetic cancellation'),
     fetched = [];
-  let startPlan, rejectPlan;
-  const started = new Promise((resolve) => {
+  let startPlan!: () => void, rejectPlan!: (reason?: unknown) => void;
+  const started = new Promise<void>((resolve) => {
       startPlan = resolve;
     }),
-    pending = new Promise((_resolve, reject) => {
+    pending = new Promise<never>((_resolve, reject) => {
       rejectPlan = reject;
     });
-  f.policy.preparePlan = (_stage, _manifest, _candidate, signal) => {
+  f.policy.preparePlan = (...args: unknown[]) => {
+    const signal = args[3];
     assert.ok(signal instanceof AbortSignal);
     startPlan();
     return pending;
   };
   const fetch = fakeFetch(f);
   globalThis.fetch = (...args) => {
-    fetched.push(new URL(args[0]).pathname);
+    fetched.push(new URL(args[0] instanceof Request ? args[0].url : args[0]).pathname);
     return fetch(...args);
   };
   try {
@@ -170,11 +181,11 @@ test('source inventory digest cancellation rejects promptly and observes a late 
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('synthetic cancellation');
-  let startDigest, rejectDigest;
-  const started = new Promise((resolve) => {
+  let startDigest!: () => void, rejectDigest!: (reason?: unknown) => void;
+  const started = new Promise<void>((resolve) => {
       startDigest = resolve;
     }),
-    pending = new Promise((_resolve, reject) => {
+    pending = new Promise<never>((_resolve, reject) => {
       rejectDigest = reject;
     });
   t.mock.method(crypto.subtle, 'digest', () => {
@@ -201,11 +212,11 @@ test('source cancellation beats an uncooperative reader and ignores late invalid
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('synthetic cancellation');
-  let startRead, resolveRead;
-  const started = new Promise((resolve) => {
+  let startRead!: () => void, resolveRead!: (value: {bytes: ArrayBuffer}) => void;
+  const started = new Promise<void>((resolve) => {
       startRead = resolve;
     }),
-    pending = new Promise((resolve) => {
+    pending = new Promise<{bytes: ArrayBuffer}>((resolve) => {
       resolveRead = resolve;
     });
   const task = openFixture(f, f.data, {
@@ -226,23 +237,23 @@ test('per-range cancellation wins over late digest failure and keeps the source 
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('synthetic cancellation');
-  const reader = async (_base, spec) => {
-    const data = f.blobs.get(spec.path).slice(spec.offset, spec.offset + spec.length);
+  const reader = async (_base: unknown, spec: {path: string; offset: number; length: number}) => {
+    const data = f.blobs.get(spec.path)!.slice(spec.offset, spec.offset + spec.length);
     return {bytes: data.buffer};
   };
   const source = await openFixture(f, f.data, {reader});
-  let startDigest, rejectDigest;
-  const started = new Promise((resolve) => {
+  let startDigest!: () => void, rejectDigest!: (reason?: unknown) => void;
+  const started = new Promise<void>((resolve) => {
       startDigest = resolve;
     }),
-    pending = new Promise((_resolve, reject) => {
+    pending = new Promise<never>((_resolve, reject) => {
       rejectDigest = reject;
     });
   t.mock.method(crypto.subtle, 'digest', () => {
     startDigest();
     return pending;
   });
-  const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending'][0]};
+  const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending']![0]!};
   const task = source.readRange('https://example.invalid/assets/', spec, {signal: controller.signal});
   await started;
   controller.abort(reason);
@@ -262,11 +273,11 @@ test('source uses actual range reader with synthetic HTTP and pins every weight 
   try {
     const source = await openFixture(f);
     assert.equal(new TextDecoder().decode(source.tokenizer), 'tokenizer');
-    const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending'][0]};
+    const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending']![0]!};
     const reply = await source.readRange('https://example.invalid/assets/', spec);
     assert.deepEqual([...new Uint8Array(reply.bytes)], [1, 2, 3, 4]);
     const full = createIncrementalSha256(Hash);
-    for (const part of source.inventory['a.pending']) {
+    for (const part of source.inventory['a.pending']!) {
       const result = await source.readRange('https://example.invalid/assets/', {
         path: 'a.pending',
         totalBytes: 8,
@@ -274,24 +285,44 @@ test('source uses actual range reader with synthetic HTTP and pins every weight 
       });
       full.update(new Uint8Array(result.bytes));
     }
-    assert.equal(full.digest(), digest(f.blobs.get('a.pending')));
+    assert.equal(full.digest(), digest(f.blobs.get('a.pending')!));
     await assert.rejects(source.readRange('https://example.invalid/assets/', {...spec, path: 'b.pending'}), {
       code: 'INVALID_ASSET'
     });
     await assert.rejects(source.readRange('https://elsewhere.invalid/assets/', spec), {code: 'INVALID_ASSET'});
-    await assert.rejects(source.readRange('https://example.invalid/assets/', spec, {cache: true}), {
-      code: 'INVALID_ASSET'
-    });
-    await assert.rejects(source.readRange('https://example.invalid/assets/', spec, {offline: true}), {
-      code: 'INVALID_ASSET'
-    });
-    await assert.rejects(source.readRange('https://example.invalid/assets/', spec, {cache: 0}), {
-      code: 'INVALID_ASSET'
-    });
-    await assert.rejects(source.readRange('https://example.invalid/assets/', spec, {maxPrefetchBytes: 1}), {
-      code: 'INVALID_ASSET'
-    });
-    await assert.rejects(source.readRange('https://example.invalid/assets/', {...spec, extra: true}), {
+    await assert.rejects(
+      source.readRange('https://example.invalid/assets/', spec, {cache: true} as unknown as NonNullable<
+        Parameters<typeof source.readRange>[2]
+      >),
+      {
+        code: 'INVALID_ASSET'
+      }
+    );
+    await assert.rejects(
+      source.readRange('https://example.invalid/assets/', spec, {offline: true} as unknown as NonNullable<
+        Parameters<typeof source.readRange>[2]
+      >),
+      {
+        code: 'INVALID_ASSET'
+      }
+    );
+    await assert.rejects(
+      source.readRange('https://example.invalid/assets/', spec, {cache: 0} as unknown as NonNullable<
+        Parameters<typeof source.readRange>[2]
+      >),
+      {
+        code: 'INVALID_ASSET'
+      }
+    );
+    await assert.rejects(
+      source.readRange('https://example.invalid/assets/', spec, {maxPrefetchBytes: 1} as unknown as NonNullable<
+        Parameters<typeof source.readRange>[2]
+      >),
+      {
+        code: 'INVALID_ASSET'
+      }
+    );
+    await assert.rejects(source.readRange('https://example.invalid/assets/', {...spec, extra: true} as typeof spec), {
       code: 'INVALID_ASSET'
     });
     source.close();
@@ -308,14 +339,14 @@ test('caller abort cancels a synthetic in-flight range request', async () => {
   try {
     const source = await openFixture(f),
       controller = new AbortController();
-    const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending'][0]};
-    let started;
-    const ready = new Promise((resolve) => {
+    const spec = {path: 'a.pending', totalBytes: 8, ...source.inventory['a.pending']![0]!};
+    let started!: () => void;
+    const ready = new Promise<void>((resolve) => {
       started = resolve;
     });
     globalThis.fetch = (_url, options) =>
       new Promise((_resolve, reject) => {
-        options.signal.addEventListener('abort', () => reject(options.signal.reason), {once: true});
+        options!.signal!.addEventListener('abort', () => reject(options!.signal!.reason), {once: true});
         started();
       });
     const task = source.readRange('https://example.invalid/assets/', spec, {signal: controller.signal});
@@ -359,7 +390,7 @@ test('inventory mismatches and caller cancellation fail without a network reques
         inventoryBytes: raw,
         inventorySha256: '0'.repeat(64),
         auditReceiptSha256: f.receipt,
-        policy: f.policy,
+        policy: f.policy as unknown as Parameters<typeof openFakeH2oSource>[0]['policy'],
         reader: readVerifiedRange,
         makeHasher: () => createIncrementalSha256(Hash)
       }),
@@ -378,7 +409,7 @@ test('tokenizer full-file hash mismatch is rejected even with correct chunk hash
   const f = fixture(),
     original = globalThis.fetch;
   f.policy.tokenizer.sha256 = '0'.repeat(64);
-  f.data.files.find((item) => item.path === f.policy.tokenizer.path).sha256 = '0'.repeat(64);
+  f.data.files.find((item) => item.path === f.policy.tokenizer.path)!.sha256 = '0'.repeat(64);
   globalThis.fetch = fakeFetch(f);
   try {
     await assert.rejects(openFixture(f), {code: 'INVALID_ASSET'});
