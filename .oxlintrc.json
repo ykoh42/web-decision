@@ -31,6 +31,13 @@
       }
     },
     {
+      "files": ["packages/web-decision/src/pinned-text-loader.ts"],
+      "rules": {
+        // Preserve the existing validated model-buffer preallocation semantics.
+        "unicorn/no-new-array": "off"
+      }
+    },
+    {
       "files": ["packages/web-decision/src/tinydecide/engine.js"],
       "rules": {
         // Preserve the upstream engine's pinned bytes, including unused reference helpers.
