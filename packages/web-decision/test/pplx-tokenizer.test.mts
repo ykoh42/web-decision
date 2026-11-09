@@ -31,7 +31,7 @@ function data() {
 }
 
 class Tokenizer {
-  encode(text) {
+  encode(text: string): {ids: unknown} {
     for (const [marker, id] of markers) {
       if (text === marker) return {ids: [id]};
       if (text === `x${marker}y`) return {ids: [1, id, 2]};
@@ -50,11 +50,11 @@ test('accepts a tokenizer with the pinned marker behavior and snapshots output I
 
 test('rejects duplicate, missing or incorrectly encoded control tokens', () => {
   const duplicate = data();
-  duplicate.added_tokens[1].id = duplicate.added_tokens[0].id;
+  duplicate.added_tokens[1]!.id = duplicate.added_tokens[0]!.id;
   const missing = data();
-  missing.added_tokens[3].content = 'replacement';
+  missing.added_tokens[3]!.content = 'replacement';
   class BrokenTokenizer extends Tokenizer {
-    encode() {
+    override encode() {
       return {ids: [0]};
     }
   }
@@ -68,9 +68,9 @@ test('rejects duplicate, missing or incorrectly encoded control tokens', () => {
 });
 
 test('checks runtime token IDs and returns an independent snapshot', () => {
-  let output = [5, 6];
+  let output: number[] | null = [5, 6];
   class MutableTokenizer extends Tokenizer {
-    encode(text) {
+    override encode(text: string) {
       return text === 'input' ? {ids: output} : super.encode(text);
     }
   }
@@ -87,7 +87,7 @@ test('checks runtime token IDs and returns an independent snapshot', () => {
 test('preserves the cause when the tokenizer throws', () => {
   const cause = new Error('encoding failed');
   class ThrowingTokenizer extends Tokenizer {
-    encode(text) {
+    override encode(text: string) {
       if (text === 'input') throw cause;
       return super.encode(text);
     }
