@@ -1,4 +1,4 @@
-function scanString(text, start, containers) {
+function scanString(text: string, start: number, containers: Array<Set<unknown> | null>): number {
   let end = start;
   while (++end < text.length) {
     if (text[end] === '\\') end++;
@@ -8,18 +8,18 @@ function scanString(text, start, containers) {
   while (text[next] === ' ' || text[next] === '\t' || text[next] === '\n' || text[next] === '\r') next++;
   if (text[next] === ':') {
     const key = JSON.parse(text.slice(start, end + 1));
-    const keys = containers[containers.length - 1];
+    const keys = containers[containers.length - 1] as Set<unknown>;
     if (keys.has(key)) throw new SyntaxError('Duplicate JSON object key');
     keys.add(key);
   }
   return end;
 }
 
-function checkDuplicateKeys(text) {
+function checkDuplicateKeys(text: string): void {
   // JSON.parse validates the grammar first. Therefore any string token followed
   // by a colon is an object key, and every closing delimiter has a matching
   // opening delimiter. Scan iteratively to avoid recursion on deeply nested JSON.
-  const containers = [];
+  const containers: Array<Set<unknown> | null> = [];
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (char === '{') containers.push(new Set());
@@ -30,14 +30,14 @@ function checkDuplicateKeys(text) {
 }
 
 /** Parse bounded UTF-8 JSON, rejecting duplicate object member names. */
-export function parseStrictJson(bytes, {maxBytes = 1024 * 1024} = {}) {
+export function parseStrictJson(bytes: unknown, {maxBytes = 1024 * 1024}: {maxBytes?: number} = {}): unknown {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('JSON input must be a Uint8Array');
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
     throw new RangeError('maxBytes must be a non-negative safe integer');
   if (bytes.byteLength > maxBytes) throw new RangeError('JSON input exceeds maxBytes');
   // Preserve a leading BOM so JSON.parse applies its own JSON grammar to it.
   const text = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(bytes);
-  const value = JSON.parse(text);
+  const value: unknown = JSON.parse(text);
   checkDuplicateKeys(text);
   return value;
 }
