@@ -5,7 +5,25 @@ import {validateDecisionFields, validateRequestFields} from '../request-fields.m
 import {finishOpenDeciderNanoRequest, packOpenDeciderNanoRequest} from './protocol.mjs';
 import {finishOpenDeciderNanoSystemOne, prepareOpenDeciderNanoSystemOne} from './typed.mjs';
 
-export function createOpenDeciderNanoSession({tokenizer, runner}) {
+interface NanoTokenizer {
+  encode(text: string): unknown;
+}
+interface NanoRunner {
+  run(ids: number[], markerPositions: number[]): Promise<Float32Array>;
+  dispose(): unknown;
+  releaseCachedMemory(): unknown;
+}
+interface NanoOptions {
+  signal?: AbortSignal | null;
+}
+
+export function createOpenDeciderNanoSession({
+  tokenizer,
+  runner
+}: {
+  tokenizer: NanoTokenizer | null | undefined;
+  runner: NanoRunner | null | undefined;
+}) {
   if (
     typeof tokenizer?.encode !== 'function' ||
     typeof runner?.run !== 'function' ||
@@ -13,18 +31,18 @@ export function createOpenDeciderNanoSession({tokenizer, runner}) {
     typeof runner?.releaseCachedMemory !== 'function'
   )
     throw new TypeError('OpenDecider-nano tokenizer and runner are required.');
-  let queue = Promise.resolve(),
+  let queue: Promise<unknown> = Promise.resolve(),
     closed = false,
-    disposing;
+    disposing: Promise<void> | undefined;
   const requireOpen = () => {
     if (closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
   };
-  const enqueue = (task) => {
+  const enqueue = <T,>(task: () => T | PromiseLike<T>): Promise<T> => {
     const current = queue.then(task);
     queue = current.catch(() => {});
     return current;
   };
-  async function infer(request, options = {}) {
+  async function infer(request: unknown, options: NanoOptions | null = {}) {
     requireOpen();
     const signal = options?.signal;
     requireOpen();
@@ -33,14 +51,14 @@ export function createOpenDeciderNanoSession({tokenizer, runner}) {
     validateDecisionFields(options);
     const checked = validateRequestFields(request);
     requireOpen();
-    const packed = packOpenDeciderNanoRequest(tokenizer, checked);
+    const packed = packOpenDeciderNanoRequest(tokenizer!, checked);
     const schedule = () => {
       requireOpen();
       return enqueue(async () => {
         const rows = [];
         for (const question of packed.questions) {
           signal?.throwIfAborted();
-          rows.push(await runner.run(question.ids, question.markerPositions));
+          rows.push(await runner!.run(question.ids, question.markerPositions));
           signal?.throwIfAborted();
         }
         return finishOpenDeciderNanoRequest(packed, rows);
@@ -51,10 +69,10 @@ export function createOpenDeciderNanoSession({tokenizer, runner}) {
   }
 
   return {
-    async decide(request, options = {}) {
+    async decide(request: unknown, options: NanoOptions | null = {}) {
       return (await infer(request, options)).result;
     },
-    async systemOne(state, questions, options = {}) {
+    async systemOne(state: unknown, questions: unknown, options: NanoOptions | null = {}) {
       requireOpen();
       const prepared = prepareOpenDeciderNanoSystemOne(state, questions);
       const {result, packed} = await infer(prepared.request, options);
@@ -62,14 +80,14 @@ export function createOpenDeciderNanoSession({tokenizer, runner}) {
     },
     async releaseCachedMemory() {
       requireOpen();
-      return enqueue(() => runner.releaseCachedMemory());
+      return enqueue(() => runner!.releaseCachedMemory());
     },
     dispose() {
       if (disposing) return disposing;
       closed = true;
       disposing = queue.then(async () => {
         try {
-          await runner.dispose();
+          await runner!.dispose();
         } finally {
           tokenizer = runner = null;
         }
