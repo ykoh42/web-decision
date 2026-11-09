@@ -54,6 +54,8 @@
     "src/mapika4b/tokenizer.mts",
     "src/mapika4b/runner.mts",
     "src/mapika4b/session.mts",
+    "src/mapika4b/loader.mts",
+    "src/mapika4b/source.mts",
     "src/opendecider-nano/gpu-compat.mts",
     "src/opendecider-nano/tokenizer.mts",
     "src/strands/loader.mts",

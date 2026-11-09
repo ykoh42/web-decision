@@ -46,8 +46,8 @@ test('indexes file segments and preserves binding order', () => {
   assert.equal(entries.length, 682);
   assert.equal(files.size, 676);
   assert.equal(files.get('weights-675'), 680 * 4);
-  assert.equal(entries[0].bindingKind, 'q4-candidate');
-  assert.equal(entries[681].bindingKind, 'derived-rotary');
+  assert.equal(entries[0]!.bindingKind, 'q4-candidate');
+  assert.equal(entries[681]!.bindingKind, 'derived-rotary');
 });
 
 test('rejects unsafe paths, invalid ranges and incomplete inventory', () => {
@@ -69,12 +69,12 @@ test('rejects unsafe paths, invalid ranges and incomplete inventory', () => {
 test('pins distinct graph bytes for each variant and rejects other models', () => {
   const baseline = mapika4Files(MAPIKA4_MODEL);
   const dlight = mapika4Files(MAPIKA4_DLIGHT_MODEL);
-  assert.equal(baseline['model.wasm'].bytes, 4963401);
-  assert.equal(dlight['model.wasm'].bytes, 4996669);
-  assert.notEqual(baseline['model.wasm'].sha256, dlight['model.wasm'].sha256);
+  assert.equal(baseline['model.wasm']!.bytes, 4963401);
+  assert.equal(dlight['model.wasm']!.bytes, 4996669);
+  assert.notEqual(baseline['model.wasm']!.sha256, dlight['model.wasm']!.sha256);
   const all = mapika4Files(MAPIKA4_DLIGHT_ALL_MODEL);
-  assert.equal(all['model.wasm'].bytes, 5168538);
-  assert.notEqual(all['model.wasm'].sha256, dlight['model.wasm'].sha256);
+  assert.equal(all['model.wasm']!.bytes, 5168538);
+  assert.notEqual(all['model.wasm']!.sha256, dlight['model.wasm']!.sha256);
   assert.deepEqual(baseline['inventory.json'], dlight['inventory.json']);
   assert.throws(() => mapika4Files('other'), {code: 'INVALID_ASSET'});
 });
