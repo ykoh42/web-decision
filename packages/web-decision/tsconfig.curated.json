@@ -60,6 +60,8 @@
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
     "src/imajev/fixture-session.mts",
+    "src/imajev/protocol.mts",
+    "src/imajev/session.mts",
     "src/imajev/result-processor.mts",
     "src/imajev/safe-outcome.mts",
     "src/kev-deberta-preview-registry.ts",
