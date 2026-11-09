@@ -4,15 +4,20 @@ import {createHash} from 'node:crypto';
 import {setImmediate as nextTurn} from 'node:timers/promises';
 import {uploadParameters} from '../src/nari/upload.mjs';
 
-const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const hash = async (bytes) => digest(bytes);
-const ROTARY = ['body.rotary_emb.inv_freq', 'body.rotary_emb.original_inv_freq'];
+type Tensor = {target?: string; shape?: number[]; dtype?: string};
+type UploadArgs = Parameters<typeof uploadParameters<Tensor>>[0];
+type Entry = UploadArgs['plan']['ordered'][number];
+type InventoryRow = UploadArgs['inventory'][number];
+
+const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const hash = async (bytes: Uint8Array) => digest(bytes);
+const ROTARY = ['body.rotary_emb.inv_freq', 'body.rotary_emb.original_inv_freq'] as const;
 function fixture(fileCount = 728) {
   const bytes = new Uint8Array([0x12, 0x34]),
     letterBytes = new Uint8Array(52 * 2560 * 4);
-  const ordered = [],
-    inventory = [],
-    data = new Map();
+  const ordered: Entry[] = [],
+    inventory: InventoryRow[] = [],
+    data = new Map<string, Uint8Array>();
   for (let i = 0; i < fileCount; i++) {
     const path = `f-${i}.pending`,
       file = {path, bytes: 2, sha256: digest(bytes)};
@@ -29,7 +34,7 @@ function fixture(fileCount = 728) {
   }
   for (let i = 0; i < 2; i++)
     ordered.push({
-      target: ROTARY[i],
+      target: ROTARY[i]!,
       graphArgument: `p${fileCount + i}`,
       shape: [32],
       dtype: 'float32',
@@ -59,10 +64,10 @@ function fixture(fileCount = 728) {
       if (this.held || this.retained) throw Error('owner held or retained');
     }
   };
-  const writes = [],
-    allocations = [],
-    read = [];
-  const args = {
+  const writes: {target: string | undefined; offset: number; bytes: Uint8Array}[] = [],
+    allocations: Tensor[] = [],
+    read: string[] = [];
+  const args: UploadArgs & {fake: boolean} = {
     fake: true,
     expectedBindings: fileCount + 2,
     owner,
@@ -71,7 +76,7 @@ function fixture(fileCount = 728) {
     rotary: Object.fromEntries(ROTARY.map((k) => [k, Float32Array.from({length: 32}, (_, i) => 1 / (i + 1))])),
     readRange: async (path, offset, count) => {
       read.push(path);
-      return data.get(path).slice(offset, offset + count);
+      return data.get(path)!.slice(offset, offset + count);
     },
     sha256: hash,
     makeHasher: () => {
@@ -79,7 +84,11 @@ function fixture(fileCount = 728) {
       return {update: (b) => h.update(b), digest: async () => h.digest('hex')};
     },
     allocate: (entry, size) => {
-      const tensor = {target: entry.target ?? 'letters', shape: entry.shape, dtype: entry.dtype};
+      const tensor: Tensor = {
+        target: (entry as typeof entry & {target?: string}).target ?? 'letters',
+        shape: entry.shape,
+        dtype: entry.dtype
+      };
       allocations.push(tensor);
       return {tensor, capacityBytes: size};
     },
@@ -104,14 +113,14 @@ test('fake 728 files, two rotary and separate original letter rows retain graph 
     out.parameters.map((x) => x.graphArgument),
     Array.from({length: 730}, (_, i) => `p${i}`)
   );
-  assert.equal(out.parameters[728].source, 'pinned-config-rotary');
-  assert.equal(out.parameters[729].target, ROTARY[1]);
+  assert.equal(out.parameters[728]!.source, 'pinned-config-rotary');
+  assert.equal(out.parameters[729]!.target, ROTARY[1]);
   assert.equal(out.letterRows.target, 'letters');
   assert.equal(out.letterSha256, f.args.plan.letterFile.sha256);
-  assert.deepEqual([...f.writes[0].bytes], [0x12, 0x34, 0, 0]);
-  assert.equal(f.writes[728].bytes.length, 128);
-  assert.deepEqual(f.writes[728].bytes, f.writes[729].bytes);
-  assert.equal(f.writes[730].bytes.length, 52 * 2560 * 4);
+  assert.deepEqual([...f.writes[0]!.bytes], [0x12, 0x34, 0, 0]);
+  assert.equal(f.writes[728]!.bytes.length, 128);
+  assert.deepEqual(f.writes[728]!.bytes, f.writes[729]!.bytes);
+  assert.equal(f.writes[730]!.bytes.length, 52 * 2560 * 4);
 });
 
 test('mixed upload binds 604 files and rejects full-Q4 binding count', async () => {
@@ -119,7 +128,7 @@ test('mixed upload binds 604 files and rejects full-Q4 binding count', async () 
   const result = await uploadParameters(mixed.args);
   assert.equal(result.parameters.length, 606);
   assert.equal(mixed.read.length, 605);
-  assert.equal(result.parameters[604].source, 'pinned-config-rotary');
+  assert.equal(result.parameters[604]!.source, 'pinned-config-rotary');
   const mismatched = fixture(604);
   mismatched.args.expectedBindings = 730;
   await assert.rejects(uploadParameters(mismatched.args));
@@ -130,15 +139,15 @@ test('mixed upload binds 604 files and rejects full-Q4 binding count', async () 
 test('invalid plan, shape, inventory and rotary fail closed and retain owner', async () => {
   for (const mutation of [
     (f) => f.args.plan.ordered.pop(),
-    (f) => (f.args.plan.ordered[1].graphArgument = 'p0'),
-    (f) => (f.args.plan.ordered[0].file.bytes = 4),
-    (f) => (f.args.inventory[0].chunks[0].offset = 1),
-    (f) => (f.args.inventory[0].chunks[0].bytes = 3),
-    (f) => (f.args.inventory[1].path = f.args.inventory[0].path),
-    (f) => (f.args.plan.ordered[728].target = ROTARY[1]),
-    (f) => (f.args.rotary[ROTARY[1]][0] = 2),
+    (f) => (f.args.plan.ordered[1]!.graphArgument = 'p0'),
+    (f) => (f.args.plan.ordered[0]!.file!.bytes = 4),
+    (f) => (f.args.inventory[0]!.chunks[0]!.offset = 1),
+    (f) => (f.args.inventory[0]!.chunks[0]!.bytes = 3),
+    (f) => (f.args.inventory[1]!.path = f.args.inventory[0]!.path),
+    (f) => (f.args.plan.ordered[728]!.target = ROTARY[1]),
+    (f) => (f.args.rotary[ROTARY[1]]![0] = 2),
     (f) => (f.args.plan.letterFile.bytes = 4)
-  ]) {
+  ] satisfies ((f: ReturnType<typeof fixture>) => unknown)[]) {
     const f = fixture();
     mutation(f);
     await assert.rejects(uploadParameters(f.args));
@@ -150,8 +159,8 @@ test('invalid plan, shape, inventory and rotary fail closed and retain owner', a
 
 test('sparse tensor dimensions are rejected before allocation', async () => {
   const f = fixture();
-  f.args.plan.ordered[0].shape = Array(2);
-  f.args.plan.ordered[0].shape[1] = 1;
+  f.args.plan.ordered[0]!.shape = Array(2);
+  f.args.plan.ordered[0]!.shape[1] = 1;
   await assert.rejects(uploadParameters(f.args));
   assert.equal(f.allocations.length, 0);
   assert.equal(f.owner.retained, 1);
@@ -162,8 +171,8 @@ test('range mismatch and full hash mismatch after writes both retain ownership',
     const f = fixture();
     if (mode === 'range') f.data.set('f-0.pending', new Uint8Array([9, 9]));
     else {
-      f.args.plan.ordered[0].file.sha256 = '0'.repeat(64);
-      f.args.inventory[0].sha256 = '0'.repeat(64);
+      f.args.plan.ordered[0]!.file!.sha256 = '0'.repeat(64);
+      f.args.inventory[0]!.sha256 = '0'.repeat(64);
     }
     await assert.rejects(uploadParameters(f.args), mode === 'range' ? /range hash/ : /whole file hash/);
     assert.equal(f.owner.phase, 'failed');
@@ -175,12 +184,12 @@ test('range mismatch and full hash mismatch after writes both retain ownership',
 test('multiple contiguous ranges preserve offsets and only pad final odd FP16 tail', async () => {
   const f = fixture(),
     bytes = Uint8Array.of(1, 2, 3, 4, 5, 6),
-    file = f.args.plan.ordered[0].file;
+    file = f.args.plan.ordered[0]!.file!;
   file.bytes = 6;
   file.sha256 = digest(bytes);
-  f.args.plan.ordered[0].shape = [3];
+  f.args.plan.ordered[0]!.shape = [3];
   f.data.set(file.path, bytes);
-  f.args.inventory[0] = {
+  f.args.inventory[0]! = {
     ...file,
     chunks: [
       {offset: 0, bytes: 4, sha256: digest(bytes.slice(0, 4))},
@@ -188,33 +197,33 @@ test('multiple contiguous ranges preserve offsets and only pad final odd FP16 ta
     ]
   };
   await uploadParameters(f.args);
-  assert.equal(f.writes[0].offset, 0);
-  assert.deepEqual([...f.writes[0].bytes], [1, 2, 3, 4]);
-  assert.equal(f.writes[1].offset, 4);
-  assert.deepEqual([...f.writes[1].bytes], [5, 6, 0, 0]);
+  assert.equal(f.writes[0]!.offset, 0);
+  assert.deepEqual([...f.writes[0]!.bytes], [1, 2, 3, 4]);
+  assert.equal(f.writes[1]!.offset, 4);
+  assert.deepEqual([...f.writes[1]!.bytes], [5, 6, 0, 0]);
 });
 
 test('aligned ranges reuse owned verified bytes while an unaligned tail is padded', async () => {
   const f = fixture();
   const bytes = Uint8Array.of(1, 2, 3, 4, 5, 6);
-  const file = f.args.plan.ordered[0].file;
+  const file = f.args.plan.ordered[0]!.file!;
   file.bytes = bytes.length;
   file.sha256 = digest(bytes);
-  f.args.plan.ordered[0].shape = [3];
+  f.args.plan.ordered[0]!.shape = [3];
   f.data.set(file.path, bytes);
-  f.args.inventory[0] = {
+  f.args.inventory[0]! = {
     ...file,
     chunks: [
       {offset: 0, bytes: 4, sha256: digest(bytes.subarray(0, 4))},
       {offset: 4, bytes: 2, sha256: digest(bytes.subarray(4))}
     ]
   };
-  const hashed = [],
-    written = [];
-  let sourceView,
+  const hashed: Uint8Array[] = [],
+    written: {offset: number; data: Uint8Array; snapshot: Uint8Array}[] = [];
+  let sourceView!: Uint8Array,
     guards = 0;
   f.args.readRange = async (path, offset, count) => {
-    const view = f.data.get(path).subarray(offset, offset + count);
+    const view = f.data.get(path)!.subarray(offset, offset + count);
     if (path === file.path && offset === 0) sourceView = view;
     return view;
   };
@@ -229,32 +238,32 @@ test('aligned ranges reuse owned verified bytes while an unaligned tail is padde
     if (written.length < 2) written.push({offset, data, snapshot: Uint8Array.from(data)});
   };
   await uploadParameters(f.args);
-  assert.notEqual(hashed[0].buffer, sourceView.buffer);
-  assert.equal(written[0].data, hashed[0]);
-  assert.deepEqual([...written[0].snapshot], [1, 2, 3, 4]);
-  assert.equal(written[1].offset, 4);
-  assert.notEqual(written[1].data, hashed[1]);
-  assert.deepEqual([...written[1].snapshot], [5, 6, 0, 0]);
+  assert.notEqual(hashed[0]!.buffer, sourceView.buffer);
+  assert.equal(written[0]!.data, hashed[0]!);
+  assert.deepEqual([...written[0]!.snapshot], [1, 2, 3, 4]);
+  assert.equal(written[1]!.offset, 4);
+  assert.notEqual(written[1]!.data, hashed[1]!);
+  assert.deepEqual([...written[1]!.snapshot], [5, 6, 0, 0]);
 });
 
 test('cancel during an aligned verified write waits and keeps the owned bytes and lease', async () => {
   const f = fixture();
   const source = Uint8Array.of(1, 2, 3, 4);
-  const file = f.args.plan.ordered[0].file;
+  const file = f.args.plan.ordered[0]!.file!;
   file.bytes = source.length;
   file.sha256 = digest(source);
-  f.args.plan.ordered[0].shape = [2];
-  f.args.inventory[0] = {...file, chunks: [{offset: 0, bytes: 4, sha256: digest(source)}]};
+  f.args.plan.ordered[0]!.shape = [2];
+  f.args.inventory[0]! = {...file, chunks: [{offset: 0, bytes: 4, sha256: digest(source)}]};
   const controller = new AbortController();
   const reason = Error('cancel aligned write');
   f.args.signal = controller.signal;
-  let hashed,
-    written,
-    settle,
-    started,
+  let hashed!: Uint8Array,
+    written!: Uint8Array,
+    settle!: () => void,
+    started!: () => void,
     reads = 0,
     writes = 0;
-  const begun = new Promise((resolve) => {
+  const begun = new Promise<void>((resolve) => {
     started = resolve;
   });
   f.args.readRange = async () => {
@@ -270,7 +279,7 @@ test('cancel during an aligned verified write waits and keeps the owned bytes an
     assert.equal(offset, 0);
     written = bytes;
     started();
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
       settle = resolve;
     });
   };
@@ -305,11 +314,11 @@ test('cancel while submitted fake GPU write is unresolved waits for settlement t
   const f = fixture(),
     controller = new AbortController();
   f.args.signal = controller.signal;
-  let settle, started;
-  const begun = new Promise((r) => (started = r));
+  let settle!: () => void, started!: () => void;
+  const begun = new Promise<void>((r) => (started = r));
   f.args.writeAndSettle = () => {
     started();
-    return new Promise((r) => (settle = r));
+    return new Promise<void>((r) => (settle = r));
   };
   let ended = false;
   const job = uploadParameters(f.args).finally(() => {
@@ -335,13 +344,13 @@ test('cancelling range and whole file hashes retains the owner and observes late
     const f = fixture();
     const controller = new AbortController();
     const reason = Error(`cancel ${stage} hash`);
-    let rejectHash, entered;
-    const started = new Promise((resolve) => {
+    let rejectHash!: (reason: Error) => void, entered!: () => void;
+    const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
     const delayed = () => {
       entered();
-      return new Promise((_resolve, reject) => {
+      return new Promise<string>((_resolve, reject) => {
         rejectHash = reject;
       });
     };
@@ -398,14 +407,14 @@ test('asynchronous lease release must settle before success and cancellation is 
     const f = fixture(),
       controller = new AbortController();
     f.args.signal = controller.signal;
-    let settle, started;
-    const begun = new Promise((r) => (started = r));
+    let settle!: () => void, started!: () => void;
+    const begun = new Promise<void>((r) => (started = r));
     f.owner.hold = () => {
       f.owner.held = true;
       return {
         release() {
           started();
-          return new Promise(
+          return new Promise<void>(
             (r) =>
               (settle = () => {
                 f.owner.held = false;

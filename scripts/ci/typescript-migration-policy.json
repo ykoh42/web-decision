@@ -15,7 +15,6 @@
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
-    "packages/web-decision/test/nari-upload.test.mjs",
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/tamev.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",
