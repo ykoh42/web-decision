@@ -8,11 +8,15 @@ import {ExperimentalFusedRunner} from '../src/strands/runner.mjs';
 import {ExperimentalStrandsSession} from '../src/strands/session.mjs';
 import {createCausalInputs} from '../src/gpu-session-utils.js';
 
+type SnapshotTokenizer = Omit<Tokenizer, 'encode'> & {
+  encode(input: string, options?: {add_special_tokens?: boolean}): {ids: number[]};
+};
+type SnapshotRow = {inputIds: number[]; answerIndex: number; optionIndices: number[]; options: string[]};
 const question = () => ({instructions: 'Pick', options: ['red', 'blue']});
 const request = () => ({state: 's', questions: [question(), question()]});
 
-function tokenizerForRowLength(length) {
-  const tokenizer = new Tokenizer();
+function tokenizerForRowLength(length: number) {
+  const tokenizer: SnapshotTokenizer = new Tokenizer();
   const suffix = tokenizer.encode(renderChoice('s', question()).questionText, {add_special_tokens: false});
   const prefixLength = length - suffix.ids.length;
   if (prefixLength < 1) throw new RangeError('Requested test row is too short');
@@ -22,22 +26,22 @@ function tokenizerForRowLength(length) {
   return tokenizer;
 }
 
-const ownHole = (values, index) => {
+const ownHole = <T,>(values: T[], index: number): T[] => {
   const copy = values.slice();
   delete copy[index];
   return copy;
 };
-const inherited = (values, index) => {
+const inherited = <T,>(values: T[], index: number): T[] => {
   const copy = ownHole(values, index),
     prototype = Object.create(Array.prototype);
   Object.defineProperty(prototype, index, {value: values[index], configurable: true});
   Object.setPrototypeOf(copy, prototype);
   return copy;
 };
-function fakeSession(tokenizer = new Tokenizer()) {
-  const calls = [];
+function fakeSession(tokenizer: SnapshotTokenizer = new Tokenizer()) {
+  const calls: SnapshotRow[] = [];
   const runner = {
-    async run(row) {
+    async run(row: SnapshotRow) {
       calls.push(row);
       return [0, 1];
     },
@@ -71,8 +75,8 @@ test('choice packer accepts 255 options in order and rejects 256', () => {
     questions: [{instructions: 'Pick', options}]
   });
 
-  assert.deepEqual(packed.rows[0].options, options);
-  assert.equal(packed.rows[0].optionIndices.length, 255);
+  assert.deepEqual(packed.rows[0]!.options, options);
+  assert.equal(packed.rows[0]!.optionIndices.length, 255);
 
   assert.throws(
     () =>
@@ -111,34 +115,38 @@ test('session validates and passes 4096-token rows to its runner without truncat
 });
 
 test('4096-token causal inputs preserve positions and attention-mask semantics', () => {
-  const tensors = [];
+  type SnapshotTensor = {shape: number[]; dtype: string; byteOffset: number; value: Int32Array; raw: Uint8Array};
+  const tensors: SnapshotTensor[] = [];
   const runtime = {
-    empty(shape, dtype) {
+    empty(shape: number[], dtype: string) {
       const tensor = {
         shape,
         dtype,
         byteOffset: 0,
-        copyFrom(value) {
-          this.value = value;
+        copyFrom(value: unknown) {
+          (this as unknown as SnapshotTensor).value = value as Int32Array;
           return this;
         },
         getDataPtr() {
           return this;
         }
       };
-      tensors.push(tensor);
+      tensors.push(tensor as unknown as SnapshotTensor);
       return tensor;
     },
     lib: {
       webGPUContext: {
-        copyRawBytesToBuffer(bytes, tensor) {
+        copyRawBytesToBuffer(bytes: Uint8Array, tensor: SnapshotTensor) {
           tensor.raw = bytes;
         }
       }
     }
   };
   const inputIds = Array.from({length: STRANDS_FUSED_GRAPH_MAX_TOKENS}, (_, index) => index % 248320);
-  const inputs = createCausalInputs({runtime, device: {}}, inputIds);
+  const inputs = createCausalInputs(
+    {runtime: runtime as unknown as NonNullable<Parameters<typeof createCausalInputs>[0]['runtime']>, device: {}},
+    inputIds
+  ) as unknown as {ids: SnapshotTensor; positions: SnapshotTensor; mask: SnapshotTensor; valid: SnapshotTensor};
   const mask = new DataView(inputs.mask.raw.buffer, inputs.mask.raw.byteOffset, inputs.mask.raw.byteLength);
   const valid = new DataView(inputs.valid.raw.buffer, inputs.valid.raw.byteOffset, inputs.valid.raw.byteLength);
 
@@ -163,7 +171,7 @@ for (const makeHole of [ownHole, inherited]) {
       const input = request(),
         fake = fakeSession();
       if (field === 'questions') input.questions = makeHole(input.questions, 1);
-      else input.questions[1].options = makeHole(input.questions[1].options, 1);
+      else input.questions[1]!.options = makeHole(input.questions[1]!.options, 1);
       await assert.rejects(fake.session.decide(input), {code: 'INVALID_INPUT'});
       assert.equal(fake.calls.length, 0);
       await fake.session.dispose();
@@ -174,7 +182,7 @@ for (const makeHole of [ownHole, inherited]) {
 test('request and tokenizer data use indexed snapshots, not user iterators or repeated getters', async () => {
   const fake = fakeSession(),
     input = request(),
-    original = input.questions[0].options;
+    original = input.questions[0]!.options;
   let states = 0,
     choices = 0;
   Object.defineProperty(input, 'state', {
@@ -183,7 +191,7 @@ test('request and tokenizer data use indexed snapshots, not user iterators or re
       return states === 1 ? 's' : 123;
     }
   });
-  Object.defineProperty(input.questions[0], 'options', {
+  Object.defineProperty(input.questions[0]!, 'options', {
     get() {
       choices++;
       return choices === 1 ? original : [false];
@@ -191,11 +199,11 @@ test('request and tokenizer data use indexed snapshots, not user iterators or re
   });
   input.questions[Symbol.iterator] = function* () {
     yield null;
-  };
+  } as unknown as (typeof input.questions)[typeof Symbol.iterator];
   original[Symbol.iterator] = function* () {
     yield 'wrong';
     yield 'other';
-  };
+  } as unknown as (typeof original)[typeof Symbol.iterator];
   const answers = await fake.session.decide(input);
   assert.equal(states, 1);
   assert.equal(choices, 1);
@@ -203,7 +211,7 @@ test('request and tokenizer data use indexed snapshots, not user iterators or re
     answers.answers.map((item) => item.selected),
     ['blue', 'blue']
   );
-  assert.deepEqual(fake.calls[0].options, ['red', 'blue']);
+  assert.deepEqual(fake.calls[0]!.options, ['red', 'blue']);
   await fake.session.dispose();
   const trick = new Tokenizer(),
     encode = trick.encode;
@@ -211,7 +219,7 @@ test('request and tokenizer data use indexed snapshots, not user iterators or re
     const result = encode.apply(this, args);
     result.ids[Symbol.iterator] = function* () {
       yield -1;
-    };
+    } as unknown as (typeof result.ids)[typeof Symbol.iterator];
     return result;
   };
   const expected = packStrandsRequest(new Tokenizer(), request());
@@ -227,17 +235,17 @@ test('every question is snapshotted before tokenization can mutate later questio
     tokenizer = new Tokenizer(),
     encode = tokenizer.encode;
   tokenizer.encode = function (...args) {
-    input.questions[1].options[1] = 'changed';
+    input.questions[1]!.options[1] = 'changed';
     return encode.apply(this, args);
   };
   const packed = packStrandsRequest(tokenizer, input);
-  assert.deepEqual(packed.rows[1].options, ['red', 'blue']);
+  assert.deepEqual(packed.rows[1]!.options, ['red', 'blue']);
 });
 
 function fusedRunner() {
-  const captures = [],
+  const captures: {ids: unknown; answer: unknown; options: unknown}[] = [],
     scope = {begun: 0};
-  const context = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+  const context = {pendingGPUToCPUCopy: null as Promise<void> | null, copyRawBytesToBuffer() {}};
   const runtime = {
     beginScope() {
       scope.begun++;
@@ -247,19 +255,21 @@ function fusedRunner() {
       return 'cpu';
     },
     lib: {webGPUContext: context},
-    empty(_shape, _dtype, target) {
+    empty(_shape: number[], _dtype: string, target: unknown) {
       return {
         byteOffset: 0,
         getDataPtr() {
           return 1;
         },
-        copyFrom(value) {
-          this.value = ArrayBuffer.isView(value) ? Array.from(value) : value.value;
+        copyFrom(value: unknown) {
+          (this as {value?: unknown}).value = ArrayBuffer.isView(value)
+            ? Array.from(value as Int32Array)
+            : (value as {value: unknown}).value;
           if (target === 'cpu') context.pendingGPUToCPUCopy = Promise.resolve();
           return this;
         },
-        toArray() {
-          return this.value;
+        toArray(): unknown {
+          return (this as {value?: unknown}).value;
         }
       };
     }
@@ -283,11 +293,18 @@ function fusedRunner() {
     weights: Array(328).fill(0),
     lifecycle: {loss: null, disposed: false},
     uncaptured: [],
-    fn(ids, _pos, _mask, _valid, answer, options) {
-      captures.push({ids: ids.value, answer: answer.value[0], options: options.value});
+    fn(
+      ids: {value: unknown},
+      _pos: unknown,
+      _mask: unknown,
+      _valid: unknown,
+      answer: {value: number[]},
+      options: {value: unknown}
+    ) {
+      captures.push({ids: ids.value, answer: answer.value[0]!, options: options.value});
       return {value: [0, 1]};
     }
-  });
+  } as unknown as ConstructorParameters<typeof ExperimentalFusedRunner>[0]);
   return {runner, captures, scope};
 }
 const row = () => ({inputIds: [5, 6, 7, 8], answerIndex: 3, optionIndices: [1, 2], options: ['red', 'blue']});
@@ -297,7 +314,8 @@ for (const field of ['inputIds', 'optionIndices', 'options']) {
     for (const makeHole of [ownHole, inherited]) {
       const value = row(),
         fake = fusedRunner();
-      value[field] = makeHole(value[field], 1);
+      const fields = value as unknown as Record<string, unknown[]>;
+      fields[field] = makeHole(fields[field]!, 1);
       await assert.rejects(fake.runner.run(value), {code: 'INVALID_INPUT'});
       assert.equal(fake.scope.begun, 0);
       assert.deepEqual(fake.captures, []);
@@ -312,11 +330,11 @@ test('runner executes exactly its validated index snapshots despite custom itera
     options = value.optionIndices;
   ids[Symbol.iterator] = function* () {
     yield -1;
-  };
+  } as unknown as (typeof ids)[typeof Symbol.iterator];
   options[Symbol.iterator] = function* () {
     yield -1;
     yield 999;
-  };
+  } as unknown as (typeof options)[typeof Symbol.iterator];
   let idReads = 0,
     optionReads = 0;
   Object.defineProperty(value, 'inputIds', {
@@ -364,13 +382,13 @@ test('protocol and unpack reject sparse and nonfinite results while ignoring cus
   tricky[Symbol.iterator] = function* () {
     yield 99;
     yield 0;
-  };
-  assert.equal(unpackStrandsScores([tricky, [2, 3]], packed).answers[0].selected, 'blue');
+  } as unknown as (typeof tricky)[typeof Symbol.iterator];
+  assert.equal(unpackStrandsScores([tricky, [2, 3]], packed).answers[0]!.selected, 'blue');
   const choices = ['red', 'blue'];
   choices[Symbol.iterator] = function* () {
     yield 'wrong';
     yield 'other';
-  };
+  } as unknown as (typeof choices)[typeof Symbol.iterator];
   assert.match(renderChoice('s', {instructions: 'Pick', options: choices}).questionText, /1\. red\n2\. blue/);
   assert.equal(scoreChoice(choices, [0, 1]).selected, 'blue');
   const values = [0, 1];
