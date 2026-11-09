@@ -20,7 +20,6 @@
     "packages/web-decision/test/elephant-loader-review.test.mjs",
     "packages/web-decision/test/elephant-variants.test.mjs",
     "packages/web-decision/test/ettin.test.mjs",
-    "packages/web-decision/test/fixtures/imajev.mjs",
     "packages/web-decision/test/gliner-mobile.test.mjs",
     "packages/web-decision/test/h2o-adapter.test.mjs",
     "packages/web-decision/test/h2o-loader.test.mjs",
