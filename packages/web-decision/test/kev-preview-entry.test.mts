@@ -19,7 +19,9 @@ test('the release entry exposes only Kev 0.6B Q4F16', () => {
       min: 1
     }
   );
-  assert.equal(limits.find((limit: {resource: string}) => limit.resource === 'options').max, 255);
+  const optionLimit = limits.find((limit: {resource: string}) => limit.resource === 'options');
+  assert.ok(optionLimit);
+  assert.equal(optionLimit.max, 255);
   assert.equal(
     limits.some((limit: {resource: string}) => limit.resource === 'characters'),
     false
