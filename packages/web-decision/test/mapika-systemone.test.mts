@@ -5,8 +5,8 @@ import {ExperimentalMapikaSession} from '../src/mapika/session.js';
 
 function createTokenizer() {
   return {
-    encode(text) {
-      return {ids: Array.from(text, (character) => character.codePointAt(0) + 200)};
+    encode(text: string) {
+      return {ids: Array.from(text, (character) => character.codePointAt(0)! + 200)};
     }
   };
 }
@@ -30,22 +30,22 @@ function createLabels() {
 
 const limits = {maxInputTokens: 8192, maxStateTokens: 4096, controlIds: [999999], temperature: 1.03};
 
-function prepare(state, questions) {
+function prepare(state: unknown, questions: unknown) {
   return prepareMapikaSystemOne(state, questions, createTokenizer(), createLabels(), limits);
 }
 
-function answer(probabilities) {
+function answer(probabilities: number[]): Parameters<typeof finishMapikaSystemOne>[1][number] {
   return {
     answers: [
       {
         probabilities: probabilities.map((probability, index) => ({option: String(index), probability, logit: 0}))
       }
     ]
-  };
+  } as unknown as Parameters<typeof finishMapikaSystemOne>[1][number];
 }
 
 function sessionFixture() {
-  const events = [];
+  const events: string[] = [];
   const lifecycle = {loss: null, disposed: false};
   const session = new ExperimentalMapikaSession({
     runtime: {
@@ -67,7 +67,7 @@ function sessionFixture() {
     uncaptured: [],
     lifecycle,
     modelId: 'mapika-0.8b-q4f16'
-  });
+  } as unknown as ConstructorParameters<typeof ExperimentalMapikaSession>[0]);
   return {session, events};
 }
 
@@ -86,7 +86,7 @@ test('JSON state annotation handles long arrays, nested objects, and an existing
     .replaceAll(':', ': ');
   const prepared = prepare(state, {pick: {instructions: 'Choose a record.', criteria: {first: null, second: null}}});
   const stateIds = createTokenizer().encode(`Context:\n${expected}`).ids;
-  assert.deepEqual(prepared.rows[0].packed.ids.slice(0, stateIds.length), stateIds);
+  assert.deepEqual(prepared.rows[0]!.packed.ids.slice(0, stateIds.length), stateIds);
 });
 
 test('string state is kept verbatim and JSON state keeps Unicode and insertion order', () => {
@@ -94,14 +94,14 @@ test('string state is kept verbatim and JSON state keeps Unicode and insertion o
   const prepared = prepare(state, {pick: {question: 'Choose.', options: ['안녕', '다음']}});
   const expected = '{"second": "안녕", "first": 2}';
   assert.deepEqual(
-    prepared.rows[0].packed.ids.slice(0, createTokenizer().encode(`Context:\n${expected}`).ids.length),
+    prepared.rows[0]!.packed.ids.slice(0, createTokenizer().encode(`Context:\n${expected}`).ids.length),
     createTokenizer().encode(`Context:\n${expected}`).ids
   );
 
   const text = ' raw state stays as provided ';
   const raw = prepare(text, {pick: {instructions: 'Choose.', criteria: {one: null, two: null}}});
   assert.deepEqual(
-    raw.rows[0].packed.ids.slice(0, createTokenizer().encode(`Context:\n${text}`).ids.length),
+    raw.rows[0]!.packed.ids.slice(0, createTokenizer().encode(`Context:\n${text}`).ids.length),
     createTokenizer().encode(`Context:\n${text}`).ids
   );
 });
@@ -113,8 +113,8 @@ test('JSON state formats extreme finite numbers like Python json and list option
     choose: {instructions: 'Choose.', criteria: [['nested', true, null], {label: 'value'}]}
   });
   const expectedState = createTokenizer().encode(`Context:\n${expected}`).ids;
-  assert.deepEqual(prepared.rows[0].packed.ids.slice(0, expectedState.length), expectedState);
-  assert.deepEqual(prepared.rows[0].packed.groups[0].options, ["['nested', True, None]", "{'label': 'value'}"]);
+  assert.deepEqual(prepared.rows[0]!.packed.ids.slice(0, expectedState.length), expectedState);
+  assert.deepEqual(prepared.rows[0]!.packed.groups[0]!.options, ["['nested', True, None]", "{'label': 'value'}"]);
 });
 
 test('question planning follows Mapika Choice list, isolated Score, and bool aliases', () => {
@@ -126,11 +126,11 @@ test('question planning follows Mapika Choice list, isolated Score, and bool ali
   assert.equal(prepared.rows.length, 4);
   assert.deepEqual(prepared.questions[0], {name: 'choice', type: 'choice', options: ['red', 'blue']});
   assert.match(
-    String.fromCodePoint(...prepared.rows[1].packed.ids.map((id) => id - 200)),
+    String.fromCodePoint(...prepared.rows[1]!.packed.ids.map((id) => id - 200)),
     /Proposed answer: low\nDoes the proposed answer fit\?/
   );
   assert.match(
-    String.fromCodePoint(...prepared.rows[2].packed.ids.map((id) => id - 200)),
+    String.fromCodePoint(...prepared.rows[2]!.packed.ids.map((id) => id - 200)),
     /Proposed answer: high\nDoes the proposed answer fit\?/
   );
   assert.deepEqual(prepared.questions[2], {name: 'flag', type: 'noul'});
@@ -142,7 +142,7 @@ test('question planning follows Mapika Choice list, isolated Score, and bool ali
 
 test('Noul can derive its question from true/false descriptions like TypeSafe', () => {
   const prepared = prepare('state', {flag: {type: 'noul', criteria: {true: 'fits', false: 'does not fit'}}});
-  const prompt = String.fromCodePoint(...prepared.rows[0].packed.ids.map((id) => id - 200));
+  const prompt = String.fromCodePoint(...prepared.rows[0]!.packed.ids.map((id) => id - 200));
   assert.match(prompt, /Which answer fits the context\?/);
   assert.throws(() => prepare('state', {flag: {type: 'noul'}}), {code: 'INVALID_INPUT'});
 });
@@ -151,7 +151,7 @@ test('typed limits retain Mapika option and score bounds without truncation', ()
   for (const optionCount of [2, 10, 11, 255]) {
     const criteria = Array.from({length: optionCount}, (_, index) => `option-${index}`);
     const prepared = prepare('state', {pick: {instructions: 'Choose.', criteria}});
-    assert.equal(prepared.rows[0].packed.groups[0].options.length, optionCount);
+    assert.equal(prepared.rows[0]!.packed.groups[0]!.options.length, optionCount);
   }
   for (const levelCount of [2, 10]) {
     const criteria = Array.from({length: levelCount}, (_, index) => `level-${index}`);
@@ -176,12 +176,14 @@ test('rejects accessors, sparse JSON arrays, cycles, and typed requests beyond t
   });
   assert.throws(() => prepare('state', {bad: getter}), {code: 'INVALID_INPUT'});
 
+  // Keep the missing entries for the sparse-array validation case.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparse = new Array(2);
   assert.throws(() => prepare('state', {bad: {type: 'choice', instructions: 'Pick?', criteria: sparse}}), {
     code: 'INVALID_INPUT'
   });
 
-  const cycle = {};
+  const cycle: {self?: unknown} = {};
   cycle.self = cycle;
   assert.throws(() => prepare(cycle, {pick: {instructions: 'Pick?', criteria: {a: null, b: null}}}), {
     code: 'INVALID_INPUT'
@@ -208,16 +210,16 @@ test('Mapika typed results keep the model contract and round values like upstrea
     'mapika-0.8b-q4f16'
   );
   assert.equal(result.model, 'mapika-0.8b-q4f16');
-  assert.equal(result.answers.choice.choice, 'b');
-  assert.equal(result.answers.choice.confidence, 0.3333);
-  assert.equal(result.answers.choice.x_p_max, 0.6667);
-  assert.deepEqual(result.answers.choice.probabilities, {a: 0.3333, b: 0.6667});
-  assert.equal(result.answers.score.score, 1.47);
-  assert.equal(result.answers.score.confidence, 0.2059);
-  assert.equal(result.answers.score.x_p_max, 0.5294);
-  assert.equal(result.answers.score.levelFit['2'], 0.9);
-  assert.equal(result.answers.score.fitMass, 1.7);
-  assert.equal(result.answers.yes.noul, 0.8);
+  assert.equal(result.answers.choice!.choice, 'b');
+  assert.equal(result.answers.choice!.confidence, 0.3333);
+  assert.equal(result.answers.choice!.x_p_max, 0.6667);
+  assert.deepEqual(result.answers.choice!.probabilities, {a: 0.3333, b: 0.6667});
+  assert.equal(result.answers.score!.score, 1.47);
+  assert.equal(result.answers.score!.confidence, 0.2059);
+  assert.equal(result.answers.score!.x_p_max, 0.5294);
+  assert.equal(result.answers.score!.levelFit!['2'], 0.9);
+  assert.equal(result.answers.score!.fitMass, 1.7);
+  assert.equal(result.answers.yes!.noul, 0.8);
 });
 
 test('listwise Score uses numeric legend order and TypeSafe confidence', () => {
@@ -229,27 +231,27 @@ test('listwise Score uses numeric legend order and TypeSafe confidence', () => {
       isolated: false
     }
   });
-  const input = String.fromCodePoint(...prepared.rows[0].packed.ids.map((id) => id - 200));
+  const input = String.fromCodePoint(...prepared.rows[0]!.packed.ids.map((id) => id - 200));
   const result = finishMapikaSystemOne(prepared, [answer([0.05, 0.15, 0.8])], 'mapika-0.8b-f16');
   assert.match(input, /\(A\) 0: low\n\(B\) 1: middle\n\(C\) 2: high/);
   assert.equal(result.model, 'mapika-0.8b-f16');
-  assert.deepEqual(result.answers.rating.legend, {0: 'low', 1: 'middle', 2: 'high'});
-  assert.equal(result.answers.rating.score, 1.75);
-  assert.equal(result.answers.rating.confidence, 0.625);
-  assert.equal(result.answers.rating.x_p_max, 0.8);
+  assert.deepEqual(result.answers.rating!.legend, {0: 'low', 1: 'middle', 2: 'high'});
+  assert.equal(result.answers.rating!.score, 1.75);
+  assert.equal(result.answers.rating!.confidence, 0.625);
+  assert.equal(result.answers.rating!.x_p_max, 0.8);
 });
 
 test('systemOne abort skips rows not yet submitted and disposal waits for the queued batch', async () => {
   const {session, events} = sessionFixture();
-  const started = {};
-  started.promise = new Promise((resolve) => {
+  const started = {} as {promise: Promise<void>; resolve: () => void};
+  started.promise = new Promise<void>((resolve) => {
     started.resolve = resolve;
   });
-  let release;
-  const gate = new Promise((resolve) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const runs = [];
+  const runs: Parameters<typeof session.run>[0][] = [];
   session.run = async (packed) => {
     runs.push(packed);
     started.resolve();

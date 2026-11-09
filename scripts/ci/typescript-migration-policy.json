@@ -19,7 +19,6 @@
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/mapika-session.test.mjs",
-    "packages/web-decision/test/mapika-systemone.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/nari-loader.test.mjs",
     "packages/web-decision/test/nari-runner.test.mjs",
