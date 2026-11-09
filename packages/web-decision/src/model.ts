@@ -59,7 +59,7 @@ type FinishKevSystemOne = (prepared: PreparedKevSystemOne, result: KevScoreResul
 const validateRequestFieldsForModel = validateRequestFields as ValidateRequestFields;
 const validateDecisionFieldsForModel = validateDecisionFields as ValidateDecisionFields;
 const waitForAbortOperation = waitForAbort as WaitForAbort;
-const assertKevAttentionFitsForModel = assertKevAttentionFits as AssertKevAttentionFits;
+const assertKevAttentionFitsForModel: AssertKevAttentionFits = assertKevAttentionFits;
 const prepareKevSystemOneForModel = prepareKevSystemOne as PrepareKevSystemOne;
 const finishKevSystemOneForModel = finishKevSystemOne as FinishKevSystemOne;
 

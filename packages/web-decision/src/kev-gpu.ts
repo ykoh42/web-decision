@@ -17,26 +17,29 @@ export const KEV_REQUIRED_LIMITS = Object.freeze({
   maxComputeWorkgroupsPerDimension: 65535
 });
 
-export function requiredKevAttentionBytes(sequenceLength) {
+export function requiredKevAttentionBytes(sequenceLength: number) {
   if (!Number.isSafeInteger(sequenceLength) || sequenceLength < 0)
     throw new RangeError('sequenceLength must be a non-negative safe integer.');
   const tokens = BigInt(sequenceLength);
   return tokens * tokens * KEV_ATTENTION_HEADS * KEV_ATTENTION_SCORE_BYTES;
 }
 
-export function assertKevAttentionFits(sequenceLength, limits) {
+export function assertKevAttentionFits(
+  sequenceLength: number,
+  limits?: {maxBufferSize?: number; maxStorageBufferBindingSize?: number} | null
+) {
   const required = requiredKevAttentionBytes(sequenceLength);
   const maxBufferSize = limits?.maxBufferSize;
   const maxStorageBufferBindingSize = limits?.maxStorageBufferBindingSize;
   if (
     !Number.isSafeInteger(maxBufferSize) ||
     !Number.isSafeInteger(maxStorageBufferBindingSize) ||
-    maxBufferSize < 0 ||
-    maxStorageBufferBindingSize < 0
+    (maxBufferSize as number) < 0 ||
+    (maxStorageBufferBindingSize as number) < 0
   )
     return;
 
-  const limit = BigInt(Math.min(maxBufferSize, maxStorageBufferBindingSize));
+  const limit = BigInt(Math.min(maxBufferSize as number, maxStorageBufferBindingSize as number));
   if (required > limit) {
     throw new WebDecisionError(
       'DEVICE_RESOURCE_LIMIT',
@@ -46,7 +49,10 @@ export function assertKevAttentionFits(sequenceLength, limits) {
 }
 
 /** Return an adapter/device pair compatible with the current loader's interface. */
-export async function detectKevGPUDevice(gpu = globalThis.navigator?.gpu, signal) {
+export async function detectKevGPUDevice(
+  gpu: GPU | null | undefined = globalThis.navigator?.gpu,
+  signal?: AbortSignal
+) {
   signal?.throwIfAborted();
   if (!gpu) return undefined;
   const adapter = await requestGpuAdapter(gpu, signal);
@@ -59,7 +65,7 @@ export async function detectKevGPUDevice(gpu = globalThis.navigator?.gpu, signal
     return {adapter, device: undefined, adapterInfo: adapter.info};
   }
   for (const [name, required] of Object.entries(KEV_REQUIRED_LIMITS)) {
-    const available = adapter.limits[name];
+    const available = (adapter.limits as unknown as Record<string, unknown>)[name];
     if (typeof available !== 'number' || !Number.isFinite(available) || available < required)
       throw new Error(`WebGPU ${name} requires ${required}; adapter reports ${available}.`);
   }
