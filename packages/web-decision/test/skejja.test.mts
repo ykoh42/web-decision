@@ -14,6 +14,7 @@ import {loadSkejja, validateSkejjaLoadOptions} from '../src/skejja/loader.mjs';
 import {openSkejjaSource, parseSkejjaArchive} from '../src/skejja/source.mjs';
 import {describeSkejjaModel} from '../src/skejja-preview-registry.mjs';
 import {createSkejjaSession} from '../src/skejja/session.mjs';
+import type {SkejjaTokenizer} from '../src/skejja/tokenizer.mjs';
 import {
   asSkejjaText,
   finishSkejjaDecision,
@@ -23,27 +24,61 @@ import {
 } from '../src/skejja/protocol.mjs';
 import {createSkejjaPrompt, createSkejjaTokenizer, SKEJJA_TRUNCATION_MARKER} from '../src/skejja/tokenizer.mjs';
 
-class CharacterTokenizer {
-  encode(text) {
-    return Array.from(text, (character) => character.codePointAt(0));
+type SkejjaProfile = typeof SKEJJA_INT8_PROFILE | typeof SKEJJA_INT8DYN_PROFILE;
+type SkejjaLoadDependencies = NonNullable<Parameters<typeof loadSkejja>[1]>;
+type SkejjaSourceDependencies = NonNullable<Parameters<typeof openSkejjaSource>[2]>;
+type SkejjaSystemResult = ReturnType<typeof finishSkejjaSystemOne>;
+type SkejjaGenericResult = ReturnType<typeof finishSkejjaDecision>;
+type TestSkejjaFeeds = {
+  input_ids: TestOrtTensor;
+  attention_mask: TestOrtTensor;
+  label_slots: TestOrtTensor;
+};
+type TestProgress = {loadedBytes: number; totalBytes: number; fraction: number};
+type SmallArchiveProfile = {files: Record<string, {bytes: number; sha256: string}>; totalBytes: number};
+type SmallArchiveSpec = NonNullable<SkejjaSourceDependencies['archiveSpec']>;
+type VerifiedAssetReader = NonNullable<SkejjaSourceDependencies['readVerifiedAsset']>;
+type ArchiveOutcome = {type: 'resolved'} | {type: 'rejected'; error: unknown} | {type: 'timeout'};
+
+class CharacterTokenizer implements SkejjaTokenizer {
+  encode(text: string): number[] {
+    return Array.from(text, (character) => character.codePointAt(0)!);
   }
 
-  decode(ids) {
+  decode(ids: number[]): string {
     return String.fromCodePoint(...ids);
   }
 }
 
-function bytes(value) {
-  return new TextEncoder().encode(JSON.stringify(value)).buffer;
+class TestOrtTensor {
+  declare readonly type: string;
+  declare readonly data: ArrayBufferView;
+  declare readonly dims: number[];
+
+  constructor(type: string, data: ArrayBufferView, dims: number[]) {
+    Object.assign(this, {type, data, dims});
+  }
 }
 
-function digest(value) {
+function bytes(value: unknown): ArrayBuffer {
+  return Uint8Array.from(new TextEncoder().encode(JSON.stringify(value))).buffer;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return {promise, resolve};
+}
+
+function digest(value: Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function tarHeader(path, size, type = '\0', corruptChecksum = false) {
+function tarHeader(path: string, size: number, type = '\0', corruptChecksum = false): Buffer {
   const header = Buffer.alloc(512);
-  const octal = (value, width) => `${value.toString(8).padStart(width - 1, '0')}\0`;
+  const octal = (value: number, width: number) => `${value.toString(8).padStart(width - 1, '0')}\0`;
   Buffer.from(path).copy(header, 0);
   Buffer.from(octal(0o644, 8)).copy(header, 100);
   Buffer.from(octal(0, 8)).copy(header, 108);
@@ -61,7 +96,10 @@ function tarHeader(path, size, type = '\0', corruptChecksum = false) {
   return header;
 }
 
-function makeTarGzip(files, {corruptChecksum = false} = {}) {
+function makeTarGzip(
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+  {corruptChecksum = false}: {corruptChecksum?: boolean} = {}
+): Buffer {
   const root = `${SKEJJA_ARCHIVE.root}/`;
   const chunks = [tarHeader(root, 0, '5')];
   for (const [index, [name, value]] of files.entries()) {
@@ -75,7 +113,12 @@ function makeTarGzip(files, {corruptChecksum = false} = {}) {
   return gzipSync(Buffer.concat(chunks));
 }
 
-function makeSmallArchiveFixture() {
+function makeSmallArchiveFixture(): {
+  files: Record<string, Buffer>;
+  compressed: Buffer;
+  profile: SmallArchiveProfile;
+  archiveSpec: SmallArchiveSpec;
+} {
   const files = {
     'tokenizer.json': Buffer.from('tokenizer'),
     'edge-v32k-ft6.int8.onnx': Buffer.from('graph'),
@@ -103,16 +146,10 @@ function makeSmallArchiveFixture() {
   return {files, compressed, profile, archiveSpec};
 }
 
-class TestOrtTensor {
-  constructor(type, data, dims) {
-    Object.assign(this, {type, data, dims});
-  }
-}
-
-function makeLoadDependencies(profile, logits = [0.2, -0.1, 0.5]) {
+function makeLoadDependencies(profile: SkejjaProfile, logits = [0.2, -0.1, 0.5]) {
   const released = {count: 0};
-  const runInputs = [];
-  const values = {
+  const runInputs: TestSkejjaFeeds[] = [];
+  const values: Record<string, ArrayBuffer> = {
     'tokenizer.json': bytes({model: {type: 'BPE', vocab: {'<bos>': 2, '<eos>': 1}}}),
     'tokenizer_config.json': bytes({
       tokenizer_class: 'PreTrainedTokenizerFast',
@@ -131,36 +168,41 @@ function makeLoadDependencies(profile, logits = [0.2, -0.1, 0.5]) {
     [profile.onnxFile]: new ArrayBuffer(4),
     [profile.dataFile]: new ArrayBuffer(4)
   };
-  class TestTokenizer extends CharacterTokenizer {
-    constructor() {
-      super();
+  class TestTokenizer {
+    constructor() {}
+
+    token_to_id(token: string): number | undefined {
+      return ({'<<LABEL>>': 32765, '<<SEP>>': 32766} as Record<string, number>)[token];
     }
 
-    token_to_id(token) {
-      return {'<<LABEL>>': 32765, '<<SEP>>': 32766}[token];
+    encode(text: string) {
+      return {ids: [2, ...Array.from(text, (character) => character.codePointAt(0)!), 1]};
     }
 
-    encode(text) {
-      return {ids: [2, ...super.encode(text), 1]};
-    }
-
-    decode(ids) {
-      return super.decode(ids.filter((id) => id !== 1 && id !== 2));
+    decode(ids: number[]) {
+      return String.fromCodePoint(...ids.filter((id) => id !== 1 && id !== 2));
     }
   }
   const ort = {
     Tensor: TestOrtTensor,
     InferenceSession: {
-      async create(_graph, options) {
+      async create(
+        _graph: Uint8Array,
+        options: {
+          executionProviders: string[];
+          intraOpNumThreads: number;
+          externalData: Array<{path: string; data: Uint8Array}>;
+        }
+      ) {
         assert.deepEqual(options.executionProviders, ['wasm']);
         assert.equal(options.intraOpNumThreads, 1);
-        assert.equal(options.externalData[0].path, profile.dataFile);
+        assert.equal(options.externalData[0]!.path, profile.dataFile);
         return {
           inputNames: ['input_ids', 'attention_mask', 'label_slots'],
           outputNames: ['logits'],
-          async run(inputs) {
+          async run(inputs: TestSkejjaFeeds) {
             runInputs.push(inputs);
-            const count = inputs.label_slots.dims[0];
+            const count = inputs.label_slots.dims[0]!;
             const row = Array.from({length: count}, (_, index) => logits[index] ?? 0);
             return {logits: new TestOrtTensor('float32', Float32Array.from(row), [1, count])};
           },
@@ -171,23 +213,34 @@ function makeLoadDependencies(profile, logits = [0.2, -0.1, 0.5]) {
       }
     }
   };
+  const dependencies = {
+    ort,
+    Tokenizer: TestTokenizer,
+    async openSource(_options: Parameters<typeof openSkejjaSource>[0], selected: SkejjaProfile) {
+      assert.equal(selected, profile);
+      return {
+        async read(name: string) {
+          assert.ok(name in values);
+          return values[name]!;
+        }
+      };
+    }
+  } as unknown as SkejjaLoadDependencies;
   return {
     released,
     runInputs,
-    dependencies: {
-      ort,
-      Tokenizer: TestTokenizer,
-      async openSource(_options, selected) {
-        assert.equal(selected, profile);
-        return {
-          async read(name) {
-            assert.ok(name in values);
-            return values[name];
-          }
-        };
-      }
-    }
+    dependencies
   };
+}
+
+function requireSystemResult(value: unknown): SkejjaSystemResult {
+  assert.ok(typeof value === 'object' && value !== null && 'answers' in value && 'tokenCount' in value);
+  return value as SkejjaSystemResult;
+}
+
+function requireGenericResult(value: unknown): SkejjaGenericResult {
+  assert.ok(typeof value === 'object' && value !== null && 'answers' in value && 'tokenCount' in value);
+  return value as SkejjaGenericResult;
 }
 
 test('Skejja profiles pin both official ONNX variants and their external weights', () => {
@@ -209,40 +262,46 @@ test('Skejja profiles pin both official ONNX variants and their external weights
 test('Skejja ID-only source shares a verified archive parse between concurrent reads', async () => {
   const fixture = makeSmallArchiveFixture();
   const calls = {cache: 0, archive: 0};
-  const progress = [];
+  const progress: TestProgress[] = [];
+  const sourceDependencies = {
+    archiveSpec: fixture.archiveSpec,
+    async openAssetCache(enabled: boolean | undefined) {
+      assert.equal(enabled, true);
+      calls.cache++;
+      return {name: 'existing-asset-cache'} as unknown as Awaited<
+        ReturnType<NonNullable<SkejjaSourceDependencies['openAssetCache']>>
+      >;
+    },
+    async readVerifiedAsset(
+      base: Parameters<VerifiedAssetReader>[0],
+      manifest: Parameters<VerifiedAssetReader>[1],
+      name: Parameters<VerifiedAssetReader>[2],
+      options: Parameters<VerifiedAssetReader>[3]
+    ) {
+      assert.equal(base.href, 'https://example.test/revision/');
+      assert.deepEqual(manifest.files[name], {
+        bytes: fixture.archiveSpec.bytes,
+        sha256: fixture.archiveSpec.sha256
+      });
+      assert.equal(name, fixture.archiveSpec.filename);
+      assert.ok(options);
+      assert.equal((options!.cache as unknown as {name: string}).name, 'existing-asset-cache');
+      assert.equal(options.offline, true);
+      assert.equal(options.maxAssetBytes, fixture.archiveSpec.bytes);
+      calls.archive++;
+      return Uint8Array.from(fixture.compressed).buffer;
+    }
+  } as unknown as SkejjaSourceDependencies;
   const source = await openSkejjaSource(
     {
       base: new URL('https://example.test/revision/'),
       cacheEnabled: true,
       offline: true,
       useArchive: true,
-      onProgress: (value) => progress.push(value)
+      onProgress: (value: TestProgress) => progress.push(value)
     },
     fixture.profile,
-    {
-      archiveSpec: fixture.archiveSpec,
-      async openAssetCache(enabled) {
-        assert.equal(enabled, true);
-        calls.cache++;
-        return {name: 'existing-asset-cache'};
-      },
-      async readVerifiedAsset(base, manifest, name, options) {
-        assert.equal(base.href, 'https://example.test/revision/');
-        assert.deepEqual(manifest.files[name], {
-          bytes: fixture.archiveSpec.bytes,
-          sha256: fixture.archiveSpec.sha256
-        });
-        assert.equal(name, fixture.archiveSpec.filename);
-        assert.equal(options.cache.name, 'existing-asset-cache');
-        assert.equal(options.offline, true);
-        assert.equal(options.maxAssetBytes, fixture.archiveSpec.bytes);
-        calls.archive++;
-        return fixture.compressed.buffer.slice(
-          fixture.compressed.byteOffset,
-          fixture.compressed.byteOffset + fixture.compressed.byteLength
-        );
-      }
-    }
+    sourceDependencies
   );
 
   const [tokenizer, graph, data] = await Promise.all([
@@ -259,14 +318,14 @@ test('Skejja ID-only source shares a verified archive parse between concurrent r
     {loadedBytes: fixture.archiveSpec.bytes, totalBytes: fixture.archiveSpec.bytes, fraction: 1}
   ]);
 
-  await source.release(['tokenizer.json', 'edge-v32k-ft6.int8.onnx', 'edge-v32k-ft6.int8.onnx.data']);
+  await source.release!(['tokenizer.json', 'edge-v32k-ft6.int8.onnx', 'edge-v32k-ft6.int8.onnx.data']);
   await assert.rejects(source.read('LICENSE'), {code: 'INVALID_ASSET'});
 });
 
 test('Skejja archive parser extracts only pinned-profile files and rejects malformed tar data', async () => {
   const fixture = makeSmallArchiveFixture();
   const parsed = await parseSkejjaArchive(fixture.compressed, fixture.profile, {archiveSpec: fixture.archiveSpec});
-  assert.equal(Buffer.from(parsed.get('tokenizer.json')).toString(), 'tokenizer');
+  assert.equal(Buffer.from(parsed.get('tokenizer.json')!).toString(), 'tokenizer');
   assert.equal(parsed.has('archive-note.txt'), false);
 
   const corrupt = makeTarGzip(Object.entries(fixture.files), {corruptChecksum: true});
@@ -276,8 +335,8 @@ test('Skejja archive parser extracts only pinned-profile files and rejects malfo
   });
 
   const duplicate = makeTarGzip([
-    ['tokenizer.json', fixture.files['tokenizer.json']],
-    ['tokenizer.json', fixture.files['tokenizer.json']],
+    ['tokenizer.json', fixture.files['tokenizer.json']!],
+    ['tokenizer.json', fixture.files['tokenizer.json']!],
     ...Object.entries(fixture.files).filter(([name]) => name !== 'tokenizer.json')
   ]);
   await assert.rejects(
@@ -309,13 +368,10 @@ test('Skejja archive hashing aborts promptly while a digest is still pending', a
   const fixture = makeSmallArchiveFixture();
   const controller = new AbortController();
   const abortReason = new DOMException('Cancelled during file verification', 'AbortError');
-  let startHash;
-  const hashStarted = new Promise((resolve) => {
-    startHash = resolve;
-  });
-  let settleDigest;
+  const hashStarted = deferred<void>();
+  let settleDigest!: (value: string) => void;
   let digestSettled = false;
-  const pendingDigest = new Promise((resolve) => {
+  const pendingDigest = new Promise<string>((resolve) => {
     settleDigest = resolve;
   }).then((value) => {
     digestSettled = true;
@@ -325,25 +381,26 @@ test('Skejja archive hashing aborts promptly while a digest is still pending', a
     archiveSpec: fixture.archiveSpec,
     signal: controller.signal,
     hashBytes() {
-      startHash();
+      hashStarted.resolve(undefined);
       return pendingDigest;
     }
   });
 
-  await hashStarted;
+  await hashStarted.promise;
   controller.abort(abortReason);
-  let timeout;
-  const outcome = await Promise.race([
+  let timeout!: ReturnType<typeof setTimeout>;
+  const timeoutResult = new Promise<ArchiveOutcome>((resolve) => {
+    timeout = setTimeout(() => resolve({type: 'timeout'}), 1000);
+  });
+  const outcome = await Promise.race<ArchiveOutcome>([
     parsing.then(
-      () => ({type: 'resolved'}),
-      (error) => ({type: 'rejected', error})
+      () => ({type: 'resolved'}) as const,
+      (error: unknown) => ({type: 'rejected', error}) as const
     ),
-    new Promise((resolve) => {
-      timeout = setTimeout(() => resolve({type: 'timeout'}), 1000);
-    })
+    timeoutResult
   ]);
   clearTimeout(timeout);
-  assert.equal(outcome.type, 'rejected');
+  assert.ok(outcome.type === 'rejected');
   assert.equal(outcome.error, abortReason);
   assert.equal(digestSettled, false);
   settleDigest('');
@@ -352,14 +409,14 @@ test('Skejja archive hashing aborts promptly while a digest is still pending', a
 test('Skejja preview metadata separates row limits from the upstream question default', () => {
   for (const model of [SKEJJA_INT8_MODEL, SKEJJA_INT8DYN_MODEL]) {
     const limits = describeSkejjaModel(model).features.textChoice.limits;
-    const tokenLimit = limits.find(({resource}) => resource === 'tokens');
-    const questionLimit = limits.find(({resource}) => resource === 'questions');
-    const optionLimit = limits.find(({resource}) => resource === 'options');
+    const tokenLimit = limits.find(({resource}) => resource === 'tokens')!;
+    const questionLimit = limits.find(({resource}) => resource === 'questions')!;
+    const optionLimit = limits.find(({resource}) => resource === 'options')!;
 
     assert.deepEqual([tokenLimit.scope, tokenLimit.max], ['question', 512]);
     assert.equal(questionLimit.min, 1);
     assert.equal(questionLimit.max, undefined);
-    assert.match(questionLimit.description, /upstream server defaults to 256/i);
+    assert.match(questionLimit.description!, /upstream server defaults to 256/i);
     assert.deepEqual([optionLimit.scope, optionLimit.min, optionLimit.max], ['question', 2, 255]);
   }
 });
@@ -368,13 +425,13 @@ test('Skejja tokenizer checks its BPE markers and adds the original truncation r
   const created = createSkejjaTokenizer(
     class {
       constructor() {}
-      token_to_id(token) {
-        return {'<<LABEL>>': 32765, '<<SEP>>': 32766}[token];
+      token_to_id(token: string) {
+        return ({'<<LABEL>>': 32765, '<<SEP>>': 32766} as Record<string, number>)[token];
       }
-      encode(text) {
-        return {ids: [2, ...Array.from(text, (character) => character.codePointAt(0)), 1]};
+      encode(text: string) {
+        return {ids: [2, ...Array.from(text, (character) => character.codePointAt(0)!), 1]};
       }
-      decode(ids) {
+      decode(ids: number[]) {
         return String.fromCodePoint(...ids.filter((id) => id !== 1 && id !== 2));
       }
     },
@@ -397,7 +454,7 @@ test('Skejja formats JSON with upstream spacing and rejects cyclic values', () =
     asSkejjaText({intent: ['set alarm', 1], enabled: true}),
     '{"intent": ["set alarm", 1], "enabled": true}'
   );
-  const cyclic = {};
+  const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
   assert.throws(() => asSkejjaText(cyclic), {code: 'INVALID_INPUT'});
 });
@@ -417,15 +474,17 @@ test('Skejja uses the upstream Choice, Noul, and Score labels and calibration', 
   const result = finishSkejjaSystemOne(prepared, [[2, 0], [1], [0, 2, 0]], SKEJJA_INT8_PROFILE, new Map());
   assert.equal(result.model, SKEJJA_INT8_MODEL);
   assert.deepEqual(Object.keys(result.answers), ['route', 'reminder', 'impact']);
-  assert.equal(result.answers.route.type, 'choice');
-  assert.equal(result.answers.route.choice, 'lights_off');
-  assert.ok(
-    Math.abs(result.answers.route.probabilities.lights_off - 0.5 - result.answers.route.confidence / 2) < 1e-12
-  );
-  assert.ok(result.answers.reminder.noul > 0.5);
-  assert.equal(result.answers.impact.type, 'score');
-  assert.equal(result.answers.impact.legend['2'], 'high');
-  assert.equal(result.answers.impact.score, 1);
+  const routeAnswer = result.answers.route!;
+  assert.ok(routeAnswer.type === 'choice');
+  assert.equal(routeAnswer.choice, 'lights_off');
+  assert.ok(Math.abs(routeAnswer.probabilities.lights_off! - 0.5 - routeAnswer.confidence / 2) < 1e-12);
+  const reminderAnswer = result.answers.reminder!;
+  assert.ok(reminderAnswer.type === 'noul');
+  assert.ok(reminderAnswer.noul! > 0.5);
+  const impactAnswer = result.answers.impact!;
+  assert.ok(impactAnswer.type === 'score');
+  assert.equal(impactAnswer.legend!['2'], 'high');
+  assert.equal(impactAnswer.score, 1);
   assert.equal(result.truncated, undefined);
   assert.ok(result.tokenCount > 0);
 });
@@ -439,7 +498,7 @@ test('Skejja shortening preserves the beginning and end and fits the complete 51
     },
     tokenizer
   );
-  const prompt = prepared.questions[0];
+  const prompt = prepared.questions[0]!;
   assert.equal(prompt.truncated, true);
   assert.ok(prompt.tokenCount <= 512);
   assert.ok(prompt.inputIds.length <= 512);
@@ -450,22 +509,30 @@ test('Skejja applies the 512-token limit to long bodies and labels before infere
   const {dependencies, runInputs} = makeLoadDependencies(SKEJJA_INT8_PROFILE);
   const model = await loadSkejja({model: SKEJJA_INT8_MODEL, assetsUrl: 'https://example.test/skejja/'}, dependencies);
   const longText = 'x'.repeat(200_001);
-  const result = await model.systemOne(longText, {
-    route: {type: 'choice', instructions: longText, criteria: {yes: 'yes', no: 'no'}}
-  });
+  const result = requireSystemResult(
+    await model.systemOne(longText, {
+      route: {type: 'choice', instructions: longText, criteria: {yes: 'yes', no: 'no'}}
+    })
+  );
   assert.equal(result.truncated, true);
   assert.ok(result.tokenCount <= 512);
   assert.equal(runInputs.length, 1);
 
-  const exactLabelBudget = await model.systemOne('', {
-    route: {type: 'choice', criteria: {first: 'x'.repeat(452), second: 'y'}}
-  });
+  const exactLabelBudget = requireSystemResult(
+    await model.systemOne('', {
+      route: {type: 'choice', criteria: {first: 'x'.repeat(452), second: 'y'}}
+    })
+  );
   assert.ok(exactLabelBudget.tokenCount <= 512);
   assert.equal(runInputs.length, 2);
 
   await assert.rejects(
     model.systemOne('', {route: {type: 'choice', criteria: {first: 'x'.repeat(453), second: 'y'}}}),
-    (error) => error.code === 'INVALID_INPUT' && error.message.includes('label text exceeds')
+    (error) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'INVALID_INPUT' &&
+      error.message.includes('label text exceeds')
   );
   assert.equal(runInputs.length, 2);
   await model.dispose();
@@ -485,7 +552,7 @@ test('Skejja accepts long calibration states and instructions through 512-token 
   assert.ok(Number.isFinite(calibration.a));
   assert.ok(Number.isFinite(calibration.b));
   assert.equal(runInputs.length, 8);
-  assert.ok(runInputs.every(({input_ids}) => input_ids.dims[1] <= 512));
+  assert.ok(runInputs.every(({input_ids}) => input_ids.dims[1]! <= 512));
   await model.dispose();
 });
 
@@ -506,9 +573,9 @@ test('Skejja enforces typed limits and preserves decision option order', () => {
     tokenizer
   );
   const result = finishSkejjaDecision(prepared, [[0, 2]], SKEJJA_INT8_PROFILE);
-  assert.equal(result.answers[0].selected, 'lights_off');
+  assert.equal(result.answers[0]!.selected, 'lights_off');
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0]!.probabilities.map(({option}) => option),
     ['lights_on', 'lights_off']
   );
   assert.throws(() => prepareSkejjaSystemOne('state', {bad: {type: 'noul', instructions: '   '}}, tokenizer), {
@@ -518,12 +585,12 @@ test('Skejja enforces typed limits and preserves decision option order', () => {
 
 test('Skejja accepts 257 generic and typed questions and preserves row order', async () => {
   const tokenizer = new CharacterTokenizer();
-  const calls = [];
+  const calls: Array<{text: string; labelCount: number}> = [];
   const session = createSkejjaSession({
     tokenizer,
     runner: {
-      async run(inputIds, labelCount) {
-        calls.push({text: tokenizer.decode(inputIds), labelCount});
+      async run(inputIds: Iterable<number | bigint>, labelCount: number) {
+        calls.push({text: tokenizer.decode(inputIds as number[]), labelCount});
         return Array.from({length: labelCount}, (_, index) => index);
       },
       async releaseCachedMemory() {},
@@ -534,7 +601,7 @@ test('Skejja accepts 257 generic and typed questions and preserves row order', a
     instructions: `question ${index}`,
     options: [`no ${index}`, `yes ${index}`]
   }));
-  const generic = await session.decide({state: 'shared state', questions: genericQuestions});
+  const generic = requireGenericResult(await session.decide({state: 'shared state', questions: genericQuestions}));
 
   assert.equal(generic.answers.length, 257);
   assert.deepEqual(
@@ -543,21 +610,21 @@ test('Skejja accepts 257 generic and typed questions and preserves row order', a
   );
   assert.equal(calls.length, 257);
   assert.ok(calls.every(({labelCount}) => labelCount === 2));
-  assert.match(calls[0].text, /no 0/);
-  assert.match(calls.at(-1).text, /no 256/);
+  assert.match(calls[0]!.text, /no 0/);
+  assert.match(calls.at(-1)!.text, /no 256/);
 
   calls.length = 0;
   const ids = Array.from({length: 257}, (_, index) => `question-${String(index).padStart(3, '0')}`);
   const typedQuestions = Object.fromEntries(
     ids.map((id, index) => [id, {type: 'choice', criteria: {[`no-${index}`]: 'no', [`yes-${index}`]: 'yes'}}])
   );
-  const typed = await session.systemOne('shared state', typedQuestions);
+  const typed = requireSystemResult(await session.systemOne('shared state', typedQuestions));
 
   assert.deepEqual(Object.keys(typed.answers), ids);
   assert.equal(calls.length, 257);
   assert.ok(calls.every(({labelCount}) => labelCount === 2));
-  assert.match(calls[0].text, /no/);
-  assert.match(calls.at(-1).text, /yes/);
+  assert.match(calls[0]!.text, /no/);
+  assert.match(calls.at(-1)!.text, /yes/);
   await session.dispose();
 });
 
@@ -598,13 +665,17 @@ test('Skejja load options are strict and require a matching HTTPS directory', ()
 test('Skejja loads its pinned WASM route, serves typed and generic decisions, then releases ONNX', async () => {
   const {dependencies, released, runInputs} = makeLoadDependencies(SKEJJA_INT8_PROFILE);
   const model = await loadSkejja({model: SKEJJA_INT8_MODEL, assetsUrl: 'https://example.test/skejja/'}, dependencies);
-  const generic = await model.decide({state: 'state', questions: [{instructions: 'choose', options: ['no', 'yes']}]});
-  assert.equal(generic.answers[0].selected, 'no');
-  const typed = await model.systemOne('state', {
-    choice: {type: 'choice', criteria: {one: 'first', two: 'second'}},
-    binary: {type: 'noul', instructions: 'Does the user want to turn it on?'},
-    score: {type: 'score', criteria: ['low', 'high']}
-  });
+  const generic = requireGenericResult(
+    await model.decide({state: 'state', questions: [{instructions: 'choose', options: ['no', 'yes']}]})
+  );
+  assert.equal(generic.answers[0]!.selected, 'no');
+  const typed = requireSystemResult(
+    await model.systemOne('state', {
+      choice: {type: 'choice', criteria: {one: 'first', two: 'second'}},
+      binary: {type: 'noul', instructions: 'Does the user want to turn it on?'},
+      score: {type: 'score', criteria: ['low', 'high']}
+    })
+  );
   assert.equal(typed.model, SKEJJA_INT8_MODEL);
   assert.deepEqual(Object.keys(typed.answers), ['choice', 'binary', 'score']);
   const calibration = await model.calibrateQuestion(
@@ -629,10 +700,14 @@ test('Skejja also selects the separate dynamic-int8 graph without changing route
     {model: SKEJJA_INT8DYN_MODEL, assetsUrl: 'https://example.test/skejja/'},
     dependencies
   );
-  const result = await model.systemOne('state', {
-    check: {type: 'noul', instructions: 'Does the user want to proceed?'}
-  });
+  const result = requireSystemResult(
+    await model.systemOne('state', {
+      check: {type: 'noul', instructions: 'Does the user want to proceed?'}
+    })
+  );
   assert.equal(result.model, SKEJJA_INT8DYN_MODEL);
-  assert.ok(result.answers.check.noul > 0 && result.answers.check.noul < 1);
+  const checkAnswer = result.answers.check!;
+  assert.ok(checkAnswer.type === 'noul');
+  assert.ok(checkAnswer.noul! > 0 && checkAnswer.noul! < 1);
   await model.dispose();
 });

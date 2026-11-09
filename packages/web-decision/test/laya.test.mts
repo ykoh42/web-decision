@@ -12,35 +12,112 @@ import {loadLayaModel, validateLayaLoadOptions} from '../src/laya/loader.mjs';
 import {createLayaSession} from '../src/laya/session.mjs';
 import {loadLayaTypedDecisionsModel} from '../src/laya-typed/loader.mjs';
 import {LAYA_TYPED_FILES, LAYA_TYPED_MODEL, LAYA_TYPED_SPEC} from '../src/laya-typed/contract.mjs';
+import {XDECISION_MODEL} from '../src/xdecision/contract.mjs';
 import {loadXDecisionModel} from '../src/xdecision/loader.mjs';
 import {finishLayaSystemOne, prepareLayaSystemOne, validateLayaDecisionRequest} from '../src/laya/protocol.mjs';
+import type {PreparedLayaRow} from '../src/laya/protocol.mjs';
 import {createLayaRunner} from '../src/laya/runner.mjs';
 import {createLayaTokenizer} from '../src/laya/tokenizer.mjs';
+import {openLayaSource} from '../src/laya/source.mjs';
+
+type LayaConfig = {
+  model_type: string;
+  vocab_size: number;
+  mask_token_id?: number;
+  sep_token_id: number;
+  pad_token_id: number;
+  laya: {
+    max_len: number;
+    head_max_len: number;
+    max_option_tokens: number;
+    qtypes: {choice: number; score: number; noul: number};
+    temperature: number[];
+    temperature_by_options: Record<string, number>;
+    temperature_clamp: number[];
+  };
+};
+type TestTensor = {
+  readonly type: string;
+  readonly data: BigInt64Array | Uint8Array | Float32Array;
+  readonly dims: number[];
+  disposed?: boolean;
+  dispose(): void;
+};
+type TestFeeds = {
+  input_ids: TestTensor;
+  attention_mask: TestTensor;
+  marker_pos: TestTensor;
+  marker_mask: TestTensor;
+  qtype: TestTensor;
+};
+type LayaTestAdapter = {features: Set<string>; info: {isFallbackAdapter: false}; limits: Record<string, number>};
+type LayaTestGpuApi = {
+  adapter: LayaTestAdapter | null;
+  requestAdapter(options: {
+    powerPreference: 'high-performance';
+    forceFallbackAdapter: false;
+  }): Promise<LayaTestAdapter | null>;
+};
+type LayaTestOrt = {
+  Tensor: new (type: string, data: BigInt64Array | Uint8Array | Float32Array, dims: number[]) => TestTensor;
+  env: {webgpu: {adapter?: LayaTestAdapter; forceFallbackAdapter?: boolean; powerPreference?: string}};
+  InferenceSession: {
+    create(
+      graph: Uint8Array,
+      options: {
+        executionProviders: string[];
+        graphOptimizationLevel: string;
+        externalData: Array<{path: string; data: Uint8Array}>;
+      }
+    ): Promise<TestOrtSession>;
+  };
+};
+type TestOrtSession = {
+  inputNames: string[];
+  outputNames: string[];
+  run(feeds: Record<string, TestTensor>): Promise<{logits: TestTensor; act_logits: TestTensor}>;
+  release(): Promise<void>;
+};
+type LayaTestDependencies = {
+  ort: LayaTestOrt;
+  Tokenizer: typeof CharacterTokenizer;
+  openSource: typeof openLayaSource;
+  gpuApi: LayaTestGpuApi;
+};
+type LayaLoadDependencies = NonNullable<Parameters<typeof loadLayaModel>[1]>;
+// Keep the original four-argument call shape; the last implementation parameter defaults through undefined.
+type CreateLayaTokenizerWithoutExpectedIds = (
+  tokenizer: Parameters<typeof createLayaTokenizer>[0],
+  data: Parameters<typeof createLayaTokenizer>[1],
+  tokenizerConfig: Parameters<typeof createLayaTokenizer>[2],
+  modelConfig: Parameters<typeof createLayaTokenizer>[3]
+) => ReturnType<typeof createLayaTokenizer>;
+const createLayaTokenizerWithoutExpectedIds = createLayaTokenizer as CreateLayaTokenizerWithoutExpectedIds;
 
 class CharacterTokenizer {
-  constructor() {}
+  constructor(..._args: unknown[]) {}
 
-  token_to_id(token) {
-    return {'<bos>': 2, '<eos>': 1, '<mask>': 4, '<pad>': 0}[token];
+  token_to_id(token: string): number | undefined {
+    return ({'<bos>': 2, '<eos>': 1, '<mask>': 4, '<pad>': 0} as Record<string, number>)[token];
   }
 
-  encode(text) {
+  encode(text: string): {ids: number[]} {
     return {
       ids: Array.from(text)
         .filter((character) => character !== ' ')
-        .map((character) => character.codePointAt(0) + 10)
+        .map((character) => character.codePointAt(0)! + 10)
     };
   }
 }
 
 class TypedCharacterTokenizer extends CharacterTokenizer {
-  token_to_id(token) {
-    return {'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '[MASK]': 50284}[token];
+  override token_to_id(token: string): number | undefined {
+    return ({'[CLS]': 50281, '[SEP]': 50282, '[PAD]': 50283, '[MASK]': 50284} as Record<string, number>)[token];
   }
 }
 
 function tokenizer() {
-  return createLayaTokenizer(
+  return createLayaTokenizerWithoutExpectedIds(
     CharacterTokenizer,
     {model: {vocab: {'<bos>': 2}}},
     {cls_token: '<bos>', sep_token: '<eos>', mask_token: '<mask>', pad_token: '<pad>'},
@@ -48,11 +125,11 @@ function tokenizer() {
   );
 }
 
-function bytes(value) {
+function bytes(value: unknown): ArrayBuffer {
   return new TextEncoder().encode(JSON.stringify(value)).buffer;
 }
 
-function config() {
+function config(): LayaConfig {
   return {
     model_type: 'modernbert',
     vocab_size: 256000,
@@ -71,8 +148,8 @@ function config() {
   };
 }
 
-function loadDependencies(overrides = {}) {
-  const values = {
+function loadDependencies(overrides: Record<string, unknown> = {}) {
+  const values: Record<string, unknown> = {
     'config.json': config(),
     'tokenizer_config.json': {cls_token: '<bos>', sep_token: '<eos>', mask_token: '<mask>', pad_token: '<pad>'},
     'tokenizer.json': {model: {vocab: {'<bos>': 2}}},
@@ -81,9 +158,14 @@ function loadDependencies(overrides = {}) {
     ...overrides
   };
   const released = {count: 0};
-  const calls = [];
+  const calls: TestFeeds[] = [];
   class Tensor {
-    constructor(type, data, dims) {
+    declare readonly type: string;
+    declare readonly data: BigInt64Array | Uint8Array | Float32Array;
+    declare readonly dims: number[];
+    declare disposed?: boolean;
+
+    constructor(type: string, data: BigInt64Array | Uint8Array | Float32Array, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
 
@@ -94,23 +176,25 @@ function loadDependencies(overrides = {}) {
   const session = {
     inputNames: ['input_ids', 'attention_mask', 'marker_pos', 'marker_mask', 'qtype'],
     outputNames: ['logits', 'act_logits'],
-    async run(feeds) {
+    async run(feeds: TestFeeds) {
       calls.push(feeds);
       const [batch, markers] = feeds.marker_pos.dims;
+      const batchSize = batch!;
+      const markerCount = markers!;
       return {
         logits: new Tensor(
           'float32',
-          new Float32Array(batch * markers).map((_, index) => index % markers),
-          [batch, markers]
+          new Float32Array(batchSize * markerCount).map((_, index) => index % markerCount),
+          [batchSize, markerCount]
         ),
-        act_logits: new Tensor('float32', new Float32Array(batch * 2).fill(0), [batch, 2])
+        act_logits: new Tensor('float32', new Float32Array(batchSize * 2).fill(0), [batchSize, 2])
       };
     },
     async release() {
       released.count++;
     }
   };
-  const ort = {
+  const ort: LayaTestOrt = {
     Tensor,
     env: {webgpu: {}},
     InferenceSession: {
@@ -118,45 +202,48 @@ function loadDependencies(overrides = {}) {
         assert.deepEqual(Array.from(graph), [1, 2, 3]);
         assert.deepEqual(options.executionProviders, ['webgpu']);
         assert.equal(options.graphOptimizationLevel, 'all');
-        assert.equal(options.externalData[0].path, 'model_fp16.onnx_data');
-        assert.deepEqual(Array.from(options.externalData[0].data), [4, 5, 6]);
+        assert.equal(options.externalData[0]!.path, 'model_fp16.onnx_data');
+        assert.deepEqual(Array.from(options.externalData[0]!.data), [4, 5, 6]);
         return session;
       }
     }
   };
+  const adapter: LayaTestAdapter = {features: new Set(), info: {isFallbackAdapter: false}, limits: {}};
+  const gpuApi: LayaTestGpuApi = {
+    adapter: null,
+    async requestAdapter(options) {
+      assert.deepEqual(options, {powerPreference: 'high-performance', forceFallbackAdapter: false});
+      return this.adapter;
+    }
+  };
+  const dependencies = {
+    ort,
+    Tokenizer: CharacterTokenizer,
+    async openSource(..._options: [Parameters<typeof openLayaSource>[0]]) {
+      return {
+        async read(name: string) {
+          const value = values[name];
+          if (value === undefined) throw new Error(`Unexpected asset ${name}`);
+          return value instanceof ArrayBuffer ? value : bytes(value);
+        }
+      };
+    },
+    gpuApi
+  } satisfies LayaLoadDependencies & LayaTestDependencies;
   return {
     calls,
     released,
     ort,
-    adapter: {features: new Set(), info: {isFallbackAdapter: false}, limits: {}, requestDevice() {}},
-    dependencies: {
-      ort,
-      Tokenizer: CharacterTokenizer,
-      async openSource() {
-        return {
-          async read(name) {
-            const value = values[name];
-            if (value === undefined) throw new Error(`Unexpected asset ${name}`);
-            return value instanceof ArrayBuffer ? value : bytes(value);
-          }
-        };
-      },
-      gpuApi: {
-        async requestAdapter(options) {
-          assert.deepEqual(options, {powerPreference: 'high-performance', forceFallbackAdapter: false});
-          return this.adapter;
-        },
-        adapter: null
-      }
-    }
+    adapter,
+    dependencies
   };
 }
 
-function genericQuestions(count) {
+function genericQuestions(count: number) {
   return Array.from({length: count}, () => ({instructions: 'pick', options: ['a', 'b']}));
 }
 
-function typedQuestions(count) {
+function typedQuestions(count: number): Record<string, {type: 'choice'; instructions: string; criteria: string[]}> {
   return Object.fromEntries(
     Array.from({length: count}, (_, index) => [
       `question-${index}`,
@@ -165,19 +252,21 @@ function typedQuestions(count) {
   );
 }
 
-function assertChunkedRows(calls, start, expectedRows) {
+function assertChunkedRows(calls: TestFeeds[], start: number, expectedRows: number) {
   const batches = calls.slice(start);
   assert.equal(
-    batches.reduce((sum, feeds) => sum + feeds.input_ids.dims[0], 0),
+    batches.reduce((sum, feeds) => sum + feeds.input_ids.dims[0]!, 0),
     expectedRows
   );
   assert.equal(batches.length, Math.ceil(expectedRows / 8));
   for (const feeds of batches) {
     const [batchRows, sequenceLength] = feeds.input_ids.dims;
-    assert.ok(batchRows > 0 && batchRows <= 8);
-    assert.ok(sequenceLength <= LAYA_MAX_SEQUENCE_TOKENS);
-    assert.ok(batchRows * sequenceLength <= LAYA_MAX_SEQUENCE_TOKENS);
-    assert.equal(feeds.marker_pos.dims[0], batchRows);
+    const rowCount = batchRows!;
+    const tokens = sequenceLength!;
+    assert.ok(rowCount > 0 && rowCount <= 8);
+    assert.ok(tokens <= LAYA_MAX_SEQUENCE_TOKENS);
+    assert.ok(rowCount * tokens <= LAYA_MAX_SEQUENCE_TOKENS);
+    assert.equal(feeds.marker_pos.dims[0]!, rowCount);
   }
 }
 
@@ -200,7 +289,7 @@ test('Laya tokenizer follows tokenizer special IDs despite the conflicting model
   assert.deepEqual(created.encode('abc'), [107, 108, 109]);
   assert.throws(
     () =>
-      createLayaTokenizer(
+      createLayaTokenizerWithoutExpectedIds(
         CharacterTokenizer,
         {model: {vocab: {'<bos>': 2}}},
         {cls_token: '<bos>', sep_token: '<eos>', mask_token: '<mask>', pad_token: '<pad>'},
@@ -232,16 +321,20 @@ test('Laya protocol preserves named Choice, ordered Score and Noul outputs', () 
     LAYA_MODEL
   );
   assert.equal(result.model, LAYA_MODEL);
-  assert.equal(result.answers.route.type, 'choice');
-  assert.deepEqual(Object.keys(result.answers.route.probabilities), ['billing', 'support']);
-  const expected = result.answers.urgency.probabilities['1'] + 2 * result.answers.urgency.probabilities['2'];
-  assert.ok(Math.abs(result.answers.urgency.score - expected) < 0.0002);
-  assert.equal(result.answers.urgency.score, result.answers.urgency.expected);
-  assert.equal(result.answers.urgency.legend['2'], 'high');
-  assert.equal(result.answers.true_case.type, 'noul');
-  assert.ok(result.answers.true_case.noul > result.answers.true_case.probabilities.false);
-  assert.equal(result.answers.route.actionProbability, 0.5);
-  assert.equal(result.answers.route.actionLogits.length, 2);
+  const routeAnswer = result.answers.route!;
+  assert.ok(routeAnswer.type === 'choice');
+  assert.deepEqual(Object.keys(routeAnswer.probabilities), ['billing', 'support']);
+  const urgencyAnswer = result.answers.urgency!;
+  assert.ok(urgencyAnswer.type === 'score');
+  const expected = urgencyAnswer.probabilities['1']! + 2 * urgencyAnswer.probabilities['2']!;
+  assert.ok(Math.abs(urgencyAnswer.score - expected) < 0.0002);
+  assert.equal(urgencyAnswer.score, urgencyAnswer.expected);
+  assert.equal(urgencyAnswer.legend['2'], 'high');
+  const noulAnswer = result.answers.true_case!;
+  assert.ok(noulAnswer.type === 'noul');
+  assert.ok(noulAnswer.noul > noulAnswer.probabilities.false);
+  assert.equal(routeAnswer.actionProbability, 0.5);
+  assert.equal(routeAnswer.actionLogits.length, 2);
 });
 
 test('Laya reports context and head truncation at the 1024 and 256 token boundaries', () => {
@@ -251,8 +344,8 @@ test('Laya reports context and head truncation at the 1024 and 256 token boundar
     {id: {type: 'choice', instructions: 'q', criteria: ['a', 'b']}},
     encoder
   );
-  assert.equal(context.rows[0].tokenCount, LAYA_MAX_SEQUENCE_TOKENS);
-  assert.equal(context.rows[0].stateTruncated, true);
+  assert.equal(context.rows[0]!.tokenCount, LAYA_MAX_SEQUENCE_TOKENS);
+  assert.equal(context.rows[0]!.stateTruncated, true);
 
   const longState = 'x'.repeat(200_001);
   const longText = 'y'.repeat(200_001);
@@ -262,10 +355,10 @@ test('Laya reports context and head truncation at the 1024 and 256 token boundar
     encoder
   );
   assert.equal(longState.length > 200_000, true);
-  assert.equal(longContext.rows[0].tokenCount, LAYA_MAX_SEQUENCE_TOKENS);
-  assert.equal(longContext.rows[0].stateTruncated, true);
-  assert.equal(longContext.rows[0].instructionTruncated, true);
-  assert.equal(longContext.rows[0].optionTruncated, true);
+  assert.equal(longContext.rows[0]!.tokenCount, LAYA_MAX_SEQUENCE_TOKENS);
+  assert.equal(longContext.rows[0]!.stateTruncated, true);
+  assert.equal(longContext.rows[0]!.instructionTruncated, true);
+  assert.equal(longContext.rows[0]!.optionTruncated, true);
 
   const options = Array.from({length: LAYA_MAX_OPTIONS}, (_, index) => `o${String(index).padStart(3, '0')}`);
   const head = prepareLayaSystemOne(
@@ -273,10 +366,10 @@ test('Laya reports context and head truncation at the 1024 and 256 token boundar
     {id: {type: 'choice', instructions: 'q'.repeat(100), criteria: options}},
     encoder
   );
-  assert.ok(head.rows[0].markerPositions.at(-1) < LAYA_MAX_HEAD_TOKENS);
-  assert.equal(head.rows[0].tokenCount, LAYA_MAX_HEAD_TOKENS + 1);
-  assert.equal(head.rows[0].markerPositions.length, LAYA_MAX_OPTIONS);
-  assert.equal(head.rows[0].optionTruncated, true);
+  assert.ok(head.rows[0]!.markerPositions.at(-1)! < LAYA_MAX_HEAD_TOKENS);
+  assert.equal(head.rows[0]!.tokenCount, LAYA_MAX_HEAD_TOKENS + 1);
+  assert.equal(head.rows[0]!.markerPositions.length, LAYA_MAX_OPTIONS);
+  assert.equal(head.rows[0]!.optionTruncated, true);
   assert.throws(
     () =>
       prepareLayaSystemOne(
@@ -291,13 +384,13 @@ test('Laya reports context and head truncation at the 1024 and 256 token boundar
 });
 
 test('Laya routes reject an option-head overflow before inference', async () => {
-  const runnerCalls = [];
+  const runnerCalls: PreparedLayaRow[][] = [];
   const criteria = Array.from({length: LAYA_MAX_OPTIONS + 1}, (_, index) => `option-${index}`);
   for (const model of [LAYA_MODEL, LAYA_TYPED_MODEL]) {
     const session = createLayaSession({
       model,
       runner: {
-        async run(rows) {
+        async run(rows: PreparedLayaRow[]) {
           runnerCalls.push(rows);
           return {rows: []};
         },
@@ -338,10 +431,11 @@ test('Laya validates model selection, local assets URL, and bounded load options
 });
 
 test('Laya routes default to distinct pinned Hugging Face revisions and preserve mirror directories', () => {
-  for (const [model, spec] of [
+  const modelSpecs: Array<[string, typeof LAYA_SPEC | typeof LAYA_TYPED_SPEC]> = [
     [LAYA_MODEL, LAYA_SPEC],
     [LAYA_TYPED_MODEL, LAYA_TYPED_SPEC]
-  ]) {
+  ];
+  for (const [model, spec] of modelSpecs) {
     const expectedBase = `https://huggingface.co/${spec.repository}/resolve/${spec.revision}/`;
     const defaults = validateLayaLoadOptions({model}, model, spec);
     assert.equal(defaults.base.href, expectedBase);
@@ -358,13 +452,13 @@ test('Laya loader defaults to its pinned source, preserves mirrors, and keeps We
   for (const assetsUrl of [undefined, 'https://example.test/laya/']) {
     const fixture = loadDependencies();
     const adapter = (fixture.dependencies.gpuApi.adapter = fixture.adapter);
-    let sourceBase;
+    let sourceBase: string | undefined;
     const openSource = fixture.dependencies.openSource;
     fixture.dependencies.openSource = async (options) => {
       sourceBase = options.base.href;
       return openSource(options);
     };
-    const options = {model: LAYA_MODEL, cache: false};
+    const options: {model: string; cache: boolean; assetsUrl?: string} = {model: LAYA_MODEL, cache: false};
     if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
     const model = await loadLayaModel(options, fixture.dependencies);
     assert.equal(
@@ -376,24 +470,32 @@ test('Laya loader defaults to its pinned source, preserves mirrors, and keeps We
     const result = await model.systemOne('state', {
       route: {type: 'choice', instructions: 'choose', criteria: ['a', 'b']}
     });
-    assert.equal(result.answers.route.choice, 'b');
+    const routeAnswer = result.answers.route!;
+    assert.ok(routeAnswer.type === 'choice');
+    assert.equal(routeAnswer.choice, 'b');
     assert.equal(fixture.calls.length, 1);
-    assert.ok(Object.values(fixture.calls[0]).every((tensor) => tensor.disposed));
+    assert.ok(Object.values(fixture.calls[0]!).every((tensor) => tensor.disposed));
     await model.dispose();
     assert.equal(fixture.released.count, 1);
   }
 });
 
 test('Laya and xDecision accept larger requests and keep ONNX chunks within the row and token bounds', async () => {
-  const routes = [
+  type LayaLoaded = Awaited<ReturnType<typeof loadLayaModel>> | Awaited<ReturnType<typeof loadXDecisionModel>>;
+  const routes: Array<{
+    model: string;
+    assetsUrl: string;
+    load(assetsUrl: string, dependencies: LayaTestDependencies): Promise<LayaLoaded>;
+  }> = [
     {
       model: LAYA_MODEL,
-      load: loadLayaModel,
+      load: (assetsUrl, dependencies) => loadLayaModel({model: LAYA_MODEL, assetsUrl, cache: false}, dependencies),
       assetsUrl: 'https://example.test/laya/'
     },
     {
-      model: 'experimental-xdecision-fp16',
-      load: loadXDecisionModel,
+      model: XDECISION_MODEL,
+      load: (assetsUrl, dependencies) =>
+        loadXDecisionModel({model: XDECISION_MODEL, assetsUrl, cache: false}, dependencies),
       assetsUrl: 'https://example.test/xdecision/'
     }
   ];
@@ -401,10 +503,7 @@ test('Laya and xDecision accept larger requests and keep ONNX chunks within the 
   for (const route of routes) {
     const fixture = loadDependencies();
     fixture.dependencies.gpuApi.adapter = fixture.adapter;
-    const model = await route.load(
-      {model: route.model, assetsUrl: route.assetsUrl, cache: false},
-      fixture.dependencies
-    );
+    const model = await route.load(route.assetsUrl, fixture.dependencies);
 
     for (const count of [256, 257, 1025]) {
       const start = fixture.calls.length;
@@ -455,7 +554,7 @@ test('Laya Typed-Decisions preserves its tokenizer IDs and typed outputs through
   });
   fixture.dependencies.Tokenizer = TypedCharacterTokenizer;
   const openSource = fixture.dependencies.openSource;
-  let sourceBase;
+  let sourceBase: string | undefined;
   fixture.dependencies.openSource = async (options) => {
     assert.equal(options.spec, LAYA_TYPED_SPEC);
     sourceBase = options.base.href;
@@ -470,11 +569,13 @@ test('Laya Typed-Decisions preserves its tokenizer IDs and typed outputs through
   });
 
   assert.equal(result.model, LAYA_TYPED_MODEL);
-  assert.equal(result.answers.delivery.choice, 'pending');
-  assert.deepEqual(Object.keys(result.answers.delivery.probabilities), ['arrived', 'pending']);
-  assert.equal(fixture.calls[0].input_ids.data[0], 50281n);
-  const markerPosition = Number(fixture.calls[0].marker_pos.data[0]);
-  assert.equal(fixture.calls[0].input_ids.data[markerPosition], 50284n);
+  const delivery = result.answers.delivery!;
+  assert.ok(delivery.type === 'choice');
+  assert.equal(delivery.choice, 'pending');
+  assert.deepEqual(Object.keys(delivery.probabilities), ['arrived', 'pending']);
+  assert.equal(fixture.calls[0]!.input_ids.data[0]!, 50281n);
+  const markerPosition = Number(fixture.calls[0]!.marker_pos.data[0]!);
+  assert.equal(fixture.calls[0]!.input_ids.data[markerPosition]!, 50284n);
 
   const typedStart = fixture.calls.length;
   const manyTypedQuestions = await model.systemOne('s', typedQuestions(257));
