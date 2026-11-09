@@ -23,6 +23,10 @@ The release matrix contains only Chromium on Windows hardware. It makes no Firef
 Pack and install the exact candidate archive first. Set the paths to that archive and the package directory that the test will load, then run the TypeScript Playwright spec and retain its JSON report:
 
 ```powershell
+$env:WEB_DECISION_REAL_GPU = '1'
+$env:WEB_DECISION_KEV06_DEFAULT_GPU = '1'
+$env:WEB_DECISION_BROWSER_NAME = 'chromium'
+$env:WEB_DECISION_BROWSER_CHANNEL = 'chrome'
 $env:WEB_DECISION_RELEASE_ARCHIVE = 'C:\release\web-decision-x.y.z.tgz'
 $env:WEB_DECISION_RELEASE_PACKAGE_DIR = 'C:\release\consumer\node_modules\web-decision'
 $env:WEB_DECISION_INSTALLED_BUNDLE = 'C:\release\consumer\node_modules\web-decision\dist\index.js'
@@ -30,6 +34,8 @@ $env:PLAYWRIGHT_JSON_OUTPUT_NAME = 'C:\release\playwright-report.json'
 $env:WEB_DECISION_TVM_BUILD_EVIDENCE = 'C:\release\tvm-build-evidence.json'
 pnpm exec playwright test tests/browser/kev06-default-source-real-webgpu.spec.ts --reporter=json
 ```
+
+`WEB_DECISION_KEV06_DEFAULT_GPU=1` is required to enable this model test; without it, Playwright marks the case skipped. `WEB_DECISION_REAL_GPU=1` launches Chromium with the real-GPU settings. On Windows, the example selects installed Chrome; use the browser channel that matches the host being recorded.
 
 The Playwright project must be `chromium`. Its report must contain exactly one passing execution per curated model, with no skip, retry, flaky result, global error, or unrelated test. The browser spec must load the package at `WEB_DECISION_RELEASE_PACKAGE_DIR`.
 
