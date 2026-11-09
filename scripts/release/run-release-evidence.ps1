@@ -26,13 +26,14 @@ try {
   $exitCode = $LASTEXITCODE
   if ($exitCode -eq 0) {
     $env:WEB_DECISION_WORKSPACE_ROOT = $workspaceRoot
+    $releaseDirectory = Join-Path $buildDirectory 'scripts/release'
     if ($Mode -eq 'test') {
-      & node.exe --test (Join-Path $buildDirectory 'verify-release-evidence.test.js') (Join-Path $buildDirectory 'tvm-build-evidence.test.js')
+      & node.exe --test (Join-Path $releaseDirectory 'verify-release-evidence.test.js') (Join-Path $releaseDirectory 'tvm-build-evidence.test.js')
     } else {
       if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $BuildEvidence) {
         throw 'Verify mode requires Archive, InstalledPackage, PlaywrightReport, and BuildEvidence.'
       }
-      & node.exe (Join-Path $buildDirectory 'verify-release-evidence.js') `
+      & node.exe (Join-Path $releaseDirectory 'verify-release-evidence.js') `
         --archive $Archive `
         --installed-package $InstalledPackage `
         --playwright-report $PlaywrightReport `

@@ -42,7 +42,7 @@
     "check:javascript-policy": "node --import tsx scripts/ci/check-typescript-policy.mts",
     "check:typescript": "pnpm run typecheck && pnpm run test:typescript-policy && pnpm run check:javascript-policy",
     "check:typescript:complete": "pnpm run typecheck && pnpm run test:typescript-policy && node --import tsx scripts/ci/check-typescript-policy.mts --require-complete",
-    "test:quality:release": "node --import tsx --test scripts/release/verify-release-evidence.test.ts scripts/release/tvm-build-evidence.test.ts tests/browser/kev06-release-evidence.test.ts",
+    "test:quality:release": "node --import tsx --test scripts/release/verify-release-evidence.test.ts scripts/release/tvm-build-evidence.test.ts scripts/release/runtime-build.test.ts tests/browser/kev06-release-evidence.test.ts",
     "check:complexity:complete": "node scripts/ci/check_cognitive_complexity.mjs && node --import tsx scripts/ci/check_cognitive_complexity_completion.mts"
   },
   "devDependencies": {
