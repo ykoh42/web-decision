@@ -4,6 +4,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {defaultTreeAdapter, parse, type DefaultTreeAdapterTypes} from 'parse5';
+import {generateTvmBoundary, verifyTvmBoundary} from './generate-tvm-boundary.mts';
 
 const policyPath = 'scripts/ci/typescript-migration-policy.json';
 const initialInventoryCommit = 'baa3c144d23e1882ba29084c9f95897b8c56accb';
@@ -466,6 +467,7 @@ export function checkTypeScriptMigration(
   };
   const result = validateTypeScriptMigrationPolicy(policy, context);
   result.problems.push(...checkSharedReleaseInputs(root));
+  result.problems.push(...verifyTvmBoundary(root, generateTvmBoundary(root)));
   if (context.requireComplete) {
     for (const path of discoverInlineJavaScriptPaths(root)) {
       result.problems.push(`${path} contains inline JavaScript; move it to a TypeScript module.`);

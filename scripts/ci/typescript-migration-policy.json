@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "baselineCommit": "baa3c144d23e1882ba29084c9f95897b8c56accb",
   "managedJavaScript": [
-    "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/pinned-text-loader.js",
     "packages/web-decision/test/assets.test.mjs",
@@ -14,7 +13,6 @@
     "packages/web-decision/test/crivo.test.mjs",
     "packages/web-decision/test/d1-omni.test.mjs",
     "packages/web-decision/test/deberta-device.test.mjs",
-    "packages/web-decision/test/deberta-loader.test.mjs",
     "packages/web-decision/test/deberta-packed.test.mjs",
     "packages/web-decision/test/deberta-typed.test.mjs",
     "packages/web-decision/test/deberta.test.mjs",
@@ -82,6 +80,10 @@
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
   ],
   "exceptions": [
+    {
+      "path": "packages/web-decision/src/runtime/tvm.generated.mjs",
+      "reason": "Generated from the checked-in TypeScript TVM boundary using the pinned compiler; marker removal preserves the original runtime module identity."
+    },
     {
       "path": "packages/web-decision/src/vendor/fast-sha256/sha256.mjs",
       "reason": "Upstream vendored from fast-sha256 1.3.0; original public domain implementation with its UMD wrapper adapted to ESM."

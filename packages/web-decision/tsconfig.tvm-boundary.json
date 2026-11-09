@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "declaration": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "skipLibCheck": true,
+    "newLine": "lf",
+    "rootDir": "src/runtime",
+    "types": []
+  },
+  "files": ["src/runtime/tvm.ts", "src/runtime/tvm-source.d.ts", "src/runtime/tvm-types.d.ts"]
+}

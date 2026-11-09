@@ -1,13 +1,23 @@
 import assert from 'node:assert/strict';
 import * as nodeModule from 'node:module';
-import test from 'node:test';
+import test, {type TestContext} from 'node:test';
+
+type ResolveContext = {parentURL?: string};
+type ResolveResult = {url: string; shortCircuit?: boolean};
+type RegisterHooks = (hooks: {
+  resolve(
+    specifier: string,
+    context: ResolveContext,
+    nextResolve: (specifier: string, context: ResolveContext) => ResolveResult
+  ): ResolveResult;
+}) => {deregister(): void};
 
 // Run the actual loader and lifecycle with a small fake asset source and runtime.
 // Synchronous module hooks are available in Node 24, as in the package CI.
-const supportsHooks = typeof nodeModule.registerHooks === 'function';
-let loadExperimentalDeberta;
+const supportsHooks = typeof (nodeModule as unknown as {registerHooks?: RegisterHooks}).registerHooks === 'function';
+let loadExperimentalDeberta: (typeof import('../src/deberta/loader.mjs'))['loadExperimentalDeberta'] | undefined;
 if (supportsHooks) {
-  const loaderUrl = new URL('../src/deberta/loader.mjs', import.meta.url).href;
+  const loaderUrl = new URL('../src/deberta/loader.mts', import.meta.url).href;
   const fakeSource = `
     const state = () => globalThis.__fakeDebertaLoader;
     export class Tokenizer {
@@ -33,6 +43,7 @@ if (supportsHooks) {
   const fakeModule = `data:text/javascript;base64,${Buffer.from(fakeSource).toString('base64')}`;
   const fakeImports = new Set([
     '@huggingface/tokenizers',
+    '../runtime/tvm.generated.mjs',
     './device.mjs',
     './model.mjs',
     './packed-readback.mjs',
@@ -42,7 +53,7 @@ if (supportsHooks) {
     '../model-source.js',
     '../model-assets.js'
   ]);
-  const hooks = nodeModule.registerHooks({
+  const hooks = (nodeModule as unknown as {registerHooks: RegisterHooks}).registerHooks({
     resolve(specifier, context, nextResolve) {
       if (
         context.parentURL === loaderUrl &&
@@ -62,24 +73,36 @@ if (supportsHooks) {
   }
 }
 
-function setup(t) {
+function setup(t: TestContext) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, '__fakeDebertaLoader');
   t.after(() => {
     if (previous) Object.defineProperty(globalThis, '__fakeDebertaLoader', previous);
-    else delete globalThis.__fakeDebertaLoader;
+    else delete (globalThis as typeof globalThis & {__fakeDebertaLoader?: unknown}).__fakeDebertaLoader;
   });
-  let resolveRuntime, rejectRuntime, started, lose;
+  let resolveRuntime!: (runtime: unknown) => void,
+    rejectRuntime!: (error: unknown) => void,
+    started!: () => void,
+    lose!: (reason: {message: string}) => void;
   const pending = new Promise((resolve, reject) => {
     resolveRuntime = resolve;
     rejectRuntime = reject;
   });
-  const ready = new Promise((resolve) => {
+  const ready = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const lost = new Promise((resolve) => {
+  const lost = new Promise<{message: string}>((resolve) => {
     lose = resolve;
   });
-  const state = {pending, started, sessions: 0, disposed: 0, destroyed: 0, initialized: 0, ended: 0};
+  const state: {
+    pending: Promise<unknown>;
+    started: () => void;
+    sessions: number;
+    disposed: number;
+    destroyed: number;
+    initialized: number;
+    ended: number;
+    gpu?: {lost: Promise<{message: string}>; addEventListener(): void; destroy(): void};
+  } = {pending, started, sessions: 0, disposed: 0, destroyed: 0, initialized: 0, ended: 0};
   state.gpu = {
     lost,
     addEventListener() {},
@@ -122,14 +145,15 @@ test(
         const f = setup(t),
           controller = new AbortController(),
           reason = new Error('caller cancelled');
-        const loading = loadExperimentalDeberta({signal: controller.signal});
+        const loading = loadExperimentalDeberta!({signal: controller.signal});
         await f.ready;
         if (kind === 'abort') controller.abort(reason);
         else f.lose({message: 'fake loss'});
         await assert.rejects(loading, (error) =>
           kind === 'abort'
             ? error === reason
-            : error.code === 'MODEL_LOAD_FAILED' && /device was lost/.test(error.message)
+            : (error as {code?: unknown}).code === 'MODEL_LOAD_FAILED' &&
+              /device was lost/.test((error as Error).message)
         );
         assert.equal(f.state.destroyed, 1);
         assert.equal(f.state.disposed, 0);
@@ -148,7 +172,7 @@ test('a late instantiation rejection after cancellation is handled', {skip: !sup
   const f = setup(t),
     controller = new AbortController(),
     reason = new Error('caller cancelled');
-  const loading = loadExperimentalDeberta({signal: controller.signal});
+  const loading = loadExperimentalDeberta!({signal: controller.signal});
   await f.ready;
   controller.abort(reason);
   await assert.rejects(loading, (error) => error === reason);
@@ -161,7 +185,7 @@ test('a late instantiation rejection after cancellation is handled', {skip: !sup
 test('successful instantiation transfers runtime ownership to the session', {skip: !supportsHooks}, async (t) => {
   const f = setup(t),
     controller = new AbortController();
-  const loading = loadExperimentalDeberta({signal: controller.signal});
+  const loading = loadExperimentalDeberta!({signal: controller.signal});
   await f.ready;
   f.resolveRuntime(f.runtime);
   const session = await loading;

@@ -138,6 +138,8 @@
     "src/skejja/protocol.mts",
     "src/skejja/source.mts",
     "src/request-fields.mts",
+    "src/deberta/loader.mts",
+    "test/deberta-loader.test.mts",
     "src/model-registry.ts",
     "src/strands/loader.mts",
     "src/strands/fused-upload.mts",
