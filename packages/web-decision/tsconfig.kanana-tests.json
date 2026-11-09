@@ -8,5 +8,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "files": ["test/kanana-scoring.test.mts", "test/kanana-chat-template.test.mts", "test/kanana-tiff16-image.test.mts"]
+  "files": ["test/kanana-scoring.test.mts", "test/kanana-chat-template.test.mts", "test/kanana-tokenizer.test.mts", "test/kanana-tiff16-image.test.mts"]
 }

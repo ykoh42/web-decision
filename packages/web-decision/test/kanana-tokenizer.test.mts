@@ -14,11 +14,11 @@ const queryMessages = (userText = 'State:\nA parcel is late.') =>
   ]);
 
 function tokenizerWithIds(ids = [128000, 128009, 128010]) {
-  const prompts = [];
+  const prompts: string[] = [];
   return {
     prompts,
     ids,
-    encode(prompt) {
+    encode(prompt: string) {
       prompts.push(prompt);
       return {ids};
     }
@@ -212,7 +212,7 @@ test('does not mutate frozen messages or image grids', () => {
 
   assert.ok(result.prompt.includes('<|image_pad|>'.repeat(6)));
   assert.deepEqual(grid, [1, 2, 3]);
-  assert.equal(messages[1].content[1].image, 'photo.png');
+  assert.equal((messages[1]!.content[1] as {image: string}).image, 'photo.png');
 });
 
 test('rejects missing tokenizers and malformed encoded IDs', () => {
@@ -221,6 +221,8 @@ test('rejects missing tokenizers and malformed encoded IDs', () => {
   assert.throws(() => encodeKananaQuery({}, messages), /tokenizer with encode/);
   assert.throws(() => encodeKananaQuery({encode: () => null}, messages), /indexed token IDs/);
   assert.throws(() => encodeKananaQuery({encode: () => ({ids: [1, Number.NaN]})}, messages), /invalid token ID/);
+  // Keep an actual sparse array to test missing token IDs.
+  // oxlint-disable-next-line unicorn/no-new-array
   const sparseIds = new Array(2);
   sparseIds[1] = 1;
   assert.throws(() => encodeKananaQuery({encode: () => ({ids: sparseIds})}, messages), /sparse token ID/);
