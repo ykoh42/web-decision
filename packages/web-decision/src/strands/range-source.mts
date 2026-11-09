@@ -56,7 +56,7 @@ interface RangeReadResult {
 }
 
 interface TransactionOptions {
-  readonly signal?: AbortSignal | null;
+  readonly signal?: AbortSignal | null | undefined;
 }
 
 interface RangedSourceTransaction {
