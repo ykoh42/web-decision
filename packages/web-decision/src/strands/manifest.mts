@@ -12,9 +12,81 @@ const TOTAL_BYTES = 3776255872;
 export const LARGEST_BINDING = 1017118720;
 const MAX_CHUNK = 8 * 1024 * 1024;
 const verified = new WeakSet();
-const invalid = (message) => new WebDecisionError('INVALID_ASSET', message);
+interface StrandsChunk {
+  readonly offset: number;
+  readonly bytes: number;
+  readonly sha256: string;
+}
 
-function validateChunks(rec) {
+interface StrandsRecord {
+  readonly index: number;
+  readonly dtype: string;
+  readonly shape: number[];
+  readonly bytes: number;
+  readonly sourceOffset: number;
+  readonly sourceFileBytes: number;
+  readonly sourcePath: string;
+  readonly chunks: StrandsChunk[];
+  readonly target: string;
+}
+
+interface StrandsInputContract {
+  readonly sequence: string;
+  readonly batch: number;
+  readonly ids: string;
+  readonly positions: string;
+  readonly mask: string;
+  readonly valid_mask: string;
+  readonly answer_index: string;
+  readonly option_indices: string;
+}
+
+interface StrandsManifest {
+  readonly status: string;
+  readonly wasmSha256: string;
+  readonly inputContract: StrandsInputContract;
+  readonly totalBytes: number;
+  readonly largestBindingBytes: number;
+  readonly maxRangeBytes: number;
+  readonly records: StrandsRecord[];
+}
+
+interface AdapterCandidate {
+  readonly isFallbackAdapter?: unknown;
+  readonly info?: {readonly isFallbackAdapter?: unknown} | null | undefined;
+  readonly features?: {readonly has?: ((feature: string) => unknown) | undefined} | null | undefined;
+  readonly limits?:
+    | {
+        readonly maxBufferSize?: number;
+        readonly maxStorageBufferBindingSize?: number;
+        readonly maxStorageBuffersPerShaderStage?: number;
+      }
+    | null
+    | undefined;
+}
+
+interface ProgressUpdate {
+  readonly loadedBytes: number;
+  readonly totalBytes: number;
+  readonly fraction: number;
+}
+
+interface UploadOptions {
+  readonly allocate?: ((record: StrandsRecord) => unknown | PromiseLike<unknown>) | undefined;
+  readonly upload?:
+    | ((
+        record: StrandsRecord,
+        tensor: unknown,
+        signal?: AbortSignal | null | undefined
+      ) => unknown | PromiseLike<unknown>)
+    | undefined;
+  readonly signal?: AbortSignal | null | undefined;
+  readonly onProgress?: ((progress: ProgressUpdate) => void) | undefined;
+}
+
+const invalid = (message: string): Error => new WebDecisionError('INVALID_ASSET', message);
+
+function validateChunks(rec: StrandsRecord): void {
   let offset = 0;
   for (const chunk of rec.chunks) {
     if (
@@ -33,14 +105,17 @@ function validateChunks(rec) {
 }
 
 /** Parse only the exact compiled graph's pinned 328-parameter source manifest. */
-export async function parsePinnedManifest(bytes, signal) {
+export async function parsePinnedManifest(
+  bytes: unknown,
+  signal?: AbortSignal | null | undefined
+): Promise<StrandsManifest> {
   signal?.throwIfAborted();
   if (!(bytes instanceof Uint8Array) || !bytes.byteLength || bytes.byteLength > 1024 * 1024)
     throw invalid('Invalid Strands manifest bytes.');
-  const digest = await waitForAbort(() => sha256(bytes), signal);
+  const digest: string = await waitForAbort(() => sha256(bytes), signal);
   signal?.throwIfAborted();
   if (digest !== MANIFEST_SHA256) throw invalid('Strands manifest hash mismatch.');
-  let manifest;
+  let manifest: StrandsManifest;
   try {
     manifest = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
   } catch {
@@ -98,7 +173,7 @@ export async function parsePinnedManifest(bytes, signal) {
   }
   if (
     total !== TOTAL_BYTES ||
-    manifest.records[0].bytes !== LARGEST_BINDING ||
+    manifest.records[0]!.bytes !== LARGEST_BINDING ||
     manifest.records.slice(320, 326).some((r) => !r.target.startsWith('pointer.head.') || r.dtype !== 'float32')
   )
     throw invalid('Unexpected Strands parameter totals or pointer head.');
@@ -111,30 +186,33 @@ export async function parsePinnedManifest(bytes, signal) {
 }
 
 /** Validate actual adapter limits; this does not prove sufficient free memory. */
-export function checkFusedAdapter(adapter) {
+export function checkFusedAdapter(adapter: unknown): void {
   if (
     !adapter ||
-    adapter.isFallbackAdapter ||
-    adapter.info?.isFallbackAdapter ||
-    typeof adapter.features?.has !== 'function' ||
-    !adapter.features.has('shader-f16') ||
-    adapter.limits?.maxBufferSize < LARGEST_BINDING ||
-    adapter.limits?.maxStorageBufferBindingSize < LARGEST_BINDING ||
-    adapter.limits?.maxStorageBuffersPerShaderStage < 8 ||
-    !Number.isFinite(adapter.limits?.maxBufferSize) ||
-    !Number.isFinite(adapter.limits?.maxStorageBufferBindingSize) ||
-    !Number.isFinite(adapter.limits?.maxStorageBuffersPerShaderStage)
+    (adapter as AdapterCandidate).isFallbackAdapter ||
+    (adapter as AdapterCandidate).info?.isFallbackAdapter ||
+    typeof (adapter as AdapterCandidate).features?.has !== 'function' ||
+    !(adapter as AdapterCandidate).features!.has!('shader-f16') ||
+    ((adapter as AdapterCandidate).limits?.maxBufferSize as number) < LARGEST_BINDING ||
+    ((adapter as AdapterCandidate).limits?.maxStorageBufferBindingSize as number) < LARGEST_BINDING ||
+    ((adapter as AdapterCandidate).limits?.maxStorageBuffersPerShaderStage as number) < 8 ||
+    !Number.isFinite((adapter as AdapterCandidate).limits?.maxBufferSize) ||
+    !Number.isFinite((adapter as AdapterCandidate).limits?.maxStorageBufferBindingSize) ||
+    !Number.isFinite((adapter as AdapterCandidate).limits?.maxStorageBuffersPerShaderStage)
   )
     throw new WebDecisionError('UNSUPPORTED_ENVIRONMENT', 'Strands needs shader-f16 and a 1,017,118,720-byte binding.');
 }
 
 /** Upload in exact graph order; caller owns all allocations and failure cleanup. */
-export async function uploadPinnedWeights(manifest, {allocate, upload, signal, onProgress} = {}) {
-  if (!verified.has(manifest) || typeof allocate !== 'function' || typeof upload !== 'function')
+export async function uploadPinnedWeights(
+  manifest: unknown,
+  {allocate, upload, signal, onProgress}: UploadOptions = {}
+): Promise<unknown[]> {
+  if (!verified.has(manifest as object) || typeof allocate !== 'function' || typeof upload !== 'function')
     throw invalid('A verified Strands manifest and upload functions are required.');
-  const weights = [];
+  const weights: unknown[] = [];
   let loaded = 0;
-  for (const record of manifest.records) {
+  for (const record of (manifest as StrandsManifest).records) {
     signal?.throwIfAborted();
     const tensor = await allocate(record);
     signal?.throwIfAborted();
