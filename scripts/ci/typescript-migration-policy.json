@@ -4,8 +4,6 @@
   "managedJavaScript": [
     "packages/web-decision/src/crivo/loader.mjs",
     "packages/web-decision/src/crivo/protocol.mjs",
-    "packages/web-decision/src/d1-omni/loader.mjs",
-    "packages/web-decision/src/d1-omni/protocol.mjs",
     "packages/web-decision/src/deberta-single-preview-entry.js",
     "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/deberta/packing.mjs",

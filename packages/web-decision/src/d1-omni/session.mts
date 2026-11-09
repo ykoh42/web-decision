@@ -148,7 +148,11 @@ export function createD1OmniSession({
       signal?.throwIfAborted();
       const rows = await (runner as D1OmniRunner).run(prepared.rows, signal);
       signal?.throwIfAborted();
-      return finishD1OmniSystemOne(prepared, rows, temperatures) as D1OmniSystemOneResult;
+      return finishD1OmniSystemOne(
+        prepared,
+        rows,
+        temperatures as Readonly<Record<string, number>>
+      ) as D1OmniSystemOneResult;
     });
     queue = task.catch(() => {});
     return signal ? waitForAbort(() => task, signal) : task;

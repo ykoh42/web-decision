@@ -1,5 +1,80 @@
 import {WebDecisionError} from '../kev.js';
 import {D1_OMNI_MAX_TOKENS, D1_OMNI_MODEL} from './contract.mjs';
+import type {D1OmniTokenizer} from './tokenizer.mjs';
+
+interface D1OmniQuestionValues {
+  readonly type?: unknown;
+  readonly instructions?: unknown;
+  readonly criteria?: unknown;
+}
+
+type D1OmniOptionEntry = [string, unknown];
+
+interface D1OmniQuestionDraft {
+  readonly id: string;
+  readonly type: 'choice' | 'score' | 'noul';
+  readonly qtype: number;
+  readonly labels: string[];
+  readonly options: string[];
+  readonly legend?: string[];
+}
+
+interface D1OmniPreparedQuestion extends D1OmniQuestionDraft {
+  readonly instructions: string;
+}
+
+interface D1OmniEncodedParts {
+  readonly ids: number[];
+  readonly markerPositions: number[];
+  readonly truncated: boolean;
+}
+
+interface D1OmniEncodedQuestion {
+  readonly ids: number[];
+  readonly markerPositions: number[];
+  readonly truncated: boolean;
+  readonly question: D1OmniPreparedQuestion;
+}
+
+export interface D1OmniPreparedSystemOne {
+  readonly model: string;
+  readonly rows: D1OmniEncodedQuestion[];
+  readonly tokenCount: number;
+  readonly truncated: boolean;
+}
+
+interface D1OmniAnswerBase {
+  readonly confidence: number;
+  readonly probabilities: Record<string, number>;
+}
+
+interface D1OmniChoiceAnswer extends D1OmniAnswerBase {
+  readonly type: 'choice';
+  readonly choice: string;
+}
+
+interface D1OmniScoreAnswer extends D1OmniAnswerBase {
+  readonly type: 'score';
+  readonly score: number;
+  readonly expected: number;
+  readonly mostLikelyLevel: number;
+  readonly legend: Record<string, string>;
+}
+
+interface D1OmniNoulAnswer extends D1OmniAnswerBase {
+  readonly type: 'noul';
+  readonly noul: number;
+}
+
+type D1OmniAnswer = D1OmniChoiceAnswer | D1OmniScoreAnswer | D1OmniNoulAnswer;
+
+export interface D1OmniSystemOneResult {
+  readonly model: string;
+  readonly tokenCount: number;
+  readonly outputTokenCount: number;
+  readonly truncated?: true;
+  readonly answers: Record<string, D1OmniAnswer>;
+}
 
 const QUESTION_FIELDS = new Set(['type', 'instructions', 'criteria']);
 const QUESTION_TYPES = Object.freeze({choice: 0, score: 1, noul: 2});
@@ -7,17 +82,17 @@ const TOKENS = Object.freeze({state: 17, question: 18, option: 19, optionEnd: 20
 const SPECIAL_TEXT = /<\|([A-Za-z0-9_]+)\|>/g;
 const OPTION_TOKEN_BUDGET = 24;
 
-const invalid = (message) => new WebDecisionError('INVALID_INPUT', message);
-const inference = (message) => new WebDecisionError('INFERENCE_ERROR', message);
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
+const inference = (message: string): WebDecisionError => new WebDecisionError('INFERENCE_ERROR', message);
 
-function ownEntries(value, id, label) {
+function ownEntries(value: unknown, id: string, label: string): D1OmniOptionEntry[] {
   if (Array.isArray(value)) {
-    return value.map((item, index) => {
+    return (value as unknown[]).map((item, index) => {
       if (!Object.hasOwn(value, index)) throw invalid(`Question ${id} ${label} cannot contain holes.`);
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
       if (!descriptor || !Object.hasOwn(descriptor, 'value'))
         throw invalid(`Question ${id} ${label} cannot contain accessors.`);
-      return [String(index), descriptor.value];
+      return [String(index), descriptor.value] as D1OmniOptionEntry;
     });
   }
   if (
@@ -30,12 +105,12 @@ function ownEntries(value, id, label) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor || !Object.hasOwn(descriptor, 'value'))
       throw invalid(`Question ${id} ${label} cannot contain accessors or symbol keys.`);
-    return [key, descriptor.value];
+    return [key, descriptor.value] as D1OmniOptionEntry;
   });
 }
 
-function serializeArray(value, seen) {
-  const items = [];
+function serializeArray(value: unknown[], seen: Set<object>): string {
+  const items: string[] = [];
   for (let index = 0; index < value.length; index++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor || !Object.hasOwn(descriptor, 'value'))
@@ -45,7 +120,7 @@ function serializeArray(value, seen) {
   return `[${items.join(', ')}]`;
 }
 
-function serializeObject(value, seen) {
+function serializeObject(value: object, seen: Set<object>): string {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null)
     throw invalid('d1-omni state and criteria must contain plain JSON values.');
@@ -58,11 +133,11 @@ function serializeObject(value, seen) {
   return `{${entries.join(', ')}}`;
 }
 
-function serializeJson(value, seen = new Set()) {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value);
+function serializeJson(value: unknown, seen: Set<object> = new Set()): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') return JSON.stringify(value) as string;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw invalid('d1-omni JSON values must contain finite numbers.');
-    return JSON.stringify(value);
+    return JSON.stringify(value) as string;
   }
   if (!value || typeof value !== 'object') throw invalid('d1-omni state and criteria must contain JSON values.');
   if (seen.has(value)) throw invalid('d1-omni state and criteria cannot contain cycles.');
@@ -72,25 +147,25 @@ function serializeJson(value, seen = new Set()) {
   return result;
 }
 
-function renderValue(value) {
+function renderValue(value: unknown): string {
   return typeof value === 'string' ? value : serializeJson(value);
 }
 
-function escapeText(value) {
+function escapeText(value: string): string {
   return value.replace(SPECIAL_TEXT, '<¦$1¦>');
 }
 
-function tokenizerIds(tokenizer, text) {
+function tokenizerIds(tokenizer: D1OmniTokenizer, text: string): number[] {
   const ids = tokenizer.encode(escapeText(text));
   if (!Array.isArray(ids) || ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id >= 65536))
     throw new WebDecisionError('INVALID_ASSET', 'd1-omni tokenizer returned invalid or out-of-range token IDs.');
   return ids;
 }
 
-function snapshotQuestions(questions) {
+function snapshotQuestions(questions: unknown): Array<{id: string; value: D1OmniQuestionValues}> {
   if (!questions || typeof questions !== 'object' || Array.isArray(questions))
     throw invalid('d1-omni questions must be a named object.');
-  const ids = Reflect.ownKeys(questions);
+  const ids = Reflect.ownKeys(questions) as string[];
   if (ids.length < 1 || ids.some((id) => typeof id !== 'string'))
     throw invalid('d1-omni needs at least one named question with string IDs.');
   return ids.map((id) => {
@@ -99,29 +174,29 @@ function snapshotQuestions(questions) {
     const question = descriptor.value;
     if (!question || typeof question !== 'object' || Array.isArray(question))
       throw invalid(`Question ${id} must be an object.`);
-    const values = Object.create(null);
+    const values: Record<string, unknown> = Object.create(null);
     for (const key of Reflect.ownKeys(question)) {
       const field = Object.getOwnPropertyDescriptor(question, key);
       if (typeof key !== 'string' || !QUESTION_FIELDS.has(key) || !field || !Object.hasOwn(field, 'value'))
         throw invalid(`Question ${id} has an unsupported field.`);
       values[key] = field.value;
     }
-    if (!Object.hasOwn(QUESTION_TYPES, values.type))
+    if (!Object.hasOwn(QUESTION_TYPES, values.type as PropertyKey))
       throw invalid(`Question ${id} type must be choice, score, or noul.`);
     if (typeof values.instructions !== 'string' || !values.instructions.trim())
       throw invalid(`Question ${id} needs non-empty string instructions.`);
-    return {id, value: values};
+    return {id, value: values as D1OmniQuestionValues};
   });
 }
 
-function prepareChoice(id, question) {
-  const criteria = Array.isArray(question.criteria)
-    ? Array.from({length: question.criteria.length}, (_, index) => {
-        const descriptor = Object.getOwnPropertyDescriptor(question.criteria, String(index));
+function prepareChoice(id: string, question: D1OmniQuestionValues): D1OmniQuestionDraft {
+  const criteria: D1OmniOptionEntry[] = Array.isArray(question.criteria)
+    ? Array.from({length: (question.criteria as unknown[]).length}, (_, index) => {
+        const descriptor = Object.getOwnPropertyDescriptor(question.criteria as object, String(index));
         if (!descriptor || !Object.hasOwn(descriptor, 'value'))
           throw invalid(`Question ${id} criteria cannot contain holes or accessors.`);
         if (typeof descriptor.value !== 'string') throw invalid(`Question ${id} choice labels must be strings.`);
-        return [descriptor.value, null];
+        return [descriptor.value, null] as D1OmniOptionEntry;
       })
     : ownEntries(question.criteria, id, 'criteria');
   if (criteria.length < 2) throw invalid(`Question ${id} needs at least 2 choice options.`);
@@ -139,20 +214,24 @@ function prepareChoice(id, question) {
   };
 }
 
-function prepareScore(id, question) {
-  if (!Array.isArray(question.criteria) || question.criteria.length < 2 || question.criteria.length > 10)
+function prepareScore(id: string, question: D1OmniQuestionValues): D1OmniQuestionDraft {
+  if (
+    !Array.isArray(question.criteria) ||
+    (question.criteria as unknown[]).length < 2 ||
+    (question.criteria as unknown[]).length > 10
+  )
     throw invalid(`Question ${id} score needs 2 to 10 ordered levels.`);
   return {
     id,
     type: 'score',
     qtype: QUESTION_TYPES.score,
-    labels: question.criteria.map((_, index) => String(index)),
-    legend: question.criteria.map(renderValue),
-    options: question.criteria.map((criterion, index) => `level ${index}: ${renderValue(criterion)}`)
+    labels: (question.criteria as unknown[]).map((_, index) => String(index)),
+    legend: (question.criteria as unknown[]).map(renderValue),
+    options: (question.criteria as unknown[]).map((criterion, index) => `level ${index}: ${renderValue(criterion)}`)
   };
 }
 
-function prepareNoul(id, question) {
+function prepareNoul(id: string, question: D1OmniQuestionValues): D1OmniQuestionDraft {
   if (question.criteria != null && (typeof question.criteria !== 'object' || Array.isArray(question.criteria)))
     throw invalid(`Question ${id} noul criteria must be an object.`);
   const criteria = question.criteria == null ? [] : ownEntries(question.criteria, id, 'noul criteria');
@@ -174,17 +253,22 @@ function prepareNoul(id, question) {
   };
 }
 
-function prepareQuestion(id, question) {
+function prepareQuestion(id: string, question: D1OmniQuestionValues): D1OmniPreparedQuestion {
   const prepared =
     question.type === 'choice'
       ? prepareChoice(id, question)
       : question.type === 'score'
         ? prepareScore(id, question)
         : prepareNoul(id, question);
-  return {...prepared, instructions: question.instructions};
+  return {...prepared, instructions: question.instructions as string};
 }
 
-function encodeQuestion(stateIds, question, tokenizer, maxTokens) {
+function encodeQuestion(
+  stateIds: number[],
+  question: D1OmniPreparedQuestion,
+  tokenizer: D1OmniTokenizer,
+  maxTokens: number
+): D1OmniEncodedParts {
   const optionCount = question.options.length;
   const optionBudget = Math.max(96, Math.min(optionCount * OPTION_TOKEN_BUDGET + 32, Math.floor(maxTokens / 2)));
   const perOption = Math.max(2, Math.floor((optionBudget - 3 * optionCount) / optionCount));
@@ -192,7 +276,7 @@ function encodeQuestion(stateIds, question, tokenizer, maxTokens) {
   const headLimit = Math.max(16, optionBudget);
   let truncated = instructionIds.length > headLimit;
   const head = instructionIds.slice(0, headLimit);
-  const markerPositions = [];
+  const markerPositions: number[] = [];
   for (const option of question.options) {
     markerPositions.push(head.length + 1);
     const optionIds = tokenizerIds(tokenizer, ` ${option}`);
@@ -210,7 +294,12 @@ function encodeQuestion(stateIds, question, tokenizer, maxTokens) {
   return {ids, markerPositions: positions, truncated};
 }
 
-export function prepareD1OmniSystemOne(state, questions, tokenizer, maxTokens = D1_OMNI_MAX_TOKENS) {
+export function prepareD1OmniSystemOne(
+  state: unknown,
+  questions: unknown,
+  tokenizer: D1OmniTokenizer | null | undefined,
+  maxTokens = D1_OMNI_MAX_TOKENS
+): D1OmniPreparedSystemOne {
   if (!tokenizer || typeof tokenizer.encode !== 'function' || !Number.isSafeInteger(maxTokens) || maxTokens < 64)
     throw new TypeError('d1-omni tokenizer and valid context size are required.');
   const stateText = state === null ? '' : typeof state === 'string' ? state : serializeJson(state);
@@ -224,26 +313,30 @@ export function prepareD1OmniSystemOne(state, questions, tokenizer, maxTokens = 
   return {model: D1_OMNI_MODEL, rows, tokenCount, truncated: rows.some((row) => row.truncated)};
 }
 
-function optionGroup(count) {
+function optionGroup(count: number): string {
   if (count <= 2) return '2';
   if (count <= 5) return '3-5';
   if (count <= 10) return '6-10';
   return '11+';
 }
 
-function temperature(question, temperatures) {
+function temperature(question: D1OmniPreparedQuestion, temperatures: Readonly<Record<string, number>>): number {
   return temperatures[`${question.type}:${optionGroup(question.options.length)}`] ?? temperatures[question.type] ?? 1;
 }
 
-function probabilities(logits, question, temperatures) {
+function probabilities(
+  logits: unknown,
+  question: D1OmniPreparedQuestion,
+  temperatures: Readonly<Record<string, number>>
+): number[] {
   if (
     !Array.isArray(logits) ||
     logits.length !== question.options.length ||
-    logits.some((value) => !Number.isFinite(value))
+    logits.some((value: unknown) => !Number.isFinite(value as number))
   )
     throw inference('d1-omni returned invalid option logits.');
   const scale = temperature(question, temperatures);
-  const scaled = logits.map((value) => value / scale);
+  const scaled = (logits as number[]).map((value) => value / scale);
   const max = Math.max(...scaled);
   const weights = scaled.map((value) => Math.exp(value - max));
   const total = weights.reduce((sum, value) => sum + value, 0);
@@ -251,15 +344,18 @@ function probabilities(logits, question, temperatures) {
   return question.type === 'noul' ? values.reverse() : values;
 }
 
-function answer(question, values) {
+function answer(question: D1OmniPreparedQuestion, values: number[]): D1OmniAnswer {
   const best = values.indexOf(Math.max(...values));
-  const confidence = values[best];
+  const confidence = values[best]!;
   if (question.type === 'choice') {
     return {
       type: 'choice',
-      choice: question.labels[best],
+      choice: question.labels[best]!,
       confidence,
-      probabilities: Object.fromEntries(question.labels.map((label, index) => [label, values[index]]))
+      probabilities: Object.fromEntries(question.labels.map((label, index) => [label, values[index]!])) as Record<
+        string,
+        number
+      >
     };
   }
   if (question.type === 'score') {
@@ -270,25 +366,38 @@ function answer(question, values) {
       expected,
       mostLikelyLevel: best,
       confidence,
-      legend: Object.fromEntries(question.labels.map((label, index) => [label, question.legend[index]])),
-      probabilities: Object.fromEntries(question.labels.map((label, index) => [label, values[index]]))
+      legend: Object.fromEntries(question.labels.map((label, index) => [label, question.legend![index]!])) as Record<
+        string,
+        string
+      >,
+      probabilities: Object.fromEntries(question.labels.map((label, index) => [label, values[index]!])) as Record<
+        string,
+        number
+      >
     };
   }
   return {
     type: 'noul',
-    noul: values[0],
+    noul: values[0]!,
     confidence,
-    probabilities: {true: values[0], false: values[1]}
+    probabilities: {true: values[0]!, false: values[1]!}
   };
 }
 
-export function finishD1OmniSystemOne(prepared, rows, temperatures) {
+export function finishD1OmniSystemOne(
+  prepared: D1OmniPreparedSystemOne,
+  rows: unknown,
+  temperatures: Readonly<Record<string, number>>
+): D1OmniSystemOneResult {
   if (!Array.isArray(rows) || rows.length !== prepared.rows.length)
     throw inference('d1-omni returned an unexpected number of question rows.');
-  const answers = Object.create(null);
-  for (let index = 0; index < rows.length; index++) {
-    const item = prepared.rows[index];
-    answers[item.question.id] = answer(item.question, probabilities(rows[index], item.question, temperatures));
+  const answers: Record<string, D1OmniAnswer> = Object.create(null);
+  for (let index = 0; index < (rows as unknown[]).length; index++) {
+    const item = prepared.rows[index]!;
+    answers[item.question.id] = answer(
+      item.question,
+      probabilities((rows as unknown[])[index], item.question, temperatures)
+    );
   }
   return {
     model: prepared.model,
