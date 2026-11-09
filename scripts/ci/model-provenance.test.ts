@@ -129,6 +129,13 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
     status: 'approved',
     sourceLineage: [
       {
+        repository: 'onnx-community/kev-0.6b-ONNX',
+        revision: '5a827091b3d58fe4fdfc02a5a5b2ce364047d678',
+        path: 'onnx/model_q4f16.onnx_data',
+        bytes: 335357952,
+        sha256: '777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b'
+      },
+      {
         repository: 'example/model',
         revision: 'a'.repeat(40),
         path: 'weights/model.bin',
@@ -194,6 +201,32 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
   });
   assert.deepEqual(checked.modelIds, ['kev-0.6b-q4f16']);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
+
+  const mismatchedEvidence = structuredClone(approvalEvidence);
+  mismatchedEvidence.sourceLineage[0]!.sha256 = 'd'.repeat(64);
+  const mismatchedEvidenceBytes = Buffer.from(`${JSON.stringify(mismatchedEvidence, null, 2)}\n`);
+  await writeFile(join(provenanceRoot, 'kev-0.6b-q4f16.json'), mismatchedEvidenceBytes);
+  const mismatchedManifest = JSON.parse(manifestBytes.toString('utf8')) as {
+    models: Array<{evidence: {sha256: string}}>;
+  };
+  mismatchedManifest.models[0]!.evidence.sha256 = sha256(mismatchedEvidenceBytes);
+  const mismatchedManifestBytes = Buffer.from(`${JSON.stringify(mismatchedManifest, null, 2)}\n`);
+  await assert.rejects(
+    validateModelProvenance({
+      packageRoot,
+      workspaceRoot: temporaryRoot,
+      modelSpec: approvedSpec,
+      artifactLock,
+      artifactLockBytes,
+      manifestBytes: mismatchedManifestBytes,
+      expectedManifestSha256: sha256(mismatchedManifestBytes),
+      expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+      allowTestFixture: false,
+      requireCommitted: false
+    }),
+    /does not match its locked upstream artifact/u
+  );
+  await writeFile(join(provenanceRoot, 'kev-0.6b-q4f16.json'), evidenceBytes);
 
   await rm(join(docsRoot, 'toolchain.json'));
   await assert.rejects(

@@ -107,6 +107,7 @@ function parseManifest(bytes: Uint8Array): ProvenanceManifest {
 async function validateReviewEvidence(
   value: unknown,
   modelId: string,
+  artifactEntry: unknown,
   workspaceRoot: string,
   requireCommitted: boolean
 ): Promise<void> {
@@ -116,7 +117,8 @@ async function validateReviewEvidence(
     `Provenance evidence model ID mismatch for ${modelId}.`
   );
   failUnless(value.status === 'approved', `Provenance evidence for ${modelId} is not approved.`);
-  await validateSourceLineage(value.sourceLineage, modelId);
+  validateSourceLineage(value.sourceLineage, modelId);
+  validateLockedUpstream(value.sourceLineage, artifactEntry, modelId);
   await validateConversionEvidence(value.conversion, modelId, workspaceRoot, requireCommitted);
   await validateRightsEvidence(value.rights, modelId, workspaceRoot, requireCommitted);
   await validateApprovalEvidence(value.approval, modelId, workspaceRoot, requireCommitted);
@@ -143,6 +145,34 @@ function validateSourceLineage(sourceLineage: unknown, modelId: string): void {
       `Source SHA-256 ${index} for ${modelId} is invalid.`
     );
   }
+}
+
+function validateLockedUpstream(sourceLineage: unknown, artifactEntry: unknown, modelId: string): void {
+  failUnless(isRecord(artifactEntry), `Artifact lock entry for ${modelId} must be an object.`);
+  if (artifactEntry.upstream === undefined) return;
+  const upstream = artifactEntry.upstream;
+  failUnless(isRecord(upstream), `Locked upstream for ${modelId} must be an object.`);
+  failUnless(
+    typeof upstream.repository === 'string' &&
+      typeof upstream.revision === 'string' &&
+      typeof upstream.sourcePath === 'string' &&
+      typeof upstream.sourceSha256 === 'string' &&
+      Number.isSafeInteger(upstream.sourceBytes),
+    `Locked upstream for ${modelId} is incomplete.`
+  );
+  failUnless(
+    Array.isArray(sourceLineage) &&
+      sourceLineage.some(
+        (item: unknown) =>
+          isRecord(item) &&
+          item.repository === upstream.repository &&
+          item.revision === upstream.revision &&
+          item.path === upstream.sourcePath &&
+          item.sha256 === upstream.sourceSha256 &&
+          item.bytes === upstream.sourceBytes
+      ),
+    `Approved source lineage for ${modelId} does not match its locked upstream artifact.`
+  );
 }
 
 async function validateConversionEvidence(
@@ -371,7 +401,13 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
       throw new Error(`Model ${entry.modelId} provenance is pending: ${unresolved}`);
     }
 
-    await validateReviewEvidence(evidenceValue, entry.modelId, options.workspaceRoot, options.requireCommitted);
+    await validateReviewEvidence(
+      evidenceValue,
+      entry.modelId,
+      (options.artifactLock as {byModelId: Record<string, unknown>}).byModelId[entry.modelId],
+      options.workspaceRoot,
+      options.requireCommitted
+    );
     const specModels = (options.modelSpec as {models: Array<{modelId: string; description: Record<string, unknown>}>})
       .models;
     const spec = specModels.find((item) => item.modelId === entry.modelId);
