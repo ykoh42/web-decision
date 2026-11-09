@@ -7,7 +7,7 @@ import {buildMapikaLabels, packMapikaRequest, unpackMapikaScores} from '../src/m
 // separately in experiments/mapika-0.8b-protocol-20261030/.
 function tokenizer() {
   return {
-    encode(text) {
+    encode(text: string) {
       if (/^[A-Z]{1,2}$/.test(text)) {
         let id = 1000;
         for (const letter of text) id = id * 27 + letter.charCodeAt(0) - 64;
@@ -19,7 +19,7 @@ function tokenizer() {
           ids.push(7);
           i += '<|control|>'.length;
         } else {
-          const point = text.codePointAt(i);
+          const point = text.codePointAt(i)!;
           ids.push(point + 100);
           i += point > 0xffff ? 2 : 1;
         }
@@ -47,8 +47,8 @@ test('packs joint questions with correct slots and snapshots the option arrays',
     packed.groups.map((group) => group.slot),
     [tok.encode(start + q1).ids.length - 1, packed.ids.length - 1]
   );
-  input.questions[0].options[0] = 'changed';
-  assert.equal(packed.groups[0].options[0], 'red');
+  input.questions[0]!.options[0] = 'changed';
+  assert.equal(packed.groups[0]!.options[0], 'red');
 });
 
 test('uses upstream label-token construction beyond the ten-option boundary', () => {
@@ -70,7 +70,7 @@ test('uses upstream label-token construction beyond the ten-option boundary', ()
             ...tok.encode(tail).ids
           ];
     assert.deepEqual(packed.ids, [...prefix, ...body]);
-    assert.equal(packed.groups[0].slot, packed.ids.length - 1);
+    assert.equal(packed.groups[0]!.slot, packed.ids.length - 1);
   }
 });
 
@@ -119,17 +119,19 @@ test('returns unscaled logits and temperature-adjusted probabilities for each op
   assert.equal(result.tokenCount, packed.ids.length);
   assert.equal(result.answers[0].selected, 'blue');
   assert.deepEqual(
-    result.answers[0].probabilities.map((entry) => entry.logit),
+    result.answers[0].probabilities.map((entry: {logit: number}) => entry.logit),
     [1, 3]
   );
   assert.ok(Math.abs(result.answers[0].probabilities[1].probability - 1 / (1 + Math.exp(-1))) < 1e-12);
   row.set([0, 0]);
   assert.equal(unpackMapikaScores([row], packed, 1).answers[0].selectedIndex, 0);
+  // Preserve the original fixed-length fixture allocation.
+  // oxlint-disable-next-line unicorn/no-new-array
   const extreme = new Array(255).fill(0);
   extreme[0] = -Number.MAX_VALUE;
   extreme[1] = Number.MAX_VALUE;
   assert.deepEqual(
-    unpackMapikaScores([extreme], packed, 1).answers[0].probabilities.map((p) => p.probability),
+    unpackMapikaScores([extreme], packed, 1).answers[0].probabilities.map((p: {probability: number}) => p.probability),
     [0, 1]
   );
 });
