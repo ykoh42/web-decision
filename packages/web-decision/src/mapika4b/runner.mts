@@ -109,7 +109,7 @@ export class Mapika4TvmRunner extends H2oTvmRunner {
   declare device: unknown;
   declare fn: ((...args: unknown[]) => unknown) | null;
   declare weights: unknown[];
-  declare exclusive: <Value>(operation: () => Value | PromiseLike<Value>) => Promise<Value>;
+  declare exclusive: <Value>(operation: () => Value | PromiseLike<Value>) => Promise<Awaited<Value>>;
 
   override async run(packed: unknown): Promise<Float32Array[]> {
     const inputs = createMapika4Inputs(packed);

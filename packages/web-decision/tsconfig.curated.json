@@ -152,6 +152,7 @@
     "src/h2o/protocol.mts",
     "src/h2o/session.mts",
     "src/h2o/plan.mts",
+    "src/h2o/runner.mts",
     "src/safedecide/*.mts",
     "src/tamev/contract.mts",
     "src/tamev/loader.mts",
