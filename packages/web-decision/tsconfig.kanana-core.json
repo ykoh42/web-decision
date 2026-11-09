@@ -11,6 +11,7 @@
   },
   "files": [
     "src/kanana/tvm-runtime.ts",
+    "src/kanana/decision-session.ts",
     "src/kanana/protocol.ts",
     "src/kanana/scoring.ts",
     "src/kanana/candidates.ts",

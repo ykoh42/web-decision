@@ -13,6 +13,8 @@ const allTests = (await readdir(testDirectory))
   .sort()
   .map((file) => join('test', file));
 const coreTests = [
+  'test/kanana-decision-session.test.mts',
+  'test/kanana-source-tokenizer.test.mts',
   'test/kanana-protocol.test.mts',
   'test/kanana-scoring.test.mts',
   'test/kanana-candidates.test.mts',

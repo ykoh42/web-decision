@@ -145,6 +145,8 @@ jobs:
             export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
           fi
           pnpm check:quality
+      - name: Prepare pinned Kanana tokenizer test assets
+        run: node scripts/kanana/prepare-tokenizer-test-assets.mjs
       - name: Run package tests
         run: pnpm test
       - name: Check package coverage
