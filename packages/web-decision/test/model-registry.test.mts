@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {describeModel, isDecisionModel, listDecisionModels} from '../src/model-registry.js';
+import {describeModel as describeRegisteredModel, isDecisionModel, listDecisionModels} from '../src/model-registry.js';
+import type {ModelDescription} from '../src/index.d.ts';
+
+type TestLimit = {resource: string; scope: string; min?: number; max?: number; description?: string};
+type TestDescription = Omit<ModelDescription, 'assets' | 'backend' | 'features'> & {
+  features: Omit<ModelDescription['features'], 'textChoice'> & {
+    textChoice: Omit<ModelDescription['features']['textChoice'], 'limits'> & {limits: readonly TestLimit[]};
+  };
+  assets: ModelDescription['assets'] & {
+    manifestSha256?: string;
+    sourceDataSha256?: string;
+    candidateWasmSha256?: string;
+  };
+  backend: ModelDescription['backend'] & {
+    requiredLimits: Readonly<Record<string, number>>;
+    requiresNonFallbackAdapter?: boolean;
+  };
+};
+const describeModel = describeRegisteredModel as unknown as (model: unknown) => TestDescription;
 import {selectModelFamily} from '../src/model-family.js';
 import {MAPIKA_MANIFEST_SHA256} from '../src/mapika/contract.js';
 import {MAPIKA_Q4_MANIFEST_SHA256} from '../src/mapika-q4/contract.js';
@@ -61,7 +79,7 @@ const currentGpuVerification = new Map([
   ['experimental-strands-qwen-2b-fp16', 'verified']
 ]);
 
-const backendByFamily = {
+const backendByFamily: Record<string, string> = {
   decima: 'onnxruntime-web-wasm',
   tinydecide: 'javascript',
   tamev: 'onnxruntime-web-wasm',
@@ -169,7 +187,7 @@ test('the catalog and router describe the same implemented routes', () => {
         : 'separate'
     );
     assert.ok(description.assets.requiredFiles.length >= 2);
-    assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').min, 1);
+    assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.min, 1);
     const expectedBackend =
       family === 'crivo'
         ? name.endsWith('-int8')
@@ -210,7 +228,7 @@ test('Laya metadata identifies WebGPU execution and runtime-managed CPU fallback
     requiresNonFallbackAdapter: true
   });
   assert.equal(description.features.textChoice.score.basis, 'ordered-levels');
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, 122);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
   assert.deepEqual(
     description.features.textChoice.limits.find((item) => item.resource === 'questions'),
     {
@@ -237,10 +255,10 @@ test('Laya Typed-Decisions identifies its independent ModernBERT ONNX assets and
   assert.equal(description.assets.integrity, 'pinned-files');
   assert.equal(description.assets.requiredFiles.length, 5);
   assert.equal(
-    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max,
+    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max,
     1024
   );
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, 122);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
   assert.deepEqual(
     description.features.textChoice.limits.find((item) => item.resource === 'questions'),
     {
@@ -259,10 +277,10 @@ test('Laya Typed-Decisions identifies its independent ModernBERT ONNX assets and
 test('xDecision exposes per-row limits without a fixed question or aggregate token cap', () => {
   const description = describeModel('experimental-xdecision-fp16');
   assert.equal(
-    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max,
+    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max,
     1024
   );
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, 122);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
   assert.deepEqual(
     description.features.textChoice.limits.find((item) => item.resource === 'questions'),
     {
@@ -279,16 +297,16 @@ test('xDecision exposes per-row limits without a fixed question or aggregate tok
 
 test('Ettin reports native per-question and head limits without a request question cap', () => {
   const limits = describeModel('experimental-ettin-68m-int8').features.textChoice.limits;
-  assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max, 2048);
-  assert.equal(limits.find((item) => item.resource === 'options' && item.scope === 'question').max, 10);
-  assert.equal(limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 2048);
+  assert.equal(limits.find((item) => item.resource === 'options' && item.scope === 'question')!.max, 10);
+  assert.equal(limits.find((item) => item.resource === 'questions')!.max, undefined);
 });
 
 test('Crivo metadata describes row and chunk bounds without question or option ceilings', () => {
   for (const model of ['experimental-crivo-32m-v2-fp32', 'experimental-crivo-32m-v2-int8']) {
     const description = describeModel(model);
     const limits = description.features.textChoice.limits;
-    assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max, 2048);
+    assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 2048);
     assert.deepEqual(
       limits.find((item) => item.resource === 'options'),
       {
@@ -330,9 +348,9 @@ test('GLiNER Mobile describes its pinned Q4F16 WebGPU checkpoint and sequence li
   assert.equal(description.features.textChoice.handling, 'packed-request');
   assert.equal(description.features.textChoice.abstention, 'not-implemented');
   assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'tokens').max, 512);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, 64);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'tokens')!.max, 512);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 64);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
   assert.equal(description.verification.currentBundleGpu, 'verified');
 });
 
@@ -351,8 +369,8 @@ test('d1-omni describes its pinned text-only Q8 route and separate model license
   assert.equal(limits.find((limit) => limit.resource === 'questions')?.max, undefined);
   assert.equal(limits.find((limit) => limit.resource === 'options')?.max, undefined);
   assert.match(description.licenses.modelTerms, /LFM Open License v1\.0/);
-  assert.match(description.licenses.modelLicenseUrl, /LiquidAI\/d1-omni-600M/);
-  assert.match(description.licenses.sourceModelCard, /LiquidAI\/d1-omni-600M/);
+  assert.match(description.licenses.modelLicenseUrl!, /LiquidAI\/d1-omni-600M/);
+  assert.match(description.licenses.sourceModelCard!, /LiquidAI\/d1-omni-600M/);
   assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
   assert.equal(description.features.textChoice.score.temperatureAppliedBy, 'decoder');
 });
@@ -386,8 +404,8 @@ test('TinyDecide describes its pinned 4-bit files and token limits without a que
     description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'request'),
     undefined
   );
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, 32);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 32);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
   assert.equal(description.verification.currentBundleJavascript, 'verified');
 });
 
@@ -428,8 +446,8 @@ test('Decima describes its pinned int8 ONNX files and CPU WASM limits', () => {
     {resource: 'options', scope: 'question', min: 2},
     {resource: 'questions', scope: 'request', min: 1}
   ]);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
 });
 
 test('Decima base-clean describes its pinned CPU model and rejects overlong state', () => {
@@ -461,8 +479,8 @@ test('Decima base-clean describes its pinned CPU model and rejects overlong stat
     }
   ]);
   assert.equal(description.verification.currentBundleCpuWasm, 'verified');
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
 });
 
 test('Decima Agent describes its pinned CPU route and native question types', () => {
@@ -486,8 +504,8 @@ test('Decima Agent describes its pinned CPU route and native question types', ()
         'Uses the checkpoint choice_fit rendering and reports the adapted rows; each row includes question text and special tokens.'
     }
   ]);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options').max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions').max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
 });
 
 test('OpenDecider-nano describes its pinned FP16 graph and independent token limit', () => {
@@ -495,10 +513,10 @@ test('OpenDecider-nano describes its pinned FP16 graph and independent token lim
   const choice = description.features.textChoice;
   assert.equal(choice.handling, 'independent-questions');
   assert.equal(choice.tokenCount, 'max-question-rows');
-  assert.equal(choice.limits.find((item) => item.resource === 'tokens').max, 2048);
+  assert.equal(choice.limits.find((item) => item.resource === 'tokens')!.max, 2048);
   assert.equal(
     Object.hasOwn(
-      choice.limits.find((item) => item.resource === 'questions'),
+      choice.limits.find((item) => item.resource === 'questions')!,
       'max'
     ),
     false
@@ -520,12 +538,12 @@ test('Clef describes joint text-choice limits and pinned selected graph assets',
   assert.equal(choice.handling, 'packed-request');
   assert.equal(choice.tokenCount, 'packed-request');
   assert.equal(choice.abstention, 'not-implemented');
-  const tokenLimit = choice.limits.find((item) => item.resource === 'tokens');
-  const questionLimit = choice.limits.find((item) => item.resource === 'questions');
+  const tokenLimit = choice.limits.find((item) => item.resource === 'tokens')!;
+  const questionLimit = choice.limits.find((item) => item.resource === 'questions')!;
   assert.equal(tokenLimit.max, 512);
-  assert.match(tokenLimit.description, /Current package graph envelope/);
+  assert.match(tokenLimit.description!, /Current package graph envelope/);
   assert.equal(questionLimit.max, 8);
-  assert.match(questionLimit.description, /dynamic question axes/);
+  assert.match(questionLimit.description!, /dynamic question axes/);
   assert.deepEqual(
     choice.limits.filter((item) => item.resource === 'options').map(({scope, min, max}) => ({scope, min, max})),
     [
@@ -534,11 +552,11 @@ test('Clef describes joint text-choice limits and pinned selected graph assets',
     ]
   );
   assert.match(
-    choice.limits.find((item) => item.resource === 'options' && item.scope === 'question').description,
+    choice.limits.find((item) => item.resource === 'options' && item.scope === 'question')!.description!,
     /dynamic option axes/
   );
   assert.match(
-    choice.limits.find((item) => item.resource === 'options' && item.scope === 'request').description,
+    choice.limits.find((item) => item.resource === 'options' && item.scope === 'request')!.description!,
     /not a pinned model/
   );
   assert.equal(description.checkpoint.repository, 'Cloudflare/clef-flash');
@@ -560,12 +578,12 @@ test('Elephant describes independent branches and its shared-prefix token count'
   const choice = description.features.textChoice;
   assert.equal(choice.handling, 'independent-questions');
   assert.equal(choice.tokenCount, 'shared-prefix-and-branches');
-  const questionLimit = choice.limits.find((item) => item.resource === 'questions');
+  const questionLimit = choice.limits.find((item) => item.resource === 'questions')!;
   assert.equal(questionLimit.min, 1);
   assert.equal(Object.hasOwn(questionLimit, 'max'), false);
-  const branchLimit = choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question');
+  const branchLimit = choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!;
   assert.equal(branchLimit.max, 128);
-  assert.match(branchLimit.description, /Packed-request memory scales with branch count and size/);
+  assert.match(branchLimit.description!, /Packed-request memory scales with branch count and size/);
   assert.equal(
     choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'request'),
     undefined
@@ -579,7 +597,7 @@ test('Mapika 4B variants share capabilities but pin different graphs', () => {
   const candidate = describeModel('experimental-mapika-4b-q4f16-dlight');
   assert.deepEqual(candidate.features, baseline.features);
   assert.deepEqual(candidate.backend, baseline.backend);
-  assert.equal(baseline.features.textChoice.limits.find((item) => item.resource === 'tokens').max, 128);
+  assert.equal(baseline.features.textChoice.limits.find((item) => item.resource === 'tokens')!.max, 128);
   assert.deepEqual(
     baseline.features.textChoice.limits.find((item) => item.resource === 'questions'),
     {
@@ -592,7 +610,7 @@ test('Mapika 4B variants share capabilities but pin different graphs', () => {
     }
   );
   assert.equal(
-    baseline.features.textChoice.limits.find((item) => item.resource === 'options').description,
+    baseline.features.textChoice.limits.find((item) => item.resource === 'options')!.description!,
     'The graph has 255 answer-code logits per question.'
   );
   assert.equal(candidate.checkpoint.graphSha256, '0fe97fa7314e66c15540ee870e0bcc30fe852ee8c0a231a94a7cd1eaad1b8375');
@@ -609,14 +627,14 @@ test('Imajev describes explicit abstention and independently processed question 
   assert.equal(choice.handling, 'independent-questions');
   assert.equal(choice.tokenCount, 'max-question-rows');
   assert.equal(choice.score.basis, 'conditional-known-choices');
-  assert.equal(choice.limits.find((item) => item.resource === 'tokens').max, 128);
-  const questionLimit = choice.limits.find((item) => item.resource === 'questions');
+  assert.equal(choice.limits.find((item) => item.resource === 'tokens')!.max, 128);
+  const questionLimit = choice.limits.find((item) => item.resource === 'questions')!;
   assert.equal(questionLimit.max, 8);
-  assert.match(questionLimit.description, /Pinned Jev public serving API/);
-  const optionLimit = choice.limits.find((item) => item.resource === 'options');
+  assert.match(questionLimit.description!, /Pinned Jev public serving API/);
+  const optionLimit = choice.limits.find((item) => item.resource === 'options')!;
   assert.equal(optionLimit.max, 255);
-  assert.match(optionLimit.description, /extended 256-code readout/);
-  assert.match(optionLimit.description, /default 255-code readout permits 254/);
+  assert.match(optionLimit.description!, /extended 256-code readout/);
+  assert.match(optionLimit.description!, /default 255-code readout permits 254/);
   assert.equal(description.assets.manifestSha256, '0741c89f225e04ef1d2b72c88d7b3913dcc006ca5975bfc64ee34386ceea73a1');
 });
 
@@ -624,7 +642,7 @@ test('Perplexity describes a joint, online-only Q4 candidate', () => {
   const description = describeModel('experimental-pplx-decider-flash-v1.2-q4f16-dlight');
   assert.equal(description.features.textChoice.handling, 'packed-request');
   assert.equal(description.features.textChoice.tokenCount, 'packed-request');
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'tokens').max, 512);
+  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'tokens')!.max, 512);
   assert.deepEqual(
     description.features.textChoice.limits.find((item) => item.resource === 'questions'),
     {
@@ -667,12 +685,12 @@ test('Nari describes joint request limits and option-count temperatures', () => 
   const description = describeModel('experimental-nari-decision-4b-q4f16');
   const choice = description.features.textChoice;
   assert.equal(choice.handling, 'packed-request');
-  const tokenLimit = choice.limits.find((limit) => limit.resource === 'tokens');
+  const tokenLimit = choice.limits.find((limit) => limit.resource === 'tokens')!;
   assert.equal(tokenLimit.max, 361);
-  assert.match(tokenLimit.description, /Current experimental package graph envelope/);
-  const questionLimit = choice.limits.find((limit) => limit.resource === 'questions');
+  assert.match(tokenLimit.description!, /Current experimental package graph envelope/);
+  const questionLimit = choice.limits.find((limit) => limit.resource === 'questions')!;
   assert.equal(questionLimit.max, 8);
-  assert.match(questionLimit.description, /dynamic question rows/);
+  assert.match(questionLimit.description!, /dynamic question rows/);
   assert.deepEqual(
     choice.limits.filter((limit) => limit.resource === 'options').map(({scope, max}) => ({scope, max})),
     [
@@ -681,15 +699,17 @@ test('Nari describes joint request limits and option-count temperatures', () => 
     ]
   );
   assert.match(
-    choice.limits.find((limit) => limit.resource === 'options' && limit.scope === 'question').description,
+    choice.limits.find((limit) => limit.resource === 'options' && limit.scope === 'question')!.description!,
     /dynamic option rows/
   );
   assert.match(
-    choice.limits.find((limit) => limit.resource === 'options' && limit.scope === 'request').description,
+    choice.limits.find((limit) => limit.resource === 'options' && limit.scope === 'request')!.description!,
     /not a pinned model capacity/
   );
   assert.deepEqual(
-    choice.score.temperature.byOptionCount.map(({min, max, value}) => [min, max, value]),
+    (
+      choice.score.temperature as {byOptionCount: readonly {min: number; max: number; value: number}[]}
+    ).byOptionCount.map(({min, max, value}) => [min, max, value]),
     [
       [2, 2, 1],
       [3, 5, 1.1189],
@@ -724,7 +744,7 @@ test('DLight shares H2O capabilities while binding its own graph and assets', ()
   assert.ok(dlight.assets.requiredFiles.includes('h2o-dlight-metadata.json'));
   assert.ok(!dlight.assets.requiredFiles.includes('model.pending.wasm'));
   assert.ok(Object.isFrozen(dlight.assets.requiredFiles));
-  assert.throws(() => dlight.assets.requiredFiles.push('extra'), TypeError);
+  assert.throws(() => (dlight.assets.requiredFiles as string[]).push('extra'), TypeError);
 });
 
 test('unknown and unregistered candidates are rejected before loading', () => {
@@ -736,22 +756,22 @@ test('unknown and unregistered candidates are rejected before loading', () => {
 });
 
 test('limits distinguish a whole packed request from independently encoded questions', () => {
-  const limit = (name, resource, scope) =>
+  const limit = (name: string, resource: string, scope: string) =>
     describeModel(name).features.textChoice.limits.find((item) => item.resource === resource && item.scope === scope);
   assert.equal(limit('kev-0.6b-q4f16', 'tokens', 'request'), undefined);
-  assert.equal(limit('kev-0.6b-q4f16', 'tokens', 'state').max, KEV_MAX_STATE_TOKENS - 1);
-  assert.equal(limit('kev-0.6b-q4f16', 'tokens', 'question').max, KEV_MAX_BRANCH_TOKENS);
-  assert.match(limit('kev-0.6b-q4f16', 'tokens', 'question').description, /native.*per-question/i);
+  assert.equal(limit('kev-0.6b-q4f16', 'tokens', 'state')!.max, KEV_MAX_STATE_TOKENS - 1);
+  assert.equal(limit('kev-0.6b-q4f16', 'tokens', 'question')!.max, KEV_MAX_BRANCH_TOKENS);
+  assert.match(limit('kev-0.6b-q4f16', 'tokens', 'question')!.description!, /native.*per-question/i);
   for (const model of ['kev-0.6b-q4f16', 'kev-0.6b-reflexes-q4f16']) {
     const description = describeModel(model);
-    const questions = limit(model, 'questions', 'request');
+    const questions = limit(model, 'questions', 'request')!;
     assert.equal(questions.min, 1);
     assert.equal(questions.max, undefined);
-    assert.equal(limit(model, 'tokens', 'question').max, KEV_MAX_BRANCH_TOKENS);
-    const options = limit(model, 'options', 'question');
+    assert.equal(limit(model, 'tokens', 'question')!.max, KEV_MAX_BRANCH_TOKENS);
+    const options = limit(model, 'options', 'question')!;
     assert.equal(options.min, 1);
     assert.equal(options.max, KEV_MAX_OPTIONS);
-    assert.match(options.description, /upstream Kev/i);
+    assert.match(options.description!, /upstream Kev/i);
     assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'noul', 'score']);
   }
   for (const model of [
@@ -759,25 +779,25 @@ test('limits distinguish a whole packed request from independently encoded quest
     'experimental-tamev-nano-tinybert-int8',
     'experimental-tamev-nano-flash-tinybert-int8'
   ]) {
-    const questions = limit(model, 'questions', 'request');
+    const questions = limit(model, 'questions', 'request')!;
     assert.equal(questions.min, 1);
     assert.equal(questions.max, undefined);
-    const options = limit(model, 'options', 'question');
+    const options = limit(model, 'options', 'question')!;
     assert.equal(options.min, 2);
     assert.equal(options.max, undefined);
-    assert.equal(limit(model, 'tokens', 'state').max, 128);
-    assert.equal(limit(model, 'tokens', 'question').max, 48);
+    assert.equal(limit(model, 'tokens', 'state')!.max, 128);
+    assert.equal(limit(model, 'tokens', 'question')!.max, 48);
   }
-  assert.equal(limit(deberta.model, 'tokens', 'request').max, deberta.maxInputTokens);
-  assert.equal(limit(deberta.model, 'tokens', 'state').max, deberta.maxStateTokens);
-  assert.equal(limit('mapika-0.8b-f16', 'tokens', 'request').max, 512);
-  assert.equal(limit('mapika-0.8b-q4f16', 'tokens', 'request').max, 128);
-  assert.equal(limit('kev-0.8b-f16', 'tokens', 'question').max, 128);
-  assert.equal(limit('kev-0.8b-f16', 'tokens', 'state').max, 127);
-  assert.equal(limit('experimental-strands-qwen-2b-fp16', 'tokens', 'question').max, STRANDS_MAX_TOKENS);
-  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'tokens', 'question').max, 512);
-  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'questions', 'request').max, undefined);
-  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'options', 'question').max, 255);
+  assert.equal(limit(deberta.model, 'tokens', 'request')!.max, deberta.maxInputTokens);
+  assert.equal(limit(deberta.model, 'tokens', 'state')!.max, deberta.maxStateTokens);
+  assert.equal(limit('mapika-0.8b-f16', 'tokens', 'request')!.max, 512);
+  assert.equal(limit('mapika-0.8b-q4f16', 'tokens', 'request')!.max, 128);
+  assert.equal(limit('kev-0.8b-f16', 'tokens', 'question')!.max, 128);
+  assert.equal(limit('kev-0.8b-f16', 'tokens', 'state')!.max, 127);
+  assert.equal(limit('experimental-strands-qwen-2b-fp16', 'tokens', 'question')!.max, STRANDS_MAX_TOKENS);
+  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'tokens', 'question')!.max, 512);
+  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'questions', 'request')!.max, undefined);
+  assert.equal(limit('experimental-h2o-lightning-4b-q4f16', 'options', 'question')!.max, 255);
   assert.equal(describeModel('experimental-h2o-lightning-4b-q4f16').features.textChoice.score.temperature, 0.75);
   assert.equal(
     describeModel('experimental-h2o-lightning-4b-q4f16').features.textChoice.handling,
@@ -787,8 +807,8 @@ test('limits distinguish a whole packed request from independently encoded quest
     describeModel('experimental-h2o-lightning-4b-q4f16').features.textChoice.tokenCount,
     'sum-question-rows'
   );
-  assert.equal(limit(deberta.model, 'questions', 'request').max, undefined);
-  assert.equal(limit('mapika-0.8b-q4f16', 'questions', 'request').max, undefined);
+  assert.equal(limit(deberta.model, 'questions', 'request')!.max, undefined);
+  assert.equal(limit('mapika-0.8b-q4f16', 'questions', 'request')!.max, undefined);
   assert.equal(describeModel('mapika-0.8b-q4f16').features.textChoice.tokenCount, 'packed-request');
   assert.equal(describeModel('kev-0.8b-f16').features.textChoice.tokenCount, 'sum-question-rows');
 });
@@ -796,14 +816,14 @@ test('limits distinguish a whole packed request from independently encoded quest
 test('Skejja advertises its upstream option limit and row-scoped token budget without a package question cap', () => {
   for (const model of ['experimental-skejja-edge32k-ft6-int8', 'experimental-skejja-edge32k-ft6-int8dyn']) {
     const choice = describeModel(model).features.textChoice;
-    const tokens = choice.limits.find((limit) => limit.resource === 'tokens');
-    const questions = choice.limits.find((limit) => limit.resource === 'questions');
-    const options = choice.limits.find((limit) => limit.resource === 'options');
+    const tokens = choice.limits.find((limit) => limit.resource === 'tokens')!;
+    const questions = choice.limits.find((limit) => limit.resource === 'questions')!;
+    const options = choice.limits.find((limit) => limit.resource === 'options')!;
 
     assert.deepEqual([tokens.scope, tokens.max], ['question', 512]);
     assert.equal(questions.min, 1);
     assert.equal(questions.max, undefined);
-    assert.match(questions.description, /upstream server defaults to 256/i);
+    assert.match(questions.description!, /upstream server defaults to 256/i);
     assert.deepEqual([options.scope, options.min, options.max], ['question', 2, 255]);
   }
 });
@@ -812,9 +832,9 @@ test('Verdict exposes per-row and class limits without a request question cap', 
   const choice = describeModel('experimental-openjev-verdict-151m-fp16').features.textChoice;
   assert.equal(choice.handling, 'independent-questions');
   assert.equal(choice.tokenCount, 'sum-question-rows');
-  assert.equal(choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question').max, 512);
-  assert.equal(choice.limits.find((item) => item.resource === 'questions').max, undefined);
-  assert.equal(choice.limits.find((item) => item.resource === 'options' && item.scope === 'question').max, 24);
+  assert.equal(choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 512);
+  assert.equal(choice.limits.find((item) => item.resource === 'questions')!.max, undefined);
+  assert.equal(choice.limits.find((item) => item.resource === 'options' && item.scope === 'question')!.max, 24);
 });
 
 test('SafeDecide describes its pinned FP32 option-pair route and selective action rules', () => {
@@ -835,9 +855,9 @@ test('SafeDecide describes its pinned FP32 option-pair route and selective actio
     choice.limits.filter((limit) => limit.resource === 'options').map(({scope, min, max}) => [scope, min, max]),
     [['question', 2, undefined]]
   );
-  assert.equal(choice.limits.find((limit) => limit.resource === 'questions').max, undefined);
-  assert.equal(choice.limits.find((limit) => limit.resource === 'tokens').max, 640);
-  assert.deepEqual(description.features.selectiveAction.levels, [
+  assert.equal(choice.limits.find((limit) => limit.resource === 'questions')!.max, undefined);
+  assert.equal(choice.limits.find((limit) => limit.resource === 'tokens')!.max, 640);
+  assert.deepEqual(description.features.selectiveAction!.levels, [
     {alpha: 0.05, delta: 0.1, threshold: null},
     {alpha: 0.1, delta: 0.1, threshold: 0.7},
     {alpha: 0.2, delta: 0.1, threshold: 0.5}
@@ -869,12 +889,15 @@ test('Strands Qwen 2B records its verified WebGPU route and declared model terms
   assert.equal(description.checkpoint.revision, '216d1ccb46a9e9b036eb9187b248db98480f77d4');
   assert.equal(description.backend.name, 'tvm-webgpu');
   assert.equal(description.verification.currentBundleGpu, 'verified');
-  assert.equal(description.features.textChoice.limits.find((limit) => limit.resource === 'tokens').max, 4096);
-  const optionLimit = description.features.textChoice.limits.find((limit) => limit.resource === 'options');
+  assert.equal(description.features.textChoice.limits.find((limit) => limit.resource === 'tokens')!.max, 4096);
+  const optionLimit = description.features.textChoice.limits.find((limit) => limit.resource === 'options')!;
   assert.deepEqual([optionLimit.min, optionLimit.max], [2, 255]);
-  assert.match(optionLimit.description, /pinned fused TVM graph.*2–255.*rejected before inference/u);
+  assert.match(optionLimit.description!, /pinned fused TVM graph.*2–255.*rejected before inference/u);
   assert.equal(description.licenses.modelTerms, 'Apache-2.0 (publisher-declared; training-data source terms vary)');
-  assert.match(description.licenses.modelLicenseUrl, /\/blob\/216d1ccb46a9e9b036eb9187b248db98480f77d4\/LICENSE\.md$/u);
+  assert.match(
+    description.licenses.modelLicenseUrl!,
+    /\/blob\/216d1ccb46a9e9b036eb9187b248db98480f77d4\/LICENSE\.md$/u
+  );
 });
 
 test('Gemma 4 registration reports the pinned E2B runtime contract and source limits', () => {
@@ -884,9 +907,9 @@ test('Gemma 4 registration reports the pinned E2B runtime contract and source li
   assert.equal(description.checkpoint.revision, 'd383ecf8534b13d49b3b567a1b66f88fca6d50ba');
   assert.equal(description.assets.integrity, 'pinned-manifest');
   assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.equal(limits.find((limit) => limit.resource === 'tokens' && limit.scope === 'question').max, 4096);
-  assert.equal(limits.find((limit) => limit.resource === 'options' && limit.scope === 'question').max, undefined);
-  assert.equal(limits.find((limit) => limit.resource === 'questions' && limit.scope === 'request').max, undefined);
+  assert.equal(limits.find((limit) => limit.resource === 'tokens' && limit.scope === 'question')!.max, 4096);
+  assert.equal(limits.find((limit) => limit.resource === 'options' && limit.scope === 'question')!.max, undefined);
+  assert.equal(limits.find((limit) => limit.resource === 'questions' && limit.scope === 'request')!.max, undefined);
   assert.equal(description.verification.currentBundleGpu, 'not-revalidated');
   assert.match(description.assets.additionalFiles, /lossy/u);
 });
@@ -899,7 +922,7 @@ test('catalog data and nested metadata cannot be mutated by callers', () => {
   assert.ok(Object.isFrozen(description.features.textChoice.limits));
   assert.ok(Object.isFrozen(description.features.textChoice.limits[0]));
   assert.ok(Object.isFrozen(description.backend.requiredLimits));
-  assert.throws(() => models.push('imajev-4b'), TypeError);
-  assert.throws(() => (description.features.textChoice.limits[0].max = 999), TypeError);
-  assert.equal(describeModel('mapika-0.8b-q4f16').features.textChoice.limits[0].max, 128);
+  assert.throws(() => (models as string[]).push('imajev-4b'), TypeError);
+  assert.throws(() => ((description.features.textChoice.limits[0] as {max?: number}).max = 999), TypeError);
+  assert.equal(describeModel('mapika-0.8b-q4f16').features.textChoice.limits[0]!.max, 128);
 });
