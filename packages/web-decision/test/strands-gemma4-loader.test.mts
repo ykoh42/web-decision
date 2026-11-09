@@ -3,11 +3,10 @@ import test from 'node:test';
 import {loadStrandsGemma4FromSource} from '../src/strands/gemma4-e2b-loader.mjs';
 
 function syntheticRuntime() {
-  const events = [];
+  const events: string[] = [];
   let pointer = 0;
-  let gpu;
   const context = {
-    pendingGPUToCPUCopy: null,
+    pendingGPUToCPUCopy: null as Promise<void> | null,
     copyRawBytesToBuffer() {
       events.push('upload');
     },
@@ -16,7 +15,12 @@ function syntheticRuntime() {
     }
   };
   class Tensor {
-    constructor(shape, dtype) {
+    declare shape: number[];
+    declare dtype: string;
+    declare byteOffset: number;
+    declare pointer: number;
+    declare values: number[] | Float32Array;
+    constructor(shape: number[], dtype: string) {
       this.shape = shape;
       this.dtype = dtype;
       this.byteOffset = 0;
@@ -24,7 +28,7 @@ function syntheticRuntime() {
       this.values = [];
     }
 
-    copyFrom(value) {
+    copyFrom(value: Tensor | ArrayLike<number>) {
       if (value instanceof Tensor) {
         this.values = value.values;
         context.pendingGPUToCPUCopy = Promise.resolve();
@@ -49,11 +53,11 @@ function syntheticRuntime() {
       await pending;
     }
   };
-  let loseDevice;
-  const lost = new Promise((resolve) => {
+  let loseDevice!: (info: {reason: string}) => void;
+  const lost = new Promise<{reason: string}>((resolve) => {
     loseDevice = resolve;
   });
-  gpu = {
+  const gpu = {
     lost,
     addEventListener() {},
     pushErrorScope() {},
@@ -80,14 +84,14 @@ function syntheticRuntime() {
     cpu() {
       return {deviceType: 'cpu'};
     },
-    empty(shape, dtype) {
+    empty(shape: number[], dtype: string) {
       return new Tensor([...shape], dtype);
     },
     createVirtualMachine() {
       return {
-        getFunction(name) {
+        getFunction(name: string) {
           assert.equal(name, 'main');
-          return (ids, answerIndex, optionIndices, ...weights) => {
+          return (ids: unknown, answerIndex: unknown, optionIndices: unknown, ...weights: unknown[]) => {
             assert.ok(ids instanceof Tensor);
             assert.ok(answerIndex instanceof Tensor);
             assert.ok(optionIndices instanceof Tensor);
@@ -100,7 +104,7 @@ function syntheticRuntime() {
         }
       };
     },
-    getGlobalFunc(name) {
+    getGlobalFunc(name: string) {
       assert.equal(name, 'vm.builtin.memory_manager.clear');
       return () => events.push('memory.clear');
     },
@@ -153,7 +157,7 @@ test('Gemma 4 requires a non-empty assetsUrl before requesting a GPU adapter', a
             adapterRequests++;
           }
         }
-      }),
+      } as unknown as Parameters<typeof loadStrandsGemma4FromSource>[0]),
       {code: 'INVALID_INPUT'}
     );
     assert.equal(adapterRequests, 0);
@@ -175,11 +179,11 @@ test('Gemma 4 loader gives the session an owned runner that can decide and dispo
     }
   };
   const tokenizer = {
-    encode(text, {add_special_tokens}) {
-      const ids = Array.from(text, (character) => character.codePointAt(0));
+    encode(text: string, {add_special_tokens}: {add_special_tokens?: boolean}) {
+      const ids = Array.from(text, (character) => character.codePointAt(0)!);
       return {ids: add_special_tokens ? [2, ...ids] : ids};
     },
-    decode(ids) {
+    decode(ids: number[]) {
       return ids.map((id) => String.fromCodePoint(id)).join('');
     }
   };
@@ -193,7 +197,7 @@ test('Gemma 4 loader gives the session an owned runner that can decide and dispo
       preparedAdapter: adapter,
       verifySource: async () => source,
       readFile: async () => source.bytes
-    }
+    } as unknown as Parameters<typeof loadStrandsGemma4FromSource>[1]
   );
 
   assert.equal(events.filter((event) => event === 'upload').length, 1248);
@@ -202,7 +206,7 @@ test('Gemma 4 loader gives the session an owned runner that can decide and dispo
     state: 'A small state.',
     questions: [{instructions: 'Choose one.', options: ['red', 'blue']}]
   });
-  assert.equal(result.answers[0].selected, 'blue');
+  assert.equal(result.answers[0]!.selected, 'blue');
   await model.releaseCachedMemory();
   await model.dispose();
   assert.ok(events.includes('memory.clear'));
