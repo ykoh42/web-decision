@@ -1,10 +1,37 @@
 import {WebDecisionError} from './kev.js';
 
-function invalid(message) {
+interface TensorRecord {
+  readonly index: number;
+  readonly offset: number;
+  readonly dtype: 'float16' | 'float32' | 'int32' | 'uint32';
+  readonly shape: number[];
+  readonly nbytes: number;
+}
+
+interface TensorShard {
+  readonly path: string;
+  readonly nbytes: number;
+}
+
+interface TensorIndex {
+  readonly totalBytes: number;
+  readonly records: TensorRecord[];
+  readonly shards: TensorShard[];
+}
+
+interface TensorIndexLimits {
+  readonly parameterCount: number;
+  readonly totalBytes: number;
+  readonly shardCount: number;
+  readonly maxShardBytes: number;
+  readonly allowedDtypes?: string[] | undefined;
+}
+
+function invalid(message: string): never {
   throw new WebDecisionError('INVALID_ASSET', message);
 }
 
-function validateRecord(record, index, offset, allowedDtypes) {
+function validateRecord(record: TensorRecord, index: number, offset: number, allowedDtypes: string[]): void {
   const width = {float16: 2, float32: 4, int32: 4, uint32: 4}[record?.dtype];
   if (
     record?.index !== index ||
@@ -25,28 +52,34 @@ function validateRecord(record, index, offset, allowedDtypes) {
 
 /** Validate contiguous parameter and shard spans before allocating GPU memory. */
 export function validateTensorIndex(
-  manifest,
-  index,
-  {parameterCount, totalBytes, shardCount, maxShardBytes, allowedDtypes = ['float16', 'float32', 'int32']}
-) {
+  manifest: unknown,
+  index: unknown,
+  {
+    parameterCount,
+    totalBytes,
+    shardCount,
+    maxShardBytes,
+    allowedDtypes = ['float16', 'float32', 'int32']
+  }: TensorIndexLimits
+): unknown {
   if (
     !index ||
-    index.totalBytes !== totalBytes ||
-    !Array.isArray(index.records) ||
-    index.records.length !== parameterCount ||
-    !Array.isArray(index.shards) ||
-    index.shards.length !== shardCount
+    (index as TensorIndex).totalBytes !== totalBytes ||
+    !Array.isArray((index as TensorIndex).records) ||
+    (index as TensorIndex).records.length !== parameterCount ||
+    !Array.isArray((index as TensorIndex).shards) ||
+    (index as TensorIndex).shards.length !== shardCount
   )
     invalid('Invalid tensor weight index.');
   let total = 0;
-  for (const [i, record] of index.records.entries()) {
+  for (const [i, record] of (index as TensorIndex).records.entries()) {
     validateRecord(record, i, total, allowedDtypes);
     total += record.nbytes;
     if (!Number.isSafeInteger(total) || total > totalBytes) invalid('Invalid tensor parameter range.');
   }
   if (total !== totalBytes) invalid('Missing tensor parameter data.');
   total = 0;
-  for (const [i, shard] of index.shards.entries()) {
+  for (const [i, shard] of (index as TensorIndex).shards.entries()) {
     const path = `weights/shard-${String(i).padStart(4, '0')}.bin`;
     if (
       shard?.path !== path ||
@@ -54,7 +87,7 @@ export function validateTensorIndex(
       shard.nbytes < 4 ||
       shard.nbytes > maxShardBytes ||
       shard.nbytes % 4 ||
-      shard.nbytes !== manifest.files?.[path]?.bytes
+      shard.nbytes !== (manifest as {files?: Record<string, {bytes: number}>}).files?.[path]?.bytes
     )
       invalid('Invalid tensor shard metadata.');
     total += shard.nbytes;

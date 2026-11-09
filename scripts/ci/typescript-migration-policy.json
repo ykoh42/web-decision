@@ -148,7 +148,6 @@
     "packages/web-decision/src/tamev/source.mjs",
     "packages/web-decision/src/tamev/tokenizer.mjs",
     "packages/web-decision/src/tamev/typed.mjs",
-    "packages/web-decision/src/tensor-index.js",
     "packages/web-decision/src/tensor-shard-upload.js",
     "packages/web-decision/src/tinydecide-preview-entry.js",
     "packages/web-decision/src/tinydecide-preview-registry.js",
