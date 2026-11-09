@@ -28,6 +28,7 @@
     "test/elephant-reference.test.mts",
     "test/gpu-preflight.test.mts",
     "test/h2o-dual-source.test.mts",
+    "test/h2o-tokenizer-snapshot.test.mts",
     "test/imajev-disposal.test.mts",
     "test/imajev-result-getter.test.mts",
     "test/imajev-loader.test.mts",

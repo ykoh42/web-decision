@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {Buffer} from 'node:buffer';
-import test from 'node:test';
+import test, {type TestContext} from 'node:test';
+import type {H2oTokenizerConstructor} from '../src/h2o/tokenizer.mjs';
 import {createH2oTokenizer} from '../src/h2o/tokenizer.mjs';
 import {prepareCheckedH2oTokenizer} from '../src/h2o/tokenizer-adapter.mjs';
 
@@ -12,13 +13,13 @@ const pins = [
   '7eb96aaea6b7dbb495f0840b42f18014ca5a697697305f76f39d46cae890ccb2'
 ];
 
-function fixture(t, {beforeDigest} = {}) {
+function fixture(t: TestContext, {beforeDigest}: {beforeDigest?: (index: number) => Promise<void>} = {}) {
   const names = Array.from({length: 33}, (_, index) => `token-${index}`);
   names[1] = '<|im_start|>';
   names[2] = '<|im_end|>';
   names[24] = '<think>';
   names[25] = '</think>';
-  const token = (content) => ({
+  const token = (content: string) => ({
     content,
     normalized: false,
     special: false,
@@ -38,29 +39,37 @@ function fixture(t, {beforeDigest} = {}) {
   };
   const contract = {probes: Array.from({length: 24}, (_, index) => ({text: `probe-${index}`, token_ids: [7]}))};
   const encoder = new TextEncoder(),
-    inputs = [data, config, contract].map((value) => encoder.encode(JSON.stringify(value)));
+    inputs: [Uint8Array, Uint8Array, Uint8Array] = [data, config, contract].map((value) =>
+      encoder.encode(JSON.stringify(value))
+    ) as [Uint8Array, Uint8Array, Uint8Array];
   const originals = inputs.map((bytes) => Buffer.from(bytes).toString('hex'));
   const tokenizerJson = new TextDecoder().decode(inputs[0]);
   const parse = JSON.parse;
   let tokenizerParses = 0;
-  t.mock.method(JSON, 'parse', (text, ...args) => {
-    if (text === tokenizerJson) tokenizerParses++;
-    return parse(text, ...args);
-  });
-  t.mock.method(crypto.subtle, 'digest', async (_algorithm, value) => {
-    const index = originals.indexOf(Buffer.from(value).toString('hex'));
+  t.mock.method(
+    JSON,
+    'parse',
+    (text: string, ...args: [reviver?: (this: unknown, key: string, value: unknown) => unknown]) => {
+      if (text === tokenizerJson) tokenizerParses++;
+      return parse(text, ...args);
+    }
+  );
+  t.mock.method(crypto.subtle, 'digest', async (_algorithm: AlgorithmIdentifier, value: BufferSource) => {
+    const index = originals.indexOf(Buffer.from(value as ArrayBuffer).toString('hex'));
     if (beforeDigest) await beforeDigest(index);
-    return Uint8Array.from((index < 0 ? '00'.repeat(32) : pins[index]).match(/../g), (part) => parseInt(part, 16))
+    return Uint8Array.from((index < 0 ? '00'.repeat(32) : pins[index]!).match(/../g)!, (part) => parseInt(part, 16))
       .buffer;
   });
   let probeCalls = 0;
   class Tokenizer {
-    constructor(parsed, parsedConfig) {
-      parsed.added_tokens[0].content = 'constructor-mutated';
+    constructor(data: object, config: object) {
+      const parsed = data as {added_tokens: {content: string}[]};
+      const parsedConfig = config as {tokenizer_class: string; added_tokens_decoder: Record<string, {content: string}>};
+      parsed.added_tokens[0]!.content = 'constructor-mutated';
       parsedConfig.tokenizer_class = 'constructor-mutated';
-      parsedConfig.added_tokens_decoder['248044'].content = 'constructor-mutated';
+      parsedConfig.added_tokens_decoder['248044']!.content = 'constructor-mutated';
     }
-    encode(text) {
+    encode(text: string) {
       if (text.startsWith('probe-')) {
         probeCalls++;
         return {ids: [7]};
@@ -69,13 +78,20 @@ function fixture(t, {beforeDigest} = {}) {
       return {ids: marker ? [248044 + names.indexOf(marker)] : []};
     }
   }
-  return {inputs, names, Tokenizer, probes: () => probeCalls, parses: () => tokenizerParses};
+  return {
+    inputs,
+    names,
+    Tokenizer,
+    typedTokenizer: Tokenizer as unknown as H2oTokenizerConstructor,
+    probes: () => probeCalls,
+    parses: () => tokenizerParses
+  };
 }
 
 test('adapter keeps pre-constructor evidence and synchronous byte snapshots', async (t) => {
-  const {inputs, names, Tokenizer, probes, parses} = fixture(t);
-  const pending = prepareCheckedH2oTokenizer(Tokenizer, ...inputs);
-  for (const input of inputs) input[0] ^= 1;
+  const {inputs, names, typedTokenizer, probes, parses} = fixture(t);
+  const pending = prepareCheckedH2oTokenizer(typedTokenizer, ...inputs);
+  for (const input of inputs) input[0] = input[0]! ^ 1;
   const result = await pending;
   assert.deepEqual(result.addedTokens, names);
   assert.equal(probes(), 48);
@@ -84,8 +100,8 @@ test('adapter keeps pre-constructor evidence and synchronous byte snapshots', as
 });
 
 test('abort during tokenizer hashing prevents JSON parsing and tokenizer construction', async (t) => {
-  let finish;
-  const pendingDigest = new Promise((resolve) => {
+  let finish!: () => void;
+  const pendingDigest = new Promise<void>((resolve) => {
     finish = resolve;
   });
   const {inputs, Tokenizer, parses} = fixture(t, {beforeDigest: () => pendingDigest}),
@@ -93,12 +109,16 @@ test('abort during tokenizer hashing prevents JSON parsing and tokenizer constru
     reason = new Error('synthetic cancellation');
   let constructed = 0;
   class CountingTokenizer extends Tokenizer {
-    constructor(...args) {
+    constructor(...args: ConstructorParameters<typeof Tokenizer>) {
       super(...args);
       constructed++;
     }
   }
-  const pending = prepareCheckedH2oTokenizer(CountingTokenizer, ...inputs, controller.signal);
+  const pending = prepareCheckedH2oTokenizer(
+    CountingTokenizer as unknown as H2oTokenizerConstructor,
+    ...inputs,
+    controller.signal
+  );
   controller.abort(reason);
   finish();
   await assert.rejects(pending, (error) => error === reason);
@@ -111,24 +131,24 @@ test('abort raised during a tokenizer probe prevents further probes', async (t) 
     controller = new AbortController(),
     reason = new Error('synthetic cancellation');
   class CancellingTokenizer extends Tokenizer {
-    encode(...args) {
+    override encode(...args: Parameters<InstanceType<typeof Tokenizer>['encode']>) {
       const result = super.encode(...args);
       controller.abort(reason);
       return result;
     }
   }
   await assert.rejects(
-    prepareCheckedH2oTokenizer(CancellingTokenizer, ...inputs, controller.signal),
+    prepareCheckedH2oTokenizer(CancellingTokenizer as unknown as H2oTokenizerConstructor, ...inputs, controller.signal),
     (error) => error === reason
   );
   assert.equal(probes(), 1);
 });
 
 test('pinned input mismatch keeps the adapter error and direct builder keeps its return type', async (t) => {
-  const {inputs, Tokenizer} = fixture(t);
-  assert.ok((await createH2oTokenizer(Tokenizer, ...inputs)) instanceof Tokenizer);
-  inputs[0][0] ^= 1;
-  await assert.rejects(prepareCheckedH2oTokenizer(Tokenizer, ...inputs), {
+  const {inputs, Tokenizer, typedTokenizer} = fixture(t);
+  assert.ok((await createH2oTokenizer(typedTokenizer, ...inputs)) instanceof Tokenizer);
+  inputs[0][0] = inputs[0][0]! ^ 1;
+  await assert.rejects(prepareCheckedH2oTokenizer(typedTokenizer, ...inputs), {
     code: 'INVALID_ASSET',
     message: 'Pinned H2O tokenizer adapter verification failed.'
   });
