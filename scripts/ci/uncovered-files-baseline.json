@@ -1,7 +1,5 @@
 [
   "browser-only-ws.ts",
   "kev08/loader.js",
-  "mapika/loader.js",
-  "strands/loader.mjs",
-  "strands/range-source.mjs"
+  "mapika/loader.js"
 ]
