@@ -82,6 +82,7 @@
     "src/strands/source-loader-internal.mts",
     "src/safedecide/*.mts",
     "src/tamev/loader.mts",
+    "src/tamev/source.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]
