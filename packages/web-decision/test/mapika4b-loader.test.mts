@@ -9,15 +9,50 @@ import {
 } from '../src/mapika4b/loader.mjs';
 import {MAPIKA4_DLIGHT_ALL_MODEL, MAPIKA4_DLIGHT_MODEL} from '../src/mapika4b/contract.mjs';
 
-function fixture() {
-  const events = [];
-  const device = {
+type FakeModel = typeof MAPIKA4_MODEL | typeof MAPIKA4_DLIGHT_MODEL | typeof MAPIKA4_DLIGHT_ALL_MODEL;
+type FakeDevice = {lost: Promise<unknown>; destroy(): void};
+type FakeAdapter = {
+  features: Set<string>;
+  limits: {maxBufferSize: number; maxStorageBufferBindingSize: number; maxStorageBuffersPerShaderStage: number};
+  isFallbackAdapter?: boolean;
+  requestDevice(): Promise<FakeDevice>;
+};
+type FakeSource = {wasm: Uint8Array; tokenizer: unknown; tokenizerConfig: unknown};
+type FakeOwner = {
+  lifecycle: {loss: unknown; disposed: boolean};
+  uncaptured: unknown[];
+  disposalGuard: {blocked: boolean; retain(): void};
+};
+type FakeRunner = {weights: string[]};
+type FakeDependencies = {
+  fake: true;
+  gpu: {requestAdapter(): Promise<FakeAdapter>} | undefined;
+  openSource(base: URL, options: {signal: AbortSignal | undefined; model: FakeModel}): Promise<FakeSource>;
+  prepareTokenizer(data: unknown, config: unknown): {tokenizer: unknown; config: unknown};
+  instantiate(wasm: Uint8Array): Promise<{dispose(): void}>;
+  initialize(runtime: {dispose(): void}, gpu: FakeDevice): FakeOwner;
+  upload(owner: FakeOwner, source: FakeSource, signal: AbortSignal): Promise<string[]>;
+  runner(value: {weights: string[]}): FakeRunner;
+  session(value: {runner: FakeRunner; tokenizer?: unknown; config?: unknown}): {runner: FakeRunner};
+};
+type FakeFixture = {
+  events: string[];
+  device: FakeDevice;
+  adapter: FakeAdapter;
+  owner: FakeOwner;
+  deps: FakeDependencies;
+  options: {model: typeof MAPIKA4_MODEL; assetsUrl: string};
+};
+
+function fixture(): FakeFixture {
+  const events: string[] = [];
+  const device: FakeDevice = {
     lost: new Promise(() => {}),
     destroy() {
       events.push('destroy');
     }
   };
-  const adapter = {
+  const adapter: FakeAdapter = {
     features: new Set(['shader-f16']),
     limits: {...MAPIKA4_LIMITS},
     async requestDevice() {
@@ -25,7 +60,7 @@ function fixture() {
       return device;
     }
   };
-  const owner = {
+  const owner: FakeOwner = {
     lifecycle: {loss: null, disposed: false},
     uncaptured: [],
     disposalGuard: {
@@ -35,7 +70,7 @@ function fixture() {
       }
     }
   };
-  const deps = {
+  const deps: FakeDependencies = {
     fake: true,
     gpu: {
       async requestAdapter() {
@@ -88,7 +123,7 @@ function fixture() {
 
 test('loads verified metadata, device and ordered weights before creating the session', async () => {
   const f = fixture();
-  const value = await loadFakeMapika4Candidate(f.options, f.deps);
+  const value = (await loadFakeMapika4Candidate(f.options, f.deps)) as {runner: FakeRunner};
   assert.deepEqual(value.runner.weights, ['weight']);
   assert.deepEqual(f.events, [
     'adapter',
@@ -106,7 +141,7 @@ test('loads verified metadata, device and ordered weights before creating the se
 test('the optimized model selection is forwarded to the asset source', async () => {
   for (const model of [MAPIKA4_DLIGHT_MODEL, MAPIKA4_DLIGHT_ALL_MODEL]) {
     const f = fixture();
-    let selected;
+    let selected: FakeModel | undefined;
     const original = f.deps.openSource;
     f.deps.openSource = async (base, options) => {
       selected = options.model;
@@ -150,7 +185,7 @@ test('rejects unsupported options and adapters before opening assets', async () 
 test('aborting a pending device request destroys the device when it resolves', async () => {
   const f = fixture(),
     controller = new AbortController();
-  let resolveDevice;
+  let resolveDevice: ((device: FakeDevice | PromiseLike<FakeDevice>) => void) | undefined;
   f.adapter.requestDevice = () =>
     new Promise((resolve) => {
       resolveDevice = resolve;
@@ -160,7 +195,7 @@ test('aborting a pending device request destroys the device when it resolves', a
   controller.abort();
   await assert.rejects(pending, {name: 'AbortError'});
   assert.ok(!f.events.includes('destroy'));
-  resolveDevice(f.device);
+  resolveDevice!(f.device);
   await nextTurn();
   assert.ok(f.events.includes('destroy'));
   assert.ok(!f.events.includes('initialize'));
@@ -168,15 +203,15 @@ test('aborting a pending device request destroys the device when it resolves', a
 
 test('device loss during upload retains the initialized runtime', async () => {
   const f = fixture();
-  let lose, entered;
-  f.device.lost = new Promise((resolve) => {
+  let lose!: (reason: unknown) => void, entered!: () => void;
+  f.device.lost = new Promise<unknown>((resolve) => {
     lose = resolve;
   });
-  const started = new Promise((resolve) => {
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
   f.deps.upload = async (_owner, _source, signal) =>
-    new Promise((_resolve, reject) => {
+    new Promise<string[]>((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), {once: true});
       entered();
     });
