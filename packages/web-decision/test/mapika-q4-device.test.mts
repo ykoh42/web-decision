@@ -4,7 +4,11 @@ import {MAPIKA_Q4_LARGEST_BUFFER} from '../src/mapika-q4/contract.js';
 import {requestMapikaQ4Device} from '../src/mapika-q4/device.js';
 
 function fixture() {
-  const state = {destroyed: 0, requests: 0};
+  const state: {
+    destroyed: number;
+    requests: number;
+    descriptor?: {requiredFeatures: string[]; requiredLimits: Record<string, number>} | undefined;
+  } = {destroyed: 0, requests: 0};
   const device = {
     destroy() {
       state.destroyed++;
@@ -17,7 +21,7 @@ function fixture() {
       maxStorageBufferBindingSize: MAPIKA_Q4_LARGEST_BUFFER,
       maxStorageBuffersPerShaderStage: 8
     },
-    async requestDevice(descriptor) {
+    async requestDevice(descriptor?: {requiredFeatures: string[]; requiredLimits: Record<string, number>}) {
       state.requests++;
       state.descriptor = descriptor;
       return device;
@@ -28,22 +32,25 @@ function fixture() {
 
 test('requests the packed embedding limit and shader-f16', async () => {
   const {state, device, gpu, adapter} = fixture();
-  assert.equal(await requestMapikaQ4Device(gpu), device);
-  assert.deepEqual(state.descriptor.requiredFeatures, ['shader-f16']);
-  assert.deepEqual(state.descriptor.requiredLimits, adapter.limits);
+  assert.equal(await requestMapikaQ4Device(gpu as unknown as GPU), device);
+  assert.deepEqual(state.descriptor!.requiredFeatures, ['shader-f16']);
+  assert.deepEqual(state.descriptor!.requiredLimits, adapter.limits);
   assert.ok(MAPIKA_Q4_LARGEST_BUFFER < 128 * 1024 * 1024);
 });
 
 test('rejects missing shader-f16 or insufficient limits before requesting a device', async () => {
-  for (const name of ['maxBufferSize', 'maxStorageBufferBindingSize', 'maxStorageBuffersPerShaderStage']) {
+  for (const name of ['maxBufferSize', 'maxStorageBufferBindingSize', 'maxStorageBuffersPerShaderStage'] as const) {
     const {state, adapter, gpu} = fixture();
     adapter.limits[name]--;
-    await assert.rejects(requestMapikaQ4Device(gpu), {code: 'UNSUPPORTED_ENVIRONMENT', message: new RegExp(name)});
+    await assert.rejects(requestMapikaQ4Device(gpu as unknown as GPU), {
+      code: 'UNSUPPORTED_ENVIRONMENT',
+      message: new RegExp(name)
+    });
     assert.equal(state.requests, 0);
   }
   const {state, adapter, gpu} = fixture();
   adapter.features.clear();
-  await assert.rejects(requestMapikaQ4Device(gpu), {code: 'UNSUPPORTED_ENVIRONMENT'});
+  await assert.rejects(requestMapikaQ4Device(gpu as unknown as GPU), {code: 'UNSUPPORTED_ENVIRONMENT'});
   assert.equal(state.requests, 0);
 });
 
@@ -51,12 +58,12 @@ test('destroys a device that arrives after cancellation', async () => {
   const {state, adapter, gpu, device} = fixture(),
     controller = new AbortController(),
     reason = Error('cancel');
-  let resolveDevice;
+  let resolveDevice: ((value: typeof device) => void) | undefined;
   adapter.requestDevice = () =>
     new Promise((resolve) => {
       resolveDevice = resolve;
     });
-  const promise = requestMapikaQ4Device(gpu, controller.signal);
+  const promise = requestMapikaQ4Device(gpu as unknown as GPU, controller.signal);
   while (!resolveDevice) await new Promise((resolve) => setImmediate(resolve));
   controller.abort(reason);
   resolveDevice(device);
