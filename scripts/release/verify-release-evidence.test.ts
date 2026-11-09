@@ -21,7 +21,8 @@ import {
   verifyArchiveInstall,
   collectReleaseEvidenceInputs,
   collectReleaseEvidenceInputsForTestFixture,
-  verifyReleaseArtifactsForTestFixture
+  verifyReleaseArtifactsForTestFixture,
+  verifyReleaseEvidence
 } from './verify-release-evidence.ts';
 import {
   createExpandedInferenceEvidence,
@@ -552,6 +553,17 @@ test('production release verification rejects the explicitly synthetic fixture s
       sourcePackageRoot: fixture.sourceRoot
     }),
     /Release verification must use the committed package source root/u
+  );
+});
+
+test('the release verifier blocks committed pending provenance before checking build inputs', async () => {
+  await assert.rejects(
+    verifyReleaseEvidence({
+      archivePath: 'unused.tgz',
+      installedPackagePath: 'unused-package',
+      playwrightReportPath: 'unused-report.json'
+    }),
+    /Model kev-0\.6b-q4f16 provenance is pending:/u
   );
 });
 
