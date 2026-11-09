@@ -47,6 +47,8 @@
     "test/nari-session.test.mts",
     "src/nari/source.mts",
     "src/nari/adapter.mts",
+    "src/nari/loader.mts",
+    "src/nari/runtime.mts",
     "src/nari/upload.mts",
     "src/nari/upload-plan.mts",
     "src/nari/session.mts",
