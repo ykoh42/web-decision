@@ -87,6 +87,7 @@
     "src/safedecide/*.mts",
     "src/tamev/loader.mts",
     "src/tamev/protocol.mts",
+    "src/tamev/runner.mts",
     "src/tamev/session.mts",
     "src/tamev/source.mts",
     "src/tamev/tokenizer.mts",
