@@ -8,19 +8,35 @@ import {defaultTreeAdapter, parse, type DefaultTreeAdapterTypes} from 'parse5';
 const policyPath = 'scripts/ci/typescript-migration-policy.json';
 const initialInventoryCommit = 'baa3c144d23e1882ba29084c9f95897b8c56accb';
 
-const sharedReleaseInputHashes = new Map([
+type SharedReleaseInput = {hash: string; versions: readonly string[]; label: string};
+const sharedReleaseInputHashes = new Map<string, SharedReleaseInput>([
+  [
+    'scripts/fetch-model.test.mjs',
+    {
+      hash: '4d155be506cf4ee41709c158828e54b8762cd2a0510f8813e19ccb29379c8d9f',
+      versions: ['0.1.0', '0.2.0'],
+      label: '0.1.0 and 0.2.0'
+    }
+  ],
   [
     'scripts/release/kev-current-source-preview-package-policy.mjs',
-    '219f7a59d67f2e5fe91af021812e19708421cbaec81e2eeef0b950ff22cb9540'
+    {
+      hash: '219f7a59d67f2e5fe91af021812e19708421cbaec81e2eeef0b950ff22cb9540',
+      versions: ['0.1.0', '0.2.0', '0.3.0'],
+      label: '0.1.0, 0.2.0 and 0.3.0'
+    }
   ],
   [
     'scripts/release/kev-current-source-preview-safety.mjs',
-    'a80d1930d2de2e41a799df87302efbf040e0082e3a62251ca89033c473f57492'
+    {
+      hash: 'a80d1930d2de2e41a799df87302efbf040e0082e3a62251ca89033c473f57492',
+      versions: ['0.1.0', '0.2.0', '0.3.0'],
+      label: '0.1.0, 0.2.0 and 0.3.0'
+    }
   ]
 ]);
-const sharedReleaseVersions = ['0.1.0', '0.2.0', '0.3.0'];
-const sharedReleaseReason = (hash: string): string =>
-  `Immutable shared historical release input; releases 0.1.0, 0.2.0 and 0.3.0 pin SHA-256 ${hash}.`;
+const sharedReleaseReason = (input: SharedReleaseInput): string =>
+  `Immutable shared historical release input; releases ${input.label} pin SHA-256 ${input.hash}.`;
 
 const javascriptExtension = /\.(?:js|mjs|cjs|jsx)$/u;
 const releasePath = /^releases\/web-decision-(\d+\.\d+\.\d+)\//u;
@@ -401,16 +417,16 @@ function defaultBaseCommit(root: string, policy: TypeScriptMigrationPolicy): str
 /** Verify immutable shared inputs and the release locks that reference them. */
 export function checkSharedReleaseInputs(root: string): string[] {
   const problems: string[] = [];
-  for (const [path, expectedHash] of sharedReleaseInputHashes) {
+  for (const [path, input] of sharedReleaseInputHashes) {
     try {
       const actualHash = createHash('sha256')
         .update(readFileSync(join(root, path)))
         .digest('hex');
-      if (actualHash !== expectedHash) problems.push(`${path} differs from its historical release hash.`);
+      if (actualHash !== input.hash) problems.push(`${path} differs from its historical release hash.`);
     } catch {
       problems.push(`${path} is missing from the historical release inputs.`);
     }
-    for (const version of sharedReleaseVersions) checkSharedReleaseLock(root, version, path, expectedHash, problems);
+    for (const version of input.versions) checkSharedReleaseLock(root, version, path, input.hash, problems);
   }
   return problems;
 }

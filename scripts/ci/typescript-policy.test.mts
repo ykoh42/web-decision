@@ -295,6 +295,7 @@ test('shared historical inputs must match both their pinned bytes and all releas
   context.after(() => rmSync(root, {recursive: true, force: true}));
   const sourceRoot = fileURLToPath(new URL('../../', import.meta.url));
   const inputPaths = [
+    'scripts/fetch-model.test.mjs',
     'scripts/release/kev-current-source-preview-package-policy.mjs',
     'scripts/release/kev-current-source-preview-safety.mjs'
   ];

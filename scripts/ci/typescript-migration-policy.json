@@ -82,7 +82,6 @@
     "packages/web-decision/test/tamev.test.mjs",
     "packages/web-decision/test/verdict.test.mjs",
     "scripts/ci/check_cognitive_complexity.mjs",
-    "scripts/fetch-model.test.mjs",
     "tests/browser/kev06-real-webgpu.spec.mjs",
     "tests/browser/stable-model-id.spec.mjs",
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
@@ -547,6 +546,10 @@
     {
       "path": "releases/web-decision-0.3.0/test/tamev-micro-wasm.spec.mjs",
       "reason": "Immutable historical release 0.3.0; preserve the published JavaScript snapshot."
+    },
+    {
+      "path": "scripts/fetch-model.test.mjs",
+      "reason": "Immutable shared historical release input; releases 0.1.0 and 0.2.0 pin SHA-256 4d155be506cf4ee41709c158828e54b8762cd2a0510f8813e19ccb29379c8d9f."
     },
     {
       "path": "scripts/release/kev-current-source-preview-package-policy.mjs",
