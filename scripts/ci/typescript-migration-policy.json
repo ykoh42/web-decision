@@ -21,7 +21,6 @@
     "packages/web-decision/src/request-fields.mjs",
     "packages/web-decision/src/skejja/protocol.mjs",
     "packages/web-decision/src/skejja/source.mjs",
-    "packages/web-decision/src/strands/loader-core.mjs",
     "packages/web-decision/test/assets.test.mjs",
     "packages/web-decision/test/bounded-response.test.mjs",
     "packages/web-decision/test/cache-cancellation.test.mjs",

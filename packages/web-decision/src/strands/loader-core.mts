@@ -18,9 +18,114 @@ import {ExperimentalStrandsSession} from './session.mjs';
 import {requestStrandsAdapter} from './preflight.mjs';
 import {guardStrandsDisposal, retainStrandsResources} from './disposal-guard.mjs';
 
-const invalid = (message) => new WebDecisionError('INVALID_ASSET', message);
+interface StrandsInputBytes {
+  readonly manifestBytes?: unknown;
+  readonly wasmBytes?: unknown;
+  readonly tokenizerBytes?: unknown;
+  readonly tokenizerConfigBytes?: unknown;
+}
 
-async function verifiedCopy(bytes, length, expected, signal, name) {
+interface GpuDeviceLike {
+  readonly lost: PromiseLike<unknown>;
+  addEventListener(
+    type: string,
+    listener: (event: UncapturedGpuErrorEvent) => void,
+    options?: AddEventListenerOptions
+  ): void;
+  removeEventListener(type: string, listener: (event: UncapturedGpuErrorEvent) => void): void;
+  destroy(): void;
+  pushErrorScope(filter: 'out-of-memory' | 'validation'): void;
+  popErrorScope(): PromiseLike<unknown>;
+}
+
+interface UncapturedGpuErrorEvent {
+  readonly error?: {readonly message?: string | undefined} | null | undefined;
+}
+
+interface RuntimeWebGpuDevice {
+  sync(): unknown | PromiseLike<unknown>;
+}
+
+interface RuntimeTensor {
+  readonly byteOffset: number;
+  copyFrom(value: unknown): RuntimeTensor;
+  getDataPtr(): unknown;
+  toArray(): unknown;
+}
+
+interface FusedUploadContext {
+  copyRawBytesToBuffer(data: Uint8Array, pointer: unknown, byteOffset: number, byteLength: number): void;
+}
+
+interface StrandsRuntime {
+  dispose(...args: unknown[]): unknown;
+  endScope(): unknown;
+  initWebGPU(gpu: GpuDeviceLike): unknown;
+  beginScope(): unknown;
+  webgpu(): RuntimeWebGpuDevice;
+  cpu(): unknown;
+  getGlobalFunc(name: string): () => unknown;
+  readonly lib: {readonly webGPUContext: FusedUploadContext};
+  empty(shape: number[], dtype: string, device: unknown): RuntimeTensor;
+  createVirtualMachine(device: RuntimeWebGpuDevice): {getFunction(name: string): (...args: unknown[]) => unknown};
+}
+
+interface StrandsAdapter {
+  requestDevice(descriptor: {
+    readonly requiredFeatures: string[];
+    readonly requiredLimits: {
+      readonly maxBufferSize: number;
+      readonly maxStorageBufferBindingSize: number;
+      readonly maxStorageBuffersPerShaderStage: number;
+    };
+  }): PromiseLike<GpuDeviceLike>;
+}
+
+interface LoadOptions extends StrandsInputBytes {
+  readonly base?: unknown;
+  readonly createTokenizer?: unknown;
+  readonly createRuntime?: unknown;
+  readonly gpuApi?: unknown;
+  readonly signal?: AbortSignal | null | undefined;
+  readonly onProgress?: UploadOptions['onProgress'];
+  readonly cache?: unknown;
+  readonly offline?: unknown;
+}
+
+type UploadOptions = NonNullable<Parameters<typeof uploadPinnedWeights>[1]>;
+type UploadTensor = NonNullable<UploadOptions['upload']>;
+
+type FusedReadRange = NonNullable<NonNullable<Parameters<typeof uploadFusedRecord>[8]>['readRange']>;
+type BivariantFusedReadRange = {
+  bivarianceHack(
+    base: Parameters<FusedReadRange>[0],
+    spec: Parameters<FusedReadRange>[1],
+    options: Parameters<FusedReadRange>[2]
+  ): ReturnType<FusedReadRange>;
+}['bivarianceHack'];
+
+interface LoadDependencies {
+  readonly uploadTensor?: UploadTensor | undefined;
+  readonly readRange?: BivariantFusedReadRange | undefined;
+  readonly finalize?: ((signal: AbortSignal) => unknown | PromiseLike<unknown>) | undefined;
+  readonly preparedAdapter?: unknown;
+  readonly verifyAssets?: typeof verifyPinnedBundle | undefined;
+  readonly uploadWeights?: typeof uploadPinnedWeights | undefined;
+  readonly retainLateDevice?: ((device: unknown) => void) | undefined;
+}
+
+type RuntimeLifecycle = ReturnType<typeof trackRuntime>;
+type StrandsDisposalGuard = ReturnType<typeof guardStrandsDisposal>;
+
+const invalid = (message: string): WebDecisionError => new WebDecisionError('INVALID_ASSET', message);
+
+async function verifiedCopy(
+  bytes: unknown,
+  length: number,
+  expected: string,
+  signal: AbortSignal | null | undefined,
+  name: string
+): Promise<Uint8Array> {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength !== length) throw invalid(`Invalid ${name} size.`);
   const copy = Uint8Array.from(bytes);
   const digest = await waitForAbort(() => sha256(copy), signal);
@@ -29,11 +134,17 @@ async function verifiedCopy(bytes, length, expected, signal, name) {
   return copy;
 }
 
-async function gpuScope(gpu, device, lifecycle, operation, disposalGuard) {
+async function gpuScope<Value>(
+  gpu: GpuDeviceLike,
+  device: RuntimeWebGpuDevice,
+  lifecycle: RuntimeLifecycle,
+  operation: () => Value | PromiseLike<Value>,
+  disposalGuard: StrandsDisposalGuard
+): Promise<Value> {
   const noFailure = Symbol('no failure');
   let count = 0,
-    value,
-    failure = noFailure,
+    value!: Value,
+    failure: unknown | typeof noFailure = noFailure,
     started = false,
     fallbackAttempted = false;
   async function fallbackSync() {
@@ -74,7 +185,13 @@ async function gpuScope(gpu, device, lifecycle, operation, disposalGuard) {
   return value;
 }
 
-function protectRuntime(runtime, gpu) {
+function protectRuntime(
+  runtime: StrandsRuntime,
+  gpu: GpuDeviceLike
+): {
+  readonly lifecycle: RuntimeLifecycle;
+  readonly disposalGuard: StrandsDisposalGuard;
+} {
   try {
     const lifecycle = trackRuntime(runtime, gpu);
     return {lifecycle, disposalGuard: guardStrandsDisposal(runtime, gpu, lifecycle)};
@@ -84,7 +201,7 @@ function protectRuntime(runtime, gpu) {
   }
 }
 
-function initializeRuntime(runtime, gpu, disposalGuard) {
+function initializeRuntime(runtime: StrandsRuntime, gpu: GpuDeviceLike, disposalGuard: StrandsDisposalGuard): void {
   try {
     runtime.initWebGPU(gpu);
     runtime.beginScope();
@@ -94,7 +211,21 @@ function initializeRuntime(runtime, gpu, disposalGuard) {
   }
 }
 
-function cleanupStrandsLoad({loadWatch, runtime, scopeOpen, lifecycle, gpu, disposalGuard}) {
+function cleanupStrandsLoad({
+  loadWatch,
+  runtime,
+  scopeOpen,
+  lifecycle,
+  gpu,
+  disposalGuard
+}: {
+  readonly loadWatch?: ReturnType<typeof watchLoadDeviceLoss> | undefined;
+  readonly runtime?: StrandsRuntime | undefined;
+  readonly scopeOpen?: boolean | undefined;
+  readonly lifecycle?: RuntimeLifecycle | undefined;
+  readonly gpu?: GpuDeviceLike | undefined;
+  readonly disposalGuard?: StrandsDisposalGuard | undefined;
+}): void {
   if (runtime && (!disposalGuard || disposalGuard.blocked || lifecycle?.loss)) {
     loadWatch?.close();
     retainStrandsResources(runtime, gpu);
@@ -103,7 +234,10 @@ function cleanupStrandsLoad({loadWatch, runtime, scopeOpen, lifecycle, gpu, disp
   }
 }
 
-async function verifyPinnedBundle({manifestBytes, wasmBytes, tokenizerBytes, tokenizerConfigBytes}, signal) {
+async function verifyPinnedBundle(
+  {manifestBytes, wasmBytes, tokenizerBytes, tokenizerConfigBytes}: StrandsInputBytes,
+  signal: AbortSignal | null | undefined
+) {
   if (!(manifestBytes instanceof Uint8Array) || manifestBytes.byteLength > 1024 * 1024)
     throw invalid('Invalid manifest bytes.');
   const manifestCopy = Uint8Array.from(manifestBytes);
@@ -131,7 +265,7 @@ export async function loadStrandsFromBytes(
     onProgress,
     cache = false,
     offline = false
-  } = {},
+  }: LoadOptions = {},
   {
     uploadTensor,
     readRange,
@@ -140,19 +274,19 @@ export async function loadStrandsFromBytes(
     verifyAssets = verifyPinnedBundle,
     uploadWeights = uploadPinnedWeights,
     retainLateDevice = (device) => retainStrandsResources(undefined, device)
-  } = {}
-) {
+  }: LoadDependencies = {}
+): Promise<ExperimentalStrandsSession> {
   if (cache !== false || offline !== false)
     throw new WebDecisionError('INVALID_INPUT', 'Experimental Strands loading does not yet support cache or offline.');
   if (
     typeof createTokenizer !== 'function' ||
     typeof createRuntime !== 'function' ||
-    typeof gpuApi?.requestAdapter !== 'function'
+    typeof (gpuApi as {readonly requestAdapter?: unknown} | null | undefined)?.requestAdapter !== 'function'
   )
     throw new WebDecisionError('INVALID_INPUT', 'Tokenizer, runtime and WebGPU factories are required.');
   let assetBase;
   try {
-    assetBase = new URL(base);
+    assetBase = new URL(base as string);
   } catch {
     throw new WebDecisionError('INVALID_INPUT', 'A valid asset base URL is required.');
   }
@@ -174,27 +308,31 @@ export async function loadStrandsFromBytes(
   let tokenizer;
   try {
     const decoder = new TextDecoder('utf-8', {fatal: true});
-    tokenizer = createTokenizer(JSON.parse(decoder.decode(tokenizerJson)), JSON.parse(decoder.decode(tokenizerConfig)));
+    tokenizer = (createTokenizer as (tokenizerJson: unknown, tokenizerConfig: unknown) => unknown)(
+      JSON.parse(decoder.decode(tokenizerJson)),
+      JSON.parse(decoder.decode(tokenizerConfig))
+    );
   } catch (cause) {
     throw new WebDecisionError('INVALID_ASSET', 'Could not create the pinned tokenizer.', {cause});
   }
-  const adapter = preparedAdapter === undefined ? await requestStrandsAdapter(gpuApi, signal) : preparedAdapter;
+  const adapter: unknown =
+    preparedAdapter === undefined ? await requestStrandsAdapter(gpuApi, signal) : preparedAdapter;
   checkFusedAdapter(adapter);
   signal?.throwIfAborted();
-  let gpu,
-    runtime,
-    lifecycle,
-    disposalGuard,
-    loadWatch,
+  let gpu: GpuDeviceLike | undefined,
+    runtime: StrandsRuntime | undefined,
+    lifecycle: RuntimeLifecycle | undefined,
+    disposalGuard: StrandsDisposalGuard | undefined,
+    loadWatch: ReturnType<typeof watchLoadDeviceLoss> | undefined,
     scopeOpen = false,
     loading = true,
-    forward;
-  const uncaptured = [],
+    forward: (() => void) | undefined;
+  const uncaptured: string[] = [],
     loadAbort = new AbortController();
   try {
     gpu = await waitForAbort(
       () =>
-        adapter.requestDevice({
+        (adapter as StrandsAdapter).requestDevice({
           requiredFeatures: ['shader-f16'],
           requiredLimits: {
             maxBufferSize: LARGEST_BINDING,
@@ -205,7 +343,7 @@ export async function loadStrandsFromBytes(
       signal,
       (late) => {
         try {
-          late?.destroy();
+          (late as GpuDeviceLike | null | undefined)?.destroy();
         } catch {
           retainLateDevice(late);
         }
@@ -213,10 +351,10 @@ export async function loadStrandsFromBytes(
     );
     signal?.throwIfAborted();
     loadWatch = watchLoadDeviceLoss(gpu, signal);
-    forward = () => loadAbort.abort(loadWatch.signal.reason);
+    forward = () => loadAbort.abort(loadWatch!.signal.reason);
     loadWatch.signal.addEventListener('abort', forward, {once: true});
     if (loadWatch.signal.aborted) forward();
-    gpu.addEventListener('uncapturederror', (event) => {
+    gpu!.addEventListener('uncapturederror', (event) => {
       if (uncaptured.length < 10) uncaptured.push(event.error?.message || String(event.error));
       if (loading && !loadAbort.signal.aborted)
         loadAbort.abort(new WebDecisionError('MODEL_LOAD_FAILED', 'WebGPU reported an uncaptured loading error.'));
@@ -224,55 +362,55 @@ export async function loadStrandsFromBytes(
     // Runtime creation does not use the GPU yet. Stop waiting on abort/loss,
     // but dispose a runtime that eventually resolves after the load failed.
     runtime = await waitForAbort(
-      () => createRuntime(wasm),
+      () => (createRuntime as (wasm: Uint8Array) => StrandsRuntime | PromiseLike<StrandsRuntime>)(wasm),
       loadAbort.signal,
       (lateRuntime) => {
         try {
-          lateRuntime?.dispose();
+          (lateRuntime as StrandsRuntime | null | undefined)?.dispose();
         } catch {}
       }
     );
     ({lifecycle, disposalGuard} = protectRuntime(runtime, gpu));
     loadAbort.signal.throwIfAborted();
-    initializeRuntime(runtime, gpu, disposalGuard);
+    initializeRuntime(runtime!, gpu!, disposalGuard!);
     scopeOpen = true;
-    const device = runtime.webgpu();
+    const device = runtime!.webgpu();
     const check = () => {
       loadAbort.signal.throwIfAborted();
-      assertLoadActive(lifecycle);
-      if (uncaptured.length) throw new WebDecisionError('MODEL_LOAD_FAILED', uncaptured[0]);
+      assertLoadActive(lifecycle!);
+      if (uncaptured.length) throw new WebDecisionError('MODEL_LOAD_FAILED', uncaptured[0]!);
     };
-    const upload =
+    const upload: UploadTensor =
       uploadTensor ||
       ((record, tensor, uploadSignal) =>
         uploadFusedRecord(
           assetBase,
           record,
-          runtime.lib.webGPUContext,
-          tensor.getDataPtr(),
-          tensor.byteOffset,
+          runtime!.lib.webGPUContext,
+          (tensor as RuntimeTensor).getDataPtr(),
+          (tensor as RuntimeTensor).byteOffset,
           () => device.sync(),
           check,
-          (work) => gpuScope(gpu, device, lifecycle, work, disposalGuard),
+          (work) => gpuScope(gpu!, device, lifecycle!, work, disposalGuard!),
           {signal: uploadSignal, readRange}
         ));
     const weights = await uploadWeights(manifest, {
       signal: loadAbort.signal,
       onProgress,
       allocate: (record) =>
-        gpuScope(gpu, device, lifecycle, () => runtime.empty(record.shape, record.dtype, device), disposalGuard),
+        gpuScope(gpu!, device, lifecycle!, () => runtime!.empty(record.shape, record.dtype, device), disposalGuard!),
       upload
     });
     check();
     signal?.throwIfAborted();
-    const fn = runtime.createVirtualMachine(device).getFunction('main');
+    const fn = runtime!.createVirtualMachine(device).getFunction('main');
     const runner = new ExperimentalFusedRunner({
-      runtime,
+      runtime: runtime!,
       device,
-      gpu,
+      gpu: gpu!,
       fn,
       weights,
-      lifecycle,
+      lifecycle: lifecycle!,
       uncaptured,
       disposalGuard
     });
@@ -289,7 +427,8 @@ export async function loadStrandsFromBytes(
     if (loadWatch && forward) loadWatch.signal.removeEventListener('abort', forward);
     cleanupStrandsLoad({loadWatch, runtime, scopeOpen, lifecycle, gpu, disposalGuard});
     signal?.throwIfAborted();
-    if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
+    if (cause instanceof WebDecisionError || (cause as {name?: unknown} | null | undefined)?.name === 'AbortError')
+      throw cause;
     throw new WebDecisionError('MODEL_LOAD_FAILED', 'Could not load experimental Strands.', {cause});
   }
 }
