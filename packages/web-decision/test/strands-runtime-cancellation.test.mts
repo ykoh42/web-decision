@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadStrandsFromBytes} from '../src/strands/loader-core.mjs';
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((yes, no) => {
+function deferred<T = void>() {
+  let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
   });
@@ -13,9 +13,9 @@ function deferred() {
 
 function fixture() {
   const started = deferred(),
-    pending = deferred(),
-    lost = deferred();
-  const events = [];
+    pending = deferred<{dispose(): void; [key: string]: unknown}>(),
+    lost = deferred<{reason: string}>();
+  const events: string[] = [];
   const gpu = {
     lost: lost.promise,
     addEventListener() {},
@@ -27,14 +27,18 @@ function fixture() {
       events.push('gpu.destroy');
     }
   };
-  const adapter = {
+  const adapter: {
+    features: Set<string>;
+    limits: {maxBufferSize: number; maxStorageBufferBindingSize: number; maxStorageBuffersPerShaderStage: number};
+    requestDevice(): Promise<unknown>;
+  } = {
     features: new Set(['shader-f16']),
     limits: {maxBufferSize: 1017118720, maxStorageBufferBindingSize: 1017118720, maxStorageBuffersPerShaderStage: 8},
     async requestDevice() {
       return gpu;
     }
   };
-  const runtime = {
+  const runtime: {dispose(): void; [key: string]: unknown} = {
     dispose() {
       events.push('runtime.dispose');
     }
@@ -48,7 +52,15 @@ function fixture() {
       return pending.promise;
     }
   };
-  const dependencies = {
+  const dependencies: {
+    preparedAdapter: typeof adapter;
+    verifyAssets: () => Promise<unknown>;
+    uploadWeights: (
+      manifest: unknown,
+      options: {allocate: (input: {shape: number[]; dtype: string}) => unknown}
+    ) => Promise<unknown>;
+    retainLateDevice?: (device: unknown) => unknown;
+  } = {
     preparedAdapter: adapter,
     verifyAssets: async () => ({
       manifest: {},
@@ -65,7 +77,7 @@ function fixture() {
 
 test('abort during device request returns promptly and disposes a late device', async () => {
   const f = fixture(),
-    pending = deferred(),
+    pending = deferred<{destroy(): void}>(),
     started = deferred(),
     controller = new AbortController();
   const reason = new Error('device request cancelled');
@@ -73,7 +85,10 @@ test('abort during device request returns promptly and disposes a late device', 
     started.resolve();
     return pending.promise;
   };
-  const load = loadStrandsFromBytes({...f.options, signal: controller.signal}, f.dependencies);
+  const load = loadStrandsFromBytes(
+    {...f.options, signal: controller.signal},
+    f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+  );
   const outcome = load.then(
     () => 'resolved',
     (error) => error
@@ -94,17 +109,20 @@ test('abort during device request returns promptly and disposes a late device', 
 test('late device rejection is handled and a failed late destroy is retained', async () => {
   for (const mode of ['reject', 'destroy']) {
     const f = fixture(),
-      pending = deferred(),
+      pending = deferred<{destroy(): void}>(),
       started = deferred(),
       controller = new AbortController();
     const reason = new Error('device request cancelled'),
-      retained = [];
+      retained: unknown[] = [];
     f.dependencies.preparedAdapter.requestDevice = () => {
       started.resolve();
       return pending.promise;
     };
     f.dependencies.retainLateDevice = (device) => retained.push(device);
-    const load = loadStrandsFromBytes({...f.options, signal: controller.signal}, f.dependencies);
+    const load = loadStrandsFromBytes(
+      {...f.options, signal: controller.signal},
+      f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+    );
     const outcome = load.then(
       () => 'resolved',
       (error) => error
@@ -129,7 +147,10 @@ test('caller abort settles pending runtime creation and disposes a late runtime'
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('cancel');
-  const load = loadStrandsFromBytes({...f.options, signal: controller.signal}, f.dependencies);
+  const load = loadStrandsFromBytes(
+    {...f.options, signal: controller.signal},
+    f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+  );
   await f.started.promise;
   controller.abort(reason);
   await assert.rejects(load, (error) => error === reason);
@@ -141,10 +162,14 @@ test('caller abort settles pending runtime creation and disposes a late runtime'
 
 test('device loss settles pending runtime creation and disposes a late runtime', {timeout: 1000}, async () => {
   const f = fixture();
-  const load = loadStrandsFromBytes(f.options, f.dependencies);
+  const load = loadStrandsFromBytes(f.options, f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]);
   await f.started.promise;
   f.lost.resolve({reason: 'unknown'});
-  await assert.rejects(load, (error) => error.code === 'MODEL_LOAD_FAILED' && /lost/.test(error.message));
+  await assert.rejects(
+    load,
+    (error) =>
+      (error as {code: string}).code === 'MODEL_LOAD_FAILED' && /lost/.test((error as {message: string}).message)
+  );
   assert.deepEqual(f.events, ['gpu.destroy']);
   f.pending.resolve(f.runtime);
   await new Promise((resolve) => setImmediate(resolve));
@@ -155,7 +180,10 @@ test('late runtime rejection after abort is handled', {timeout: 1000}, async () 
   const f = fixture(),
     controller = new AbortController(),
     reason = new Error('cancel');
-  const load = loadStrandsFromBytes({...f.options, signal: controller.signal}, f.dependencies);
+  const load = loadStrandsFromBytes(
+    {...f.options, signal: controller.signal},
+    f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+  );
   await f.started.promise;
   controller.abort(reason);
   await assert.rejects(load, (error) => error === reason);
@@ -167,7 +195,7 @@ test('late runtime rejection after abort is handled', {timeout: 1000}, async () 
 test('successful runtime creation transfers ownership to the session', {timeout: 1000}, async () => {
   const f = fixture();
   Object.assign(f.runtime, {
-    initWebGPU(gpu) {
+    initWebGPU(gpu: unknown) {
       assert.ok(gpu);
     },
     beginScope() {
@@ -184,7 +212,7 @@ test('successful runtime creation transfers ownership to the session', {timeout:
     }
   });
   f.dependencies.uploadWeights = async () => Array.from({length: 328}, () => ({}));
-  const load = loadStrandsFromBytes(f.options, f.dependencies);
+  const load = loadStrandsFromBytes(f.options, f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]);
   await f.started.promise;
   f.pending.resolve(f.runtime);
   const session = await load;
@@ -193,7 +221,7 @@ test('successful runtime creation transfers ownership to the session', {timeout:
   assert.deepEqual(f.events, ['runtime.begin', 'runtime.end', 'runtime.dispose']);
 });
 
-function setupLoadRuntime(f, sync) {
+function setupLoadRuntime(f: ReturnType<typeof fixture>, sync: () => Promise<void>) {
   Object.assign(f.runtime, {
     initWebGPU() {
       f.events.push('runtime.init');
@@ -215,14 +243,14 @@ function setupLoadRuntime(f, sync) {
 
 test('device loss during a pending load retains runtime until the realm is discarded', {timeout: 1000}, async () => {
   const f = fixture(),
-    upload = deferred(),
+    upload = deferred<unknown>(),
     entered = deferred();
   setupLoadRuntime(f, async () => {});
   f.dependencies.uploadWeights = async () => {
     entered.resolve();
     return upload.promise;
   };
-  const load = loadStrandsFromBytes(f.options, f.dependencies);
+  const load = loadStrandsFromBytes(f.options, f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]);
   await f.started.promise;
   f.pending.resolve(f.runtime);
   await entered.promise;
@@ -241,7 +269,10 @@ test('unconfirmed load fallback retains runtime while a confirmed fallback clean
       if (rejectSync) throw Error('fallback failed');
     });
     f.dependencies.uploadWeights = async (_manifest, {allocate}) => allocate({shape: [1], dtype: 'float32'});
-    const load = loadStrandsFromBytes(f.options, f.dependencies);
+    const load = loadStrandsFromBytes(
+      f.options,
+      f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+    );
     await f.started.promise;
     f.pending.resolve(f.runtime);
     await assert.rejects(load, {code: 'MODEL_LOAD_FAILED'});
@@ -261,7 +292,7 @@ test('an exception registering the tracker or guard retains the runtime and devi
     const lost = new Proxy(new Promise(() => {}), {
       get(target, key) {
         if (key !== 'then') return Reflect.get(target, key);
-        return (...args) => {
+        return (...args: unknown[]) => {
           if (++registrations === failingRegistration) throw Error('cannot observe loss');
           return Reflect.apply(Promise.prototype.then, target, args);
         };
@@ -284,7 +315,10 @@ test('an exception registering the tracker or guard retains the runtime and devi
         };
       }
     };
-    const load = loadStrandsFromBytes(f.options, f.dependencies);
+    const load = loadStrandsFromBytes(
+      f.options,
+      f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+    );
     await f.started.promise;
     f.pending.resolve(f.runtime);
     await assert.rejects(load, {code: 'MODEL_LOAD_FAILED'});
@@ -299,7 +333,10 @@ test('partial WebGPU initialization or scope setup retains the runtime and devic
     f.runtime[failurePhase] = () => {
       throw Error('partial setup');
     };
-    const load = loadStrandsFromBytes(f.options, f.dependencies);
+    const load = loadStrandsFromBytes(
+      f.options,
+      f.dependencies as unknown as Parameters<typeof loadStrandsFromBytes>[1]
+    );
     await f.started.promise;
     f.pending.resolve(f.runtime);
     await assert.rejects(load, {code: 'MODEL_LOAD_FAILED'});
