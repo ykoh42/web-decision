@@ -4,7 +4,11 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {NariToqRunner, snapshotToqInput} from '../src/nari/runner.mjs';
 
-const BINDINGS = JSON.parse(readFileSync(new URL('./fixtures/nari/metadata.json', import.meta.url))).ordered;
+type Binding = {target: string; graphArgument: string; shape: number[]; dtype: string};
+type Input = ReturnType<typeof snapshotToqInput>;
+const BINDINGS = (
+  JSON.parse(readFileSync(new URL('./fixtures/nari/metadata.json', import.meta.url), 'utf8')) as {ordered: Binding[]}
+).ordered;
 
 function fixture() {
   const raw = readFileSync(new URL('./fixtures/nari/short.json', import.meta.url));
@@ -12,7 +16,7 @@ function fixture() {
     createHash('sha256').update(raw).digest('hex'),
     'caca40d05d3af0dbcc4767e588ba5d612196dbae36096d1840c216a327d7a38e'
   );
-  return JSON.parse(raw);
+  return JSON.parse(raw.toString('utf8')) as Input;
 }
 function joint() {
   const raw = readFileSync(new URL('./fixtures/nari/joint.json', import.meta.url));
@@ -20,7 +24,14 @@ function joint() {
     createHash('sha256').update(raw).digest('hex'),
     'edd0094bbd94eba95d7f0741f687e4cf21f0e2fa96d795d70a6a32d44c345a4d'
   );
-  const p = JSON.parse(raw),
+  const p = JSON.parse(raw.toString('utf8')) as {
+      counts: number[];
+      inputIds: number[];
+      optPos: number[];
+      optQ: number[];
+      optType: number[];
+      slots: number[];
+    },
     options = p.counts.map((n) => Array.from({length: n}, (_, i) => String(i)));
   return {
     inputIds: p.inputIds,
@@ -32,7 +43,18 @@ function joint() {
     options
   };
 }
-function tensor(shape, dtype, device) {
+interface FakeTensor {
+  shape: number[];
+  dtype: string;
+  device: unknown;
+  isView: boolean;
+  byteOffset?: number;
+  getDataPtr?: () => number;
+  copyFrom?: (value: Float32Array | Int32Array | {data: Float32Array}) => FakeTensor;
+  toArray?: () => unknown;
+  data?: Float32Array | Int32Array | {data: Float32Array};
+}
+function tensor(shape: number[], dtype: string, device: unknown): FakeTensor {
   return {shape: [...shape], dtype, device, isView: false};
 }
 
@@ -42,23 +64,23 @@ test('Q1 snapshot rejects malformed positions and owns its input arrays', () => 
   input.inputIds[0] = -1;
   assert.notEqual(snapshot.inputIds[0], -1);
   for (const change of [
-    (value) => {
+    (value: Input) => {
       value.inputIds = Array(362).fill(1);
     },
-    (value) => {
-      value.optPos[1] = value.optPos[0];
+    (value: Input) => {
+      value.optPos[1] = value.optPos[0]!;
     },
-    (value) => {
-      value.slotPos[0] = value.optPos[1];
+    (value: Input) => {
+      value.slotPos[0] = value.optPos[1]!;
     },
-    (value) => {
+    (value: Input) => {
       value.optQ[1] = 1;
     },
-    (value) => {
+    (value: Input) => {
       value.optType[0] = 0;
     },
-    (value) => {
-      value.options[0][1] = value.options[0][0];
+    (value: Input) => {
+      value.options[0]![1] = value.options[0]![0]!;
     }
   ]) {
     const bad = fixture();
@@ -68,7 +90,7 @@ test('Q1 snapshot rejects malformed positions and owns its input arrays', () => 
 });
 
 test('TOQ host enforces independent token, option and question limits', () => {
-  function packed(counts) {
+  function packed(counts: number[]) {
     let position = 0;
     const options = [],
       optPos = [],
@@ -100,22 +122,22 @@ test('TOQ host enforces independent token, option and question limits', () => {
 test('Q1 runner sends the exact input ABI and reads both output shapes', async () => {
   const gpuDevice = {deviceType: 15, deviceId: 0},
     cpu = {deviceType: 1, deviceId: 0};
-  const ctx = {pendingGPUToCPUCopy: null, copyRawBytesToBuffer() {}};
+  const ctx = {pendingGPUToCPUCopy: null as Promise<void> | null, copyRawBytesToBuffer() {}};
   const runtime = {
     lib: {webGPUContext: ctx},
     beginScope() {},
     endScope() {},
     cpu: () => cpu,
-    empty(shape, dtype, device) {
+    empty(shape: number[], dtype: string, device: unknown) {
       const result = tensor(shape, dtype, device);
       result.byteOffset = 0;
       result.getDataPtr = () => 1;
-      result.copyFrom = (value) => {
+      result.copyFrom = (value: Float32Array | Int32Array | {data: Float32Array}) => {
         if (device === cpu) {
           ctx.pendingGPUToCPUCopy = Promise.resolve().then(() => {
-            result.data = Float32Array.from(value.data);
+            result.data = Float32Array.from((value as {data: Float32Array}).data);
           });
-        } else result.data = ArrayBuffer.isView(value) ? value.slice() : value;
+        } else result.data = ArrayBuffer.isView(value) ? (value as Float32Array | Int32Array).slice() : value;
         return result;
       };
       result.toArray = () => result.data;
@@ -143,7 +165,7 @@ test('Q1 runner sends the exact input ABI and reads both output shapes', async (
   }));
   const letterRows = tensor([2, 26, 2560], 'float32', device);
   let calls = 0;
-  const fn = (...args) => {
+  const fn = (...args: FakeTensor[]) => {
     calls++;
     assert.equal(args.length, 739);
     const n = calls === 1 ? 79 : 361,
@@ -163,14 +185,14 @@ test('Q1 runner sends the exact input ABI and reads both output shapes', async (
         ['float32', [2, 26, 2560]]
       ]
     );
-    assert.deepEqual(Array.from(args[5].data), Array(count).fill(1));
-    assert.deepEqual(Array.from(args[7].data), calls === 1 ? [78] : [214, -1]);
+    assert.deepEqual(Array.from(args[5]!.data as Int32Array), Array(count).fill(1));
+    assert.deepEqual(Array.from(args[7]!.data as Int32Array), calls === 1 ? [78] : [214, -1]);
     const head = {...tensor([1, count], 'float32', device), data: Float32Array.from({length: count}, (_, i) => i + 1)};
     const letters = {
       ...tensor([1, questions, 26], 'float32', device),
       data: Float32Array.from({length: questions * 26}, (_, i) => i)
     };
-    return {size: () => 2, get: (i) => [head, letters][i]};
+    return {size: () => 2, get: (i: number) => [head, letters][i]};
   };
   const runner = new NariToqRunner({
     bindings: BINDINGS,
@@ -185,7 +207,7 @@ test('Q1 runner sends the exact input ABI and reads both output shapes', async (
     disposalGuard: {retain() {}, blocked: false},
     teardownObserver: {async beforeDispose() {}, async afterDispose() {}},
     teardownTimeoutMs: 100
-  });
+  } as unknown as ConstructorParameters<typeof NariToqRunner>[0]);
   const result = await runner.run(fixture());
   const resultLong = await runner.run(joint());
   assert.equal(calls, 2);
@@ -242,7 +264,7 @@ test('teardown waits for device loss observation and retains on an unexpected lo
       }
     }
   };
-  const runner = new NariToqRunner(owner);
+  const runner = new NariToqRunner(owner as unknown as ConstructorParameters<typeof NariToqRunner>[0]);
   await assert.rejects(runner.dispose(), {code: 'INFERENCE_ERROR'});
   await assert.rejects(runner.dispose(), {code: 'INFERENCE_ERROR'});
   assert.equal(disposed, 1);
