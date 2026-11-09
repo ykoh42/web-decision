@@ -47,6 +47,55 @@ jobs:
           fi
           pnpm run test:quality:complexity
           pnpm run check:typescript:complete
+  package-tests:
+    name: Package test suite (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20.19.0, 22.13.0]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: apache/tvm
+          ref: 7b5acb32bd271342a24130f4ef439ff6c2e52c6c
+          path: .toolchains/apache-tvm-src
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: emscripten-core/emsdk
+          ref: d7b4130688bfa348392b921ab04015aa15c4f154
+          path: .toolchains/emsdk
+          persist-credentials: false
+      - name: Install Node runtime dependency
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libatomic1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.18.0
+          run_install: false
+      - name: Prepare pinned TVM runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C .toolchains/apache-tvm-src submodule update --init --recursive 3rdparty/tvm-ffi
+          .toolchains/emsdk/emsdk install 4.0.23
+          .toolchains/emsdk/emsdk activate 4.0.23 --embedded
+          source .toolchains/emsdk/emsdk_env.sh
+          make -C .toolchains/apache-tvm-src/web -j4 src/tvmjs_runtime_wasi.js
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run the complete package test suite
+        run: pnpm test
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 30
