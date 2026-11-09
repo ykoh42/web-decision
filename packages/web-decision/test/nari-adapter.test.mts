@@ -4,9 +4,19 @@ import test from 'node:test';
 import {pack, unpack, validatePacked} from '../src/nari/adapter.mjs';
 import {decodeNariChoice, packNariRequest} from '../src/nari/protocol.mjs';
 
-const input = JSON.parse(readFileSync(new URL('./fixtures/nari/short.json', import.meta.url)));
+interface MutablePacked {
+  inputIds: number[];
+  optQ: number[];
+  optType: number[];
+  optPos: number[];
+  slotPos: number[];
+  nLetters: number[];
+  options: string[][];
+}
+
+const input = JSON.parse(readFileSync(new URL('./fixtures/nari/short.json', import.meta.url)) as unknown as string);
 const tokenizer = {
-  encode(text) {
+  encode(text: string) {
     return {ids: Array.from({length: Math.ceil(text.length / 3)}, (_, i) => text.codePointAt(i * 3))};
   }
 };
@@ -14,31 +24,31 @@ const request = {state: 'x', questions: [{instructions: 'x', options: ['a', 'b']
 
 test('packed choice validation rejects changed positions, owners and malformed option groups', () => {
   for (const change of [
-    (v) => {
+    (v: MutablePacked) => {
       v.inputIds[0] = -1;
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.inputIds = [];
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.optQ[0] = 3;
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.optType[0] = 0;
     },
-    (v) => {
-      v.optPos[1] = v.optPos[0];
+    (v: MutablePacked) => {
+      v.optPos[1] = v.optPos[0]!;
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.slotPos[0] = -1;
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.nLetters[0] = 0;
     },
-    (v) => {
-      v.options[0][1] = v.options[0][0];
+    (v: MutablePacked) => {
+      v.options[0]![1] = v.options[0]![0]!;
     },
-    (v) => {
+    (v: MutablePacked) => {
       v.optPos.pop();
     }
   ]) {
@@ -50,7 +60,7 @@ test('packed choice validation rejects changed positions, owners and malformed o
 
 test('unpack requires finite scores of the correct shapes', () => {
   const good = {headScores: Float32Array.of(0, 1), letterScores: new Float32Array(26)};
-  assert.equal(unpack(input, good).answers[0].selectedIndex, 1);
+  assert.equal(unpack(input, good).answers[0]!.selectedIndex, 1);
   for (const bad of [
     {headScores: new Float64Array(2), letterScores: good.letterScores},
     {headScores: Float32Array.of(NaN, 1), letterScores: good.letterScores},
