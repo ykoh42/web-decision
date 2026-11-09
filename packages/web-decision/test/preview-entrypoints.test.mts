@@ -42,8 +42,8 @@ if (supportsHooks) {
   const wrapperUrls = new Set([
     new URL('../src/deberta-single-preview-entry.ts', import.meta.url).href,
     new URL('../src/kev-preview-entry.ts', import.meta.url).href,
-    new URL('../src/kev-deberta-preview-entry.js', import.meta.url).href,
-    new URL('../src/kev-deberta-reflexes-preview-entry.js', import.meta.url).href
+    new URL('../src/kev-deberta-preview-entry.ts', import.meta.url).href,
+    new URL('../src/kev-deberta-reflexes-preview-entry.ts', import.meta.url).href
   ]);
   const fakeModules: Readonly<Record<string, string>> = {
     './deberta/loader.mjs': `data:text/javascript,${encodeURIComponent('export async function loadExperimentalDeberta() { throw new Error("unexpected DeBERTa load"); }')}`,
@@ -72,6 +72,12 @@ if (supportsHooks) {
       )
     );
     assert.ok(hookedImports.has(`${new URL('../src/kev-preview-entry.ts', import.meta.url).href}\n./kev-loader.js`));
+    for (const wrapper of ['kev-deberta-preview-entry.ts', 'kev-deberta-reflexes-preview-entry.ts']) {
+      const parentUrl = new URL(`../src/${wrapper}`, import.meta.url).href;
+      for (const specifier of ['./deberta/loader.mjs', './kev-loader.js']) {
+        assert.ok(hookedImports.has(`${parentUrl}\n${specifier}`));
+      }
+    }
   } finally {
     hooks.deregister();
   }

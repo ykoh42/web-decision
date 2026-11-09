@@ -1,4 +1,5 @@
 import {CACHE_NAME} from './assets.js';
+import type {DebertaLoadOptions, LoadOptions} from './kev-deberta-preview.js';
 import {WebDecisionError} from './kev.js';
 import {loadExperimentalDeberta} from './deberta/loader.mjs';
 import {loadKev06DecisionModel} from './kev-loader.js';
@@ -10,7 +11,7 @@ const DEFAULT_MODEL = 'kev-0.6b-q4f16';
 const DEBERTA_MODEL = 'open-jev-deberta-v3-large-q4f16';
 
 /** Load Kev 0.6B by default, or the explicitly selected DeBERTa route. */
-export async function loadDecisionModel(options) {
+export async function loadDecisionModel(options: LoadOptions) {
   const modelName = options?.model ?? DEFAULT_MODEL;
   const description = describeModel(modelName);
   if (modelName === DEFAULT_MODEL) {
@@ -21,7 +22,7 @@ export async function loadDecisionModel(options) {
     return model;
   }
   if (modelName === DEBERTA_MODEL) {
-    const model = await loadExperimentalDeberta(options);
+    const model = await loadExperimentalDeberta(options as DebertaLoadOptions);
     Object.defineProperty(model, 'description', {value: description});
     return model;
   }

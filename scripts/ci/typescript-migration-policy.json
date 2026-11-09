@@ -18,8 +18,6 @@
     "packages/web-decision/src/imajev/candidate-loader.mjs",
     "packages/web-decision/src/imajev/upload.mjs",
     "packages/web-decision/src/index.js",
-    "packages/web-decision/src/kev-deberta-preview-entry.js",
-    "packages/web-decision/src/kev-deberta-reflexes-preview-entry.js",
     "packages/web-decision/src/kev/system-one.mjs",
     "packages/web-decision/src/kev08/session.js",
     "packages/web-decision/src/kev08/system-one.mjs",

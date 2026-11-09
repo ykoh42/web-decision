@@ -81,6 +81,8 @@
     "src/imajev/safe-outcome.mts",
     "src/kev-gpu.ts",
     "src/kev-reflexes.ts",
+    "src/kev-deberta-preview-entry.ts",
+    "src/kev-deberta-reflexes-preview-entry.ts",
     "src/kev-deberta-preview-registry.ts",
     "src/kev-deberta-reflexes-preview-registry.ts",
     "src/kev-preview-entry.ts",
