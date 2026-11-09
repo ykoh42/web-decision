@@ -37,7 +37,7 @@ const sourceSkip = sourceFiles.every(existsSync)
   : 'Local OpenDecider-nano graph and tokenizer assets are not included.';
 
 test('OpenDecider-nano tokens match the official README input fixture', {skip: tokenizerSkip}, () => {
-  const packed = packOpenDeciderNanoRequest(tokenizer, {
+  const packed = packOpenDeciderNanoRequest(tokenizer!, {
     state: 'I was charged twice for order 1182.',
     questions: [
       {
@@ -46,18 +46,18 @@ test('OpenDecider-nano tokens match the official README input fixture', {skip: t
       }
     ]
   });
-  assert.deepEqual(packed.questions[0].ids, cases[0].inputIds);
-  assert.deepEqual(packed.questions[0].markerPositions, cases[0].markerPositions);
+  assert.deepEqual(packed.questions[0]!.ids, cases[0].inputIds);
+  assert.deepEqual(packed.questions[0]!.markerPositions, cases[0].markerPositions);
   assert.equal(packed.tokenCount, 37);
 });
 
 test('OpenDecider-nano typed questions preserve choice, ordered score, and yes probability', async () => {
-  const prompts = [];
+  const prompts: string[] = [];
   const logits = [Float32Array.of(3, 0, 0), Float32Array.of(0, 1, 2), Float32Array.of(2, 0)];
   const session = createOpenDeciderNanoSession({
     tokenizer: {encode: (text) => (prompts.push(text), [1])},
     runner: {
-      run: async () => logits.shift(),
+      run: async () => logits.shift()!,
       releaseCachedMemory: async () => {},
       dispose: async () => {}
     }
@@ -77,18 +77,18 @@ test('OpenDecider-nano typed questions preserve choice, ordered score, and yes p
   );
 
   assert.equal(result.model, 'experimental-opendecider-nano-fp16');
-  assert.equal(result.answers.department.type, 'choice');
-  assert.equal(result.answers.department.choice, 'billing');
-  assert.deepEqual(Object.keys(result.answers.department.probabilities), ['billing', 'technical', 'other']);
-  assert.equal(result.answers.urgency.type, 'score');
-  assert.equal(result.answers.urgency.score, 2);
-  assert.equal(result.answers.urgency.legend['0'], 'not urgent');
-  assert.ok(Math.abs(result.answers.urgency.expected - 1.57521) < 0.0001);
-  assert.equal(result.answers.churnRisk.type, 'noul');
-  assert.ok(Math.abs(result.answers.churnRisk.noul - 0.880797) < 0.00001);
-  assert.ok(
-    Math.abs(result.answers.churnRisk.probabilities.true + result.answers.churnRisk.probabilities.false - 1) < 1e-12
-  );
+  const {department, urgency, churnRisk} = result.answers;
+  assert.ok(department?.type === 'choice' && urgency?.type === 'score' && churnRisk?.type === 'noul');
+  assert.equal(department.type, 'choice');
+  assert.equal(department.choice, 'billing');
+  assert.deepEqual(Object.keys(department.probabilities), ['billing', 'technical', 'other']);
+  assert.equal(urgency.type, 'score');
+  assert.equal(urgency.score, 2);
+  assert.equal(urgency.legend['0'], 'not urgent');
+  assert.ok(Math.abs(urgency.expected - 1.57521) < 0.0001);
+  assert.equal(churnRisk.type, 'noul');
+  assert.ok(Math.abs(churnRisk.noul - 0.880797) < 0.00001);
+  assert.ok(Math.abs(churnRisk.probabilities.true + churnRisk.probabilities.false - 1) < 1e-12);
   assert.equal(result.tokenCount, 12);
   assert.deepEqual(prompts, [
     'input: {"ticket": "refund", "attempt": 2}',
@@ -149,18 +149,20 @@ test('OpenDecider-nano accepts more than 255 generic and typed options within on
     state: 'state',
     questions: [{instructions: 'Choose.', options}]
   });
-  assert.equal(genericResult.answers[0].probabilities.length, 256);
-  assert.equal(genericResult.answers[0].selected, 'option-255');
+  assert.equal(genericResult.answers[0]!.probabilities.length, 256);
+  assert.equal(genericResult.answers[0]!.selected, 'option-255');
   assert.equal(genericResult.tokenCount, 518);
 
   const typedResult = await session.systemOne('state', {
     choice: {type: 'choice', instructions: 'Choose.', criteria: options},
     score: {type: 'score', instructions: 'Rate this.', criteria: options}
   });
-  assert.equal(typedResult.answers.choice.choice, 'option-255');
-  assert.equal(Object.keys(typedResult.answers.choice.probabilities).length, 256);
-  assert.equal(typedResult.answers.score.score, 255);
-  assert.equal(typedResult.answers.score.legend['255'], 'option-255');
+  const {choice, score} = typedResult.answers;
+  assert.ok(choice?.type === 'choice' && score?.type === 'score');
+  assert.equal(choice.choice, 'option-255');
+  assert.equal(Object.keys(choice.probabilities).length, 256);
+  assert.equal(score.score, 255);
+  assert.equal(score.legend['255'], 'option-255');
   assert.equal(typedResult.tokenCount, 518);
   await session.dispose();
 });
@@ -179,7 +181,7 @@ test('OpenDecider-nano typed questions reject unsupported schemas before inferen
     }
   });
   const validNoul = {check: {type: 'noul', instructions: 'Is this true?'}};
-  const cyclic = {};
+  const cyclic: {self?: unknown} = {};
   cyclic.self = cyclic;
 
   for (const [state, questions] of [
@@ -200,20 +202,20 @@ test('OpenDecider-nano typed questions reject unsupported schemas before inferen
 });
 
 test('text that looks like a model marker remains ordinary state text', {skip: tokenizerSkip}, () => {
-  const packed = packOpenDeciderNanoRequest(tokenizer, {
+  const packed = packOpenDeciderNanoRequest(tokenizer!, {
     state: 'The log contained [MASK] and [SEP] as literal text.',
     questions: [{instructions: 'Route the event.', options: ['billing', 'tech']}]
   });
-  assert.equal(packed.questions[0].markerPositions.length, 2);
-  assert.equal(packed.questions[0].ids.filter((id) => id === 50282).length, 3);
+  assert.equal(packed.questions[0]!.markerPositions.length, 2);
+  assert.equal(packed.questions[0]!.ids.filter((id) => id === 50282).length, 3);
 });
 
 test('state truncation preserves the question and every option marker', {skip: tokenizerSkip}, () => {
-  const packed = packOpenDeciderNanoRequest(tokenizer, {
+  const packed = packOpenDeciderNanoRequest(tokenizer!, {
     state: 'ticket details '.repeat(4000),
     questions: [{instructions: 'Choose a route.', options: ['billing', 'technical']}]
   });
-  const question = packed.questions[0];
+  const question = packed.questions[0]!;
   assert.equal(question.ids.length, 2048);
   assert.equal(question.truncated, true);
   assert.deepEqual(
@@ -222,9 +224,9 @@ test('state truncation preserves the question and every option marker', {skip: t
   );
   const result = finishOpenDeciderNanoRequest(packed, [Float32Array.of(2, 0)]);
   assert.equal(result.truncated, true);
-  assert.equal(result.answers[0].selected, 'billing');
+  assert.equal(result.answers[0]!.selected, 'billing');
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    result.answers[0]!.probabilities.map(({option}) => option),
     ['billing', 'technical']
   );
 });
@@ -232,7 +234,7 @@ test('state truncation preserves the question and every option marker', {skip: t
 test('invalid question choices and oversized question text are rejected', {skip: tokenizerSkip}, () => {
   assert.throws(
     () =>
-      packOpenDeciderNanoRequest(tokenizer, {
+      packOpenDeciderNanoRequest(tokenizer!, {
         state: 'ticket',
         questions: [{instructions: 'Choose.', options: ['billing', 'billing']}]
       }),
@@ -240,7 +242,7 @@ test('invalid question choices and oversized question text are rejected', {skip:
   );
   assert.throws(
     () =>
-      packOpenDeciderNanoRequest(tokenizer, {
+      packOpenDeciderNanoRequest(tokenizer!, {
         state: 'ticket',
         questions: [{instructions: 'Choose.', options: ['x '.repeat(3000), 'technical']}]
       }),
@@ -258,7 +260,7 @@ test('marker readback follows marker positions and validates their layout', () =
 
 test('pinned source metadata and tokenizer load from the generated TVM bundle', {skip: sourceSkip}, async (context) => {
   const server = createServer(async (request, response) => {
-    const path = normalize(decodeURIComponent(new URL(request.url, 'http://localhost').pathname.slice(1)));
+    const path = normalize(decodeURIComponent(new URL(request.url!, 'http://localhost').pathname.slice(1)));
     const file = join(assets, path);
     if (relative(assets, file).startsWith(`..${sep}`)) {
       response.writeHead(400).end();
@@ -271,14 +273,20 @@ test('pinned source metadata and tokenizer load from the generated TVM bundle', 
       response.writeHead(404).end();
     }
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  context.after(() => new Promise((resolve) => server.close(resolve)));
-  const base = `http://127.0.0.1:${server.address().port}/`;
-  const progress = [];
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  context.after(
+    () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  );
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const base = `http://127.0.0.1:${address.port}/`;
+  const progress: Parameters<
+    NonNullable<NonNullable<Parameters<typeof openOpenDeciderNanoSource>[1]>['onProgress']>
+  >[0][] = [];
   const loaded = await openOpenDeciderNanoSource(new URL(base), {onProgress: (item) => progress.push(item)});
-  assert.equal(loaded.manifest.build.parameterCount, 200);
-  assert.equal(loaded.tensorCache.metadata.numParams, 200);
+  assert.equal(loaded.manifest.build!.parameterCount, 200);
+  assert.equal(loaded.tensorCache.metadata!.numParams, 200);
   assert.equal(loaded.tensorCache.records.length, 29);
   assert.ok(progress.length >= 2);
-  assert.ok(progress.at(-1).loadedBytes < progress.at(-1).totalBytes);
+  assert.ok(progress.at(-1)!.loadedBytes < progress.at(-1)!.totalBytes);
 });

@@ -22,7 +22,6 @@
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/nari-loader.test.mjs",
     "packages/web-decision/test/nari-upload.test.mjs",
-    "packages/web-decision/test/opendecider-nano.test.mjs",
     "packages/web-decision/test/pplx-loader.test.mjs",
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/strands-device-loss.test.mjs",
