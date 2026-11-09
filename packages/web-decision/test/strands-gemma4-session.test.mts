@@ -3,7 +3,7 @@ import test from 'node:test';
 import {createGemma4Session} from '../src/strands/gemma4-e2b-session.mjs';
 
 function fixture() {
-  const rows: {type: string; options: string[]}[] = [];
+  const rows: {type: string; options: readonly string[]}[] = [];
   const tokenizer = {
     encode(text: string) {
       return {ids: Array.from(text, (character) => character.codePointAt(0)!)};
@@ -13,7 +13,7 @@ function fixture() {
     }
   };
   const runner = {
-    async run(row: {type: string; options: string[]}) {
+    async run(row: {type: string; options: readonly string[]}) {
       rows.push(row);
       const logits = new Float32Array(row.options.length);
       logits[logits.length - 1] = 1;
@@ -34,10 +34,16 @@ test('Gemma 4 session preserves typed choice order and the native score and Noul
   });
 
   assert.equal(result.model, 'experimental-strands-gemma4-e2b-fp16');
-  assert.equal(result.answers.decision.choice, 'second');
-  assert.deepEqual(Object.keys(result.answers.decision.probabilities), ['first', 'second']);
-  assert.equal(result.answers.rating.type, 'score');
-  assert.equal(result.answers.claim.type, 'noul');
+  const decision = result.answers.decision;
+  const rating = result.answers.rating;
+  const claim = result.answers.claim;
+  assert.ok(decision?.type === 'choice');
+  assert.ok(rating?.type === 'score');
+  assert.ok(claim?.type === 'noul');
+  assert.equal(decision.choice, 'second');
+  assert.deepEqual(Object.keys(decision.probabilities), ['first', 'second']);
+  assert.equal(rating.type, 'score');
+  assert.equal(claim.type, 'noul');
   assert.deepEqual(
     rows.map((row) => row.type),
     ['choice', 'score', 'noul']
@@ -53,13 +59,17 @@ test('Gemma 4 generic choice accepts 260 options and returns logits in caller or
   });
 
   assert.equal(rows[0]!.options.length, 260);
-  assert.equal(result.answers[0].selected, options.at(-1));
-  assert.equal(result.answers[0].selectedIndex, 259);
+  const answer = result.answers[0];
+  assert.ok(answer);
+  assert.equal(answer.selected, options.at(-1));
+  assert.equal(answer.selectedIndex, 259);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}: {option: string}) => option),
+    answer.probabilities.map(({option}) => option),
     options
   );
-  assert.equal(result.answers[0].probabilities.at(-1).logit, 1);
+  const lastProbability = answer.probabilities.at(-1);
+  assert.ok(lastProbability);
+  assert.equal(lastProbability.logit, 1);
 });
 
 test('Gemma 4 session rejects rows over the pinned context without token truncation', async () => {
