@@ -28,7 +28,6 @@
     "packages/web-decision/src/mapika/session.js",
     "packages/web-decision/src/mapika/system-one.mjs",
     "packages/web-decision/src/model-registry.js",
-    "packages/web-decision/src/nari/adapter.mjs",
     "packages/web-decision/src/nari/loader.mjs",
     "packages/web-decision/src/nari/runner.mjs",
     "packages/web-decision/src/nari/runtime.mjs",

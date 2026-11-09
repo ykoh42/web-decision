@@ -44,6 +44,7 @@
     "test/nari-adapter.test.mts",
     "test/nari-checkpoints.test.mts",
     "test/nari-session.test.mts",
+    "src/nari/adapter.mts",
     "src/nari/upload-plan.mts",
     "src/nari/session.mts",
     "src/nari/protocol.mts",
