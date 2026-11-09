@@ -29,7 +29,6 @@
     "packages/web-decision/src/imajev/upload.mjs",
     "packages/web-decision/src/index.js",
     "packages/web-decision/src/kev-deberta-preview-entry.js",
-    "packages/web-decision/src/kev-deberta-preview-registry.js",
     "packages/web-decision/src/kev-deberta-reflexes-preview-entry.js",
     "packages/web-decision/src/kev-deberta-reflexes-preview-registry.js",
     "packages/web-decision/src/kev-gpu.js",

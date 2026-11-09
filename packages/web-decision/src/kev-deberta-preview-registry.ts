@@ -7,7 +7,7 @@ const KEV_MODEL = kevDescription.model;
 const DEBERTA_MODEL = deberta.model;
 const MODELS = Object.freeze([KEV_MODEL, DEBERTA_MODEL]);
 
-function deepFreeze(value) {
+function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);
@@ -81,7 +81,7 @@ const debertaDescription = deepFreeze({
   }
 });
 
-const descriptions = new Map([
+const descriptions = new Map<unknown, typeof kevDescription | typeof debertaDescription>([
   [KEV_MODEL, deepFreeze(kevDescription)],
   [DEBERTA_MODEL, debertaDescription]
 ]);
@@ -90,11 +90,11 @@ export function listDecisionModels() {
   return MODELS;
 }
 
-export function isDecisionModel(value) {
+export function isDecisionModel(value: unknown): boolean {
   return descriptions.has(value);
 }
 
-export function describeModel(model) {
+export function describeModel(model: unknown) {
   const description = descriptions.get(model);
   if (!description) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return description;

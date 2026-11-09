@@ -20,7 +20,7 @@ test('two-model preview describes pinned assets and native limits', () => {
   assert.equal(deberta.assets.integrity, 'pinned-files');
   assert.equal(deberta.checkpoint.revision, '7c79f25b5ac496089f448a969c801872ad59d31c');
   assert.deepEqual(deberta.backend.requiredFeatures, ['shader-f16']);
-  assert.equal(deberta.features.textChoice.limits[0].max, 512);
+  assert.equal(deberta.features.textChoice.limits[0]!.max, 512);
 });
 
 test('two-model preview rejects unknown descriptors', () => {
