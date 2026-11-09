@@ -5,24 +5,122 @@ import {WebDecisionError} from '../kev.js';
 import {parseStrictJson} from '../h2o/strict-json.mjs';
 import {OPENDECIDER_NANO_MANIFEST_SHA256, OPENDECIDER_NANO_PARAMETER_COUNT} from './contract.mjs';
 
-const MANIFEST_BYTES = 6262;
-const FILE_PATHS = ['model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'weights/tensor-cache.json'];
-const WIDTHS = Object.freeze({float16: 2, float32: 4, int32: 4, int64: 8, bool: 1});
-const PARAMETER_BYTES = 791668895;
-const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
-const invalidAsset = (message) => fail('INVALID_ASSET', message);
+export interface OpenDeciderNanoDigestEntry {
+  readonly bytes: number;
+  readonly sha256: string;
+}
 
-async function readFile(base, path, entry, {signal, onBytes} = {}) {
+export interface OpenDeciderNanoManifestFile extends OpenDeciderNanoDigestEntry {
+  readonly path: string;
+}
+
+export interface OpenDeciderNanoManifestShard extends OpenDeciderNanoDigestEntry {
+  readonly path: string;
+}
+
+export interface OpenDeciderNanoManifest {
+  readonly kind?: unknown;
+  readonly schemaVersion?: unknown;
+  readonly model?: unknown;
+  readonly source?: {
+    readonly repository?: unknown;
+    readonly revision?: unknown;
+    readonly modelSha256?: unknown;
+    readonly tokenizerSha256?: unknown;
+  } | null;
+  readonly build?: {
+    readonly tvm?: unknown;
+    readonly target?: unknown;
+    readonly host?: unknown;
+    readonly integerDtype?: unknown;
+    readonly parameterCount?: unknown;
+    readonly parameterBytes?: unknown;
+  } | null;
+  readonly tensorCache?: {readonly parameterCount?: unknown} | null;
+  readonly files?: unknown;
+  readonly shards?: unknown;
+}
+
+export interface OpenDeciderNanoTensorRecord {
+  readonly name: string;
+  readonly dtype: string;
+  readonly shape: number[];
+  readonly byteOffset: number;
+  readonly nbytes: number;
+  readonly format: string;
+}
+
+export interface OpenDeciderNanoTensorShard {
+  readonly dataPath: string;
+  readonly format: string;
+  readonly nbytes: number;
+  readonly records: OpenDeciderNanoTensorRecord[];
+}
+
+export interface OpenDeciderNanoTensorCache {
+  readonly metadata?: {readonly numParams?: unknown} | null;
+  readonly records: OpenDeciderNanoTensorShard[];
+}
+
+export interface OpenDeciderNanoProgress {
+  readonly loadedBytes: number;
+  readonly totalBytes: number;
+  readonly fraction: number;
+}
+
+export interface OpenDeciderNanoSourceOptions {
+  readonly signal?: AbortSignal | null | undefined;
+  readonly onProgress?: ((progress: OpenDeciderNanoProgress) => void) | undefined;
+}
+
+export interface OpenDeciderNanoSource {
+  readonly manifest: OpenDeciderNanoManifest;
+  readonly wasm: Uint8Array;
+  readonly tokenizer: unknown;
+  readonly tokenizerConfig: unknown;
+  readonly tensorCache: OpenDeciderNanoTensorCache;
+  readonly totalBytes: number;
+  readShard(dataPath: string, signal?: AbortSignal | null | undefined): Promise<Uint8Array>;
+}
+
+const MANIFEST_BYTES = 6262;
+const FILE_PATHS = ['model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'weights/tensor-cache.json'] as const;
+const WIDTHS: Readonly<Record<string, number>> = Object.freeze({float16: 2, float32: 4, int32: 4, int64: 8, bool: 1});
+const PARAMETER_BYTES = 791668895;
+type WebDecisionErrorCode = ConstructorParameters<typeof WebDecisionError>[0];
+type NanoFilePath = (typeof FILE_PATHS)[number];
+interface NanoByteInterval {
+  readonly index: number;
+  readonly start: number;
+  readonly end: number;
+  readonly bytes: number;
+}
+
+const fail = (code: WebDecisionErrorCode, message: string, cause?: unknown) =>
+  new WebDecisionError(code, message, cause ? {cause} : undefined);
+const invalidAsset = (message: string) => fail('INVALID_ASSET', message);
+
+async function readFile(
+  base: URL,
+  path: string,
+  entry: OpenDeciderNanoDigestEntry,
+  {
+    signal,
+    onBytes
+  }: {readonly signal?: AbortSignal | null | undefined; readonly onBytes?: ((count: number) => void) | undefined} = {}
+): Promise<Uint8Array> {
   let response;
   try {
-    response = await waitForAbort(() => fetch(assetUrl(base, path), {signal}), signal, cancelResponse);
+    response = await waitForAbort(() => fetch(assetUrl(base, path), {signal} as RequestInit), signal, cancelResponse);
     if (response.status !== 200) {
       cancelResponse(response);
       throw new Error(`Unexpected HTTP status ${response.status}`);
     }
     if (!Number.isSafeInteger(entry.bytes) || entry.bytes < 0 || entry.bytes > MAX_ASSET_BYTES)
       throw invalidAsset('OpenDecider-nano asset is outside the supported file size.');
-    const bytes = await readBoundedResponse(response, entry.bytes, {exact: true, signal});
+    const bytes = await readBoundedResponse(response, entry.bytes, {exact: true, signal} as unknown as Parameters<
+      typeof readBoundedResponse
+    >[2]);
     if ((await waitForAbort(() => sha256(bytes), signal)) !== entry.sha256)
       throw invalidAsset('OpenDecider-nano asset hash differs.');
     signal?.throwIfAborted();
@@ -35,11 +133,14 @@ async function readFile(base, path, entry, {signal, onBytes} = {}) {
   }
 }
 
-function checkDigest(value) {
+function checkDigest(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 }
 
-function validateManifest(manifest) {
+function validateManifest(manifest: OpenDeciderNanoManifest | null | undefined): {
+  readonly files: Map<string, OpenDeciderNanoManifestFile>;
+  readonly shards: Map<string, OpenDeciderNanoManifestShard>;
+} {
   if (
     manifest?.kind !== 'web-decision-opendecider-nano-tvm-assets' ||
     manifest.schemaVersion !== 1 ||
@@ -62,11 +163,11 @@ function validateManifest(manifest) {
   )
     throw invalidAsset('OpenDecider-nano manifest does not match the pinned graph.');
 
-  const files = new Map();
-  for (const entry of manifest.files) {
+  const files = new Map<string, OpenDeciderNanoManifestFile>();
+  for (const entry of manifest.files as OpenDeciderNanoManifestFile[]) {
     if (
       !entry ||
-      !FILE_PATHS.includes(entry.path) ||
+      !FILE_PATHS.includes(entry.path as NanoFilePath) ||
       files.has(entry.path) ||
       !Number.isSafeInteger(entry.bytes) ||
       entry.bytes < 1 ||
@@ -78,8 +179,8 @@ function validateManifest(manifest) {
   }
   if (FILE_PATHS.some((path) => !files.has(path))) throw invalidAsset('OpenDecider-nano manifest is missing a file.');
 
-  const shards = new Map();
-  for (const shard of manifest.shards) {
+  const shards = new Map<string, OpenDeciderNanoManifestShard>();
+  for (const shard of manifest.shards as OpenDeciderNanoManifestShard[]) {
     if (
       !shard ||
       typeof shard.path !== 'string' ||
@@ -99,7 +200,11 @@ function validateManifest(manifest) {
   return {files, shards};
 }
 
-function validateTensorRecord(record, shard, seen) {
+function validateTensorRecord(
+  record: OpenDeciderNanoTensorRecord | null | undefined,
+  shard: Pick<OpenDeciderNanoTensorShard, 'nbytes'>,
+  seen: Set<number>
+): NanoByteInterval {
   if (!record || typeof record.name !== 'string' || !Array.isArray(record.shape))
     throw invalidAsset('OpenDecider-nano tensor metadata is invalid.');
   const match = /^param_(\d+)$/.exec(record.name);
@@ -128,7 +233,12 @@ function validateTensorRecord(record, shard, seen) {
   return {index, start: record.byteOffset, end, bytes: record.nbytes};
 }
 
-function validateTensorShard(shard, shards, seen, seenShards) {
+function validateTensorShard(
+  shard: OpenDeciderNanoTensorShard | null | undefined,
+  shards: Map<string, OpenDeciderNanoManifestShard>,
+  seen: Set<number>,
+  seenShards: Set<string>
+): number {
   if (!shard || typeof shard.dataPath !== 'string')
     throw invalidAsset('OpenDecider-nano tensor cache has an invalid shard.');
   const path = `weights/${shard.dataPath}`;
@@ -146,20 +256,23 @@ function validateTensorShard(shard, shards, seen, seenShards) {
   const intervals = shard.records.map((record) => validateTensorRecord(record, shard, seen));
   intervals.sort((left, right) => left.start - right.start);
   for (let index = 1; index < intervals.length; index++)
-    if (intervals[index - 1].end > intervals[index].start)
+    if (intervals[index - 1]!.end > intervals[index]!.start)
       throw invalidAsset('OpenDecider-nano tensor records overlap.');
   return intervals.reduce((total, interval) => total + interval.bytes, 0);
 }
 
-function validateTensorCache(cache, shards) {
+function validateTensorCache(
+  cache: OpenDeciderNanoTensorCache | null | undefined,
+  shards: Map<string, OpenDeciderNanoManifestShard>
+): void {
   if (
     cache?.metadata?.numParams !== OPENDECIDER_NANO_PARAMETER_COUNT ||
     !Array.isArray(cache.records) ||
     cache.records.length !== shards.size
   )
     throw invalidAsset('OpenDecider-nano tensor cache has an invalid parameter count.');
-  const seen = new Set(),
-    seenShards = new Set();
+  const seen = new Set<number>(),
+    seenShards = new Set<string>();
   const parameterBytes = cache.records.reduce(
     (total, shard) => total + validateTensorShard(shard, shards, seen, seenShards),
     0
@@ -173,41 +286,45 @@ function validateTensorCache(cache, shards) {
 }
 
 /** Read and verify the pinned graph, tokenizer and shards without model caching. */
-export async function openOpenDeciderNanoSource(base, {signal, onProgress} = {}) {
+export async function openOpenDeciderNanoSource(
+  base: URL,
+  {signal, onProgress}: OpenDeciderNanoSourceOptions = {}
+): Promise<OpenDeciderNanoSource> {
   const manifestBytes = await readFile(
     base,
     'manifest.json',
     {bytes: MANIFEST_BYTES, sha256: OPENDECIDER_NANO_MANIFEST_SHA256},
     {signal}
   );
-  let manifest;
+  let manifest: OpenDeciderNanoManifest;
   try {
-    manifest = parseStrictJson(manifestBytes);
+    manifest = parseStrictJson(manifestBytes) as OpenDeciderNanoManifest;
   } catch (cause) {
     signal?.throwIfAborted();
     throw fail('INVALID_ASSET', 'OpenDecider-nano manifest is invalid.', cause);
   }
-  const {files, shards} = validateManifest(manifest);
+  const {files, shards} = validateManifest(manifest as OpenDeciderNanoManifest | null | undefined);
   const totalBytes =
     MANIFEST_BYTES +
     [...files.values()].reduce((total, entry) => total + entry.bytes, 0) +
     [...shards.values()].reduce((total, entry) => total + entry.bytes, 0);
   let loadedBytes = MANIFEST_BYTES;
-  const reportProgress = (count) => {
+  const reportProgress = (count: number) => {
     loadedBytes += count;
     onProgress?.({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes});
   };
   onProgress?.({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes});
-  const [wasm, tokenizerBytes, tokenizerConfigBytes, tensorCacheBytes] = await readAssetBatch(
+  const [wasm, tokenizerBytes, tokenizerConfigBytes, tensorCacheBytes] = await (readAssetBatch(
     FILE_PATHS,
-    (path, localSignal) => readFile(base, path, files.get(path), {signal: localSignal, onBytes: reportProgress}),
+    (path: string, localSignal: AbortSignal) =>
+      readFile(base, path, files.get(path)!, {signal: localSignal, onBytes: reportProgress}),
     signal
-  );
-  let tokenizer, tokenizerConfig, tensorCache;
+  ) as unknown as Promise<[Uint8Array, Uint8Array, Uint8Array, Uint8Array]>);
+  let tokenizer: unknown, tokenizerConfig: unknown, tensorCache: OpenDeciderNanoTensorCache;
   try {
     tokenizer = parseStrictJson(tokenizerBytes, {maxBytes: 16 * 1024 * 1024});
     tokenizerConfig = parseStrictJson(tokenizerConfigBytes);
-    tensorCache = parseStrictJson(tensorCacheBytes, {maxBytes: 1024 * 1024});
+    tensorCache = parseStrictJson(tensorCacheBytes, {maxBytes: 1024 * 1024}) as OpenDeciderNanoTensorCache;
   } catch (cause) {
     signal?.throwIfAborted();
     throw fail('INVALID_ASSET', 'OpenDecider-nano model metadata is invalid.', cause);

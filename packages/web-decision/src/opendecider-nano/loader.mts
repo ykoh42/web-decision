@@ -7,9 +7,21 @@ import {retainStrandsResources} from '../strands/disposal-guard.mjs';
 import {assertUsable, withStrandsScope} from '../strands/scope.mjs';
 import {OPENDECIDER_NANO_LIMITS, OPENDECIDER_NANO_MODEL, OPENDECIDER_NANO_PARAMETER_COUNT} from './contract.mjs';
 import {installOpenDeciderNanoGpuCompatibility} from './gpu-compat.mjs';
-import {OpenDeciderNanoTvmRunner} from './runner.mjs';
+import {
+  OpenDeciderNanoTvmRunner,
+  type OpenDeciderNanoGpu,
+  type OpenDeciderNanoRuntime,
+  type OpenDeciderNanoRuntimeOwner,
+  type OpenDeciderNanoRunnerOwner,
+  type OpenDeciderNanoTensor
+} from './runner.mjs';
 import {createOpenDeciderNanoSession} from './session.mjs';
-import {openOpenDeciderNanoSource} from './source.mjs';
+import {
+  openOpenDeciderNanoSource,
+  type OpenDeciderNanoProgress,
+  type OpenDeciderNanoSource,
+  type OpenDeciderNanoSourceOptions
+} from './source.mjs';
 import {createOpenDeciderNanoTokenizer} from './tokenizer.mjs';
 
 const KEYS = new Set([
@@ -23,21 +35,106 @@ const KEYS = new Set([
   'debertaReadback'
 ]);
 const PROTOTYPE_KEYS = new Set(Object.getOwnPropertyNames(Object.prototype));
-const fail = (code, message, cause) => new WebDecisionError(code, message, cause ? {cause} : undefined);
+type OpenDeciderNanoErrorCode = ConstructorParameters<typeof WebDecisionError>[0];
+type OpenDeciderNanoTokenizer = ReturnType<typeof createOpenDeciderNanoTokenizer>;
+type OpenDeciderNanoGpuCompatibility = ReturnType<typeof installOpenDeciderNanoGpuCompatibility>;
 
-function validateOpenDeciderNanoOptions(options) {
+interface OpenDeciderNanoLoadOptions {
+  readonly model?: unknown;
+  readonly assetsUrl?: unknown;
+  readonly signal?: unknown;
+  readonly cache?: unknown;
+  readonly offline?: unknown;
+  readonly maxPrefetchBytes?: unknown;
+  readonly onProgress?: unknown;
+  readonly debertaReadback?: unknown;
+}
+
+interface OpenDeciderNanoCheckedOptions {
+  readonly base: URL;
+  readonly signal: AbortSignal | null | undefined;
+  readonly onProgress: ((progress: OpenDeciderNanoProgress) => void) | undefined;
+}
+
+interface OpenDeciderNanoValidatedAdapter {
+  readonly features: {has(feature: string): boolean};
+  readonly requestDevice: (descriptor: {
+    readonly requiredFeatures: string[];
+    readonly requiredLimits: typeof OPENDECIDER_NANO_LIMITS;
+  }) => PromiseLike<OpenDeciderNanoGpu>;
+  readonly info?: {readonly isFallbackAdapter?: unknown} | null | undefined;
+  readonly isFallbackAdapter?: unknown;
+  readonly limits?: Readonly<Record<string, number | undefined>> | null | undefined;
+}
+
+interface OpenDeciderNanoAdapter {
+  readonly features?: {has?: unknown} | null | undefined;
+  readonly requestDevice?: unknown;
+  readonly info?: {readonly isFallbackAdapter?: unknown} | null | undefined;
+  readonly isFallbackAdapter?: unknown;
+  readonly limits?: Readonly<Record<string, number | undefined>> | null | undefined;
+}
+
+interface OpenDeciderNanoGpuProvider {
+  requestAdapter(): PromiseLike<OpenDeciderNanoAdapter | null | undefined>;
+}
+
+interface OpenDeciderNanoGpuBindings {
+  readonly requestAdapter?: unknown;
+}
+
+interface OpenDeciderNanoWrite {
+  readonly tensor: OpenDeciderNanoTensor;
+  readonly bytes: Uint8Array;
+}
+
+interface OpenDeciderNanoRuntimeBindings {
+  readonly Tokenizer?: unknown;
+  readonly instantiate?: unknown;
+  readonly createPolyfillWASI?: unknown;
+  readonly gpu?: OpenDeciderNanoGpuProvider | OpenDeciderNanoGpuBindings | null | undefined;
+}
+
+interface OpenDeciderNanoLoaderDependencies {
+  readonly gpu: OpenDeciderNanoGpuProvider | OpenDeciderNanoGpuBindings | null | undefined;
+  readonly openSource: (base: URL, options: OpenDeciderNanoSourceOptions) => Promise<OpenDeciderNanoSource>;
+  readonly prepareTokenizer: (data: unknown, config: unknown) => OpenDeciderNanoTokenizer;
+  readonly instantiate: (wasm: Uint8Array) => PromiseLike<OpenDeciderNanoRuntime>;
+  readonly initialize: (
+    runtime: OpenDeciderNanoRuntime,
+    gpu: OpenDeciderNanoGpu,
+    options: {readonly setupWebGPUContext: (context: unknown) => void}
+  ) => OpenDeciderNanoRuntimeOwner;
+  readonly installGpuCompatibility?: ((context: unknown) => OpenDeciderNanoGpuCompatibility) | undefined;
+  readonly upload: (
+    owner: OpenDeciderNanoRuntimeOwner,
+    source: OpenDeciderNanoSource,
+    signal: AbortSignal
+  ) => Promise<OpenDeciderNanoTensor[]>;
+  readonly runner: (owner: OpenDeciderNanoRunnerOwner) => OpenDeciderNanoTvmRunner;
+  readonly session: (args: {
+    readonly tokenizer: OpenDeciderNanoTokenizer;
+    readonly runner: OpenDeciderNanoTvmRunner;
+  }) => unknown;
+}
+
+const fail = (code: OpenDeciderNanoErrorCode, message: string, cause?: unknown) =>
+  new WebDecisionError(code, message, cause ? {cause} : undefined);
+
+function validateOpenDeciderNanoOptions(options: unknown): OpenDeciderNanoCheckedOptions {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw fail('INVALID_INPUT', 'Invalid OpenDecider-nano options.');
   const prototype = Object.getPrototypeOf(options);
   if (
     prototype !== null &&
-    (Object.getPrototypeOf(prototype) !== null || Reflect.ownKeys(prototype).some((key) => !PROTOTYPE_KEYS.has(key)))
+    (Object.getPrototypeOf(prototype) !== null ||
+      Reflect.ownKeys(prototype).some((key) => !PROTOTYPE_KEYS.has(key as string)))
   )
     throw fail('INVALID_INPUT', 'Unsupported OpenDecider-nano option prototype.');
-  const snapshot = Object.create(null);
+  const snapshot: Record<string, unknown> = Object.create(null);
   for (const key of Reflect.ownKeys(options)) {
     const descriptor = Object.getOwnPropertyDescriptor(options, key);
-    if (typeof key !== 'string' || !KEYS.has(key) || !descriptor || !Object.hasOwn(descriptor, 'value'))
+    if (typeof key !== 'string' || !KEYS.has(key as string) || !descriptor || !Object.hasOwn(descriptor, 'value'))
       throw fail('INVALID_INPUT', 'Unsupported OpenDecider-nano load option.');
     snapshot[key] = descriptor.value;
   }
@@ -62,10 +159,16 @@ function validateOpenDeciderNanoOptions(options) {
     throw fail('INVALID_INPUT', 'Invalid OpenDecider-nano asset URL.');
   if (!base.pathname.endsWith('/')) base.pathname += '/';
   validateH2oSignal(snapshot.signal);
-  return {base, signal: snapshot.signal, onProgress: snapshot.onProgress};
+  return {
+    base,
+    signal: snapshot.signal as AbortSignal | null | undefined,
+    onProgress: snapshot.onProgress as ((progress: OpenDeciderNanoProgress) => void) | undefined
+  };
 }
 
-function validateOpenDeciderNanoAdapter(adapter) {
+function validateOpenDeciderNanoAdapter(
+  adapter: OpenDeciderNanoAdapter | null | undefined
+): asserts adapter is OpenDeciderNanoValidatedAdapter {
   if (
     typeof adapter?.features?.has !== 'function' ||
     !adapter.features.has('shader-f16') ||
@@ -75,35 +178,40 @@ function validateOpenDeciderNanoAdapter(adapter) {
   )
     throw fail('UNSUPPORTED_ENVIRONMENT', 'OpenDecider-nano requires a hardware WebGPU adapter with shader-f16.');
   for (const [name, minimum] of Object.entries(OPENDECIDER_NANO_LIMITS))
-    if (!Number.isSafeInteger(adapter.limits?.[name]) || adapter.limits[name] < minimum)
+    if (!Number.isSafeInteger(adapter.limits?.[name]) || adapter.limits![name]! < minimum)
       throw fail('UNSUPPORTED_ENVIRONMENT', `OpenDecider-nano requires ${name} of at least ${minimum}.`);
 }
 
-function alignedBytes(bytes) {
+function alignedBytes(bytes: Uint8Array): Uint8Array {
   if (bytes.byteLength % 4 === 0) return bytes;
   const aligned = new Uint8Array(Math.ceil(bytes.byteLength / 4) * 4);
   aligned.set(bytes);
   return aligned;
 }
 
-async function upload(owner, source, signal) {
-  const context = owner.runtime.lib?.webGPUContext;
+async function upload(
+  owner: OpenDeciderNanoRuntimeOwner,
+  source: OpenDeciderNanoSource,
+  signal: AbortSignal
+): Promise<OpenDeciderNanoTensor[]> {
+  const context = owner.runtime!.lib?.webGPUContext;
   if (typeof context?.copyRawBytesToBuffer !== 'function') throw new Error('Pinned TVM upload API unavailable.');
+  // oxlint-disable-next-line unicorn/no-new-array -- Preserve sparse weight slots for the indexed upload completeness check.
   const weights = new Array(OPENDECIDER_NANO_PARAMETER_COUNT);
   for (const shard of source.tensorCache.records) {
     signal?.throwIfAborted();
     const bytes = await source.readShard(shard.dataPath, signal);
-    const writes = [];
+    const writes: OpenDeciderNanoWrite[] = [];
     for (const record of shard.records) {
       const index = Number(record.name.slice('param_'.length));
-      const tensor = owner.runtime.empty(record.shape, record.dtype, owner.device);
+      const tensor = owner.runtime!.empty(record.shape, record.dtype, owner.device!);
       weights[index] = tensor;
       writes.push({tensor, bytes: alignedBytes(bytes.subarray(record.byteOffset, record.byteOffset + record.nbytes))});
     }
     await withStrandsScope(owner, 'OpenDecider-nano weight upload failed.', async (lease) => {
       for (const {tensor, bytes: raw} of writes) {
         assertUsable(owner);
-        if (owner.lifecycle.loss || owner.lifecycle.disposed || owner.uncaptured.length)
+        if (owner.lifecycle!.loss || owner.lifecycle!.disposed || owner.uncaptured.length)
           throw new Error('GPU unavailable.');
         if (typeof tensor.byteOffset !== 'number' || tensor.byteOffset % 4 !== 0 || raw.byteLength % 4 !== 0)
           throw new Error('Invalid OpenDecider-nano tensor alignment.');
@@ -124,11 +232,17 @@ async function upload(owner, source, signal) {
   return weights;
 }
 
-function cleanupFailedLoad(owner, runtime, gpu, initialized, gpuCompatibility) {
+function cleanupFailedLoad(
+  owner: OpenDeciderNanoRuntimeOwner | null | undefined,
+  runtime: OpenDeciderNanoRuntime | null | undefined,
+  gpu: OpenDeciderNanoGpu | null | undefined,
+  initialized: boolean,
+  gpuCompatibility: OpenDeciderNanoGpuCompatibility | null | undefined
+): void {
   if (owner) {
     owner.gpuCompatibility = gpuCompatibility;
     try {
-      owner.disposalGuard.retain();
+      owner.disposalGuard!.retain();
     } catch {
       retainStrandsResources(runtime, gpu);
     }
@@ -148,17 +262,20 @@ function cleanupFailedLoad(owner, runtime, gpu, initialized, gpuCompatibility) {
   }
 }
 
-async function orchestrate({base, signal, onProgress}, deps) {
+async function orchestrate(
+  {base, signal, onProgress}: OpenDeciderNanoCheckedOptions,
+  deps: OpenDeciderNanoLoaderDependencies
+): Promise<unknown> {
   if (typeof deps.gpu?.requestAdapter !== 'function') throw fail('UNSUPPORTED_ENVIRONMENT', 'WebGPU is unavailable.');
-  let gpu,
-    runtime,
-    owner,
-    gpuCompatibility,
-    watch,
+  let gpu: OpenDeciderNanoGpu | null | undefined,
+    runtime: OpenDeciderNanoRuntime | null | undefined,
+    owner: OpenDeciderNanoRuntimeOwner | null | undefined,
+    gpuCompatibility: OpenDeciderNanoGpuCompatibility | null | undefined,
+    watch: ReturnType<typeof watchLoadDeviceLoss> | null | undefined,
     initialized = false;
   try {
     signal?.throwIfAborted();
-    const adapter = await waitForAbort(() => deps.gpu.requestAdapter(), signal);
+    const adapter = await waitForAbort(() => (deps.gpu as OpenDeciderNanoGpuProvider).requestAdapter(), signal);
     validateOpenDeciderNanoAdapter(adapter);
     const source = await deps.openSource(base, {signal, onProgress});
     const tokenizer = deps.prepareTokenizer(source.tokenizer, source.tokenizerConfig);
@@ -189,34 +306,35 @@ async function orchestrate({base, signal, onProgress}, deps) {
     );
     watch.signal.throwIfAborted();
     initialized = true;
-    owner = deps.initialize(runtime, gpu, {
+    owner = deps.initialize(runtime!, gpu!, {
       setupWebGPUContext(context) {
         gpuCompatibility = deps.installGpuCompatibility?.(context);
       }
     });
     owner.gpuCompatibility = gpuCompatibility;
-    const weights = await deps.upload(owner, source, watch.signal);
-    watch.signal.throwIfAborted();
-    if (owner.lifecycle.loss || owner.lifecycle.disposed || owner.disposalGuard.blocked || owner.uncaptured.length)
+    const weights = await deps.upload(owner, source, watch!.signal);
+    watch!.signal.throwIfAborted();
+    if (owner.lifecycle!.loss || owner.lifecycle!.disposed || owner.disposalGuard!.blocked || owner.uncaptured.length)
       throw new Error('OpenDecider-nano runtime unavailable.');
     const runner = deps.runner({...owner, weights});
     const session = deps.session({tokenizer, runner});
-    watch.signal.throwIfAborted();
-    watch.close();
+    watch!.signal.throwIfAborted();
+    watch!.close();
     watch = null;
     return session;
   } catch (cause) {
     watch?.close();
     cleanupFailedLoad(owner, runtime, gpu, initialized, gpuCompatibility);
     signal?.throwIfAborted();
-    if (cause instanceof WebDecisionError || cause?.name === 'AbortError') throw cause;
+    if (cause instanceof WebDecisionError || (cause as {name?: unknown} | null | undefined)?.name === 'AbortError')
+      throw cause;
     throw fail('MODEL_LOAD_FAILED', 'Could not load OpenDecider-nano.', cause);
   }
 }
 
 export function loadOpenDeciderNano(
-  options,
-  {Tokenizer, instantiate, createPolyfillWASI, gpu = globalThis.navigator?.gpu} = {}
+  options: OpenDeciderNanoLoadOptions | null | undefined,
+  {Tokenizer, instantiate, createPolyfillWASI, gpu = globalThis.navigator?.gpu}: OpenDeciderNanoRuntimeBindings = {}
 ) {
   const checked = validateOpenDeciderNanoOptions(options);
   if (typeof Tokenizer !== 'function' || typeof instantiate !== 'function' || typeof createPolyfillWASI !== 'function')
@@ -226,7 +344,7 @@ export function loadOpenDeciderNano(
     openSource: openOpenDeciderNanoSource,
     prepareTokenizer: (data, config) => createOpenDeciderNanoTokenizer(Tokenizer, data, config),
     instantiate: (wasm) => instantiate(wasm, createPolyfillWASI()),
-    initialize: initializeH2oRuntime,
+    initialize: initializeH2oRuntime as OpenDeciderNanoLoaderDependencies['initialize'],
     installGpuCompatibility: installOpenDeciderNanoGpuCompatibility,
     upload,
     runner: (owner) => new OpenDeciderNanoTvmRunner(owner),
