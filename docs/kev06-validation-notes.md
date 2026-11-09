@@ -18,7 +18,7 @@ At commit `0d41a42f073c7ef726a9d03906cc7ba80491c24c`, the expanded Windows check
 
 At commit `2b04d164620ee834be42dd11cf718970f02571d1`, the same archive SHA-256 passed the stronger Windows gate requiring each decision selection and each packed and individual typed selection to match the pinned CPU reference. The Playwright report SHA-256 was `e9651686b26789c4230afffbed8b5f94a95407e8a7336b1d42806c5c13034a59`. Probability differences for the added inputs remain observations without a new numerical tolerance. This evidence covers the specific inputs, browser, and machine tested.
 
-The verifier also matched the package WASM to the separately built `ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0` artifact and its build report. This is evidence for that archive, one browser, one host, and one reference input; later package changes need a new check. It does not resolve the broader numerical and model-quality questions below.
+The verifier also matched the package WASM to the separately built `ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0` artifact and its build report. The numerical acceptance thresholds cover one baseline input; the expanded selection checks cover only the inputs described above. These checks cover one browser and one host, and later package changes need a new check. They do not resolve the broader numerical and model-quality questions below.
 
 ## Exploratory output comparison
 
