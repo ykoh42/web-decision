@@ -15,7 +15,7 @@ import {
 const root = new URL('../../../', import.meta.url);
 const model = new URL('models/h2o-integration-20261030/', root);
 const prepared = new URL('experiments/h2o-q4-dual-private-preparation-20261101/local-20261101-v1/', root);
-const files = {
+const files: Record<string, URL> = {
   'evidence/inventory.json': new URL('h2o-inventory-31d7b5f89e2c41a6/inventory.pending.json', model),
   'h2o-public-metadata.json': new URL(
     'experiments/h2o-public-evidence-preparation-20261031/h2o-public-metadata.pending.json',
@@ -51,43 +51,43 @@ test('dual graph binds the baseline order and rejects another variant or altered
       files['manifest.pending.json'],
       files['h2o-dual-metadata.json'],
       files['model.dual.pending.wasm']
-    ].map((path) => readFile(path))
+    ].map((path) => readFile(path!))
   );
-  const original = await preparePublicCandidatePlan(metadata, manifest);
-  const dual = await preparePublicCandidatePlan(metadata, manifest, H2O_DUAL_MODEL_ID, candidate);
+  const original = await preparePublicCandidatePlan(metadata!, manifest!);
+  const dual = await preparePublicCandidatePlan(metadata!, manifest!, H2O_DUAL_MODEL_ID, candidate);
   assert.equal(dual.wasmSha256, DUAL_WASM_SHA256);
   assert.deepEqual(dual.parameters, original.parameters);
   assert.deepEqual(dual.labelIds, original.labelIds);
-  const verified = await verifyWasm(wasm, H2O_DUAL_MODEL_ID);
-  assert.ok(Buffer.from(verified).equals(wasm));
+  const verified = await verifyWasm(wasm!, H2O_DUAL_MODEL_ID);
+  assert.ok(Buffer.from(verified).equals(wasm!));
   assert.notEqual(verified, wasm);
-  await assert.rejects(verifyWasm(wasm, H2O_DLIGHT_MODEL_ID), {code: 'INVALID_ASSET'});
-  await assert.rejects(preparePublicCandidatePlan(metadata, manifest, H2O_DLIGHT_MODEL_ID, candidate), {
+  await assert.rejects(verifyWasm(wasm!, H2O_DLIGHT_MODEL_ID), {code: 'INVALID_ASSET'});
+  await assert.rejects(preparePublicCandidatePlan(metadata!, manifest!, H2O_DLIGHT_MODEL_ID, candidate), {
     code: 'INVALID_ASSET'
   });
-  const changed = Uint8Array.from(candidate);
-  changed[0] ^= 1;
-  await assert.rejects(preparePublicCandidatePlan(metadata, manifest, H2O_DUAL_MODEL_ID, changed), {
+  const changed = Uint8Array.from(candidate!);
+  changed[0] = changed[0]! ^ 1;
+  await assert.rejects(preparePublicCandidatePlan(metadata!, manifest!, H2O_DUAL_MODEL_ID, changed), {
     code: 'INVALID_ASSET'
   });
 });
 
 test('dual source fetches its own graph and rejects corrupted files', {skip}, async () => {
   const originalFetch = globalThis.fetch;
-  const seen = [];
-  let corrupt;
+  const seen: string[] = [];
+  let corrupt: string | undefined;
   globalThis.fetch = async (url, options) => {
-    const name = new URL(url).pathname.slice('/assets/'.length),
+    const name = new URL(url instanceof Request ? url.url : url).pathname.slice('/assets/'.length),
       path = files[name];
     assert.ok(path, `unexpected asset ${name}`);
     seen.push(name);
     const data = await readFile(path),
-      range = /^bytes=(\d+)-(\d+)$/.exec(options.headers.Range);
+      range = /^bytes=(\d+)-(\d+)$/.exec(new Headers(options?.headers).get('Range') ?? '');
     assert.ok(range);
     const start = Number(range[1]),
       end = Number(range[2]);
     const bytes = Uint8Array.from(data.subarray(start, end + 1));
-    if (name === corrupt) bytes[0] ^= 1;
+    if (name === corrupt) bytes[0] = bytes[0]! ^ 1;
     return new Response(bytes, {
       status: 206,
       headers: {'Content-Range': `bytes ${start}-${end}/${data.length}`, 'Content-Length': String(bytes.length)}
@@ -96,7 +96,7 @@ test('dual source fetches its own graph and rejects corrupted files', {skip}, as
   try {
     const source = await openH2oAssetSource({assetsUrl: base, model: H2O_DUAL_MODEL_ID});
     assert.equal(source.wasm.byteLength, 4916749);
-    assert.equal(source.candidateMetadata.byteLength, 179056);
+    assert.equal(source.candidateMetadata!.byteLength, 179056);
     assert.ok(seen.includes('model.dual.pending.wasm'));
     assert.ok(seen.includes('h2o-dual-metadata.json'));
     source.close();

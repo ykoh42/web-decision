@@ -179,7 +179,7 @@ export async function preparePublicCandidatePlan(
   metadataBytes: unknown,
   manifestBytes: unknown,
   model: string = H2O_BASELINE_MODEL_ID,
-  candidateBytes: unknown,
+  candidateBytes?: unknown,
   signal?: AbortSignal | null | undefined
 ): Promise<H2oCandidatePlan> {
   signal?.throwIfAborted();
