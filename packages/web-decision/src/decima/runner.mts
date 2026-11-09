@@ -1,15 +1,42 @@
 import {WebDecisionError} from '../kev.js';
+import type {InferenceSession, TypedTensor} from 'onnxruntime-web/wasm';
+import type {DecimaRawScores} from './protocol.mjs';
+import type {DecimaTokenizer} from './tokenizer.mjs';
 
-const fail = (message, cause) => new WebDecisionError('INFERENCE_ERROR', message, cause ? {cause} : undefined);
+export type DecimaOrtApi = typeof import('onnxruntime-web/wasm');
 
-function checkRows(rows, padId) {
+interface DecimaBatch {
+  readonly ids: BigInt64Array;
+  readonly mask: BigInt64Array;
+  readonly shape: number[];
+}
+
+export interface DecimaEncodedInputs {
+  readonly states: TypedTensor<'float32'>;
+  readonly mask: TypedTensor<'int64'>;
+}
+
+export interface DecimaRunner {
+  encode(rows: readonly (readonly number[])[]): Promise<DecimaEncodedInputs>;
+  scoreEncoded(state: DecimaEncodedInputs, choices: DecimaEncodedInputs, choiceCount: number): Promise<DecimaRawScores>;
+  score(
+    stateRows: readonly (readonly number[])[],
+    choiceRows: readonly (readonly number[])[]
+  ): Promise<DecimaRawScores>;
+  dispose(): Promise<void>;
+}
+
+const fail = (message: string, cause?: unknown): WebDecisionError =>
+  new WebDecisionError('INFERENCE_ERROR', message, cause ? {cause} : undefined);
+
+function checkRows(rows: readonly (readonly number[])[], padId: number): DecimaBatch {
   if (!Array.isArray(rows) || !rows.length || rows.some((row) => !Array.isArray(row) || !row.length))
     throw fail('Decima received an empty token batch.');
   const width = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
   const ids = new BigInt64Array(rows.length * width);
   const mask = new BigInt64Array(rows.length * width);
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-    const row = rows[rowIndex];
+    const row = rows[rowIndex]!;
     const offset = rowIndex * width;
     for (let column = 0; column < width; column++) {
       ids[offset + column] = BigInt(row[column] ?? padId);
@@ -19,18 +46,26 @@ function checkRows(rows, padId) {
   return {ids, mask, shape: [rows.length, width]};
 }
 
-function isFloatTensor(tensor, minimumRank) {
+function isFloatTensor(tensor: unknown, minimumRank: number): tensor is TypedTensor<'float32'> {
   return (
-    tensor?.type === 'float32' &&
-    Array.isArray(tensor.dims) &&
-    tensor.dims.length >= minimumRank &&
-    tensor.dims.every((dimension) => Number.isSafeInteger(dimension) && dimension > 0) &&
-    ArrayBuffer.isView(tensor.data) &&
-    tensor.data.length === tensor.dims.reduce((size, value) => size * value, 1)
+    (tensor as TypedTensor<'float32'> | null | undefined)?.type === 'float32' &&
+    Array.isArray((tensor as TypedTensor<'float32'>).dims) &&
+    (tensor as TypedTensor<'float32'>).dims.length >= minimumRank &&
+    (tensor as TypedTensor<'float32'>).dims.every(
+      (dimension: number) => Number.isSafeInteger(dimension) && dimension > 0
+    ) &&
+    ArrayBuffer.isView((tensor as TypedTensor<'float32'>).data) &&
+    (tensor as TypedTensor<'float32'>).data.length ===
+      (tensor as TypedTensor<'float32'>).dims.reduce((size, value) => size * value, 1)
   );
 }
 
-export function createDecimaRunner(ort, encoder, scorer, tokenizer) {
+export function createDecimaRunner(
+  ort: DecimaOrtApi,
+  encoder: InferenceSession,
+  scorer: InferenceSession,
+  tokenizer: DecimaTokenizer
+): DecimaRunner {
   if (
     typeof ort?.Tensor !== 'function' ||
     typeof encoder?.run !== 'function' ||
@@ -41,9 +76,9 @@ export function createDecimaRunner(ort, encoder, scorer, tokenizer) {
   )
     throw new TypeError('Decima requires ONNX Runtime sessions and its tokenizer.');
   let closed = false;
-  let disposing;
+  let disposing: Promise<void> | undefined;
 
-  async function encode(rows) {
+  async function encode(rows: readonly (readonly number[])[]): Promise<DecimaEncodedInputs> {
     if (closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
     const batch = checkRows(rows, tokenizer.special.padId);
     const outputs = await encoder.run({
@@ -56,7 +91,11 @@ export function createDecimaRunner(ort, encoder, scorer, tokenizer) {
     return {states, mask: new ort.Tensor('int64', batch.mask, batch.shape)};
   }
 
-  async function scoreEncoded(state, choices, choiceCount) {
+  async function scoreEncoded(
+    state: DecimaEncodedInputs,
+    choices: DecimaEncodedInputs,
+    choiceCount: number
+  ): Promise<DecimaRawScores> {
     if (closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
     if (!state || !choices || !Number.isSafeInteger(choiceCount) || choiceCount < 2)
       throw fail('Decima scorer received invalid encoded inputs.');
@@ -85,13 +124,16 @@ export function createDecimaRunner(ort, encoder, scorer, tokenizer) {
   return {
     encode,
     scoreEncoded,
-    async score(stateRows, choiceRows) {
+    async score(
+      stateRows: readonly (readonly number[])[],
+      choiceRows: readonly (readonly number[])[]
+    ): Promise<DecimaRawScores> {
       if (!Array.isArray(stateRows) || stateRows.length !== 1 || !Array.isArray(choiceRows) || choiceRows.length < 2)
         throw fail('Decima scorer received invalid input rows.');
       const [state, choices] = await Promise.all([encode(stateRows), encode(choiceRows)]);
       return scoreEncoded(state, choices, choiceRows.length);
     },
-    dispose() {
+    dispose(): Promise<void> {
       if (disposing) return disposing;
       closed = true;
       disposing = Promise.allSettled([scorer.release(), encoder.release()]).then((results) => {
