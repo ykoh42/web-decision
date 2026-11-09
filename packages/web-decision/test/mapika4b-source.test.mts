@@ -3,8 +3,21 @@ import test from 'node:test';
 import {indexMapika4Files, mapika4Files} from '../src/mapika4b/source.mjs';
 import {MAPIKA4_DLIGHT_ALL_MODEL, MAPIKA4_DLIGHT_MODEL, MAPIKA4_MODEL} from '../src/mapika4b/contract.mjs';
 
+interface FixtureParameter {
+  position: number;
+  target: string;
+  shape: string[];
+  dtype: string;
+  kind: string;
+  path?: string | undefined;
+  fileOffset?: number | undefined;
+  bytes?: number | undefined;
+  ranges?: {offset: number; bytes: number; sha256: string}[] | undefined;
+  values?: number[] | undefined;
+}
+
 function inventory() {
-  const parameters = Array.from({length: 680}, (_, index) => ({
+  const parameters: FixtureParameter[] = Array.from({length: 680}, (_, index) => ({
     position: index + 5,
     target: `tensor-${index}`,
     shape: ['1'],
@@ -39,13 +52,13 @@ test('indexes file segments and preserves binding order', () => {
 
 test('rejects unsafe paths, invalid ranges and incomplete inventory', () => {
   for (const change of [
-    (value) => value.parameters.pop(),
-    (value) => (value.parameters[0].path = '../escape'),
-    (value) => (value.parameters[0].fileOffset = -1),
-    (value) => (value.parameters[0].bytes = 0),
-    (value) => (value.parameters[0].position = 7),
-    (value) => (value.parameters[0].shape = ['not-a-number']),
-    (value) => (value.parameters[0].path = value.parameters[1].path)
+    (value: ReturnType<typeof inventory>) => value.parameters.pop(),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.path = '../escape'),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.fileOffset = -1),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.bytes = 0),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.position = 7),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.shape = ['not-a-number']),
+    (value: ReturnType<typeof inventory>) => (value.parameters[0]!.path = value.parameters[1]!.path)
   ]) {
     const fixture = inventory();
     change(fixture);

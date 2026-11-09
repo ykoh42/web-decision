@@ -193,7 +193,6 @@
     "packages/web-decision/test/mapika4b-loader.test.mjs",
     "packages/web-decision/test/mapika4b-runner.test.mjs",
     "packages/web-decision/test/mapika4b-session.test.mjs",
-    "packages/web-decision/test/mapika4b-source.test.mjs",
     "packages/web-decision/test/model-memory.test.mjs",
     "packages/web-decision/test/model-registry.test.mjs",
     "packages/web-decision/test/model-source.test.mjs",
