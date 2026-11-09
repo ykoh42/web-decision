@@ -29,6 +29,7 @@ interface RangeTransactionOptions {
   readonly offline?: boolean | undefined;
   readonly signal?: AbortSignal | null | undefined;
   readonly markerId: string;
+  readonly markerPath?: string | undefined;
 }
 
 interface CancellableBody {
@@ -145,8 +146,22 @@ export class RangeCacheTransaction {
   #sealed = false;
   #ready = false;
 
-  constructor({base, cache, offline = false, signal, markerId}: RangeTransactionOptions) {
-    if (!(base instanceof URL) || typeof markerId !== 'string' || !markerId || typeof offline !== 'boolean')
+  constructor({
+    base,
+    cache,
+    offline = false,
+    signal,
+    markerId,
+    markerPath = 'strands-offline-complete-v1.json'
+  }: RangeTransactionOptions) {
+    if (
+      !(base instanceof URL) ||
+      typeof markerId !== 'string' ||
+      !markerId ||
+      typeof offline !== 'boolean' ||
+      typeof markerPath !== 'string' ||
+      !markerPath
+    )
       throw invalid('Invalid range cache transaction options.');
     if (offline && !cache) throw new WebDecisionError('ASSET_LOAD_FAILED', 'Offline range cache is unavailable.');
     this.#base = new URL(base.href);
@@ -154,7 +169,7 @@ export class RangeCacheTransaction {
     this.#offline = offline;
     this.#signal = signal;
     this.#marker = Object.freeze({format: 1, markerId});
-    this.#markerUrl = assetUrl(base, 'strands-offline-complete-v1.json');
+    this.#markerUrl = assetUrl(base, markerPath);
   }
 
   async open(): Promise<void> {
