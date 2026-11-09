@@ -50,6 +50,7 @@
     "test/kev.test.mts",
     "test/kev-gpu.test.mts",
     "test/kev-reflexes.test.mts",
+    "test/kev-systemone.test.mts",
     "src/nari/source.mts",
     "src/nari/adapter.mts",
     "src/nari/loader.mts",

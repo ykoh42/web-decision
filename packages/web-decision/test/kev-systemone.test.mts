@@ -3,7 +3,44 @@ import test from 'node:test';
 import {runInNewContext} from 'node:vm';
 import {DecisionModel} from '../src/model.js';
 import {KEV_MAX_BRANCH_TOKENS, KEV_MAX_OPTIONS, KEV_MAX_STATE_TOKENS, WebDecisionError} from '../src/kev.js';
+import type {KevTokenizer} from '../src/kev.js';
+import type {KevAnswer, KevResult} from '../src/curated/types.js';
 import {finishKevSystemOne, prepareKevSystemOne} from '../src/kev/system-one.mjs';
+
+type TestAnswer = KevAnswer & {
+  readonly choice?: string;
+  readonly score?: number;
+  readonly noul?: number;
+  readonly probabilities?: Readonly<Record<string, number>>;
+  readonly probabilityEntries?: readonly (readonly [string, number])[];
+  readonly legend?: Readonly<Record<string, string>>;
+  readonly confidence?: number;
+};
+type TestAnswers<Questions> =
+  Questions extends ReadonlyMap<infer Key, unknown>
+    ? {[Name in Extract<Key, string>]: TestAnswer}
+    : Questions extends object
+      ? {[Name in keyof Questions]: TestAnswer}
+      : Record<string, TestAnswer>;
+type TestResult<Questions> = Omit<KevResult, 'answers' | 'answerEntries'> & {
+  readonly answers: TestAnswers<Questions>;
+  readonly answerEntries: readonly (readonly [question: string, answer: TestAnswer])[];
+};
+type TestModel = Omit<DecisionModel, 'systemOne' | 'limits'> & {
+  limits: {
+    maxInputTokens: number | undefined;
+    maxStateTokens: number;
+    maxBranchTokens: number;
+    maxQuestions: number | undefined;
+    maxOptions: number | undefined;
+    maxInputCharacters: number | undefined;
+  };
+  systemOne<Questions>(
+    state: unknown,
+    questions: Questions,
+    options?: {signal?: AbortSignal | undefined} | null
+  ): Promise<TestResult<Questions>>;
+};
 
 const halfBits = new Map([
   [0, 0x0000],
@@ -20,15 +57,15 @@ function createModel(
   ],
   supportsSystemOne = true,
   modelId = 'kev-0.6b-q4f16',
-  maxInputCharacters
+  maxInputCharacters?: number
 ) {
-  const texts = [];
+  const texts: string[] = [];
   let inferences = 0;
   const lifecycle = {loss: null, disposed: false};
   const tokenizer = {
-    encode(text) {
+    encode(text: string) {
       texts.push(text);
-      return {ids: Array.from(text, (character) => character.codePointAt(0) + 200)};
+      return {ids: Array.from(text, (character) => character.codePointAt(0)! + 200)};
     }
   };
   const runtime = {
@@ -40,18 +77,19 @@ function createModel(
     cpu() {
       return 'cpu';
     },
-    empty(shape, dtype) {
-      let values;
+    empty(shape: number[], dtype: string) {
+      let values: ArrayLike<number>;
       return {
-        copyFrom(next) {
-          values = next;
+        copyFrom(next: unknown) {
+          values = next as ArrayLike<number>;
           return this;
         },
         toRawBytes() {
           assert.equal(dtype, 'float16');
-          const bytes = new Uint8Array(shape[1] * 2);
+          const bytes = new Uint8Array(shape[1]! * 2);
           const view = new DataView(bytes.buffer);
-          for (let index = 0; index < shape[1]; index++) view.setUint16(index * 2, halfBits.get(values[index]), true);
+          for (let index = 0; index < shape[1]!; index++)
+            view.setUint16(index * 2, halfBits.get(values[index]!)!, true);
           return bytes;
         },
         values: () => values
@@ -61,34 +99,34 @@ function createModel(
   const device = {sync: async () => {}};
   const gpu = {pushErrorScope() {}, popErrorScope: async () => null};
   const model = new DecisionModel(
-    runtime,
-    device,
-    gpu,
+    runtime as unknown as ConstructorParameters<typeof DecisionModel>[0],
+    device as unknown as ConstructorParameters<typeof DecisionModel>[1],
+    gpu as unknown as ConstructorParameters<typeof DecisionModel>[2],
     (ids) => {
       inferences++;
-      const scores = new Float32Array(ids.values().length);
+      const scores = new Float32Array((ids as {values(): ArrayLike<number>}).values().length);
       const optionEnds = [];
-      for (let index = 0; index < ids.values().length; index++)
-        if (ids.values()[index] === 151649) optionEnds.push(index);
+      for (let index = 0; index < (ids as {values(): ArrayLike<number>}).values().length; index++)
+        if ((ids as {values(): ArrayLike<number>}).values()[index] === 151649) optionEnds.push(index);
       let offset = 0;
       for (const group of logitsByQuestion) {
-        for (const score of group) scores[optionEnds[offset++]] = score;
+        for (const score of group) scores[optionEnds[offset++]!] = score;
       }
       return scores;
     },
-    [],
-    tokenizer,
+    [] as ConstructorParameters<typeof DecisionModel>[4],
+    tokenizer as unknown as KevTokenizer,
     {
       maxStateTokens: KEV_MAX_STATE_TOKENS,
       maxBranchTokens: KEV_MAX_BRANCH_TOKENS,
       maxOptions: KEV_MAX_OPTIONS,
       ...(maxInputCharacters === undefined ? {} : {maxInputCharacters})
-    },
-    [],
-    lifecycle,
+    } as unknown as ConstructorParameters<typeof DecisionModel>[6],
+    [] as ConstructorParameters<typeof DecisionModel>[7],
+    lifecycle as unknown as ConstructorParameters<typeof DecisionModel>[8],
     supportsSystemOne,
     modelId
-  );
+  ) as TestModel;
   return {
     model,
     texts,
@@ -155,29 +193,29 @@ test('Kev typed Maps preserve numeric-key order in rendered input and result ent
     [0, 2]
   ]);
   const result = await model.systemOne(
-    new Map([
+    new Map<'2' | '1', unknown>([
       ['2', 'second'],
       [
         '1',
-        new Map([
+        new Map<'10' | '3', unknown>([
           ['10', 10n],
           ['3', 3.5]
         ])
       ]
     ]),
-    new Map([
+    new Map<'10' | '2', unknown>([
       [
         '10',
         {
           type: 'choice',
-          instructions: new Map([
+          instructions: new Map<'8' | '4', unknown>([
             ['8', 'context'],
-            ['4', new Map([['2', 'deep']])]
+            ['4', new Map<'2', unknown>([['2', 'deep']])]
           ]),
-          criteria: new Map([
+          criteria: new Map<'2' | '1', unknown>([
             [
               '2',
-              new Map([
+              new Map<'10' | '3', unknown>([
                 ['10', 'ten'],
                 ['3', 3n]
               ])
@@ -191,7 +229,7 @@ test('Kev typed Maps preserve numeric-key order in rendered input and result ent
         {
           type: 'noul',
           instructions: null,
-          criteria: new Map([
+          criteria: new Map<'true' | 'false' | 'ignored', unknown>([
             ['true', 'yes'],
             ['false', 'no'],
             ['ignored', 'skip']
@@ -206,12 +244,12 @@ test('Kev typed Maps preserve numeric-key order in rendered input and result ent
     ['10', '2']
   );
   assert.deepEqual(Object.keys(result.answers), ['2', '10']);
-  assert.deepEqual(result.answerEntries[0][1].probabilityEntries, [
+  assert.deepEqual(result.answerEntries[0]![1].probabilityEntries, [
     ['2', 0.8808],
     ['1', 0.1192]
   ]);
-  assert.deepEqual(Object.keys(result.answers['10'].probabilities), ['1', '2']);
-  assert.deepEqual(result.answers['10'].probabilities, {1: 0.1192, 2: 0.8808});
+  assert.deepEqual(Object.keys(result.answers['10']!.probabilities!), ['1', '2']);
+  assert.deepEqual(result.answers['10']!.probabilities, {1: 0.1192, 2: 0.8808});
   assert.deepEqual(texts, [
     '2: second\n1:\n  10: 10\n  3: 3.5',
     '8: context\n4:\n  2: deep',
@@ -225,18 +263,18 @@ test('Kev typed Maps preserve numeric-key order in rendered input and result ent
 });
 
 test('Kev typed input accepts cross-realm Maps and bypasses overridden Map methods', () => {
-  const state = runInNewContext('new Map([["2", "second"], ["1", "first"]])');
-  const questions = runInNewContext(
+  const state: unknown = runInNewContext('new Map([["2", "second"], ["1", "first"]])');
+  const questions: unknown = runInNewContext(
     'new Map([["route", {type: "choice", instructions: null, criteria: new Map([["2", "two"], ["1", "one"]])}]])'
   );
   const prepared = prepareKevSystemOne(state, questions);
   assert.equal(prepared.request.state, '2: second\n1: first');
   assert.deepEqual(
-    prepared.metadata[0].options.map(({key}) => key),
+    prepared.metadata[0]!.options.map(({key}) => key),
     ['2', '1']
   );
 
-  const criteria = new Map([
+  const criteria = new Map<string, unknown>([
     ['second', '2'],
     ['first', '1']
   ]);
@@ -250,23 +288,23 @@ test('Kev typed input accepts cross-realm Maps and bypasses overridden Map metho
     route: {type: 'choice', instructions: null, criteria}
   });
   assert.deepEqual(
-    overridden.metadata[0].options.map(({key}) => key),
+    overridden.metadata[0]!.options.map(({key}) => key),
     ['second', 'first']
   );
 
-  class KevMapSubclass extends Map {}
+  class KevMapSubclass extends Map<string, unknown> {}
   const subclass = prepareKevSystemOne(new KevMapSubclass([['state', 'value']]), {
     route: {type: 'choice', instructions: null, criteria: new KevMapSubclass([['key', null]])}
   });
   assert.equal(subclass.request.state, 'state: value');
   assert.deepEqual(
-    subclass.metadata[0].options.map(({key}) => key),
+    subclass.metadata[0]!.options.map(({key}) => key),
     ['key']
   );
 });
 
 test('Kev typed input rejects structural Map-like objects and Proxy-wrapped Maps', () => {
-  const entries = [
+  const entries: [string, string][] = [
     ['second', '2'],
     ['first', '1']
   ];
@@ -281,7 +319,7 @@ test('Kev typed input rejects structural Map-like objects and Proxy-wrapped Maps
       yield* entries;
     }
   };
-  const proxyMap = new Proxy(new Map(entries), {});
+  const proxyMap = new Proxy(new Map<string, string>(entries), {});
 
   for (const criteria of [structuralMap, proxyMap])
     assert.throws(() => prepareKevSystemOne('', {route: {type: 'choice', instructions: null, criteria}}), {
@@ -482,7 +520,7 @@ test('Kev systemOne rejects unsupported typed schemas before inference', async (
       (error) => error instanceof WebDecisionError && error.code === 'INVALID_INPUT'
     );
   }
-  const cycle = {};
+  const cycle: Record<string, unknown> = {};
   cycle.self = cycle;
   await assert.rejects(
     model.systemOne(cycle, {check: {type: 'noul', instructions: 'Is this true?'}}),
@@ -565,6 +603,7 @@ test('Kev Score preserves repeated empty level labels from the typed contract', 
 });
 
 test('Kev Score serializes typed results to four decimals like the upstream API', async () => {
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep the fixture at eight dense zero logits.
   const {model} = createModel([new Array(8).fill(0)]);
   const result = await model.systemOne('state', {
     score: {type: 'score', instructions: null, criteria: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']}
@@ -599,7 +638,7 @@ test('Kev typed Choice, Noul, and Score use Python-compatible four-decimal round
       {probabilities: probability.map((value) => ({probability: value}))},
       {probabilities: probability.map((value) => ({probability: value}))}
     ]
-  });
+  } as Parameters<typeof finishKevSystemOne>[1]) as TestResult<{choice: unknown; noul: unknown; score: unknown}>;
 
   assert.deepEqual(result.answers.choice.probabilities, {low: 0.0312, high: 0.9688});
   assert.equal(result.answers.choice.confidence, 0.9375);
@@ -628,7 +667,14 @@ test('Kev Score confidence uses the current TypeSafe distance normalization', ()
       {probabilities: [0.75, 0, 0.26].map((probability) => ({probability}))},
       {probabilities: [{probability: 1}]}
     ]
-  });
+  } as Parameters<typeof finishKevSystemOne>[1]) as TestResult<{
+    concentrated: unknown;
+    uniform: unknown;
+    oneHot: unknown;
+    tiedMode: unknown;
+    slightlyUnnormalized: unknown;
+    oneLevel: unknown;
+  }>;
 
   assert.equal(result.answers.concentrated.confidence, 0.25);
   assert.equal(result.answers.uniform.confidence, 0);
@@ -645,7 +691,7 @@ test('Kev Choice confidence normalizes probabilities before applying the upstrea
   const result = finishKevSystemOne(prepared, {
     tokenCount: 0,
     answers: [{selectedIndex: 1, probabilities: [0.75, 0.26].map((probability) => ({probability}))}]
-  });
+  } as Parameters<typeof finishKevSystemOne>[1]) as TestResult<{choice: unknown}>;
 
   assert.equal(result.answers.choice.confidence, 0.4851);
 });
@@ -657,7 +703,7 @@ test('Kev confidence normalizes a zero-sum probability vector like the upstream 
   const result = finishKevSystemOne(prepared, {
     tokenCount: 0,
     answers: [{selectedIndex: 0, probabilities: [{probability: 0}, {probability: 0}]}]
-  });
+  } as Parameters<typeof finishKevSystemOne>[1]) as TestResult<{choice: unknown}>;
 
   assert.equal(result.answers.choice.confidence, 0);
 });
@@ -676,20 +722,20 @@ test('Kev typed Score rounds valid values through the maximum 254-level score', 
   const result = finishKevSystemOne(prepared, {
     tokenCount: 0,
     answers: [{probabilities}]
-  });
+  } as Parameters<typeof finishKevSystemOne>[1]) as TestResult<{score: unknown}>;
 
   assert.equal(result.answers.score.score, KEV_MAX_OPTIONS - 1);
   assert.ok(result.answers.score.score >= 0 && result.answers.score.score <= KEV_MAX_OPTIONS - 1);
   assert.equal(result.answers.score.confidence, 1);
-  assert.equal(result.answers.score.probabilities[String(KEV_MAX_OPTIONS - 1)], 1);
-  assert.equal(result.answers.score.probabilityEntries.length, KEV_MAX_OPTIONS);
+  assert.equal(result.answers.score.probabilities![String(KEV_MAX_OPTIONS - 1)], 1);
+  assert.equal(result.answers.score.probabilityEntries!.length, KEV_MAX_OPTIONS);
 });
 
 test('Kev typed Score accepts 255 ordered levels and rejects 256', () => {
   const accepted = prepareKevSystemOne('state', {
     score: {type: 'score', criteria: Array.from({length: KEV_MAX_OPTIONS}, (_, index) => String(index))}
   });
-  assert.equal(accepted.metadata[0].options.length, KEV_MAX_OPTIONS);
+  assert.equal(accepted.metadata[0]!.options.length, KEV_MAX_OPTIONS);
   assert.throws(
     () =>
       prepareKevSystemOne('state', {
@@ -712,12 +758,12 @@ test('Kev systemOne checks an aborted signal before rendering typed input', asyn
   const {model, texts} = context;
   const controller = new AbortController();
   controller.abort();
-  let state = 'value';
+  let state: unknown = 'value';
   for (let depth = 0; depth < 2_000; depth++) state = {next: state};
 
   await assert.rejects(
     model.systemOne(state, {check: {type: 'noul', instructions: null}}, {signal: controller.signal}),
-    (error) => error.name === 'AbortError'
+    (error) => (error as Error).name === 'AbortError'
   );
   assert.deepEqual(texts, []);
   assert.equal(context.inferences, 0);
@@ -728,10 +774,11 @@ test('Kev systemOne accepts the upstream 255 ordered Choice criteria and rejects
   const criteria = Object.fromEntries(
     Array.from({length: 255}, (_, index) => [String.fromCodePoint(0x4e00 + index), null])
   );
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep one dense zero logit for every option.
   const context = createModel([new Array(KEV_MAX_OPTIONS).fill(0)]);
   const result = await context.model.systemOne('s', {route: {type: 'choice', instructions: '', criteria}});
   assert.equal(result.answers.route.choice, Object.keys(criteria)[0]);
-  assert.equal(Object.keys(result.answers.route.probabilities).length, KEV_MAX_OPTIONS);
+  assert.equal(Object.keys(result.answers.route.probabilities!).length, KEV_MAX_OPTIONS);
   assert.equal(result.tokenCount, 769);
 
   const tooMany = {...criteria, [String.fromCodePoint(0x4e00 + 255)]: null};
@@ -796,7 +843,7 @@ test('Kev character safety cap is opt-in and applies to rendered request text', 
   await assert.rejects(model.systemOne('s'.repeat(maxInputCharacters + 1), question), {
     code: 'INVALID_INPUT'
   });
-  let state = {value: 'x'};
+  let state: unknown = {value: 'x'};
   for (let depth = 0; depth < 20; depth++) state = {left: state, right: state};
   await assert.rejects(model.systemOne(state, question), {code: 'INVALID_INPUT'});
   assert.deepEqual(texts, []);
@@ -826,7 +873,7 @@ test('Kev character safety cap rejects oversized array output before building it
     code: 'INVALID_INPUT'
   });
 
-  let nested = 'x';
+  let nested: unknown = 'x';
   for (let depth = 0; depth < 10_000; depth++) nested = [nested];
   assert.throws(() => prepareKevSystemOne(nested, question, 64), {code: 'INVALID_INPUT'});
 
@@ -850,7 +897,7 @@ test('Kev has a configured character cap before tokenizing repeated shared JSON 
   const context = createModel(undefined, true, 'kev-0.6b-q4f16', maxInputCharacters);
   const {model, texts} = context;
   const question = {check: {type: 'noul', instructions: null}};
-  let state = {value: 'x'};
+  let state: unknown = {value: 'x'};
   for (let depth = 0; depth < 20; depth++) state = {left: state, right: state};
   await assert.rejects(model.systemOne(state, question), {code: 'INVALID_INPUT'});
   assert.deepEqual(texts, []);
@@ -866,6 +913,6 @@ test('Kev does not reject text by character count when no safety cap was configu
     .catch((error) => error);
   assert.equal(checked.code, 'INVALID_INPUT');
   assert.equal(checked.message.includes('character'), false);
-  assert.equal(context.texts.at(-1).length, 65_537);
+  assert.equal(context.texts.at(-1)!.length, 65_537);
   await context.model.dispose();
 });

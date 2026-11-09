@@ -87,7 +87,7 @@ function resolveTestAssetImport(
 const registerHooks = Reflect.get(nodeModule, 'registerHooks') as RegisterHooks | undefined;
 const hooks = registerHooks
   ? registerHooks({resolve: resolveTestAssetImport})
-  : (nodeModule.register(new URL('./kev06-asset-import-loader.mjs', import.meta.url), import.meta.url, {
+  : (nodeModule.register(new URL('./kev06-asset-import-loader.mts', import.meta.url), import.meta.url, {
       data: {bundledAssetsUrl, stableBundledAssetsUrl, upstreamSourceUrl, inlineAssets, stableInlineAssets}
     }),
     undefined);

@@ -43,8 +43,6 @@
     "packages/web-decision/test/imajev-upload.test.mjs",
     "packages/web-decision/test/kanana-core-modules.mjs",
     "packages/web-decision/test/kanana-tvm-runtime.test.mjs",
-    "packages/web-decision/test/kev-systemone.test.mjs",
-    "packages/web-decision/test/kev06-asset-import-loader.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/mapika-device.test.mjs",
     "packages/web-decision/test/mapika-session.test.mjs",

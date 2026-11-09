@@ -24,6 +24,7 @@
     "src/deberta/packed-readback.mts",
     "src/deberta/validate.mts",
     "test/kev-loader.test.mts",
+    "test/kev06-asset-import-loader.mts",
     "test/kev06-upstream-source.test.mts"
   ]
 }
