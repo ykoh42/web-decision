@@ -4,9 +4,9 @@ import {readAssetBatch} from '../src/asset-batch.js';
 import {readVerifiedAsset, sha256} from '../src/assets.js';
 import {responseFromReader} from './stream-helpers.mjs';
 
-const deferred = () => {
-  let resolve, reject;
-  const promise = new Promise((a, b) => {
+const deferred = <T = void,>() => {
+  let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((a, b) => {
     resolve = a;
     reject = b;
   });
@@ -22,17 +22,17 @@ test('returns successful initial assets in requested order', async () => {
 });
 
 test('a failed asset stops sibling reads and preserves the original error', async (t) => {
-  const pending = deferred(),
+  const pending = deferred<ArrayBuffer>(),
     started = deferred(),
     reason = Error('failure'),
-    signals = [],
-    progress = [];
+    signals: AbortSignal[] = [],
+    progress: number[] = [];
   const bytes = new TextEncoder().encode('model'),
     digest = await sha256(bytes);
   const manifest = {
     files: {'bad.bin': {bytes: bytes.length, sha256: digest}, 'slow.bin': {bytes: bytes.length, sha256: digest}}
   };
-  t.mock.method(globalThis, 'fetch', async (url, {signal}) => {
+  t.mock.method(globalThis, 'fetch', async (url: string, {signal}: {signal: AbortSignal}) => {
     signals.push(signal);
     if (url.endsWith('slow.bin')) {
       started.resolve();
@@ -41,13 +41,18 @@ test('a failed asset stops sibling reads and preserves the original error', asyn
     await started.promise;
     throw reason;
   });
-  const read = (name, signal) =>
+  const read = (name: string, signal: AbortSignal) =>
     readVerifiedAsset(new URL('https://example.test/'), manifest, name, {
       signal,
       onBytes: (count) => progress.push(count)
     });
   const task = readAssetBatch(['bad.bin', 'slow.bin'], read);
-  await assert.rejects(task, (error) => error.code === 'ASSET_LOAD_FAILED' && error.cause === reason);
+  await assert.rejects(
+    task,
+    (error) =>
+      (error as {code: string; cause: unknown}).code === 'ASSET_LOAD_FAILED' &&
+      (error as {cause: unknown}).cause === reason
+  );
   assert.equal(signals.length, 2);
   assert(signals.every((signal) => signal.aborted));
   pending.resolve(bytes.buffer);
@@ -63,11 +68,11 @@ test('caller cancellation propagates its exact reason and cleans up the listener
     add = signal.addEventListener.bind(signal),
     remove = signal.removeEventListener.bind(signal);
   let listeners = 0;
-  signal.addEventListener = (...args) => {
+  signal.addEventListener = (...args: Parameters<typeof add>) => {
     listeners++;
     return add(...args);
   };
-  signal.removeEventListener = (...args) => {
+  signal.removeEventListener = (...args: Parameters<typeof remove>) => {
     listeners--;
     return remove(...args);
   };
@@ -89,7 +94,7 @@ test('caller cancellation propagates its exact reason and cleans up the listener
 test('already cancelled input starts no reads', async () => {
   const controller = new AbortController(),
     reason = Error('cancel'),
-    calls = [];
+    calls: unknown[][] = [];
   controller.abort(reason);
   await assert.rejects(
     readAssetBatch(['one'], (...args) => calls.push(args), controller.signal),
@@ -101,7 +106,7 @@ test('already cancelled input starts no reads', async () => {
 test('caller abort immediately after the final read still rejects the batch', async () => {
   const controller = new AbortController();
   const reason = Error('cancel completed batch');
-  const pending = deferred();
+  const pending = deferred<string>();
   const entered = deferred();
   const job = readAssetBatch(
     ['one'],

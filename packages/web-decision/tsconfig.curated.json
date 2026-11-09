@@ -19,6 +19,7 @@
     "src/browser-only-ws.ts",
     "src/catalog/index.generated.ts",
     "scripts/build-model-catalog.mts",
+    "test/asset-batch.test.mts",
     "test/catalog.test.mts",
     "test/clef-protocol.test.mts",
     "test/curated-*.test.mts",
