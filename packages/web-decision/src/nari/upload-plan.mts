@@ -17,7 +17,7 @@ interface UploadEntry {
   source: string;
   dtype: string;
   shape: number[];
-  file: FileDescriptor;
+  file?: FileDescriptor;
 }
 interface UploadPlan {
   ordered: UploadEntry[];
@@ -91,8 +91,8 @@ function validateEntries(plan: UploadPlan, bindings: number) {
     const size = bytesFor(entry);
     if (i < fileCount) {
       if (entry.source !== 'planned-asset') invalid();
-      validateDescriptor(entry.file, files);
-      if (entry.file.bytes !== size) invalid();
+      validateDescriptor(entry.file!, files);
+      if (entry.file!.bytes !== size) invalid();
     } else if (
       entry.source !== 'pinned-config-rotary' ||
       entry.target !== ROTARY[i - fileCount] ||
@@ -105,7 +105,7 @@ function validateEntries(plan: UploadPlan, bindings: number) {
   }
   validateDescriptor(plan.letterFile, files);
   if (plan.letterFile.bytes !== 52 * 2560 * 4) invalid();
-  return [...plan.ordered.slice(0, fileCount).map((entry) => entry.file), plan.letterFile];
+  return [...plan.ordered.slice(0, fileCount).map((entry) => entry.file!), plan.letterFile];
 }
 
 function validateRanges(row: InventoryRow, file: FileDescriptor) {

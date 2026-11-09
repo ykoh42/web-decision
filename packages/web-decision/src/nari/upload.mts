@@ -1,13 +1,45 @@
 // Ordered verified range uploader. The caller must supply a pinned source and guarded runtime owner.
 import {aligned, bytesFor, prepareUpload} from './upload-plan.mjs';
 import {waitForAbort} from '../abort.js';
-const fail = () => {
+type UploadPlan = Parameters<typeof prepareUpload>[0];
+type UploadInventory = Parameters<typeof prepareUpload>[1];
+type UploadRotary = Parameters<typeof prepareUpload>[2];
+type UploadFile = UploadPlan['letterFile'];
+interface UploadOwner {
+  phase: string;
+  lost: unknown;
+  retain(): unknown;
+  hold(): {release(): unknown};
+}
+interface UploadDiagnostic {
+  phase(value: string): void;
+  upload(phase: string, tensorIndex: number, rangeIndex?: number | null): void;
+  rangeComplete(): void;
+  tensorComplete(): void;
+}
+interface UploadOptions<T> {
+  owner: UploadOwner;
+  plan: UploadPlan;
+  inventory: UploadInventory;
+  rotary: UploadRotary;
+  readRange(path: string, offset: number, length: number, options: {signal: AbortSignal | undefined}): Promise<unknown>;
+  sha256(data: Uint8Array): string | PromiseLike<string>;
+  makeHasher(): {update(data: Uint8Array): unknown; digest(): string | PromiseLike<string>};
+  allocate(entry: {shape: number[]; dtype: string}, size: number): {tensor: T; capacityBytes: number};
+  writeAndSettle(tensor: T, offset: number, bytes: Uint8Array): PromiseLike<unknown>;
+  beforeUpload?: () => PromiseLike<unknown> | unknown;
+  signal?: AbortSignal | undefined;
+  diagnostic?: UploadDiagnostic | undefined;
+  expectedBindings?: number | undefined;
+}
+
+const fail: () => never = () => {
   throw new Error('invalid Nari upload');
 };
-const aborted = (signal) => signal?.throwIfAborted();
-const safe = (n) => Number.isSafeInteger(n) && n >= 0;
+const aborted = (signal: AbortSignal | undefined) => signal?.throwIfAborted();
+const safe = (n: number) => Number.isSafeInteger(n) && n >= 0;
 
-export async function uploadParameters({
+export async function uploadParameters<T>({
   owner,
   plan,
   inventory,
@@ -21,7 +53,7 @@ export async function uploadParameters({
   signal,
   diagnostic,
   expectedBindings = 730
-}) {
+}: UploadOptions<T>) {
   if (
     !owner ||
     owner.phase !== 'prepared' ||
@@ -35,7 +67,7 @@ export async function uploadParameters({
     typeof beforeUpload !== 'function'
   )
     fail();
-  const parameters = [];
+  const parameters: {target: string; graphArgument: string; tensor: T; fileSha256?: string; source?: string}[] = [];
   try {
     diagnostic?.phase('upload-validate');
     aborted(signal);
@@ -47,7 +79,12 @@ export async function uploadParameters({
     const lease = owner.hold();
     if (!lease || typeof lease.release !== 'function') fail();
     owner.phase = 'uploading';
-    async function tensor(entry, file, constant, tensorIndex) {
+    async function tensor(
+      entry: {shape: number[]; dtype: string},
+      file: UploadFile | null | undefined,
+      constant: Uint8Array | null | undefined,
+      tensorIndex: number
+    ) {
       diagnostic?.upload('upload-guard', tensorIndex);
       check();
       await beforeUpload();
@@ -57,7 +94,7 @@ export async function uploadParameters({
       const allocated = allocate(entry, aligned(size));
       if (!allocated || !allocated.tensor || !safe(allocated.capacityBytes) || allocated.capacityBytes < aligned(size))
         fail();
-      async function write(offset, bytes, rangeIndex = null) {
+      async function write(offset: number, bytes: Uint8Array, rangeIndex: number | null = null) {
         diagnostic?.upload('upload-guard', tensorIndex, rangeIndex);
         check();
         await beforeUpload();
@@ -80,10 +117,10 @@ export async function uploadParameters({
         const hasher = makeHasher();
         if (!hasher || typeof hasher.update !== 'function' || typeof hasher.digest !== 'function') fail();
         let rangeIndex = 0;
-        for (const range of byFile.get(file.path).chunks) {
+        for (const range of byFile.get(file!.path)!.chunks) {
           diagnostic?.upload('range-read', tensorIndex, rangeIndex);
           check();
-          const received = await readRange(file.path, range.offset, range.bytes, {signal});
+          const received = await readRange(file!.path, range.offset, range.bytes, {signal});
           check();
           if (!(received instanceof Uint8Array) || received.byteLength !== range.bytes) fail();
           const data = Uint8Array.from(received);
@@ -99,7 +136,7 @@ export async function uploadParameters({
         diagnostic?.upload('file-hash', tensorIndex);
         const hash = await waitForAbort(() => hasher.digest(), signal);
         check();
-        if (hash !== file.sha256) throw new Error('whole file hash mismatch');
+        if (hash !== file!.sha256) throw new Error('whole file hash mismatch');
       }
       check();
       diagnostic?.upload('tensor-complete', tensorIndex);
@@ -108,7 +145,7 @@ export async function uploadParameters({
     }
     const fileCount = expectedBindings - 2;
     for (let i = 0; i < expectedBindings; i++) {
-      const entry = p.ordered[i],
+      const entry = p.ordered[i]!,
         t = await tensor(
           entry,
           i < fileCount ? entry.file : null,
@@ -119,7 +156,7 @@ export async function uploadParameters({
         target: entry.target,
         graphArgument: entry.graphArgument,
         tensor: t,
-        ...(i < fileCount ? {fileSha256: entry.file.sha256} : {source: 'pinned-config-rotary'})
+        ...(i < fileCount ? {fileSha256: entry.file!.sha256} : {source: 'pinned-config-rotary'})
       });
     }
     const letterRows = await tensor({shape: [2, 26, 2560], dtype: 'float32'}, p.letterFile, null, expectedBindings);

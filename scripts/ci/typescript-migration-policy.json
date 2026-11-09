@@ -23,7 +23,6 @@
     "packages/web-decision/src/nari/runner.mjs",
     "packages/web-decision/src/nari/runtime.mjs",
     "packages/web-decision/src/nari/scope.mjs",
-    "packages/web-decision/src/nari/upload.mjs",
     "packages/web-decision/src/opendecider-nano/loader.mjs",
     "packages/web-decision/src/opendecider-nano/runner.mjs",
     "packages/web-decision/src/opendecider-nano/source.mjs",
