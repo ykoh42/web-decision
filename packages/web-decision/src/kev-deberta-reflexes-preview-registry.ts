@@ -10,7 +10,7 @@ const REFLEXES_MODEL = reflexes.model;
 const REFLEXES_MANIFEST_SHA256 = '1cd07a9326e4d8273d8972fdfb4ba9ab23cf3ff1f5e5b99cbea263116eebee07';
 const MODELS = Object.freeze([KEV_MODEL, DEBERTA_MODEL, REFLEXES_MODEL]);
 
-function deepFreeze(value) {
+function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);
@@ -170,7 +170,10 @@ const reflexesDescription = deepFreeze({
   }
 });
 
-const descriptions = new Map([
+const descriptions = new Map<
+  unknown,
+  typeof kevPreviewDescription | typeof debertaDescription | typeof reflexesDescription
+>([
   [KEV_MODEL, kevPreviewDescription],
   [DEBERTA_MODEL, debertaDescription],
   [REFLEXES_MODEL, reflexesDescription]
@@ -180,11 +183,11 @@ export function listDecisionModels() {
   return MODELS;
 }
 
-export function isDecisionModel(value) {
+export function isDecisionModel(value: unknown): boolean {
   return descriptions.has(value);
 }
 
-export function describeModel(model) {
+export function describeModel(model: unknown) {
   const description = descriptions.get(model);
   if (!description) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model.');
   return description;

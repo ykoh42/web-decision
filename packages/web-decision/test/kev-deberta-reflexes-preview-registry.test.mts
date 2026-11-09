@@ -15,9 +15,12 @@ test('three-model preview lists only the pinned Kev, DeBERTa and Reflexes routes
 });
 
 test('three-model preview describes pinned assets and native limits', () => {
-  const kev = describeModel(KEV);
+  const kev = describeModel(KEV) as ReturnType<typeof describeModel> & {features: {typedTextQuestionTypes: string[]}};
   const deberta = describeModel(DEBERTA);
-  const reflexes = describeModel(REFLEXES);
+  const reflexes = describeModel(REFLEXES) as ReturnType<typeof describeModel> & {
+    assets: {manifestSha256: string};
+    features: {typedTextQuestionTypes: string[]};
+  };
 
   assert.equal(kev.verification.currentBundleGpu, 'not-revalidated');
   assert.deepEqual(kev.features.typedTextQuestionTypes, ['choice', 'noul', 'score']);
@@ -26,17 +29,17 @@ test('three-model preview describes pinned assets and native limits', () => {
   assert.equal(deberta.assets.integrity, 'pinned-files');
   assert.equal(deberta.checkpoint.revision, '7c79f25b5ac496089f448a969c801872ad59d31c');
   assert.deepEqual(deberta.backend.requiredFeatures, ['shader-f16']);
-  assert.equal(deberta.features.textChoice.limits[0].max, 512);
+  assert.equal(deberta.features.textChoice.limits[0]!.max, 512);
   assert.equal(deberta.verification.currentBundleGpu, 'not-revalidated');
   assert.match(deberta.verification.priorEvidence, /Preview\.36/);
   assert.equal(reflexes.assets.integrity, 'pinned-manifest');
   assert.equal(reflexes.assets.manifestSha256, '1cd07a9326e4d8273d8972fdfb4ba9ab23cf3ff1f5e5b99cbea263116eebee07');
   assert.equal(reflexes.checkpoint.revision, '243bcef054df85dc6ed4e4becb68590c65a9f36e');
   assert.deepEqual(reflexes.backend.requiredFeatures, ['shader-f16']);
-  assert.equal(reflexes.features.textChoice.limits[0].max, 8191);
-  assert.equal(reflexes.features.textChoice.limits[1].max, 8192);
-  assert.equal(reflexes.features.textChoice.limits[2].min, 1);
-  assert.equal(reflexes.features.textChoice.limits[2].max, 255);
+  assert.equal(reflexes.features.textChoice.limits[0]!.max, 8191);
+  assert.equal(reflexes.features.textChoice.limits[1]!.max, 8192);
+  assert.equal(reflexes.features.textChoice.limits[2]!.min, 1);
+  assert.equal(reflexes.features.textChoice.limits[2]!.max, 255);
   assert.equal(reflexes.features.textChoice.abstention, 'not-implemented');
   assert.deepEqual(reflexes.features.typedTextQuestionTypes, ['choice', 'noul', 'score']);
   assert.equal(reflexes.verification.currentBundleGpu, 'not-revalidated');
