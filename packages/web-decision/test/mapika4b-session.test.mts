@@ -19,10 +19,10 @@ const request = () => ({
 });
 
 test('runs one joint request and applies the model temperature', async () => {
-  const calls = [],
-    events = [];
+  const calls: Array<{groups: readonly {readonly slot: number}[]}> = [],
+    events: string[] = [];
   const runner = {
-    async run(packed) {
+    async run(packed: {groups: readonly {readonly slot: number}[]}) {
       calls.push(packed);
       const first = new Float32Array(255),
         second = new Float32Array(255);
@@ -41,14 +41,14 @@ test('runs one joint request and applies the model temperature', async () => {
   const result = await session.decide(request());
   assert.equal(calls.length, 1);
   assert.deepEqual(
-    calls[0].groups.map((group) => group.slot),
+    calls[0]!.groups.map((group) => group.slot),
     [1, 2]
   );
   assert.deepEqual(
     result.answers.map((answer) => answer.selected),
     ['b', 'c']
   );
-  assert.ok(Math.abs(result.answers[0].probabilities[1].probability - Math.E / (1 + Math.E)) < 1e-7);
+  assert.ok(Math.abs(result.answers[0]!.probabilities[1]!.probability - Math.E / (1 + Math.E)) < 1e-7);
   await session.releaseCachedMemory();
   await session.dispose();
   assert.deepEqual(events, ['release', 'dispose']);
@@ -56,7 +56,7 @@ test('runs one joint request and applies the model temperature', async () => {
 });
 
 test('caller cancellation does not let later work overtake the active GPU operation', async () => {
-  let finish,
+  let finish!: () => void,
     started = false,
     calls = 0;
   const runner = {
@@ -64,7 +64,7 @@ test('caller cancellation does not let later work overtake the active GPU operat
       calls++;
       if (calls === 1) {
         started = true;
-        await new Promise((resolve) => {
+        await new Promise<void>((resolve) => {
           finish = resolve;
         });
       }

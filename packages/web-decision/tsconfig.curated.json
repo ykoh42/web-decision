@@ -33,6 +33,7 @@
     "test/kev08-contract.test.mts",
     "test/kev-systemone-render-depth.test.mts",
     "test/load-device-loss.test.mts",
+    "test/mapika4b-session.test.mts",
     "test/mapika4b-source.test.mts",
     "test/mapika4b-tokenizer.test.mts",
     "test/mapika-contract.test.mts",
