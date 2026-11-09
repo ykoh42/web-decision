@@ -11,7 +11,6 @@
     "packages/web-decision/test/clef-runner.test.mjs",
     "packages/web-decision/test/crivo.test.mjs",
     "packages/web-decision/test/d1-omni.test.mjs",
-    "packages/web-decision/test/deberta-packed.test.mjs",
     "packages/web-decision/test/deberta.test.mjs",
     "packages/web-decision/test/decima.test.mjs",
     "packages/web-decision/test/decision-cancellation.test.mjs",

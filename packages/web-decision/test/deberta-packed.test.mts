@@ -2,24 +2,37 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ExperimentalDebertaSession} from '../src/deberta/model.mjs';
 import {runWithPackedReadback} from '../src/deberta/packed-readback.mjs';
-function makeSession({shortHeadBuffer = false, onPop = () => null, onSync = () => {}, onEnd = () => {}} = {}) {
-  const events = [],
-    buffers = [undefined],
-    life = {disposed: false, loss: null},
-    uncaptured = [];
+type Life = {disposed: boolean; loss: unknown};
+type CopyEvent = {src: number; sourceOffset: number; dst: number; destOffset: number; nbytes: number};
+type TestError = Error & {code: string; cause: Error};
+function makeSession({
+  shortHeadBuffer = false,
+  onPop = () => null,
+  onSync = () => {},
+  onEnd = () => {}
+}: {
+  shortHeadBuffer?: boolean;
+  onPop?: (life: Life, uncaptured: string[]) => Error | null | void;
+  onSync?: () => void;
+  onEnd?: () => void;
+} = {}) {
+  const events: (string | CopyEvent)[] = [],
+    buffers: ({size: number; bytes: Uint8Array} | undefined)[] = [undefined],
+    life: Life = {disposed: false, loss: null},
+    uncaptured: string[] = [];
   let scopes = 1,
     headCount = 0;
   const context = {
     bufferTable: buffers,
-    getDeviceAPI(name) {
+    getDeviceAPI(name: string) {
       assert.equal(name, 'deviceCopyWithinGPU');
-      return (src, sourceOffset, dst, destOffset, nbytes) => {
+      return (src: number, sourceOffset: number, dst: number, destOffset: number, nbytes: number) => {
         events.push({src, sourceOffset, dst, destOffset, nbytes});
-        buffers[dst].bytes.set(buffers[src].bytes.subarray(sourceOffset, sourceOffset + nbytes), destOffset);
+        buffers[dst]!.bytes.set(buffers[src]!.bytes.subarray(sourceOffset, sourceOffset + nbytes), destOffset);
       };
     }
   };
-  function gpuTensor(shape, dtype, bytes) {
+  function gpuTensor(shape: number[], dtype: string, bytes: number) {
     const ptr = buffers.length,
       buffer = {size: bytes, bytes: new Uint8Array(bytes)};
     buffers.push(buffer);
@@ -48,15 +61,15 @@ function makeSession({shortHeadBuffer = false, onPop = () => null, onSync = () =
     cpu() {
       return 'cpu';
     },
-    empty(shape, dtype, device) {
-      if (device !== 'cpu') return gpuTensor(shape, dtype, shape[1] * (dtype === 'int32' ? 4 : 2));
+    empty(shape: number[], dtype: string, device: string) {
+      if (device !== 'cpu') return gpuTensor(shape, dtype, shape[1]! * (dtype === 'int32' ? 4 : 2));
       return {
-        copyFrom(gpu) {
-          this.raw = buffers[gpu.getDataPtr()].bytes.slice();
+        copyFrom(gpu: {getDataPtr: () => number}) {
+          (this as {raw?: Uint8Array}).raw = buffers[gpu.getDataPtr()]!.bytes.slice();
           return this;
         },
-        toRawBytes() {
-          return this.raw;
+        toRawBytes(): Uint8Array {
+          return (this as {raw?: Uint8Array}).raw!;
         }
       };
     }
@@ -67,8 +80,8 @@ function makeSession({shortHeadBuffer = false, onPop = () => null, onSync = () =
     ],
     head = () => {
       const t = gpuTensor([1, 3], 'float16', shortHeadBuffer ? 6 : 8),
-        view = new DataView(buffers[t.getDataPtr()].bytes.buffer);
-      for (const [i, value] of heads[headCount++].entries()) view.setUint16(i * 2, value, true);
+        view = new DataView(buffers[t.getDataPtr()]!.bytes.buffer);
+      for (const [i, value] of heads[headCount++]!.entries()) view.setUint16(i * 2, value, true);
       return t;
     };
   const gpu = {
@@ -83,7 +96,7 @@ function makeSession({shortHeadBuffer = false, onPop = () => null, onSync = () =
         return onSync();
       }
     },
-    tokenizer = {encode: (s) => ({ids: [s.length + 10]})};
+    tokenizer = {encode: (s: string) => ({ids: [s.length + 10]})};
   const session = new ExperimentalDebertaSession({
     runtime,
     device,
@@ -95,7 +108,7 @@ function makeSession({shortHeadBuffer = false, onPop = () => null, onSync = () =
     tokenizer,
     uncaptured,
     lifecycle: life
-  });
+  } as unknown as ConstructorParameters<typeof ExperimentalDebertaSession>[0]);
   session.run = runWithPackedReadback;
   return {
     session,
@@ -142,7 +155,9 @@ test('packed readback rejects a head buffer smaller than its aligned copy', asyn
   const x = makeSession({shortHeadBuffer: true});
   await assert.rejects(
     x.session.decide(request),
-    (e) => e.code === 'INFERENCE_ERROR' && e.cause.message === 'Unexpected head tensor storage.'
+    (e) =>
+      (e as TestError).code === 'INFERENCE_ERROR' &&
+      (e as TestError).cause.message === 'Unexpected head tensor storage.'
   );
   assert.equal(x.events.filter((e) => typeof e === 'object').length, 0);
   assert.equal(x.scopes, 1);
@@ -159,7 +174,7 @@ test('packed readback rejects device loss during error scope cleanup', async () 
   });
   await assert.rejects(
     x.session.decide(request),
-    (error) => error.code === 'INFERENCE_ERROR' && /lost/.test(error.cause?.message)
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && /lost/.test((error as TestError).cause?.message)
   );
   assert.equal(x.scopes, 1);
   await x.session.dispose();
@@ -179,7 +194,10 @@ for (const phase of ['onSync', 'onPop', 'onEnd']) {
       });
       await assert.rejects(
         x.session.decide(request),
-        (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, reason)
+        (error) =>
+          (error as TestError).code === 'INFERENCE_ERROR' &&
+          Object.hasOwn(error as object, 'cause') &&
+          Object.is((error as TestError).cause, reason)
       );
       await x.session.dispose();
     }
@@ -200,7 +218,7 @@ test('packed readback preserves an earlier failure over later cleanup loss and v
   });
   await assert.rejects(
     x.session.decide(request),
-    (error) => error.code === 'INFERENCE_ERROR' && error.cause === original
+    (error) => (error as TestError).code === 'INFERENCE_ERROR' && (error as TestError).cause === original
   );
   await x.session.dispose();
 });
@@ -218,7 +236,10 @@ test('packed readback preserves a falsy original failure over later validation e
     });
     await assert.rejects(
       x.session.decide(request),
-      (error) => error.code === 'INFERENCE_ERROR' && Object.hasOwn(error, 'cause') && Object.is(error.cause, reason)
+      (error) =>
+        (error as TestError).code === 'INFERENCE_ERROR' &&
+        Object.hasOwn(error as object, 'cause') &&
+        Object.is((error as TestError).cause, reason)
     );
     await x.session.dispose();
   }
@@ -234,7 +255,9 @@ test('packed readback preserves an uncaptured error that appears with cleanup lo
   await assert.rejects(
     x.session.decide(request),
     (error) =>
-      error.code === 'INFERENCE_ERROR' && error.message === 'earlier uncaptured GPU error' && error.cause === undefined
+      (error as TestError).code === 'INFERENCE_ERROR' &&
+      (error as TestError).message === 'earlier uncaptured GPU error' &&
+      (error as TestError).cause === undefined
   );
   await x.session.dispose();
 });
