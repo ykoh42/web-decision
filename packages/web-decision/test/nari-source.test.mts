@@ -8,12 +8,14 @@ import {NARI_FULL, NARI_MIXED} from '../src/nari/variants.mjs';
 
 const metadata = await readFile(new URL('./fixtures/nari/metadata.json', import.meta.url));
 const mixedMetadata = await readFile(new URL('./fixtures/nari/mixed-metadata.json', import.meta.url));
-const copy = (bytes) => Uint8Array.from(bytes).buffer;
+type Reader = NonNullable<NonNullable<Parameters<typeof openNariSource>[1]>['reader']>;
+type Metadata = {assets: {path: string; chunks: {offset: number; bytes: number; sha256: string}[]}[]};
+const copy = (bytes: Uint8Array) => Uint8Array.from(bytes).buffer;
 const base = 'https://example.test/nari/';
 
 test('pinned source accepts only inventory ranges and rejects corruption', async () => {
   let calls = 0;
-  const reader = async (_base, entry) => {
+  const reader: Reader = async (_base, entry) => {
     calls++;
     if (entry.path === 'nari-metadata.json') return {bytes: copy(metadata)};
     return {bytes: new ArrayBuffer(entry.length)};
@@ -21,7 +23,7 @@ test('pinned source accepts only inventory ranges and rejects corruption', async
   const source = await openNariSource(base, {reader});
   assert.equal(source.plan.ordered.length, 730);
   assert.equal(source.inventory.length, 729);
-  assert.equal(Object.isFrozen(source.inventory[0].chunks), true);
+  assert.equal(Object.isFrozen(source.inventory[0]!.chunks), true);
   await assert.rejects(source.readRange('config.json', 0, 5), {code: 'INVALID_ASSET'});
   assert.equal(calls, 1);
   await assert.rejects(source.readAsset('config.json'), {code: 'INVALID_ASSET'});
@@ -31,7 +33,7 @@ test('pinned source accepts only inventory ranges and rejects corruption', async
 
 test('rejects altered metadata before exposing any ranges', async () => {
   const altered = Uint8Array.from(metadata);
-  altered[0] ^= 1;
+  altered[0] = altered[0]! ^ 1;
   await assert.rejects(openNariSource(base, {reader: async () => ({bytes: altered.buffer})}), {code: 'INVALID_ASSET'});
 });
 
@@ -43,7 +45,7 @@ test('variants accept only their own pinned metadata', async () => {
   for (const [variant, bytes] of [
     [NARI_FULL, mixedMetadata],
     [NARI_MIXED, metadata]
-  ])
+  ] as const)
     await assert.rejects(openNariSource(base, {variant, reader: async () => ({bytes: copy(bytes)})}), {
       code: 'INVALID_ASSET'
     });
@@ -54,14 +56,14 @@ test('variants accept only their own pinned metadata', async () => {
 });
 
 test('closing the source aborts an outstanding range read', async () => {
-  let entered;
-  const started = new Promise((resolve) => {
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
-  const reader = async (_base, entry, options) => {
+  const reader: Reader = async (_base, entry, options) => {
     if (entry.path === 'nari-metadata.json') return {bytes: copy(metadata)};
-    return new Promise((_resolve, reject) => {
-      options.signal.addEventListener('abort', () => reject(options.signal.reason), {once: true});
+    return new Promise<{bytes: ArrayBuffer}>((_resolve, reject) => {
+      options.signal!.addEventListener('abort', () => reject(options.signal!.reason), {once: true});
       entered();
     });
   };
@@ -72,9 +74,9 @@ test('closing the source aborts an outstanding range read', async () => {
   await assert.rejects(pending, {name: 'AbortError'});
 });
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((success, failure) => {
+function deferred<T = void>() {
+  let resolve!: (value: T) => void, reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((success, failure) => {
     resolve = success;
     reject = failure;
   });
@@ -83,7 +85,7 @@ function deferred() {
 
 test('metadata reader and hash cancellation preserve the caller reason', async (t) => {
   for (const stage of ['reader', 'hash']) {
-    const delayed = deferred();
+    const delayed = deferred<never>();
     const entered = deferred();
     if (stage === 'hash')
       t.mock.method(crypto.subtle, 'digest', () => {
@@ -112,10 +114,12 @@ test('metadata reader and hash cancellation preserve the caller reason', async (
 });
 
 test('range reader and hash cancellation preserve the caller reason', async (t) => {
-  const config = JSON.parse(metadata).assets.find((entry) => entry.path === 'config.json');
-  const chunk = config.chunks[0];
+  const config = (JSON.parse(metadata.toString('utf8')) as Metadata).assets.find(
+    (entry) => entry.path === 'config.json'
+  )!;
+  const chunk = config.chunks[0]!;
   for (const stage of ['reader', 'hash']) {
-    const delayed = deferred();
+    const delayed = deferred<never>();
     const entered = deferred();
     const source = await openNariSource(base, {
       reader: (_base, entry) => {
@@ -146,9 +150,11 @@ test('range reader and hash cancellation preserve the caller reason', async (t) 
 });
 
 test('full asset hash observes both operation cancellation and source close', async (t) => {
-  const config = JSON.parse(metadata).assets.find((entry) => entry.path === 'config.json');
+  const config = (JSON.parse(metadata.toString('utf8')) as Metadata).assets.find(
+    (entry) => entry.path === 'config.json'
+  )!;
   for (const kind of ['operation', 'close']) {
-    const delayed = deferred();
+    const delayed = deferred<never>();
     const entered = deferred();
     const source = await openNariSource(base, {
       reader: (_base, entry) => ({
@@ -157,7 +163,7 @@ test('full asset hash observes both operation cancellation and source close', as
     });
     let hashes = 0;
     t.mock.method(crypto.subtle, 'digest', () => {
-      if (++hashes === 1) return Promise.resolve(Uint8Array.from(Buffer.from(config.chunks[0].sha256, 'hex')).buffer);
+      if (++hashes === 1) return Promise.resolve(Uint8Array.from(Buffer.from(config.chunks[0]!.sha256, 'hex')).buffer);
       entered.resolve();
       return delayed.promise;
     });
@@ -167,7 +173,9 @@ test('full asset hash observes both operation cancellation and source close', as
     await entered.promise;
     if (kind === 'operation') controller.abort(reason);
     else source.close();
-    await assert.rejects(pending, (error) => (kind === 'operation' ? error === reason : error.name === 'AbortError'));
+    await assert.rejects(pending, (error) =>
+      kind === 'operation' ? error === reason : (error as {name: string}).name === 'AbortError'
+    );
     delayed.reject(Error('late full hash failure'));
     await nextTurn();
     source.close();
@@ -176,9 +184,11 @@ test('full asset hash observes both operation cancellation and source close', as
 });
 
 test('operation abort detaches the full-hash source listener before digest settles', async (t) => {
-  const config = JSON.parse(metadata).assets.find((entry) => entry.path === 'config.json');
+  const config = (JSON.parse(metadata.toString('utf8')) as Metadata).assets.find(
+    (entry) => entry.path === 'config.json'
+  )!;
   const NativeController = AbortController;
-  const controllers = [];
+  const controllers: AbortController[] = [];
   t.mock.method(
     globalThis,
     'AbortController',
@@ -194,12 +204,12 @@ test('operation abort detaches the full-hash source listener before digest settl
       bytes: entry.path === 'nari-metadata.json' ? copy(metadata) : new ArrayBuffer(entry.length)
     })
   });
-  const sourceSignal = controllers[0].signal;
+  const sourceSignal = controllers[0]!.signal;
   const entered = deferred();
-  const delayed = deferred();
+  const delayed = deferred<never>();
   let hashes = 0;
   t.mock.method(crypto.subtle, 'digest', () => {
-    if (++hashes === 1) return Promise.resolve(Uint8Array.from(Buffer.from(config.chunks[0].sha256, 'hex')).buffer);
+    if (++hashes === 1) return Promise.resolve(Uint8Array.from(Buffer.from(config.chunks[0]!.sha256, 'hex')).buffer);
     entered.resolve();
     return delayed.promise;
   });

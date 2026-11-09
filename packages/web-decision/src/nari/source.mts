@@ -35,7 +35,7 @@ type NariReader = (
   base: URL,
   entry: NariRange,
   options: {cache: false; offline: false; signal: AbortSignal | undefined}
-) => Promise<{bytes: ArrayBuffer}>;
+) => {bytes: ArrayBuffer} | PromiseLike<{bytes: ArrayBuffer}>;
 interface SourceOptions {
   signal?: AbortSignal | undefined;
   reader?: NariReader | undefined;
