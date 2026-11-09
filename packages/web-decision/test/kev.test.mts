@@ -9,18 +9,24 @@ import {
   unpackKevScores,
   decodeFloat16
 } from '../src/kev.js';
+import type {KevTokenizer} from '../src/kev.js';
 
-function tokenizer() {
-  const texts = [];
+type KevTestTokenizer = KevTokenizer & {readonly texts: string[]};
+
+function tokenizer(): KevTestTokenizer {
+  const texts: string[] = [];
   return {
     texts,
-    encode(text) {
+    encode(text: string) {
       texts.push(text);
-      return {ids: Array.from(text, (c) => c.codePointAt(0) + 200)};
+      return {ids: Array.from(text, (c) => c.codePointAt(0)! + 200)};
     }
-  };
+  } as unknown as KevTestTokenizer;
 }
-const limits = {maxStateTokens: KEV_MAX_STATE_TOKENS, maxBranchTokens: KEV_MAX_BRANCH_TOKENS};
+const limits: Parameters<typeof packKevRequest>[2] = {
+  maxStateTokens: KEV_MAX_STATE_TOKENS,
+  maxBranchTokens: KEV_MAX_BRANCH_TOKENS
+};
 
 test('packs multiple questions and returns scores for each option', () => {
   const tok = tokenizer();
@@ -35,17 +41,18 @@ test('packs multiple questions and returns scores for each option', () => {
     },
     limits
   );
-  assert.equal(packed.ids[0], KEV_DELIMITERS.state);
+  assert.equal(packed.ids[0]!, KEV_DELIMITERS.state);
   for (const group of packed.groups)
-    for (const i of group.indices) assert.equal(packed.ids[i], KEV_DELIMITERS.option_end);
+    for (const i of group.indices) assert.equal(packed.ids[i]!, KEV_DELIMITERS.option_end);
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep the dense logits fixture size tied to the packed tokens.
   const logits = new Array(packed.ids.length).fill(0);
-  logits[packed.groups[0].indices[1]] = 2;
-  logits[packed.groups[1].indices[0]] = 1;
+  logits[packed.groups[0]!.indices[1]!] = 2;
+  logits[packed.groups[1]!.indices[0]!] = 1;
   const result = unpackKevScores(logits, packed);
-  assert.equal(result.answers[0].selected, 'c');
-  assert.equal(result.answers[1].selected, 'd');
+  assert.equal(result.answers[0]!.selected, 'c');
+  assert.equal(result.answers[1]!.selected, 'd');
   assert.equal(result.tokenCount, packed.ids.length);
-  assert.ok(Math.abs(result.answers[0].probabilities.reduce((s, x) => s + x.probability, 0) - 1) < 1e-12);
+  assert.ok(Math.abs(result.answers[0]!.probabilities.reduce((s, x) => s + x.probability, 0) - 1) < 1e-12);
 });
 
 test('an exact probability tie selects the first tied option', () => {
@@ -54,11 +61,12 @@ test('an exact probability tie selects the first tied option', () => {
     {state: '', questions: [{instructions: 'q', options: ['first', 'second']}]},
     limits
   );
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep this zero-logit fixture dense.
   const result = unpackKevScores(new Array(packed.ids.length).fill(0), packed);
-  assert.equal(result.answers[0].selected, 'first');
-  assert.equal(result.answers[0].selectedIndex, 0);
+  assert.equal(result.answers[0]!.selected, 'first');
+  assert.equal(result.answers[0]!.selectedIndex, 0);
   assert.deepEqual(
-    result.answers[0].probabilities.map((p) => p.probability),
+    result.answers[0]!.probabilities.map((p) => p.probability),
     [0.5, 0.5]
   );
 });
@@ -69,10 +77,11 @@ test('a single upstream choice is accepted with probability one', () => {
     {state: '', questions: [{instructions: 'choose if applicable', options: ['only choice']}]},
     limits
   );
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep this zero-logit fixture dense.
   const result = unpackKevScores(new Array(packed.ids.length).fill(0), packed);
-  assert.equal(result.answers[0].selected, 'only choice');
-  assert.equal(result.answers[0].selectedIndex, 0);
-  assert.deepEqual(result.answers[0].probabilities, [{option: 'only choice', probability: 1, logit: 0}]);
+  assert.equal(result.answers[0]!.selected, 'only choice');
+  assert.equal(result.answers[0]!.selectedIndex, 0);
+  assert.deepEqual(result.answers[0]!.probabilities, [{option: 'only choice', probability: 1, logit: 0}]);
 });
 
 test('an optional packed-token cap accepts its exact boundary and rejects the next token', () => {
@@ -100,7 +109,7 @@ test('an optional packed-token cap accepts its exact boundary and rejects the ne
 
 test('state plus each question branch uses the native 8,192-token limit', () => {
   const tok = tokenizer();
-  const requestFor = (instructions) => ({state: '', questions: [{instructions, options: ['']}]});
+  const requestFor = (instructions: string) => ({state: '', questions: [{instructions, options: ['']}]});
   const exact = packKevRequest(tok, requestFor('i'.repeat(8187)), limits, {
     allowEmptyOptions: true
   });
@@ -120,7 +129,7 @@ test('a state-heavy row accepts 8,192 packed tokens and rejects 8,193', () => {
   );
 
   assert.equal(exact.ids.length, KEV_MAX_BRANCH_TOKENS);
-  assert.equal(exact.ids[0], KEV_DELIMITERS.state);
+  assert.equal(exact.ids[0]!, KEV_DELIMITERS.state);
   assert.deepEqual(
     exactTokenizer.texts.map((text) => text.length),
     [8185, 1, 1]
@@ -163,8 +172,8 @@ test('accepts 255 distinct options in their original order and rejects 256', () 
   const tok = tokenizer();
   const options = Array.from({length: 255}, (_, index) => String.fromCodePoint(0x4e00 + index));
   const packed = packKevRequest(tok, {state: '', questions: [{instructions: 'q', options}]}, limits);
-  assert.deepEqual(packed.groups[0].options, options);
-  assert.equal(packed.groups[0].indices.length, 255);
+  assert.deepEqual(packed.groups[0]!.options, options);
+  assert.equal(packed.groups[0]!.indices.length, 255);
   assert.throws(
     () =>
       packKevRequest(
@@ -195,10 +204,10 @@ test('rejects distinct options that encode to the same Kev tokens', () => {
   const request = {state: '', questions: [{instructions: 'choose', options: ['<|box_end|>', '<¦box_end¦>']}]};
   assert.throws(() => packKevRequest(tok, request, limits), {code: 'INVALID_INPUT', message: /same tokens/i});
   const collapsingTokenizer = {
-    encode(text) {
+    encode(text: string) {
       return {ids: text === 'one' || text === 'uno' ? [99] : [42]};
     }
-  };
+  } as unknown as KevTestTokenizer;
   assert.throws(
     () =>
       packKevRequest(
@@ -232,8 +241,8 @@ test('rejects unpaired UTF-16 surrogates in any text field', () => {
     {...base, state: 'a\udc00b'},
     {...base, state: '\ud800\ud800'},
     {...base, state: '\udc00\ud800'},
-    {...base, questions: [{...base.questions[0], instructions: 'choose \ud800'}]},
-    {...base, questions: [{...base.questions[0], options: ['yes', 'no\udc00']}]}
+    {...base, questions: [{...base.questions[0]!, instructions: 'choose \ud800'}]},
+    {...base, questions: [{...base.questions[0]!, options: ['yes', 'no\udc00']}]}
   ];
   for (const request of invalids) {
     assert.throws(() => packKevRequest(tok, request, limits), {code: 'INVALID_INPUT', message: /surrogate/i});
@@ -259,6 +268,7 @@ test('rejects invalid, duplicate, overlong and non-finite inputs instead of sile
     {code: 'INVALID_INPUT', message: /state and branch exceed 8192/i}
   );
   const packed = packKevRequest(tok, {state: '', questions: [{instructions: 'q', options: ['a', 'b']}]}, limits);
+  // oxlint-disable-next-line unicorn/no-new-array -- Keep malformed-logit fixture length exact.
   assert.throws(() => unpackKevScores(new Array(packed.ids.length).fill(NaN), packed), WebDecisionError);
 });
 

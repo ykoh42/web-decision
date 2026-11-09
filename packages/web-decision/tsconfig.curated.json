@@ -46,6 +46,8 @@
     "test/nari-checkpoints.test.mts",
     "test/nari-session.test.mts",
     "test/kev08-systemone.test.mts",
+    "test/kev.test.mts",
+    "test/kev-reflexes.test.mts",
     "src/nari/source.mts",
     "src/nari/adapter.mts",
     "src/nari/loader.mts",

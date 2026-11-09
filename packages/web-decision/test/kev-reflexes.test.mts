@@ -11,6 +11,36 @@ import {
 import {selectModelFamily} from '../src/model-family.js';
 import {responseFromReader} from './stream-helpers.mjs';
 
+interface MutableReflexesManifest {
+  model: string;
+  checkpoint: {revision: string};
+  parameterCount: number;
+  files: Record<string, {bytes: number; sha256: string}>;
+}
+
+interface UploadRecord {
+  readonly shape: number[];
+  readonly dtype: string;
+  bytes?: number;
+  first?: number | undefined;
+}
+
+interface FakeUpload {
+  readonly calls: (string | UploadRecord)[];
+  readonly weights: unknown[];
+  readonly device: {sync(): Promise<void>};
+  readonly runtime: {
+    empty(shape: number[], dtype: string, device: unknown): {copyFromRawBytes(bytes: Uint8Array): void};
+  };
+  readonly uncaptured: string[];
+  read(path: string): Promise<ArrayBuffer>;
+}
+
+interface FakeUploadOptions {
+  readonly afterSync?: (() => unknown) | undefined;
+  readonly uncaptured?: string[] | undefined;
+}
+
 test('explicit reflexes selection accepts only its pinned model asset manifest', () => {
   assert.equal(selectModelFamily({model: REFLEXES_ID}), 'kev');
   assert.equal(selectModelFamily({}), 'kev');
@@ -18,7 +48,7 @@ test('explicit reflexes selection accepts only its pinned model asset manifest',
   assert.equal(Object.hasOwn(pinned, 'maxInputTokens'), false);
   assert.equal(pinned.maxStateTokens, 8192);
   assert.equal(pinned.maxBranchTokens, 8192);
-  for (const mutate of [
+  const mutators: ((manifest: MutableReflexesManifest) => void)[] = [
     (m) => {
       m.model = 'kev-0.6b-q4f16';
     },
@@ -29,10 +59,10 @@ test('explicit reflexes selection accepts only its pinned model asset manifest',
       m.parameterCount = 394;
     },
     (m) => {
-      m.files['heads/param_394.bin'].sha256 = '0'.repeat(64);
+      m.files['heads/param_394.bin']!.sha256 = '0'.repeat(64);
     },
     (m) => {
-      m.files['heads/param_397.bin'].bytes--;
+      m.files['heads/param_397.bin']!.bytes--;
     },
     (m) => {
       delete m.files['heads/param_395.bin'];
@@ -40,8 +70,9 @@ test('explicit reflexes selection accepts only its pinned model asset manifest',
     (m) => {
       m.files['other'] = {bytes: 0, sha256: '0'.repeat(64)};
     }
-  ]) {
-    const value = structuredClone(pinned);
+  ];
+  for (const mutate of mutators) {
+    const value = structuredClone(pinned) as unknown as MutableReflexesManifest;
     mutate(value);
     assert.throws(() => validateReflexesManifest(value), {code: 'INVALID_ASSET'});
   }
@@ -63,16 +94,17 @@ test('invalid or cancelled reflexes manifest preserves the correct error', async
       responseFromReader(async () => {
         controller.abort(reason);
         throw Error('bad');
-      }),
+      }) as unknown as Response,
       controller.signal
     ),
     (e) => e === reason
   );
 });
 
-function fakeUpload({afterSync = () => {}, uncaptured = []} = {}) {
-  const calls = [],
-    weights = new Array(398),
+function fakeUpload({afterSync = () => {}, uncaptured = []}: FakeUploadOptions = {}): FakeUpload {
+  const calls: (string | UploadRecord)[] = [],
+    // oxlint-disable-next-line unicorn/no-new-array -- Preserve sparse parameter slots in the upload fixture.
+    weights: unknown[] = new Array(398),
     device = {
       async sync() {
         calls.push('sync');
@@ -80,12 +112,12 @@ function fakeUpload({afterSync = () => {}, uncaptured = []} = {}) {
       }
     },
     runtime = {
-      empty(shape, dtype, dev) {
+      empty(shape: number[], dtype: string, dev: unknown) {
         assert.equal(dev, device);
-        const record = {shape: [...shape], dtype};
+        const record: UploadRecord = {shape: [...shape], dtype};
         calls.push(record);
         return {
-          copyFromRawBytes(bytes) {
+          copyFromRawBytes(bytes: Uint8Array) {
             record.bytes = bytes.byteLength;
             record.first = bytes[0];
           }
@@ -109,7 +141,7 @@ function fakeUpload({afterSync = () => {}, uncaptured = []} = {}) {
 
 test('uploads all four distinct verified heads in parameter order', async () => {
   const f = fakeUpload();
-  await uploadReflexesHeads(f);
+  await uploadReflexesHeads(f as unknown as Parameters<typeof uploadReflexesHeads>[0]);
   assert.deepEqual(
     f.calls.filter((x) => typeof x === 'string' && x !== 'sync'),
     REFLEXES_HEADS.map((x) => x.path)
@@ -127,14 +159,21 @@ test('head upload stops on cancellation, bad length or a GPU error', async () =>
   const controller = new AbortController(),
     reason = new Error('stop'),
     f = fakeUpload({afterSync: () => controller.abort(reason)});
-  await assert.rejects(uploadReflexesHeads({...f, signal: controller.signal}), (e) => e === reason);
+  await assert.rejects(
+    uploadReflexesHeads({...f, signal: controller.signal} as unknown as Parameters<typeof uploadReflexesHeads>[0]),
+    (e) => e === reason
+  );
   assert.equal(f.calls.filter((x) => x === 'sync').length, 1);
   assert.equal(f.weights[395], undefined);
   const bad = fakeUpload();
   bad.read = async () => new ArrayBuffer(1);
-  await assert.rejects(uploadReflexesHeads(bad), {code: 'INVALID_ASSET'});
+  await assert.rejects(uploadReflexesHeads(bad as unknown as Parameters<typeof uploadReflexesHeads>[0]), {
+    code: 'INVALID_ASSET'
+  });
   assert.equal(bad.calls.length, 0);
   const gpu = fakeUpload({uncaptured: ['GPU failed']});
-  await assert.rejects(uploadReflexesHeads(gpu), {code: 'INFERENCE_ERROR'});
+  await assert.rejects(uploadReflexesHeads(gpu as unknown as Parameters<typeof uploadReflexesHeads>[0]), {
+    code: 'INFERENCE_ERROR'
+  });
   assert.equal(gpu.calls.filter((x) => x === 'sync').length, 1);
 });
