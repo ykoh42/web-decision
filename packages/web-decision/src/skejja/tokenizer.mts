@@ -1,34 +1,67 @@
 import {WebDecisionError} from '../kev.js';
 import {SKEJJA_MAX_TOKENS, SKEJJA_MIN_BODY_TOKENS} from './contract.mjs';
+import type {Tokenizer as TokenizerImplementation} from '@huggingface/tokenizers';
+
+type TokenizerConstructor = new (data: object, config: object) => TokenizerImplementation;
+type TokenizerData = {
+  readonly model?: {readonly type?: unknown; readonly vocab?: {readonly [token: string]: unknown} | null} | null;
+};
+type TokenizerConfig = {
+  readonly tokenizer_class?: unknown;
+  readonly add_bos_token?: unknown;
+  readonly bos_token?: unknown;
+  readonly eos_token?: unknown;
+  readonly max_length?: unknown;
+};
+
+export interface SkejjaTokenizer {
+  encode(text: string): number[];
+  decode(ids: number[]): string;
+}
+
+interface ShortenedText {
+  readonly text: string;
+  readonly truncated: boolean;
+}
+
+interface SkejjaPrompt {
+  readonly inputIds: number[];
+  readonly tokenCount: number;
+  readonly truncated: boolean;
+}
 
 export const SKEJJA_TRUNCATION_MARKER = '\n[…]\n';
 const LABEL_TOKEN = '<<LABEL>>';
 const SEPARATOR_TOKEN = '<<SEP>>';
 
 const invalidAsset = () => new WebDecisionError('INVALID_ASSET', 'Skejja tokenizer does not match the pinned model.');
-const invalidInput = (message) => new WebDecisionError('INVALID_INPUT', message);
+const invalidInput = (message: string): WebDecisionError => new WebDecisionError('INVALID_INPUT', message);
 
-function tokenIds(tokenizer, text) {
+function tokenIds(tokenizer: TokenizerImplementation, text: string): number[] {
   const ids = tokenizer.encode(text)?.ids;
   if (!Array.isArray(ids) || ids.some((id) => !Number.isSafeInteger(id) || id < 0)) throw invalidAsset();
-  return ids;
+  return ids as number[];
 }
 
-export function createSkejjaTokenizer(Tokenizer, data, config) {
+export function createSkejjaTokenizer(
+  Tokenizer: TokenizerConstructor | null | undefined,
+  data: unknown,
+  config: unknown
+): SkejjaTokenizer {
   if (
     typeof Tokenizer !== 'function' ||
-    data?.model?.type !== 'BPE' ||
-    config?.tokenizer_class !== 'PreTrainedTokenizerFast' ||
-    config?.add_bos_token !== true ||
-    config?.bos_token !== '<bos>' ||
-    config?.eos_token !== '<eos>' ||
-    config?.max_length !== 4096 ||
-    data?.model?.vocab?.['<bos>'] !== 2 ||
-    data?.model?.vocab?.['<eos>'] !== 1
+    (data as TokenizerData | null | undefined)?.model?.type !== 'BPE' ||
+    (config as TokenizerConfig | null | undefined)?.tokenizer_class !== 'PreTrainedTokenizerFast' ||
+    (config as TokenizerConfig | null | undefined)?.add_bos_token !== true ||
+    (config as TokenizerConfig | null | undefined)?.bos_token !== '<bos>' ||
+    (config as TokenizerConfig | null | undefined)?.eos_token !== '<eos>' ||
+    (config as TokenizerConfig | null | undefined)?.max_length !== 4096 ||
+    (data as TokenizerData | null | undefined)?.model?.vocab?.['<bos>'] !== 2 ||
+    (data as TokenizerData | null | undefined)?.model?.vocab?.['<eos>'] !== 1
   )
     throw invalidAsset();
 
-  const tokenizer = new Tokenizer(data, config);
+  const tokenizer = new Tokenizer(data as object, config as object);
   if (tokenizer.token_to_id(LABEL_TOKEN) !== 32765 || tokenizer.token_to_id(SEPARATOR_TOKEN) !== 32766)
     throw invalidAsset();
 
@@ -36,10 +69,10 @@ export function createSkejjaTokenizer(Tokenizer, data, config) {
   if (probe[0] !== 2 || probe.at(-1) !== 1) throw invalidAsset();
 
   return Object.freeze({
-    encode(text) {
+    encode(text: string) {
       return tokenIds(tokenizer, text);
     },
-    decode(ids) {
+    decode(ids: number[]) {
       const text = tokenizer.decode(ids, {skip_special_tokens: true});
       if (typeof text !== 'string') throw invalidAsset();
       return text;
@@ -47,7 +80,7 @@ export function createSkejjaTokenizer(Tokenizer, data, config) {
   });
 }
 
-export function createSkejjaPrompt(tokenizer, labels, body) {
+export function createSkejjaPrompt(tokenizer: SkejjaTokenizer, labels: string[], body: string): SkejjaPrompt {
   const prefix = `${labels.map((label) => `${LABEL_TOKEN}${label}`).join('')}${SEPARATOR_TOKEN}`;
   const prefixTokens = tokenizer.encode(prefix);
   const textBudget = SKEJJA_MAX_TOKENS - prefixTokens.length;
@@ -60,7 +93,7 @@ export function createSkejjaPrompt(tokenizer, labels, body) {
   return {inputIds, tokenCount: inputIds.length, truncated: shortened.truncated};
 }
 
-function shortenSkejjaText(tokenizer, text, budget) {
+function shortenSkejjaText(tokenizer: SkejjaTokenizer, text: string, budget: number): ShortenedText {
   const ids = tokenizer.encode(text);
   if (ids.length <= budget) return {text, truncated: false};
 
