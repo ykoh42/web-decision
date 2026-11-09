@@ -87,6 +87,7 @@
     "src/parameter-upload.mts",
     "src/opendecider-nano/gpu-compat.mts",
     "src/opendecider-nano/tokenizer.mts",
+    "src/opendecider-nano/typed.mts",
     "src/strands/loader.mts",
     "src/strands/fused-upload.mts",
     "src/strands/preflight.mts",
