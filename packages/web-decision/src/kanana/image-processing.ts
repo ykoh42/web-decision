@@ -55,6 +55,13 @@ export function smartResize(
     factor < 1
   )
     throw new RangeError('resize dimensions and pixel limits must be positive safe integers');
+  if (height < factor || width < factor)
+    throw new RangeError(`height:${height} or width:${width} must be larger than factor:${factor}`);
+  const aspectRatio = Math.max(height, width) / Math.min(height, width);
+  if (aspectRatio > 200) {
+    const formattedAspectRatio = Number.isInteger(aspectRatio) ? `${aspectRatio}.0` : String(aspectRatio);
+    throw new RangeError(`absolute aspect ratio must be smaller than 200, got ${formattedAspectRatio}`);
+  }
 
   let resizedHeight = Math.max(factor, roundToEvenMultiple(height, factor));
   let resizedWidth = Math.max(factor, roundToEvenMultiple(width, factor));

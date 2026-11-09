@@ -58,6 +58,28 @@ test('smart resize preserves Python ties-to-even and pixel boundaries', () => {
   assert.deepEqual(smartResize(32, 2016, 65_536, 16_777_216), [64, 2048]);
 });
 
+test('smart resize matches the pinned minimum dimension and aspect-ratio errors', () => {
+  assert.deepEqual(smartResize(32, 6400, 4096, 1_638_400), [32, 6400]);
+  assert.throws(() => smartResize(32, 6432, 4096, 1_638_400), {
+    name: 'RangeError',
+    message: 'absolute aspect ratio must be smaller than 200, got 201.0'
+  });
+  assert.throws(() => smartResize(31, 6400, 4096, 1_638_400), {
+    name: 'RangeError',
+    message: 'height:31 or width:6400 must be larger than factor:32'
+  });
+});
+
+test('image processor accepts an aspect ratio of 200 and rejects larger ratios', () => {
+  const boundary = preprocessKananaImage(new Uint8Array(32 * 6400 * 3), 6400, 32);
+
+  assert.deepEqual([boundary.width, boundary.height], [6400, 32]);
+  assert.throws(() => preprocessKananaImage(new Uint8Array(32 * 6432 * 3), 6432, 32), {
+    name: 'RangeError',
+    message: 'absolute aspect ratio must be smaller than 200, got 201.0'
+  });
+});
+
 test('fixed point Pillow bicubic matches pinned preprocessing references', () => {
   const nearDown = resizePillowBicubic(makeRgb(641, 479, 'highfreq'), 641, 479, 640, 480);
   const checkerDown = resizePillowBicubic(makeRgb(257, 193, 'checker'), 257, 193, 128, 96);
@@ -112,6 +134,41 @@ test('preprocessing returns source grid metadata and normalized patch values', (
   assert.equal(result.pixelValues.length, 256 * 3 * 2 * 16 * 16);
   assert.equal(result.pixelValues[0], -1);
   assert.equal(result.pixelValues.at(-1), -1);
+});
+
+test('full preprocessing matches pinned Python output through downscale and antialiased-upscale paths', () => {
+  const downscaled = preprocessKananaImage(makeRgb(641, 479, 'highfreq'), 641, 479);
+  const upscaled = preprocessKananaImage(makeRgb(128, 32, 'highfreq'), 128, 32);
+
+  assert.deepEqual([downscaled.width, downscaled.height], [640, 480]);
+  assert.deepEqual(downscaled.visionGridThw, [1, 30, 40]);
+  assert.deepEqual(downscaled.imageTokenThw, [1, 15, 20]);
+  assert.ok(downscaled.pixelValues instanceof Float32Array);
+  assert.equal(downscaled.pixelValues.length, 1200 * 3 * 2 * 16 * 16);
+  assert.equal(
+    hash(
+      new Uint8Array(
+        downscaled.pixelValues.buffer,
+        downscaled.pixelValues.byteOffset,
+        downscaled.pixelValues.byteLength
+      )
+    ),
+    '57c32ef78d83d2652d785bf75cd0d099ae252ab8ee5760e826f5b96156f030c0'
+  );
+
+  assert.deepEqual([upscaled.width, upscaled.height], [512, 128]);
+  assert.deepEqual(upscaled.visionGridThw, [1, 8, 32]);
+  assert.deepEqual(upscaled.imageTokenThw, [1, 4, 16]);
+  assert.ok(upscaled.pixelValues instanceof Float32Array);
+  assert.equal(
+    upscaled.imageTokenThw.reduce((product, dimension) => product * dimension, 1),
+    64
+  );
+  assert.equal(upscaled.pixelValues.length, 256 * 3 * 2 * 16 * 16);
+  assert.equal(
+    hash(new Uint8Array(upscaled.pixelValues.buffer, upscaled.pixelValues.byteOffset, upscaled.pixelValues.byteLength)),
+    'c6d09a833f0da491714d71e112cfeda0bf9cc362dce502450b79eb39d936cdc1'
+  );
 });
 
 test('preprocessing rejects invalid pixel buffers and patch dimensions', () => {
