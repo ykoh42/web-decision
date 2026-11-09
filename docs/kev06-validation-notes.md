@@ -14,6 +14,8 @@ At commit `ba6262c7908b3e8b40a75631a00d4fbe0474cfee`, the exact npm archive with
 
 After the shared asset pipeline was converted to TypeScript, commit `670e19ef2a0824e637f100cc1a6460187709719d` passed the same Windows check with archive SHA-256 `bafa517a15ea64e9a67c5f8ef3cc76bcc7db655b5a05ab58a57a2ccd4b7885d3` and Playwright report SHA-256 `6fbda42741c2bbef40ae4c9634246cff94a28dcff42785a396ba168b2517a7e6`.
 
+At commit `0d41a42f073c7ef726a9d03906cc7ba80491c24c`, the expanded Windows check passed for archive SHA-256 `305f03153b16f3adecdf306b290b4de7686890ef7b0845280f0fcfc4a503d367` and Playwright report SHA-256 `dfa43b7fbd867670528f39c7302da9492dace096d22f965f55875e9a6ae0c0b6`. The exact installed archive downloaded the pinned weights, verified all 14 cached files, and reran the baseline with network access blocked. Four decision inputs and packed and individual choice, `noul`, and score questions completed. All four decision selections matched the pinned CPU observations; their maximum absolute probability differences ranged from approximately 0.000101 to 0.012235. The additional comparisons are recorded observations, not numerical acceptance thresholds. The existing numerical gate remains limited to its original baseline input.
+
 The verifier also matched the package WASM to the separately built `ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0` artifact and its build report. This is evidence for that archive, one browser, one host, and one reference input; later package changes need a new check. It does not resolve the broader numerical and model-quality questions below.
 
 ## Exploratory output comparison
