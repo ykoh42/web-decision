@@ -10,7 +10,6 @@
     "packages/web-decision/src/d1-omni/session.mjs",
     "packages/web-decision/src/deberta-single-preview-entry.js",
     "packages/web-decision/src/deberta-single-preview-registry.mjs",
-    "packages/web-decision/src/deberta/device.mjs",
     "packages/web-decision/src/deberta/loader.mjs",
     "packages/web-decision/src/deberta/packing.mjs",
     "packages/web-decision/src/deberta/typed.mjs",

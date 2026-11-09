@@ -14,7 +14,10 @@ export const DEBERTA_REQUIRED_LIMITS = Object.freeze({
 });
 
 /** This does not guarantee sufficient memory or correctness on an untested GPU. */
-export async function detectDebertaGPUDevice(gpu = globalThis.navigator?.gpu, signal) {
+export async function detectDebertaGPUDevice(
+  gpu: GPU | null | undefined = globalThis.navigator?.gpu,
+  signal?: AbortSignal
+) {
   signal?.throwIfAborted();
   if (!gpu) return undefined;
   const adapter = await requestGpuAdapter(gpu, signal);
@@ -23,14 +26,14 @@ export async function detectDebertaGPUDevice(gpu = globalThis.navigator?.gpu, si
   // The caller produces the established unsupported-environment error.
   if (!adapter.features.has('shader-f16')) return {adapter, device: undefined, adapterInfo: adapter.info};
   for (const [name, required] of Object.entries(DEBERTA_REQUIRED_LIMITS)) {
-    const available = adapter.limits[name];
+    const available = (adapter.limits as unknown as Record<string, unknown>)[name];
     if (typeof available !== 'number' || !Number.isFinite(available) || available < required) {
       throw new Error(`WebGPU ${name} requires ${required}; adapter reports ${available}.`);
     }
   }
   const device = await requestGpuDevice(
     adapter,
-    {requiredLimits: {...DEBERTA_REQUIRED_LIMITS}, requiredFeatures: ['shader-f16']},
+    {requiredLimits: {...DEBERTA_REQUIRED_LIMITS}, requiredFeatures: ['shader-f16']} as GPUDeviceDescriptor,
     signal
   );
   try {
