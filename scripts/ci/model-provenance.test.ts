@@ -12,7 +12,8 @@ import {
   RELEASE_TEST_PROVENANCE_MANIFEST_SHA256,
   RELEASE_TEST_PROVENANCE_MANIFEST_PATH,
   sha256,
-  validateModelProvenance
+  validateModelProvenance,
+  validateLockedUpstream
 } from './model-provenance.ts';
 
 const WORKSPACE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -265,6 +266,10 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
     }),
     /catalog license terms remain unresolved/u
   );
+});
+
+test('an approved model cannot omit its locked upstream source', () => {
+  assert.throws(() => validateLockedUpstream([], {}, 'fixture-model'), /Locked upstream.*must be an object/u);
 });
 
 test('tampered committed evidence cannot match the manifest evidence digest', async () => {

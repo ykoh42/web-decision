@@ -147,9 +147,8 @@ function validateSourceLineage(sourceLineage: unknown, modelId: string): void {
   }
 }
 
-function validateLockedUpstream(sourceLineage: unknown, artifactEntry: unknown, modelId: string): void {
+export function validateLockedUpstream(sourceLineage: unknown, artifactEntry: unknown, modelId: string): void {
   failUnless(isRecord(artifactEntry), `Artifact lock entry for ${modelId} must be an object.`);
-  if (artifactEntry.upstream === undefined) return;
   const upstream = artifactEntry.upstream;
   failUnless(isRecord(upstream), `Locked upstream for ${modelId} must be an object.`);
   failUnless(
