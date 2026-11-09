@@ -1,16 +1,34 @@
 import {expect, test} from '@playwright/test';
+import type {
+  LoadedStableTamevModel,
+  StableTamevModelId,
+  TamevModelName
+} from '../../packages/web-decision/src/index.d.ts';
 
 const enabled = process.env.WEB_DECISION_STABLE_MODEL_ID_REAL === '1';
-const tamevModelIds = ['tamev-micro-minilm-int8', 'tamev-nano-tinybert-int8', 'tamev-nano-flash-tinybert-int8'];
+const tamevModelIds = [
+  'tamev-micro-minilm-int8',
+  'tamev-nano-tinybert-int8',
+  'tamev-nano-flash-tinybert-int8'
+] as const;
 
 for (const modelId of tamevModelIds) {
   test(`stable model ID ${modelId} loads pinned assets without an assetsUrl`, async ({page}) => {
     test.skip(!enabled, 'Set WEB_DECISION_STABLE_MODEL_ID_REAL=1 to load a pinned TAMEV model by stable ID.');
+    if (!process.env.WEB_DECISION_INSTALLED_BUNDLE) {
+      throw new Error(
+        'The legacy TAMEV browser test requires WEB_DECISION_INSTALLED_BUNDLE to point to a compatible legacy bundle.'
+      );
+    }
     test.setTimeout(180_000);
     await page.goto('/');
     const report = await page.evaluate(async (modelId) => {
-      const {describeStableModel, listStableModelIds, loadDecisionModel} = window.webDecision;
-      const model = await loadDecisionModel({modelId, cache: false});
+      const {describeStableModel, listStableModelIds, loadDecisionModel} =
+        window.webDecision as unknown as typeof import('../../packages/web-decision/src/index.d.ts');
+      const model = (await loadDecisionModel({modelId, cache: false})) as LoadedStableTamevModel<
+        StableTamevModelId,
+        TamevModelName
+      >;
       try {
         const result = await model.systemOne('A customer was charged twice.', {
           route: {
@@ -25,6 +43,12 @@ for (const modelId of tamevModelIds) {
             criteria: ['low', 'medium', 'high']
           }
         });
+        const route = result.answers.route;
+        const refund = result.answers.refund;
+        const priority = result.answers.priority;
+        if (route?.type !== 'choice' || refund?.type !== 'noul' || priority?.type !== 'score') {
+          throw new Error('Legacy TAMEV returned unexpected answer types.');
+        }
         return {
           modelId,
           catalog: listStableModelIds(),
@@ -33,25 +57,25 @@ for (const modelId of tamevModelIds) {
           backend: model.description.backend.name,
           resultId: result.model,
           answerOrder: Object.keys(result.answers),
-          choiceType: result.answers.route.type,
-          choice: result.answers.route.choice,
-          choiceOptionOrder: Object.keys(result.answers.route.probabilities),
-          choiceProbabilities: Object.entries(result.answers.route.probabilities),
-          choiceProbabilityTotal: Object.values(result.answers.route.probabilities).reduce(
+          choiceType: route.type,
+          choice: route.choice,
+          choiceOptionOrder: Object.keys(route.probabilities),
+          choiceProbabilities: Object.entries(route.probabilities),
+          choiceProbabilityTotal: Object.values(route.probabilities).reduce(
             (total, probability) => total + probability,
             0
           ),
-          noulType: result.answers.refund.type,
-          noul: result.answers.refund.noul,
-          scoreType: result.answers.priority.type,
-          score: result.answers.priority.score,
-          scoreOptionOrder: Object.keys(result.answers.priority.probabilities),
-          scoreProbabilities: Object.entries(result.answers.priority.probabilities),
-          scoreProbabilityTotal: Object.values(result.answers.priority.probabilities).reduce(
+          noulType: refund.type,
+          noul: refund.noul,
+          scoreType: priority.type,
+          score: priority.score,
+          scoreOptionOrder: Object.keys(priority.probabilities),
+          scoreProbabilities: Object.entries(priority.probabilities),
+          scoreProbabilityTotal: Object.values(priority.probabilities).reduce(
             (total, probability) => total + probability,
             0
           ),
-          scoreLegend: Object.entries(result.answers.priority.legend)
+          scoreLegend: Object.entries(priority.legend)
         };
       } finally {
         await model.dispose();

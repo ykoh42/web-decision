@@ -10,7 +10,6 @@
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/tamev.test.mjs",
     "tests/browser/kev06-real-webgpu.spec.mjs",
-    "tests/browser/stable-model-id.spec.mjs",
     "tests/browser/strands-qwen2-real-webgpu.spec.mjs"
   ],
   "exceptions": [
