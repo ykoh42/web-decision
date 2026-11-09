@@ -6,12 +6,12 @@ import {describeSkejjaModel, isSkejjaModel, listSkejjaModels} from './skejja-pre
 export {WebDecisionError, describeSkejjaModel as describeModel, isSkejjaModel as isDecisionModel};
 export {listSkejjaModels as listDecisionModels};
 
-export async function loadDecisionModel(options) {
-  if (!options || !isSkejjaModel(options.model)) {
+export async function loadDecisionModel(options: unknown) {
+  if (!options || !isSkejjaModel((options as {model?: unknown}).model)) {
     throw new WebDecisionError('INVALID_INPUT', 'Select one of the two Skejja edge32k-ft6 int8 models.');
   }
   const model = await loadSkejja(options);
-  Object.defineProperty(model, 'description', {value: describeSkejjaModel(options.model)});
+  Object.defineProperty(model, 'description', {value: describeSkejjaModel((options as {model?: unknown}).model)});
   return model;
 }
 

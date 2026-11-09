@@ -10,8 +10,8 @@ export async function clearModelCache() {
   return caches.delete(CACHE_NAME);
 }
 
-export async function loadDecisionModel(options) {
-  const description = describeModel(options?.model);
+export async function loadDecisionModel(options: unknown) {
+  const description = describeModel((options as {model?: unknown} | null | undefined)?.model);
   const model = await loadTinyDecide(options);
   Object.defineProperty(model, 'description', {value: description});
   return model;
