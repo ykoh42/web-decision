@@ -1,35 +1,49 @@
 import {WebDecisionError} from '../kev.js';
 import {ETTIN_MAX_OPTIONS, ETTIN_MAX_SCORE_LEVELS} from './contract.mjs';
+import type {InferenceSession, InferenceSessionFactory, Tensor} from 'onnxruntime-web/wasm';
+import type {PackedEttinQuestion, EttinRunnerResult} from './protocol.mjs';
 
-const inferenceFailure = (cause) =>
+export interface EttinOrt {
+  readonly Tensor: typeof Tensor;
+  readonly InferenceSession: InferenceSessionFactory;
+}
+
+interface EttinTensorData {
+  readonly type?: unknown;
+  readonly dims?: unknown;
+  readonly data?: unknown;
+}
+
+const inferenceFailure = (cause?: unknown) =>
   new WebDecisionError('INFERENCE_ERROR', 'Decider Ettin ONNX inference failed.', cause ? {cause} : undefined);
 
-function logits(tensor, count, name) {
+function logits(tensor: unknown, count: number, name: string): number[] {
+  const candidate = tensor as EttinTensorData | null | undefined;
   if (
-    tensor?.type !== 'float32' ||
-    !Array.isArray(tensor.dims) ||
-    tensor.dims.length !== 2 ||
-    tensor.dims[0] !== 1 ||
-    tensor.dims[1] !== count ||
-    !ArrayBuffer.isView(tensor.data) ||
-    tensor.data.length !== count
+    candidate?.type !== 'float32' ||
+    !Array.isArray(candidate.dims) ||
+    candidate.dims.length !== 2 ||
+    candidate.dims[0] !== 1 ||
+    candidate.dims[1] !== count ||
+    !ArrayBuffer.isView(candidate.data) ||
+    (candidate.data as unknown as ArrayLike<number>).length !== count
   )
     throw inferenceFailure(new TypeError(`Decider Ettin returned an invalid ${name} tensor.`));
-  const values = Array.from(tensor.data);
+  const values = Array.from(candidate.data as unknown as ArrayLike<number>);
   if (values.some((value) => !Number.isFinite(value)))
     throw inferenceFailure(new TypeError(`Decider Ettin returned non-finite ${name} logits.`));
   return values;
 }
 
-export function createEttinRunner(ort, session) {
+export function createEttinRunner(ort: EttinOrt, session: InferenceSession) {
   if (typeof ort?.Tensor !== 'function' || typeof session?.run !== 'function' || typeof session?.release !== 'function')
     throw new TypeError('Decider Ettin requires an ONNX Runtime Web session.');
 
   let closed = false;
-  let disposing;
+  let disposing: Promise<void> | undefined;
 
   return {
-    async run(question) {
+    async run(question: PackedEttinQuestion): Promise<EttinRunnerResult> {
       if (closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
       if (
         !Array.isArray(question?.inputIds) ||
@@ -47,7 +61,7 @@ export function createEttinRunner(ort, session) {
       const ids = BigInt64Array.from(question.inputIds, BigInt);
       const mask = new BigInt64Array(ids.length).fill(1n);
       const optionMask = Uint8Array.from(question.optionMask, (value) => (value ? 1 : 0));
-      let output;
+      let output: InferenceSession.ReturnType;
       try {
         output = await session.run({
           input_ids: new ort.Tensor('int64', ids, [1, ids.length]),
