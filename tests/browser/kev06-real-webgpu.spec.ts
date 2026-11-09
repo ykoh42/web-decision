@@ -4,6 +4,15 @@ import {mkdir, readFile, rename, stat, writeFile} from 'node:fs/promises';
 import {dirname, resolve} from 'node:path';
 import os from 'node:os';
 import {expect, test} from '@playwright/test';
+import type {DecisionResult, LoadedKev06DecisionModel} from '../../packages/web-decision/src/index.d.ts';
+
+type Progress = {stage: string; state: string; [key: string]: unknown};
+type Manifest = {model: string; checkpoint: string; files: Record<string, {bytes: number; sha256: string}>};
+declare global {
+  interface Window {
+    __webDecisionKev06Progress(event: Progress): Promise<void>;
+  }
+}
 
 const enabled = process.env.WEB_DECISION_KEV06_REAL_GPU === '1';
 const manifestSha256 = '8577804e638051cb056af51fee89eb18ea5de85ccec4f196594d830c16fdc767';
@@ -12,7 +21,11 @@ const modelAssets = resolve(assetsRoot, 'kev-0.6b-q4f16');
 const servedBundle = resolve(process.env.WEB_DECISION_INSTALLED_BUNDLE ?? 'packages/web-decision/dist/index.js');
 const progressPrefix = 'KEV06_PROGRESS ';
 
-async function trackAsyncStage(reportProgress, stage, run) {
+async function trackAsyncStage<T>(
+  reportProgress: (event: Progress) => Promise<void>,
+  stage: string,
+  run: () => Promise<T>
+) {
   const startedAt = Date.now();
   await reportProgress({stage, state: 'started'});
   try {
@@ -30,18 +43,18 @@ async function trackAsyncStage(reportProgress, stage, run) {
   }
 }
 
-function sortKeys(value) {
+function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeys);
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(
     Object.keys(value)
       .sort()
-      .map((key) => [key, sortKeys(value[key])])
+      .map((key) => [key, sortKeys((value as Record<string, unknown>)[key])])
   );
 }
 
-function sha256(path) {
-  return new Promise((resolveHash, reject) => {
+function sha256(path: string) {
+  return new Promise<string>((resolveHash, reject) => {
     const hash = createHash('sha256');
     const stream = createReadStream(path);
     stream.on('data', (chunk) => hash.update(chunk));
@@ -50,11 +63,14 @@ function sha256(path) {
   });
 }
 
-async function verifyAssets(reportProgress, onManifest) {
+async function verifyAssets(
+  reportProgress: (event: Progress) => Promise<void>,
+  onManifest: (manifest: Manifest) => void
+) {
   const manifestText = await trackAsyncStage(reportProgress, 'assets.manifest.read', () =>
     readFile(resolve(modelAssets, 'manifest.json'), 'utf8')
   );
-  const manifest = JSON.parse(manifestText);
+  const manifest = JSON.parse(manifestText) as Manifest;
   onManifest?.(manifest);
   await reportProgress({stage: 'assets.manifest.loaded', state: 'verified', files: Object.keys(manifest.files)});
   const actualManifestHash = createHash('sha256')
@@ -77,11 +93,31 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
   browser
 }) => {
   test.skip(!enabled, 'Set WEB_DECISION_KEV06_REAL_GPU=1 to run the pinned local Kev model on WebGPU.');
+  if (!process.env.WEB_DECISION_INSTALLED_BUNDLE) {
+    throw new Error(
+      'The legacy Kev local-assets browser test requires WEB_DECISION_INSTALLED_BUNDLE to point to a compatible legacy bundle.'
+    );
+  }
   test.setTimeout(10 * 60 * 1000);
 
-  const progress = [];
+  const progress: Progress[] = [];
   const reportPath = process.env.WEB_DECISION_KEV06_REPORT ? resolve(process.env.WEB_DECISION_KEV06_REPORT) : null;
-  const report = {
+  const report: {
+    status: string;
+    date: string;
+    host: {platform: string; release: string; arch: string; totalMemoryBytes: number; freeMemoryBytes: number};
+    browser: {
+      name: string;
+      version: string;
+      userAgent: string | null;
+      webGpuFeatureStatus?: string | null;
+      gpuDeviceDescription?: string | null;
+    };
+    package: {name: string | null; version: string | null; bundlePath: string; bundleSha256: string | null};
+    assets: {manifestSha256: string; model: string | null; checkpoint: string | null; files: string[]};
+    inference: {modelId: string; status: string; progress: Progress[]; [key: string]: unknown};
+    progress: Progress[];
+  } = {
     status: 'partial',
     date: new Date().toISOString(),
     host: {
@@ -108,7 +144,7 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
     });
     return reportWriteQueue;
   };
-  const reportProgress = async (event, source = 'node') => {
+  const reportProgress = async (event: Progress, source = 'node') => {
     const recorded = {...event, recordedAt: new Date().toISOString()};
     if (source === 'node' && event.state === 'failed') report.status = 'failed';
     progress.push(recorded);
@@ -140,7 +176,7 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
   });
   await reportProgress({stage: 'assets.verified', state: 'completed', manifestSha256});
   await trackAsyncStage(reportProgress, 'browser.progress-binding', () =>
-    page.exposeFunction('__webDecisionKev06Progress', (event) => reportProgress(event, 'browser'))
+    page.exposeFunction('__webDecisionKev06Progress', (event: Progress) => reportProgress(event, 'browser'))
   );
   await trackAsyncStage(reportProgress, 'browser.navigate', () => page.goto('/'));
   await trackAsyncStage(reportProgress, 'browser.harness.ready', () =>
@@ -151,14 +187,14 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
   await reportProgress({stage: 'inference.started', state: 'started'});
   const inference = await trackAsyncStage(reportProgress, 'browser.kev-inference', () =>
     page.evaluate(async () => {
-      const browserProgress = [];
-      const reportProgress = async (stage, state, details = {}) => {
+      const browserProgress: Progress[] = [];
+      const reportProgress = async (stage: string, state: string, details: Record<string, unknown> = {}) => {
         const event = {at: new Date().toISOString(), stage, state, ...details};
         browserProgress.push(event);
         console.info(`KEV06_PROGRESS ${JSON.stringify(event)}`);
         await window.__webDecisionKev06Progress(event);
       };
-      const runAsyncStage = async (stage, run) => {
+      const runAsyncStage = async <T>(stage: string, run: () => Promise<T>) => {
         await reportProgress(stage, 'started');
         const startedAt = performance.now();
         try {
@@ -173,7 +209,7 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
           throw error;
         }
       };
-      const runSyncStage = async (stage, run) => {
+      const runSyncStage = async <T>(stage: string, run: () => T) => {
         await reportProgress(stage, 'started');
         const startedAt = performance.now();
         try {
@@ -193,7 +229,10 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
       const adapter = await runAsyncStage('adapter.request', () => navigator.gpu.requestAdapter());
       if (!adapter) throw new Error('WebGPU did not provide an adapter.');
       if (!adapter.features.has('shader-f16')) throw new Error('The adapter does not support shader-f16.');
-      const adapterIsFallback = adapter.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
+      const adapterIsFallback =
+        (adapter as GPUAdapter & {isFallbackAdapter?: boolean}).isFallbackAdapter ??
+        (adapter.info as GPUAdapterInfo & {isFallbackAdapter?: boolean})?.isFallbackAdapter ??
+        null;
       await runSyncStage('adapter.verify', () => {
         if (adapterIsFallback !== false) {
           throw new Error(`Expected a non-fallback WebGPU adapter; got ${String(adapterIsFallback)}.`);
@@ -202,27 +241,35 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
 
       const adapterInfo = adapter.info ?? {};
       const limits = Object.fromEntries(
-        ['maxBufferSize', 'maxStorageBufferBindingSize', 'maxComputeWorkgroupStorageSize'].map((name) => [
+        (['maxBufferSize', 'maxStorageBufferBindingSize', 'maxComputeWorkgroupStorageSize'] as const).map((name) => [
           name,
           adapter.limits[name]
         ])
       );
-      const model = await runAsyncStage('model.load', () =>
-        window.webDecision.loadDecisionModel({
-          model: 'kev-0.6b-q4f16',
-          assetsUrl: '/kev-0.6b-q4f16/'
-        })
+      const model = await runAsyncStage(
+        'model.load',
+        () =>
+          (
+            window.webDecision as unknown as typeof import('../../packages/web-decision/src/index.d.ts')
+          ).loadDecisionModel({
+            model: 'kev-0.6b-q4f16',
+            assetsUrl: '/kev-0.6b-q4f16/'
+          }) as Promise<
+            LoadedKev06DecisionModel & {
+              tokenizer: {encode(text: string, options: {add_special_tokens: false}): {ids: number[]}};
+            }
+          >
       );
 
       try {
-        const timed = async (stage, run) => {
+        const timed = async <T>(stage: string, run: () => Promise<T>) => {
           const start = performance.now();
           const result = await runAsyncStage(stage, run);
           return {elapsedMs: performance.now() - start, result};
         };
         const tokenizer = model.tokenizer;
-        const tokenLength = (text) => tokenizer.encode(text, {add_special_tokens: false}).ids.length;
-        const exactTokenText = (target) => {
+        const tokenLength = (text: string) => tokenizer.encode(text, {add_special_tokens: false}).ids.length;
+        const exactTokenText = (target: number) => {
           const pieces = [' the', ' a', ' to', ' of', ' is', ' x', ' q', ' 0', ' yes', ' no', '. ', '! ', '\n'];
           for (const piece of pieces) {
             const candidate = piece.repeat(target);
@@ -252,7 +299,7 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
           model.decide({state: '', questions: [{instructions: 'Choose.', options: ['no', 'yes']}]})
         );
         const fixedTokens = base.result.tokenCount - tokenLength('Choose.');
-        const attentionBytes = Math.min(limits.maxBufferSize, limits.maxStorageBufferBindingSize);
+        const attentionBytes = Math.min(limits.maxBufferSize!, limits.maxStorageBufferBindingSize!);
         const attentionTokenLimit = Math.floor(Math.sqrt(attentionBytes / 32));
         const sequenceTokenLimit = Math.min(8192, attentionTokenLimit);
         const lengths = [];
@@ -282,7 +329,8 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
           );
           overBoundary = {code: 'UNEXPECTED_SUCCESS'};
         } catch (error) {
-          overBoundary = {code: error.code ?? error.name, message: error.message};
+          const failure = error as {code?: string; name: string; message: string};
+          overBoundary = {code: failure.code ?? failure.name, message: failure.message};
         }
 
         const choices = Object.fromEntries(Array.from({length: 255}, (_, index) => [`option-${index}`, null]));
@@ -294,6 +342,12 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
           })
         );
 
+        const route = typed.result.answers.route;
+        const refund = typed.result.answers.refund;
+        const priority = typed.result.answers.priority;
+        if (route?.type !== 'choice' || refund?.type !== 'noul' || priority?.type !== 'score') {
+          throw new Error('Legacy Kev returned unexpected answer types.');
+        }
         return {
           modelId: 'kev-0.6b-q4f16',
           model: model.description.model,
@@ -309,7 +363,7 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
           base,
           lengths,
           overBoundary,
-          typed,
+          typed: {...typed, result: {...typed.result, answers: {route, refund, priority}}},
           progress: browserProgress
         };
       } finally {
@@ -338,9 +392,9 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
   expect(inference.backend).toBe('tvm-webgpu');
   expect(inference.currentBundleGpu).toBe('verified');
   expect(inference.adapterIsFallback).toBe(false);
-  expect(inference.minimum.result.answers[0].selected).toBe('only');
-  expect(inference.minimum.result.answers[0].probabilities.map(({option}) => option)).toEqual(['only']);
-  expect(inference.base.result.answers[0].probabilities.map(({option}) => option)).toEqual(['no', 'yes']);
+  expect(inference.minimum.result.answers[0]!.selected).toBe('only');
+  expect(inference.minimum.result.answers[0]!.probabilities.map(({option}) => option)).toEqual(['only']);
+  expect(inference.base.result.answers[0]!.probabilities.map(({option}) => option)).toEqual(['no', 'yes']);
   for (const sample of inference.lengths) expect(sample.result.tokenCount).toBe(sample.targetTokens);
   expect(inference.overBoundary.code).toBe(
     inference.sequenceTokenLimit < 8192 ? 'DEVICE_RESOURCE_LIMIT' : 'INVALID_INPUT'
@@ -360,8 +414,8 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
     await trackAsyncStage(reportProgress, 'chromium.gpu-page.navigate', () => gpuPage.goto('chrome://gpu'));
     const gpuReport = await trackAsyncStage(reportProgress, 'chromium.gpu-report.read', () =>
       gpuPage.evaluate(() => {
-        const texts = [];
-        function visit(root) {
+        const texts: string[] = [];
+        function visit(root: Document | ShadowRoot) {
           if (root?.textContent) texts.push(root.textContent);
           for (const element of root?.querySelectorAll?.('*') ?? []) if (element.shadowRoot) visit(element.shadowRoot);
         }
@@ -384,13 +438,21 @@ test('Kev 0.6B Q4F16 runs pinned-asset WebGPU boundary cases on the served bundl
   report.browser.gpuDeviceDescription = gpuDeviceDescription;
   await reportProgress({stage: 'browser.gpu-metadata', state: 'completed'});
 
-  const summarizeDecision = ({targetTokens, elapsedMs, result}) => ({
+  const summarizeDecision = ({
+    targetTokens,
+    elapsedMs,
+    result
+  }: {
+    targetTokens?: number;
+    elapsedMs: number;
+    result: DecisionResult;
+  }) => ({
     ...(targetTokens === undefined ? {} : {targetTokens}),
     elapsedMs,
     tokenCount: result.tokenCount,
-    selected: result.answers[0].selected,
-    optionOrder: result.answers[0].probabilities.map(({option}) => option),
-    probabilityTotal: result.answers[0].probabilities.reduce((sum, answer) => sum + answer.probability, 0)
+    selected: result.answers[0]!.selected,
+    optionOrder: result.answers[0]!.probabilities.map(({option}) => option),
+    probabilityTotal: result.answers[0]!.probabilities.reduce((sum, answer) => sum + answer.probability, 0)
   });
   report.browser.userAgent = await trackAsyncStage(reportProgress, 'browser.user-agent.read', () =>
     page.evaluate(() => navigator.userAgent)
