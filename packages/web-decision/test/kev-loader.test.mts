@@ -518,8 +518,8 @@ test(
     await f.started;
     f.resolveRuntime(f.runtime);
     const model = await loading;
-    assert.equal(model.limits.maxInputTokens, 32_769);
-    model.dispose();
+    assert.equal(modelLimits(model).maxInputTokens, 32_769);
+    disposeModel(model);
   }
 );
 
