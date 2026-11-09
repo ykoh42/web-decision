@@ -3,14 +3,26 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createH2oSession} from '../src/h2o/session.mjs';
 
-const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url)));
+type SessionOptions = Parameters<typeof createH2oSession>[0];
+type Runner = NonNullable<SessionOptions['runner']>;
+type GraphInputs = Parameters<Runner['run']>[0];
+type Request = NonNullable<Parameters<Awaited<ReturnType<typeof createH2oSession>>['decide']>[0]>;
+const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url), 'utf8')) as NonNullable<
+  SessionOptions['plan']
+>;
 const request = () => ({state: 'record', questions: [{instructions: 'Choose', options: ['first', 'second']}]});
 
-async function sessionWith(runner, encode = () => ({ids: [1, 2, 3]})) {
+async function sessionWith(runner: Runner, encode: (prompt: string) => {ids: number[]} = () => ({ids: [1, 2, 3]})) {
   return createH2oSession({tokenizer: {encode}, plan, addedTokens: ['<reserved>'], runner});
 }
 
-function setReentrantHook(hook, input, options, signal, close) {
+function setReentrantHook(
+  hook: string,
+  input: Request,
+  options: {signal?: AbortSignal},
+  signal: AbortSignal,
+  close: () => void
+) {
   if (hook === 'state')
     Object.defineProperty(input, 'state', {
       enumerable: true,
@@ -36,7 +48,7 @@ function setReentrantHook(hook, input, options, signal, close) {
       }
     });
   if (hook === 'signal-listener')
-    signal.addEventListener = function (...args) {
+    signal.addEventListener = function (...args: Parameters<AbortSignal['addEventListener']>) {
       close();
       return AbortSignal.prototype.addEventListener.apply(this, args);
     };
@@ -51,12 +63,12 @@ function setReentrantHook(hook, input, options, signal, close) {
 }
 
 test('H2O choice session packs independent questions and reports temperature-scaled results', async () => {
-  const calls = [],
-    prompts = [],
-    events = [];
+  const calls: GraphInputs[] = [],
+    prompts: string[] = [],
+    events: string[] = [];
   const session = await sessionWith(
     {
-      async run(input) {
+      async run(input: GraphInputs) {
         calls.push(input);
         const scores = new Float32Array(255);
         scores[1] = 1;
@@ -76,22 +88,22 @@ test('H2O choice session packs independent questions and reports temperature-sca
   );
   const result = await session.decide({
     state: 'record',
-    questions: [request().questions[0], {instructions: 'Again', options: ['third', 'fourth']}]
+    questions: [request().questions[0]!, {instructions: 'Again', options: ['third', 'fourth']}]
   });
   assert.equal(result.tokenCount, 6);
   assert.deepEqual(
     result.answers.map((answer) => answer.selected),
     ['second', 'fourth']
   );
-  assert.ok(Math.abs(result.answers[0].probabilities[1].probability - 1 / (1 + Math.exp(-1 / 0.75))) < 1e-12);
-  assert.match(prompts[0], /record: record\nquestion: Choose/);
+  assert.ok(Math.abs(result.answers[0]!.probabilities[1]!.probability - 1 / (1 + Math.exp(-1 / 0.75))) < 1e-12);
+  assert.match(prompts[0]!, /record: record\nquestion: Choose/);
   assert.deepEqual(
-    calls[0].map((input) => input.dtype),
+    calls[0]!.map((input) => input.dtype),
     ['int32', 'int32', 'float16', 'float16', 'int32']
   );
-  assert.deepEqual([...calls[0][2].data], Array(9).fill(0));
-  assert.deepEqual([...calls[0][3].data], [0x3c00, 0x3c00, 0x3c00]);
-  assert.deepEqual([...calls[0][4].data], [2]);
+  assert.deepEqual([...calls[0]![2]!.data], Array(9).fill(0));
+  assert.deepEqual([...calls[0]![3]!.data], [0x3c00, 0x3c00, 0x3c00]);
+  assert.deepEqual([...calls[0]![4]!.data], [2]);
   await session.releaseCachedMemory();
   await session.dispose();
   assert.deepEqual(events, ['release', 'dispose']);
@@ -117,11 +129,11 @@ test('invalid common fields, sparse values, reserved tokens and bad tokens fail 
   delete sparseOptions[1];
   for (const [input, options] of [
     [{...request(), image: 'ignored'}, {}],
-    [{...request(), questions: [{...request().questions[0], criteria: 'ignored'}]}, {}],
+    [{...request(), questions: [{...request().questions[0]!, criteria: 'ignored'}]}, {}],
     [request(), {temperature: 2}],
     [{state: 'record', questions: [{instructions: 'Choose', options: sparseOptions}]}, {}],
     [{state: '<reserved>', questions: request().questions}, {}]
-  ])
+  ] as Array<[Request, Record<string, unknown>]>)
     await assert.rejects(session.decide(input, options), {code: 'INVALID_INPUT'});
   assert.equal(tokenizations, 0);
   assert.equal(calls, 0);
@@ -141,11 +153,11 @@ test('H2O accepts 257 independent questions and executes each full graph sequent
     maxActive = 0;
   const session = await sessionWith(
     {
-      async run(inputs) {
+      async run(inputs: GraphInputs) {
         calls++;
         active++;
         maxActive = Math.max(maxActive, active);
-        assert.deepEqual(inputs[0].shape, [1, 2]);
+        assert.deepEqual(inputs[0]!.shape, [1, 2]);
         await Promise.resolve();
         active--;
         return new Float32Array(255);
@@ -172,13 +184,13 @@ test('H2O accepts 257 independent questions and executes each full graph sequent
 });
 
 test('queued inputs are snapshotted and abort does not release in-flight work', async () => {
-  let finish;
-  const events = [],
-    prompts = [];
+  let finish!: (scores: Float32Array) => void;
+  const events: string[] = [],
+    prompts: string[] = [];
   const runner = {
     run() {
       events.push('run');
-      return new Promise((resolve) => {
+      return new Promise<Float32Array>((resolve) => {
         finish = resolve;
       });
     },
@@ -194,13 +206,13 @@ test('queued inputs are snapshotted and abort does not release in-flight work', 
   const input = request(),
     controller = new AbortController();
   const result = session.decide(input, {signal: controller.signal});
-  input.questions[0].options[1] = 'changed';
+  input.questions[0]!.options[1] = 'changed';
   await Promise.resolve();
   controller.abort();
   await assert.rejects(result, {name: 'AbortError'});
   const disposal = session.dispose();
   assert.deepEqual(events, ['run']);
-  assert.match(prompts[0], /second: second/);
+  assert.match(prompts[0]!, /second: second/);
   finish(new Float32Array(255));
   await disposal;
   assert.deepEqual(events, ['run', 'dispose']);
@@ -223,7 +235,7 @@ test('invalid signals and failed abort setup never schedule inference', async ()
       return {ids: [1, 2]};
     }
   );
-  for (const signal of [{throwIfAborted() {}}, Object.create(AbortSignal.prototype), false])
+  for (const signal of [{throwIfAborted() {}}, Object.create(AbortSignal.prototype), false] as unknown as AbortSignal[])
     await assert.rejects(session.decide(request(), {signal}), {code: 'INVALID_INPUT'});
   assert.equal(tokenizations, 0);
 
@@ -247,9 +259,9 @@ test('reentrant disposal during request or abort setup prevents scheduling infer
     'signal-check',
     'tokenizer'
   ]) {
-    const events = [];
-    let session,
-      disposal,
+    const events: string[] = [];
+    let session!: Awaited<ReturnType<typeof createH2oSession>>,
+      disposal: Promise<void> | undefined,
       tokenizations = 0;
     const close = () => {
       if (!disposal) disposal = session.dispose();
@@ -285,7 +297,7 @@ test('reentrant disposal during request or abort setup prevents scheduling infer
 });
 
 test('a decision queued before disposal completes before the runner is disposed', async () => {
-  const events = [];
+  const events: string[] = [];
   const session = await sessionWith({
     async run() {
       events.push('run');
@@ -304,16 +316,16 @@ test('a decision queued before disposal completes before the runner is disposed'
 });
 
 test('reentrant disposal during an accepted signal check waits for inference', async () => {
-  const events = [],
+  const events: string[] = [],
     signal = new AbortController().signal;
-  let session,
-    disposal,
-    finish,
+  let session!: Awaited<ReturnType<typeof createH2oSession>>,
+    disposal: Promise<void> | undefined,
+    finish!: (scores: Float32Array) => void,
     checks = 0;
   session = await sessionWith({
     run() {
       events.push('run');
-      return new Promise((resolve) => {
+      return new Promise<Float32Array>((resolve) => {
         finish = resolve;
       });
     },
@@ -336,13 +348,13 @@ test('reentrant disposal during an accepted signal check waits for inference', a
 });
 
 test('cancelling a queued decision skips it without interrupting earlier work', async () => {
-  let finish;
-  const events = [];
+  let finish!: (scores: Float32Array) => void;
+  const events: string[] = [];
   const session = await sessionWith({
     run() {
       events.push('run');
       if (events.length === 1)
-        return new Promise((resolve) => {
+        return new Promise<Float32Array>((resolve) => {
           finish = resolve;
         });
       return Promise.resolve(new Float32Array(255));
@@ -370,11 +382,11 @@ test('cancelling a queued decision skips it without interrupting earlier work', 
 
 test('each question keeps its own tokens when the tokenizer reuses an output array', async () => {
   const shared = [1, 2],
-    seen = [];
+    seen: number[][] = [];
   let next = 0;
   const runner = {
-    async run(input) {
-      seen.push([...input[0].data]);
+    async run(input: GraphInputs) {
+      seen.push([...input[0]!.data]);
       return new Float32Array(255);
     },
     async releaseCachedMemory() {},
@@ -386,7 +398,7 @@ test('each question keeps its own tokens when the tokenizer reuses an output arr
   });
   const result = session.decide({
     state: 'record',
-    questions: [request().questions[0], {instructions: 'Again', options: ['third', 'fourth']}]
+    questions: [request().questions[0]!, {instructions: 'Again', options: ['third', 'fourth']}]
   });
   shared[0] = 99;
   await result;
@@ -407,7 +419,7 @@ test('invalid head identity and model outputs fail closed', async () => {
   };
   await assert.rejects(
     createH2oSession({
-      tokenizer: {encode() {}},
+      tokenizer: {encode() {}} as unknown as NonNullable<SessionOptions['tokenizer']>,
       plan: {...plan, labelIds: [...plan.labelIds].reverse()},
       addedTokens: [],
       runner
