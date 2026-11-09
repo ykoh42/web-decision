@@ -180,7 +180,6 @@
     "packages/web-decision/test/nari-runner.test.mjs",
     "packages/web-decision/test/nari-runtime.test.mjs",
     "packages/web-decision/test/nari-scope.test.mjs",
-    "packages/web-decision/test/nari-session.test.mjs",
     "packages/web-decision/test/nari-source.test.mjs",
     "packages/web-decision/test/nari-upload.test.mjs",
     "packages/web-decision/test/opendecider-nano.test.mjs",

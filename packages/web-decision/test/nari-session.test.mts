@@ -3,7 +3,7 @@ import test from 'node:test';
 import {createNariSession} from '../src/nari/session.mjs';
 
 const tokenizer = {
-  encode(text) {
+  encode(text: string) {
     return {ids: Array.from({length: Math.ceil(text.length / 3)}, (_, i) => text.codePointAt(i * 3))};
   }
 };
@@ -12,7 +12,7 @@ const request = {state: 'x', questions: [{instructions: 'x', options: ['a', 'b']
 test('session submits all questions jointly and returns model choices', async () => {
   let calls = 0;
   const runner = {
-    async run(input) {
+    async run(input: {options: string[][]}) {
       calls++;
       assert.equal(input.options.length, 2);
       assert.deepEqual(input.options, [
@@ -25,10 +25,10 @@ test('session submits all questions jointly and returns model choices', async ()
     async dispose() {}
   };
   const session = createNariSession({tokenizer, controlIds: [248045], runner});
-  const result = await session.decide({
+  const result = (await session.decide({
     state: 'x',
     questions: [request.questions[0], {instructions: 'x', options: ['c', 'd']}]
-  });
+  })) as unknown as {answers: {selected: string}[]};
   assert.equal(calls, 1);
   assert.deepEqual(
     result.answers.map((value) => value.selected),
@@ -63,16 +63,16 @@ test('rejects excessive questions, options and tokens before the graph', async (
 });
 
 test('cancellation cannot release a pending GPU run before it settles', async () => {
-  let finish,
-    started,
+  let finish!: (result: {headScores: Float32Array; letterScores: Float32Array}) => void,
+    started!: () => void,
     disposed = false;
-  const entered = new Promise((resolve) => {
+  const entered = new Promise<void>((resolve) => {
     started = resolve;
   });
   const runner = {
     run() {
       started();
-      return new Promise((resolve) => {
+      return new Promise<{headScores: Float32Array; letterScores: Float32Array}>((resolve) => {
         finish = resolve;
       });
     },

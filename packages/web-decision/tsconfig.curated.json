@@ -36,6 +36,7 @@
     "test/mapika-q4-contract.test.mts",
     "test/mapika-q4-device.test.mts",
     "test/model-assets.test.mts",
+    "test/nari-session.test.mts",
     "test/opendecider-nano-gpu-compat.test.mts",
     "test/opendecider-nano-tokenizer.test.mts",
     "test/parameter-upload-count.test.mts",
