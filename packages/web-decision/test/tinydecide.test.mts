@@ -245,8 +245,8 @@ test('the TypeScript weight reader preserves upstream f32, q4 and quantized deco
   }
 });
 
-test('the bundled TinyDecide correction helper matches the pinned upstream source hash', async () => {
-  const source = await readFile(new URL('../src/tinydecide/corrections.js', import.meta.url));
+test('the TinyDecide correction fixture matches the pinned upstream source hash', async () => {
+  const source = await readFile(new URL('./fixtures/vendor/tinydecide-corrections.js.txt', import.meta.url));
   assert.equal(createHash('sha256').update(source).digest('hex'), correctionsHash);
 });
 

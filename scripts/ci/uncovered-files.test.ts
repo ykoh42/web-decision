@@ -37,7 +37,7 @@ test('reports newly uncovered and resolved paths while preserving baseline order
   });
 });
 
-test('discovers each executable source extension and skips declarations and the pinned correction file', () => {
+test('discovers each executable source extension and skips declarations', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'coverage-inventory-'));
   const sourceDirectory = join(temporaryRoot, 'src');
   const nestedDirectory = join(sourceDirectory, 'nested');
@@ -52,11 +52,14 @@ test('discovers each executable source extension and skips declarations and the 
     for (const extension of ['.d.ts', '.d.mts', '.d.cts']) {
       writeFileSync(join(nestedDirectory, `declaration${extension}`), '');
     }
-    writeFileSync(join(correctionsDirectory, 'corrections.js'), '');
+    writeFileSync(join(correctionsDirectory, 'corrections.ts'), '');
 
     assert.deepEqual(
       listRuntimeSourceFiles(sourceDirectory),
-      RUNTIME_SOURCE_EXTENSIONS.map((extension) => `nested/runtime${extension}`).sort()
+      [
+        ...RUNTIME_SOURCE_EXTENSIONS.map((extension) => `nested/runtime${extension}`),
+        'tinydecide/corrections.ts'
+      ].sort()
     );
   } finally {
     rmSync(temporaryRoot, {recursive: true, force: true});
@@ -121,7 +124,7 @@ test('keeps c8 configured for the complete executable source extension set and e
   assert.match(script, /--exclude=src\/\*\*\/\*\.d\.mts/);
   assert.match(script, /--exclude=src\/\*\.d\.cts/);
   assert.match(script, /--exclude=src\/\*\*\/\*\.d\.cts/);
-  assert.match(script, /--exclude=src\/tinydecide\/corrections\.js/);
+  assert.doesNotMatch(script, /--exclude=src\/tinydecide\/corrections\.(?:js|ts)/);
 });
 
 test('rejects coverage paths outside the source root and invalid line counts', () => {

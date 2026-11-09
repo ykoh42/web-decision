@@ -22,8 +22,6 @@ export interface CoverageInventoryMismatches {
 
 export const RUNTIME_SOURCE_EXTENSIONS = ['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.mts', '.cts'] as const;
 
-const ignoredSourceFiles = new Set(['tinydecide/corrections.js']);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -55,11 +53,7 @@ function sourceFileNames(directory: string, sourceRoot: string, result: string[]
     if (!entry.isFile()) continue;
 
     const name = relative(sourceRoot, absolutePath).split(sep).join('/');
-    if (
-      ignoredSourceFiles.has(name) ||
-      /\.d\.(?:ts|mts|cts)$/.test(name) ||
-      !RUNTIME_SOURCE_EXTENSIONS.some((extension) => name.endsWith(extension))
-    ) {
+    if (/\.d\.(?:ts|mts|cts)$/.test(name) || !RUNTIME_SOURCE_EXTENSIONS.some((extension) => name.endsWith(extension))) {
       continue;
     }
     result.push(name);

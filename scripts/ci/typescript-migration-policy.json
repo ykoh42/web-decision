@@ -120,7 +120,6 @@
     "packages/web-decision/src/tamev/tokenizer.mjs",
     "packages/web-decision/src/tamev/typed.mjs",
     "packages/web-decision/src/tensor-shard-upload.js",
-    "packages/web-decision/src/tinydecide/corrections.js",
     "packages/web-decision/src/tinydecide/inputs.mjs",
     "packages/web-decision/src/tinydecide/loader.mjs",
     "packages/web-decision/src/tinydecide/session.mjs",
