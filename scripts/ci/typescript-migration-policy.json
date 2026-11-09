@@ -4,7 +4,6 @@
   "managedJavaScript": [
     "packages/web-decision/test/decima.test.mjs",
     "packages/web-decision/test/ettin.test.mjs",
-    "packages/web-decision/test/h2o-adapter.test.mjs",
     "packages/web-decision/test/laya.test.mjs",
     "packages/web-decision/test/skejja.test.mjs",
     "packages/web-decision/test/tamev.test.mjs"

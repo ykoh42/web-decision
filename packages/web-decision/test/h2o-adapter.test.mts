@@ -7,28 +7,111 @@ import {initializeH2oRuntime, attachH2oRunner} from '../src/h2o/owner.mjs';
 import {H2oTvmRunner} from '../src/h2o/runner.mjs';
 import {createH2oSession} from '../src/h2o/session.mjs';
 import {uploadFakeH2oParameters, uploadH2oParameters} from '../src/h2o/upload.mjs';
+import type {H2oGpu, H2oRuntime, H2oRuntimeOwner, H2oTensor} from '../src/h2o/owner.mjs';
+import type {H2oOpenedSource} from '../src/h2o/source.mjs';
 
-function deferred() {
-  let resolve, reject;
-  const promise = new Promise((a, b) => {
-    resolve = a;
-    reject = b;
+type Deferred<Value> = {
+  readonly promise: Promise<Value>;
+  resolve(value?: Value): void;
+  reject(reason: unknown): void;
+};
+
+type H2oIntInput = {dtype: 'int32'; shape: number[]; data: Int32Array};
+type H2oHalfInput = {dtype: 'float16'; shape: number[]; data: Uint16Array};
+type H2oInput = H2oIntInput | H2oHalfInput;
+type H2oInputTuple = [H2oIntInput, H2oIntInput, H2oHalfInput, H2oHalfInput, H2oIntInput];
+type H2oFileParameter = {
+  kind: 'file';
+  path: string;
+  bytes: number;
+  sha256: string;
+  dtype: string;
+  shape: number[];
+};
+type H2oRotaryParameter = {
+  kind: 'rotary';
+  target: string;
+  dtype: string;
+  shape: number[];
+  values: number[];
+};
+type H2oParameter = H2oFileParameter | H2oRotaryParameter;
+type H2oRangeChunk = {offset: number; length: number; sha256: string};
+type H2oInventory = Record<string, H2oRangeChunk[] | undefined>;
+type H2oRangeReader = H2oOpenedSource['readRange'];
+type H2oRangeResponse = Awaited<ReturnType<H2oRangeReader>>;
+type H2oTestContext = {
+  pendingGPUToCPUCopy: Promise<void> | null;
+  copyRawBytesToBuffer(bytes: Uint8Array, pointer: unknown, offset: number, length: number): void;
+};
+type H2oTestTensor = H2oTensor & {
+  readonly dtype: string;
+  readonly shape: number[];
+  readonly byteOffset: number;
+  value?: Float32Array | number[];
+  copyFrom(value: unknown): H2oTestTensor;
+  toArray(): unknown;
+};
+type H2oTestDevice = {sync(): Promise<void>};
+type H2oTestRuntime = Omit<H2oRuntime, 'lib' | 'webgpu' | 'empty'> & {
+  readonly lib: {readonly webGPUContext: H2oTestContext};
+  webgpu(): H2oTestDevice;
+  cpu(): string;
+  getGlobalFunc(name: string): () => void;
+  empty(shape: number[], dtype: string, device: unknown): H2oTestTensor;
+  createVirtualMachine(device: unknown): {getFunction(name: string): (...args: unknown[]) => unknown};
+};
+type H2oTestGpu = H2oGpu & {
+  addEventListener(
+    type: 'uncapturederror',
+    listener: (event: {error?: {message?: unknown} | null | undefined}) => void
+  ): void;
+  pushErrorScope(): void;
+  popErrorScope(): Promise<null>;
+};
+type H2oTestFixture = {
+  gpu: H2oTestGpu;
+  device: H2oTestDevice;
+  runtime: H2oTestRuntime;
+  context: H2oTestContext;
+  lost: Deferred<{reason: string}>;
+  events: string[];
+  writes: Array<{bytes: number[]; pointer: unknown; offset: number; length: number}>;
+  graphCalls: unknown[][];
+};
+
+function deferred<Value = void>(): Deferred<Value> {
+  let resolvePromise!: (value: Value | PromiseLike<Value>) => void;
+  let rejectPromise!: (reason?: unknown) => void;
+  const promise = new Promise<Value>((a, b) => {
+    resolvePromise = a;
+    rejectPromise = b;
   });
-  return {promise, resolve, reject};
+  return {
+    promise,
+    resolve: (value?: Value) => resolvePromise(value as Value),
+    reject: (reason) => rejectPromise(reason)
+  };
 }
-function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
-  const lost = deferred(),
-    events = [],
-    writes = [],
-    graphCalls = [];
-  const context = {
+function fixture({
+  syncImpl,
+  disposeMode = 'destroyed'
+}: {
+  syncImpl?: (pending: Promise<void> | null) => Promise<void> | void;
+  disposeMode?: string;
+} = {}): H2oTestFixture {
+  const lost = deferred<{reason: string}>(),
+    events: string[] = [],
+    writes: H2oTestFixture['writes'] = [],
+    graphCalls: unknown[][] = [];
+  const context: H2oTestContext = {
     pendingGPUToCPUCopy: null,
-    copyRawBytesToBuffer(bytes, pointer, offset, length) {
+    copyRawBytesToBuffer(bytes: Uint8Array, pointer: unknown, offset: number, length: number) {
       writes.push({bytes: [...bytes], pointer, offset, length});
     }
   };
-  let uncaptured;
-  const gpu = {
+  let uncaptured: ((event: {error?: {message?: unknown} | null | undefined}) => void) | undefined;
+  const gpu: H2oTestGpu = {
     lost: lost.promise,
     addEventListener(name, callback) {
       if (name === 'uncapturederror') uncaptured = callback;
@@ -41,7 +124,7 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
       return null;
     }
   };
-  const device = {
+  const device: H2oTestDevice = {
     async sync() {
       events.push('sync');
       const pending = context.pendingGPUToCPUCopy;
@@ -51,7 +134,7 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
     }
   };
   let pointer = 0;
-  const runtime = {
+  const runtime: H2oTestRuntime = {
     lib: {webGPUContext: context},
     initWebGPU(g) {
       g.lost.then(
@@ -69,11 +152,11 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
       events.push('dispose');
       if (disposeMode === 'rejected') lost.reject(Error('loss rejected'));
       else if (disposeMode === 'uncaptured') {
-        uncaptured({error: Error('late validation')});
+        uncaptured!({error: Error('late validation')});
         lost.resolve({reason: 'destroyed'});
       } else if (disposeMode === 'uncaptured-microtask') {
         lost.resolve({reason: 'destroyed'});
-        queueMicrotask(() => uncaptured({error: Error('late validation')}));
+        queueMicrotask(() => uncaptured!({error: Error('late validation')}));
       } else if (disposeMode !== 'pending') lost.resolve({reason: disposeMode});
     },
     webgpu() {
@@ -85,7 +168,7 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
     createVirtualMachine() {
       return {
         getFunction() {
-          return (...args) => {
+          return (...args: unknown[]) => {
             graphCalls.push(args);
             return {dtype: 'float32', shape: [1, 1, 255]};
           };
@@ -97,23 +180,24 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
     },
     empty(shape, dtype, where) {
       const id = ++pointer;
-      return {
+      const tensor: H2oTestTensor = {
         shape,
         dtype,
         byteOffset: 0,
         getDataPtr: () => id,
-        copyFrom(value) {
+        copyFrom(value: unknown) {
           if (where === 'cpu') {
             context.pendingGPUToCPUCopy = Promise.resolve();
             this.value = new Float32Array(255);
             this.value[1] = 2;
-          } else this.value = Array.from(value);
+          } else this.value = Array.from(value as ArrayLike<number>);
           return this;
         },
-        toArray() {
+        toArray(): unknown {
           return this.value;
         }
       };
+      return tensor;
     }
   };
   return {gpu, device, runtime, context, lost, events, writes, graphCalls};
@@ -121,7 +205,7 @@ function fixture({syncImpl, disposeMode = 'destroyed'} = {}) {
 
 test('runtime context setup runs after WebGPU initialization and before VM allocation', () => {
   const f = fixture();
-  const events = [];
+  const events: string[] = [];
   f.runtime.initWebGPU = () => events.push('init');
   f.runtime.beginScope = () => events.push('scope');
   f.runtime.webgpu = () => {
@@ -143,27 +227,54 @@ test('runtime context setup runs after WebGPU initialization and before VM alloc
   assert.deepEqual(events, ['init', 'setup', 'scope', 'device', 'vm']);
   assert.equal(owner.phase, 'prepared');
 });
-const inputs = (n) => [
+const inputs = (n: number): H2oInputTuple => [
   {dtype: 'int32', shape: [1, n], data: Int32Array.from({length: n}, (_, i) => i + 1)},
   {dtype: 'int32', shape: [1, n], data: Int32Array.from({length: n}, (_, i) => i)},
   {dtype: 'float16', shape: [1, 1, n, n], data: new Uint16Array(n * n)},
   {dtype: 'float16', shape: [1, n], data: new Uint16Array(n).fill(0x3c00)},
   {dtype: 'int32', shape: [1], data: Int32Array.of(n - 1)}
 ];
-const digest = (data) => createHash('sha256').update(data).digest('hex');
+const digest = (data: Uint8Array): string => createHash('sha256').update(data).digest('hex');
 const makeHasher = () => {
   const h = createHash('sha256');
-  return {update: (bytes) => h.update(bytes), digest: () => h.digest('hex')};
+  return {update: (bytes: unknown) => h.update(bytes as Uint8Array), digest: () => h.digest('hex')};
 };
 const rotaryTargets = ['body.rotary_emb.inv_freq', 'body.rotary_emb.original_inv_freq'];
-const rotaryInputs = () =>
-  rotaryTargets.map((target) => ({kind: 'rotary', target, dtype: 'float32', shape: [32], values: Array(32).fill(1)}));
+const rotaryInputs = (): H2oRotaryParameter[] =>
+  rotaryTargets.map((target) => ({
+    kind: 'rotary',
+    target,
+    dtype: 'float32',
+    shape: [32],
+    values: Array<number>(32).fill(1)
+  }));
+
+function repeatedRunnerWeights(): H2oTensor[] {
+  // The runner contract checks ordered truthy placeholders here; these mocks
+  // intentionally remain empty objects as in the original JavaScript test.
+  return Array(682).fill({} as unknown as H2oTensor);
+}
+
+function distinctRunnerWeights(): H2oTensor[] {
+  // Keep Array.from's distinct placeholder identity for the original cases.
+  return Array.from({length: 682}, () => ({}) as unknown as H2oTensor);
+}
+
+function replaceInputData(input: H2oInput, data: unknown): void {
+  (input as unknown as {data: unknown}).data = data;
+}
+
+function rangeResponse(bytes: unknown): H2oRangeResponse {
+  // The test only exercises response bytes; the real range source also returns
+  // a cache marker that these legacy mocks intentionally do not provide.
+  return {bytes} as H2oRangeResponse;
+}
 
 for (const mode of ['unknown', 'rejected', 'pending', 'uncaptured', 'uncaptured-microtask']) {
   test(`H2O teardown retains owner and rejects ${mode} loss or error`, async () => {
     const f = fixture({disposeMode: mode});
     const owner = initializeH2oRuntime(f.runtime, f.gpu, {teardownTimeoutMs: 15});
-    const runner = new H2oTvmRunner({...owner, weights: Array(682).fill({})});
+    const runner = new H2oTvmRunner({...owner, weights: repeatedRunnerWeights()});
     const disposal = runner.dispose();
     assert.equal(runner.dispose(), disposal);
     await assert.rejects(disposal, {code: 'INFERENCE_ERROR'});
@@ -185,7 +296,7 @@ for (const mode of ['unknown', 'rejected', 'pending', 'uncaptured', 'uncaptured-
 test('H2O normal destroyed teardown waits for its outcome and is idempotent', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array(682).fill({})});
+  const runner = new H2oTvmRunner({...owner, weights: repeatedRunnerWeights()});
   const disposal = runner.dispose();
   assert.equal(runner.dispose(), disposal);
   await disposal;
@@ -198,7 +309,7 @@ test('H2O normal destroyed teardown waits for its outcome and is idempotent', as
 test('H2O refuses a destroyed loss already observed before disposal', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array(682).fill({})});
+  const runner = new H2oTvmRunner({...owner, weights: repeatedRunnerWeights()});
   f.lost.resolve({reason: 'destroyed'});
   await assert.rejects(runner.dispose(), {code: 'INFERENCE_ERROR'});
   assert.equal(f.events.includes('end'), false);
@@ -209,14 +320,14 @@ test('H2O refuses a destroyed loss already observed before disposal', async () =
 test('H2O does not call runtime dispose after loss or uncaptured error during scope release', async () => {
   for (const mode of ['loss', 'uncaptured']) {
     const f = fixture();
-    let owner;
+    let owner: H2oRuntimeOwner<H2oTestRuntime, H2oTestGpu>;
     f.runtime.endScope = () => {
       f.events.push('end');
       if (mode === 'loss') f.lost.resolve({reason: 'unknown'});
       else owner.uncaptured.push('synthetic validation');
     };
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-    const runner = new H2oTvmRunner({...owner, weights: Array(682).fill({})});
+    const runner = new H2oTvmRunner({...owner, weights: repeatedRunnerWeights()});
     await assert.rejects(runner.dispose(), {code: 'INFERENCE_ERROR'});
     assert.deepEqual(f.events, ['begin', 'end']);
     assert.equal(owner.disposalGuard.blocked, true);
@@ -247,8 +358,11 @@ test('H2O cancellation leaves actual runner readback queued before disposal', as
     return tensor;
   };
   const owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array(682).fill({})});
-  const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url)));
+  const runner = new H2oTvmRunner({...owner, weights: repeatedRunnerWeights()});
+  const plan = JSON.parse(await readFile(new URL('./fixtures/h2o-labels.json', import.meta.url), 'utf8')) as {
+    labels: string[];
+    labelIds: number[];
+  };
   const session = await createH2oSession({
     tokenizer: {encode: () => ({ids: [1, 2, 3]})},
     plan,
@@ -280,7 +394,7 @@ test('fake TVM uploads 680 files plus rotary in order and reads FP32 head', asyn
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
     bytes = Uint8Array.of(1, 2, 3, 4);
-  const parameters = Array.from({length: 680}, (_, i) => ({
+  const files: H2oFileParameter[] = Array.from({length: 680}, (_, i) => ({
     kind: 'file',
     path: `tensor-${i}.pending`,
     bytes: 4,
@@ -288,11 +402,11 @@ test('fake TVM uploads 680 files plus rotary in order and reads FP32 head', asyn
     dtype: 'uint32',
     shape: [1]
   }));
-  parameters.push(...rotaryInputs());
-  const inventory = Object.fromEntries(
-    parameters.slice(0, 680).map((x) => [x.path, [{offset: 0, length: 4, sha256: digest(bytes)}]])
+  const parameters: H2oParameter[] = [...files, ...rotaryInputs()];
+  const inventory: H2oInventory = Object.fromEntries(
+    files.map((x) => [x.path, [{offset: 0, length: 4, sha256: digest(bytes)}]])
   );
-  const seen = [];
+  const seen: string[] = [];
   const weights = await uploadFakeH2oParameters({
     fake: true,
     owner,
@@ -301,12 +415,12 @@ test('fake TVM uploads 680 files plus rotary in order and reads FP32 head', asyn
     makeHasher,
     async readRange(_base, range) {
       seen.push(range.path);
-      return {bytes: bytes.buffer};
+      return rangeResponse(bytes.buffer);
     }
   });
   assert.deepEqual(
     seen,
-    parameters.slice(0, 680).map((x) => x.path)
+    files.map((x) => x.path)
   );
   assert.equal(weights.length, 682);
   assert.ok(Object.isFrozen(weights));
@@ -314,15 +428,16 @@ test('fake TVM uploads 680 files plus rotary in order and reads FP32 head', asyn
   const runner = attachH2oRunner(owner, weights);
   assert.throws(() => attachH2oRunner(owner, weights), /not available/);
   const scores = await runner.run(inputs(3));
+  assert.ok(scores instanceof Float32Array);
   assert.equal(scores.length, 255);
   assert.equal(scores[1], 2);
-  assert.equal(f.graphCalls[0].length, 687);
-  assert.deepEqual(f.graphCalls[0].slice(5), weights);
+  assert.equal(f.graphCalls[0]!.length, 687);
+  assert.deepEqual(f.graphCalls[0]!.slice(5), weights);
   assert.deepEqual(
     f.writes.slice(-2).map((x) => x.length),
     [20, 8]
   );
-  assert.deepEqual(f.writes.at(-1).bytes, [0, 60, 0, 60, 0, 60, 0, 0]);
+  assert.deepEqual(f.writes.at(-1)!.bytes, [0, 60, 0, 60, 0, 60, 0, 0]);
   await runner.releaseCachedMemory();
   await runner.dispose();
   assert.ok(f.events.includes('clear'));
@@ -333,7 +448,7 @@ test('fake TVM uploads 680 files plus rotary in order and reads FP32 head', asyn
 test('invalid inputs and wrong readback shapes fail before or during graph work', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+  const runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const bad = inputs(3);
   bad[2].data[1] = 1;
   await assert.rejects(runner.run(bad), {code: 'INVALID_INPUT'});
@@ -346,7 +461,7 @@ test('invalid inputs and wrong readback shapes fail before or during graph work'
 test('runner validates and uses one snapshot despite changing getters and hostile iterators', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const values = inputs(3),
     first = values[0].data;
   const counts = {dtype: 0, shape: 0, data: 0};
@@ -396,8 +511,8 @@ test('runner validates and uses one snapshot despite changing getters and hostil
   });
   await runner.run(values);
   assert.deepEqual(counts, {dtype: 1, shape: 1, data: 1});
-  assert.deepEqual(f.graphCalls[0][0].value, [1, 2, 3]);
-  assert.equal(f.writes.at(-2).bytes[0], 0);
+  assert.deepEqual((f.graphCalls[0]![0] as H2oTestTensor).value, [1, 2, 3]);
+  assert.equal(f.writes.at(-2)!.bytes[0], 0);
   assert.equal(mask[0], 1);
   await runner.dispose();
 });
@@ -405,17 +520,18 @@ test('runner validates and uses one snapshot despite changing getters and hostil
 test('runner rejects sparse inputs and shared buffers before graph work', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
-  const sparse = inputs(3);
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
+  const sparse = inputs(3) as unknown[];
   delete sparse[1];
   await assert.rejects(runner.run(sparse), {code: 'INVALID_INPUT'});
   if (typeof SharedArrayBuffer === 'function') {
     for (let i = 0; i < 5; i++) {
       const values = inputs(3),
-        original = values[i].data;
-      const shared = new original.constructor(new SharedArrayBuffer(original.byteLength));
+        original = values[i]!.data;
+      const sharedBuffer = new SharedArrayBuffer(original.byteLength);
+      const shared = original instanceof Int32Array ? new Int32Array(sharedBuffer) : new Uint16Array(sharedBuffer);
       shared.set(original);
-      values[i].data = shared;
+      replaceInputData(values[i]!, shared);
       await assert.rejects(runner.run(values), {code: 'INVALID_INPUT'});
     }
   }
@@ -426,10 +542,10 @@ test('runner rejects sparse inputs and shared buffers before graph work', async 
 test('detached buffers in every descriptor are rejected as invalid input before graph work', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   for (let i = 0; i < 5; i++) {
     const values = inputs(3),
-      buffer = values[i].data.buffer;
+      buffer = values[i]!.data.buffer;
     structuredClone(buffer, {transfer: [buffer]});
     await assert.rejects(runner.run(values), {name: 'WebDecisionError', code: 'INVALID_INPUT'});
   }
@@ -440,15 +556,15 @@ test('detached buffers in every descriptor are rejected as invalid input before 
 test('prototype-swapped arrays cannot impersonate the required typed arrays', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   for (let i = 0; i < 5; i++) {
     const values = inputs(3),
-      original = values[i].data;
+      original = values[i]!.data;
     const forged = new Uint32Array(original);
     if (i === 2) forged[0] = 65536;
     Object.setPrototypeOf(forged, i === 2 || i === 3 ? Uint16Array.prototype : Int32Array.prototype);
     Object.defineProperty(forged, Symbol.toStringTag, {value: i === 2 || i === 3 ? 'Uint16Array' : 'Int32Array'});
-    values[i].data = forged;
+    replaceInputData(values[i]!, forged);
     await assert.rejects(runner.run(values), {code: 'INVALID_INPUT'});
   }
   assert.equal(f.graphCalls.length, 0);
@@ -462,21 +578,22 @@ test('prototype-swapped arrays cannot impersonate the required typed arrays', as
 test('genuine cross-realm typed arrays retain their intrinsic brands', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const values = inputs(3);
   for (const value of values) {
     const type = value.dtype === 'int32' ? 'Int32Array' : 'Uint16Array';
-    value.data = runInNewContext(`new ${type}(${JSON.stringify(Array.from(value.data))})`);
+    const foreignData: unknown = runInNewContext(`new ${type}(${JSON.stringify(Array.from(value.data))})`);
+    replaceInputData(value, foreignData);
   }
   await runner.run(values);
-  assert.deepEqual(f.graphCalls[0][0].value, [1, 2, 3]);
+  assert.deepEqual((f.graphCalls[0]![0] as H2oTestTensor).value, [1, 2, 3]);
   await runner.dispose();
 });
 
 test('invalid first data snapshot cannot be replaced by a later valid getter result', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const values = inputs(3),
     good = values[0].data;
   let reads = 0;
@@ -500,7 +617,7 @@ test('sync failure retains readback scope until settlement and poisons on undrai
     }
   });
   const owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const empty = f.runtime.empty;
   f.runtime.empty = (shape, dtype, where) => {
     const tensor = empty(shape, dtype, where);
@@ -529,7 +646,7 @@ test('sync failure retains readback scope until settlement and poisons on undrai
 test('device loss guard blocks TVM automatic disposal and reuse', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+  const runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   f.lost.resolve({reason: 'fixture'});
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(owner.disposalGuard.blocked, true);
@@ -542,10 +659,20 @@ test('failed fake range verification retains the runtime and never opens a sessi
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
     bytes = Uint8Array.of(1, 2, 3, 4);
-  const entry = {kind: 'file', path: 'a.pending', bytes: 4, sha256: digest(bytes), dtype: 'uint32', shape: [1]};
-  const parameters = Array.from({length: 680}, (_, i) => ({...entry, path: i ? `t-${i}.pending` : 'a.pending'}));
+  const entry: H2oFileParameter = {
+    kind: 'file',
+    path: 'a.pending',
+    bytes: 4,
+    sha256: digest(bytes),
+    dtype: 'uint32',
+    shape: [1]
+  };
+  const parameters: H2oParameter[] = Array.from({length: 680}, (_, i): H2oFileParameter => ({
+    ...entry,
+    path: i ? `t-${i}.pending` : 'a.pending'
+  }));
   parameters.push(...rotaryInputs());
-  const inventory = {'a.pending': [{offset: 0, length: 4, sha256: digest(bytes)}]};
+  const inventory: H2oInventory = {'a.pending': [{offset: 0, length: 4, sha256: digest(bytes)}]};
   await assert.rejects(
     uploadFakeH2oParameters({
       fake: true,
@@ -554,7 +681,7 @@ test('failed fake range verification retains the runtime and never opens a sessi
       inventory,
       makeHasher,
       async readRange() {
-        return {bytes: Uint8Array.of(0, 0, 0, 0).buffer};
+        return rangeResponse(Uint8Array.of(0, 0, 0, 0).buffer);
       }
     }),
     {code: 'INVALID_ASSET'}
@@ -562,14 +689,7 @@ test('failed fake range verification retains the runtime and never opens a sessi
   assert.equal(owner.phase, 'failed');
   assert.equal(owner.disposalGuard.blocked, true);
   assert.equal(f.events.includes('dispose'), false);
-  assert.throws(
-    () =>
-      attachH2oRunner(
-        owner,
-        Array.from({length: 682}, () => ({}))
-      ),
-    /not available/
-  );
+  assert.throws(() => attachH2oRunner(owner, distinctRunnerWeights()), /not available/);
 });
 
 test('whole-file hash mismatch and abort after a range retain the owned runtime', async () => {
@@ -578,7 +698,7 @@ test('whole-file hash mismatch and abort after a range retain the owned runtime'
       owner = initializeH2oRuntime(f.runtime, f.gpu),
       bytes = Uint8Array.of(1, 2, 3, 4);
     const controller = new AbortController();
-    const entry = {
+    const entry: H2oFileParameter = {
       kind: 'file',
       path: 'a.pending',
       bytes: 4,
@@ -586,9 +706,12 @@ test('whole-file hash mismatch and abort after a range retain the owned runtime'
       dtype: 'uint32',
       shape: [1]
     };
-    const parameters = Array.from({length: 680}, (_, i) => ({...entry, path: i ? `t-${i}.pending` : 'a.pending'}));
+    const parameters: H2oParameter[] = Array.from({length: 680}, (_, i): H2oFileParameter => ({
+      ...entry,
+      path: i ? `t-${i}.pending` : 'a.pending'
+    }));
     parameters.push(...rotaryInputs());
-    const inventory = {'a.pending': [{offset: 0, length: 4, sha256: digest(bytes)}]};
+    const inventory: H2oInventory = {'a.pending': [{offset: 0, length: 4, sha256: digest(bytes)}]};
     const task = uploadFakeH2oParameters({
       fake: true,
       owner,
@@ -598,7 +721,7 @@ test('whole-file hash mismatch and abort after a range retain the owned runtime'
       signal: controller.signal,
       async readRange() {
         if (mode === 'abort') controller.abort();
-        return {bytes: bytes.buffer};
+        return rangeResponse(bytes.buffer);
       }
     });
     await assert.rejects(task, mode === 'abort' ? {name: 'AbortError'} : {code: 'INVALID_ASSET'});
@@ -612,7 +735,7 @@ test('direct runner rejects concurrent work while a delayed readback is pending'
   const delayed = deferred(),
     f = fixture();
   const owner = initializeH2oRuntime(f.runtime, f.gpu),
-    runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+    runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const empty = f.runtime.empty;
   f.runtime.empty = (shape, dtype, where) => {
     const tensor = empty(shape, dtype, where);
@@ -637,7 +760,7 @@ test('direct runner rejects concurrent work while a delayed readback is pending'
 test('root scope release failure is retained and every dispose reports the same failure', async () => {
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const weights = Array.from({length: 682}, () => ({}));
+  const weights = distinctRunnerWeights();
   const runner = new H2oTvmRunner({...owner, weights});
   f.runtime.endScope = () => {
     f.events.push('end-failed');
@@ -645,12 +768,15 @@ test('root scope release failure is retained and every dispose reports the same 
   };
   const first = runner.dispose();
   assert.equal(runner.dispose(), first);
-  let reason;
+  let reason: unknown;
   await first.catch((error) => {
     reason = error;
   });
-  assert.equal(reason.code, 'INFERENCE_ERROR');
-  assert.equal(reason.cause.message, 'fake scope cleanup failed');
+  assert.ok(reason && typeof reason === 'object');
+  assert.equal(Reflect.get(reason, 'code'), 'INFERENCE_ERROR');
+  const cause = Reflect.get(reason, 'cause');
+  assert.ok(cause instanceof Error);
+  assert.equal(cause.message, 'fake scope cleanup failed');
   await assert.rejects(runner.dispose(), (error) => error === reason);
   assert.equal(f.events.includes('dispose'), false);
   assert.equal(owner.disposalGuard.blocked, true);
@@ -665,7 +791,7 @@ test('runtime dispose failure retains ownership and rejects repeated disposal', 
     throw new Error('fake runtime cleanup failed');
   };
   const owner = initializeH2oRuntime(f.runtime, f.gpu);
-  const runner = new H2oTvmRunner({...owner, weights: Array.from({length: 682}, () => ({}))});
+  const runner = new H2oTvmRunner({...owner, weights: distinctRunnerWeights()});
   const first = runner.dispose();
   await assert.rejects(first, {code: 'INFERENCE_ERROR'});
   assert.equal(runner.dispose(), first);
@@ -680,16 +806,23 @@ test('upload rejects duplicate files and misplaced rotary tensors before allocat
   const f = fixture(),
     owner = initializeH2oRuntime(f.runtime, f.gpu),
     bytes = Uint8Array.of(1, 2, 3, 4);
-  const entry = {kind: 'file', path: 'a.pending', bytes: 4, sha256: digest(bytes), dtype: 'uint32', shape: [1]};
-  const files = Array.from({length: 680}, (_, i) => ({...entry, path: `t-${i}.pending`}));
-  const good = [...files, ...rotaryInputs()];
-  const duplicate = [...files];
-  duplicate[4] = {...files[3]};
+  const entry: H2oFileParameter = {
+    kind: 'file',
+    path: 'a.pending',
+    bytes: 4,
+    sha256: digest(bytes),
+    dtype: 'uint32',
+    shape: [1]
+  };
+  const files: H2oFileParameter[] = Array.from({length: 680}, (_, i) => ({...entry, path: `t-${i}.pending`}));
+  const good: H2oParameter[] = [...files, ...rotaryInputs()];
+  const duplicate: H2oParameter[] = [...files];
+  duplicate[4] = {...files[3]!};
   duplicate.push(...rotaryInputs());
-  const reversed = [...files, ...rotaryInputs().reverse()];
-  const misplaced = [...good];
-  [misplaced[0], misplaced[680]] = [misplaced[680], misplaced[0]];
-  const onlyRotary = Array.from({length: 682}, (_, i) => ({...rotaryInputs()[i % 2]}));
+  const reversed: H2oParameter[] = [...files, ...rotaryInputs().reverse()];
+  const misplaced: H2oParameter[] = [...good];
+  [misplaced[0], misplaced[680]] = [misplaced[680]!, misplaced[0]!];
+  const onlyRotary: H2oRotaryParameter[] = Array.from({length: 682}, (_, i) => ({...rotaryInputs()[i % 2]!}));
   for (const parameters of [duplicate, reversed, misplaced, onlyRotary]) {
     await assert.rejects(
       uploadFakeH2oParameters({
