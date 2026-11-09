@@ -21,6 +21,22 @@ import {calibrateTamevProbabilities, finishTamevDecision, prepareTamevDecision} 
 import {createTamevRunner} from '../src/tamev/runner.mjs';
 import {createTamevSession} from '../src/tamev/session.mjs';
 import {createTamevTokenizer} from '../src/tamev/tokenizer.mjs';
+import type {TestContext} from 'node:test';
+
+type TamevTokenizer = {
+  readonly special: {readonly clsId: number; readonly sepId: number; readonly padId: number};
+  encodeContext(text: string): {readonly ids: number[]; readonly truncated: boolean};
+  encodeOption(text: string): {readonly ids: number[]; readonly truncated: boolean};
+};
+type TamevSessionRunner = NonNullable<Parameters<typeof createTamevSession>[0]['runner']>;
+type TamevSessionTokenizer = NonNullable<Parameters<typeof createTamevSession>[0]['tokenizer']>;
+type TamevSession = ReturnType<typeof createTamevSession>;
+type TamevPreparedTyped = Parameters<typeof finishTamevSystemOne>[0];
+type TamevDecisionOutput = {readonly dims: number[]; readonly data: BigInt64Array};
+type TamevRunnerInputs = Record<string, TamevDecisionOutput>;
+type TamevMockTensorData = BigInt64Array | Float32Array;
+type TamevMockAssetSource = {read(name: string): Promise<ArrayBuffer>};
+type TamevCheckedOptions = ReturnType<typeof validateTamevLoadOptions>;
 import {finishTamevSystemOne, prepareTamevSystemOne, renderTamevValue} from '../src/tamev/typed.mjs';
 
 const tokenizerData = {model: {type: 'WordPiece'}};
@@ -37,23 +53,32 @@ const tokenizerConfig = {
 class FakeTokenizer {
   constructor() {}
 
-  token_to_id(token) {
-    return {'[CLS]': 101, '[SEP]': 102, '[PAD]': 0}[token];
+  token_to_id(token: string) {
+    const specialTokens = {'[CLS]': 101, '[SEP]': 102, '[PAD]': 0};
+    return specialTokens[token as keyof typeof specialTokens];
   }
 
-  encode(text) {
+  encode(text: string): {ids: number[]} {
     const content = text.trim()
       ? text
           .trim()
           .split(/\s+/u)
-          .map((word) => word.length + 200)
+          .map((word: string) => word.length + 200)
       : [];
     return {ids: [101, ...content, 102]};
   }
 }
 
-function tokenizer() {
-  return createTamevTokenizer(FakeTokenizer, tokenizerData, tokenizerConfig);
+function tokenizer(): TamevTokenizer {
+  return createTamevTokenizer(FakeTokenizer, tokenizerData, tokenizerConfig) as TamevTokenizer;
+}
+
+function itemAt<Value>(values: readonly Value[], index: number): Value {
+  return values[index]!;
+}
+
+function asTestSession(model: unknown): TamevSession {
+  return model as TamevSession;
 }
 
 test('TAMEV pins the current Micro checkpoint and its complete local file set', () => {
@@ -143,19 +168,19 @@ test('TAMEV generic decisions preserve option order and count unpadded encoded t
     questions: [{instructions: 'pick one', options: ['alpha', 'a longer option']}]
   });
   assert.equal(prepared.questions.length, 1);
-  assert.deepEqual(prepared.questions[0].options, ['alpha', 'a longer option']);
-  assert.equal(prepared.questions[0].contextIds.length, 6);
+  assert.deepEqual(itemAt(prepared.questions, 0).options, ['alpha', 'a longer option']);
+  assert.equal(itemAt(prepared.questions, 0).contextIds.length, 6);
   assert.deepEqual(
-    prepared.questions[0].optionRows.map((row) => row.length),
+    itemAt(prepared.questions, 0).optionRows.map((row) => row.length),
     [3, 5]
   );
   assert.equal(prepared.tokenCount, 14);
   assert.equal(prepared.truncated, false);
   const result = finishTamevDecision(prepared, [{logits: [1, 2], probabilities: [0.2, 0.8]}]);
-  assert.equal(result.answers[0].selected, 'a longer option');
-  assert.equal(result.answers[0].selectedIndex, 1);
+  assert.equal(itemAt(result.answers, 0).selected, 'a longer option');
+  assert.equal(itemAt(result.answers, 0).selectedIndex, 1);
   assert.deepEqual(
-    result.answers[0].probabilities.map(({option}) => option),
+    itemAt(result.answers, 0).probabilities.map(({option}) => option),
     ['alpha', 'a longer option']
   );
 });
@@ -163,25 +188,25 @@ test('TAMEV generic decisions preserve option order and count unpadded encoded t
 test('TAMEV generic choices preserve the first winner above the spread argument limit', () => {
   const optionCount = 200_000;
   const options = Array.from({length: optionCount}, (_, index) => `option-${index}`);
-  const probabilities = new Array(optionCount).fill(0);
+  const probabilities = Array.from({length: optionCount}, () => 0);
   probabilities[0] = 0.5;
   probabilities[optionCount - 1] = 0.5;
-  const logits = new Array(optionCount).fill(0);
+  const logits = Array.from({length: optionCount}, () => 0);
 
   const result = finishTamevDecision({questions: [{options}], tokenCount: optionCount}, [{logits, probabilities}]);
 
-  assert.equal(result.answers[0].selected, 'option-0');
-  assert.equal(result.answers[0].selectedIndex, 0);
-  assert.equal(result.answers[0].probabilities.length, optionCount);
-  assert.equal(result.answers[0].probabilities[0].option, 'option-0');
-  assert.equal(result.answers[0].probabilities.at(-1).option, 'option-199999');
+  assert.equal(itemAt(result.answers, 0).selected, 'option-0');
+  assert.equal(itemAt(result.answers, 0).selectedIndex, 0);
+  assert.equal(itemAt(result.answers, 0).probabilities.length, optionCount);
+  assert.equal(itemAt(itemAt(result.answers, 0).probabilities, 0).option, 'option-0');
+  assert.equal(itemAt(result.answers, 0).probabilities.at(-1)!.option, 'option-199999');
 });
 
 test('TAMEV generic and typed choices preserve 78-option order', async () => {
   const options = Array.from({length: 78}, (_, index) => `candidate-${index}`);
   const probabilities = options.map((_, index) => (index === options.length - 1 ? 0.5 : 0.5 / (options.length - 1)));
-  const calls = [];
-  const runner = {
+  const calls: Array<readonly (readonly number[])[]> = [];
+  const runner: TamevSessionRunner = {
     async run(contextIds, optionRows) {
       calls.push(optionRows);
       return {
@@ -198,11 +223,11 @@ test('TAMEV generic and typed choices preserve 78-option order', async () => {
     state: 'state',
     questions: [{instructions: 'pick', options}]
   });
-  assert.equal(calls[0].length, 78);
-  assert.equal(generic.answers[0].selected, options.at(-1));
-  assert.equal(generic.answers[0].selectedIndex, 77);
+  assert.equal(calls[0]!.length, 78);
+  assert.equal(itemAt(generic.answers, 0).selected, options.at(-1));
+  assert.equal(itemAt(generic.answers, 0).selectedIndex, 77);
   assert.deepEqual(
-    generic.answers[0].probabilities.map(({option}) => option),
+    itemAt(generic.answers, 0).probabilities.map(({option}) => option),
     options
   );
 
@@ -210,16 +235,16 @@ test('TAMEV generic and typed choices preserve 78-option order', async () => {
   const typed = await model.systemOne('state', {
     choice: {type: 'choice', criteria}
   });
-  assert.equal(calls[1].length, 78);
-  assert.equal(typed.answers.choice.choice, options.at(-1));
-  assert.deepEqual(Object.keys(typed.answers.choice.probabilities), options);
+  assert.equal(calls[1]!.length, 78);
+  assert.equal(typed.answers.choice!.choice, options.at(-1));
+  assert.deepEqual(Object.keys(typed.answers.choice!.probabilities!), options);
 
   await model.dispose();
 });
 
 test('TAMEV generic and typed requests preserve order above 256 questions', async () => {
-  const calls = [];
-  const runner = {
+  const calls: number[] = [];
+  const runner: TamevSessionRunner = {
     async run(contextIds, optionRows) {
       calls.push(optionRows.length);
       return {logits: [1, 0], probabilities: [0.75, 0.25]};
@@ -239,9 +264,9 @@ test('TAMEV generic and typed requests preserve order above 256 questions', asyn
   const typed = await model.systemOne('state', questions);
 
   assert.equal(generic.answers.length, 257);
-  assert.equal(generic.answers.at(-1).selected, 'first');
+  assert.equal(generic.answers.at(-1)!.selected, 'first');
   assert.deepEqual(Object.keys(typed.answers), names);
-  assert.equal(typed.answers[names.at(-1)].choice, 'first');
+  assert.equal(typed.answers[names.at(-1)!]!.choice, 'first');
   assert.equal(calls.length, 514);
   assert.ok(calls.every((count) => count === 2));
   await model.dispose();
@@ -269,7 +294,7 @@ test('TAMEV snapshots a Proxy data descriptor once without invoking a later acce
       }
     }
   );
-  const encodedOptions = [];
+  const encodedOptions: string[] = [];
   const model = createTamevSession({
     runner: {
       async run() {
@@ -294,7 +319,7 @@ test('TAMEV snapshots a Proxy data descriptor once without invoking a later acce
   });
 
   const result = await model.decide({state: 'state', questions: [{instructions: 'Choose', options}]});
-  assert.equal(result.answers[0].selected, 'A');
+  assert.equal(itemAt(result.answers, 0).selected, 'A');
   assert.deepEqual(encodedOptions, ['A', 'B']);
   assert.equal(counts.descriptorReads, 1);
   assert.equal(counts.getterReads, 0);
@@ -305,14 +330,14 @@ test('TAMEV snapshots a Proxy data descriptor once without invoking a later acce
 
 test('TAMEV preserves inherited data fields while rejecting inherited accessors', async () => {
   const counts = {getter: 0, tokenizer: 0};
-  const runner = {
+  const runner: TamevSessionRunner = {
     async run(_context, options) {
       return {logits: options.map(() => 0), probabilities: options.map(() => 1 / options.length)};
     },
     async releaseCachedMemory() {},
     async dispose() {}
   };
-  const encoder = {
+  const encoder: TamevSessionTokenizer = {
     encodeContext() {
       counts.tokenizer++;
       return {ids: [1], truncated: false};
@@ -326,7 +351,7 @@ test('TAMEV preserves inherited data fields while rejecting inherited accessors'
   const inheritedQuestion = Object.create({instructions: 'Choose', options: ['A', 'B']});
   const inheritedRequest = Object.create({state: 'state', questions: [inheritedQuestion]});
   const result = await model.decide(inheritedRequest);
-  assert.equal(result.answers[0].selected, 'A');
+  assert.equal(itemAt(result.answers, 0).selected, 'A');
 
   let getterReads = 0;
   const questionPrototype = Object.create({options: ['A', 'B']});
@@ -363,8 +388,8 @@ test('TAMEV per-option-count calibration uses only checkpoint entries and preser
 });
 
 test('TAMEV typed inputs keep upstream rendering, option labels, and question kinds', () => {
-  const contextTexts = [];
-  const encoder = {
+  const contextTexts: string[] = [];
+  const encoder: TamevSessionTokenizer = {
     encodeContext(text) {
       contextTexts.push(text);
       return {ids: [101, 202, 102], truncated: false};
@@ -383,14 +408,15 @@ test('TAMEV typed inputs keep upstream rendering, option labels, and question ki
     encoder
   );
   assert.equal(contextTexts[0], 'customer:\n  issue: charged twice\nurgent: False [SEP] Select a queue');
-  assert.equal(prepared.questions[0].options[0], 'billing: duplicate charge');
-  assert.equal(prepared.questions[0].options[1], 'fraud');
-  assert.deepEqual(prepared.questions[1].options, ['No / False', 'Yes / True: no access to cash']);
-  assert.deepEqual(prepared.questions[2].labels, ['0', '1', '2']);
+  assert.equal(itemAt(itemAt(prepared.questions, 0).options, 0), 'billing: duplicate charge');
+  assert.equal(itemAt(itemAt(prepared.questions, 0).options, 1), 'fraud');
+  assert.deepEqual(itemAt(prepared.questions, 1).options, ['No / False', 'Yes / True: no access to cash']);
+  assert.deepEqual(itemAt(prepared.questions, 2).labels, ['0', '1', '2']);
   assert.equal(renderTamevValue(['one', {two: 'three'}]), '- one\n- two: three');
 });
 
 test('TAMEV typed results retain native confidence, yes probability and expected score semantics', () => {
+  // finishTamevSystemOne only reads this subset; keep the original minimal test fixture.
   const prepared = {
     questions: [
       {id: 'route', type: 'choice', labels: ['billing', 'fraud'], tokenCount: 7, truncated: false},
@@ -412,7 +438,7 @@ test('TAMEV typed results retain native confidence, yes probability and expected
         truncated: false
       }
     ]
-  };
+  } as unknown as TamevPreparedTyped;
   const result = finishTamevSystemOne(
     prepared,
     [
@@ -426,44 +452,44 @@ test('TAMEV typed results retain native confidence, yes probability and expected
   assert.equal(result.model, TAMEV_MICRO_MODEL);
   assert.equal(result.tokenCount, 21);
   assert.equal(result.truncated, true);
-  assert.deepEqual(result.answers.route, {
+  assert.deepEqual(result.answers.route!, {
     type: 'choice',
     choice: 'fraud',
     confidence: 0.6,
     probabilities: {billing: 0.2, fraud: 0.8}
   });
-  assert.deepEqual(result.answers.urgent, {type: 'noul', noul: 0.75});
-  assert.deepEqual(result.answers.risk, {
+  assert.deepEqual(result.answers.urgent!, {type: 'noul', noul: 0.75});
+  assert.deepEqual(result.answers.risk!, {
     type: 'score',
     score: 1.2,
     confidence: 0.8,
     legend: {0: 'low', 1: 'medium', 2: 'high'},
     probabilities: {0: 0.1, 1: 0.6, 2: 0.3}
   });
-  assert.equal(result.answers.riskTie.confidence, 0.5333);
+  assert.equal(result.answers.riskTie!.confidence, 0.5333);
 });
 
 test('TAMEV typed choices preserve the first winner above the spread argument limit', () => {
   const optionCount = 200_000;
   const labels = Array.from({length: optionCount}, (_, index) => `choice-${index}`);
-  const probabilities = new Array(optionCount).fill(0);
+  const probabilities = Array.from({length: optionCount}, () => 0);
   probabilities[0] = 0.5;
   probabilities[optionCount - 1] = 0.5;
 
   const result = finishTamevSystemOne(
     {
       questions: [{id: 'choice', type: 'choice', labels, tokenCount: optionCount, truncated: false}]
-    },
+    } as unknown as TamevPreparedTyped,
     [{probabilities}],
     TAMEV_NANO_MODEL
   );
 
-  assert.equal(result.answers.choice.type, 'choice');
-  assert.equal(result.answers.choice.choice, 'choice-0');
-  assert.equal(result.answers.choice.confidence, 0.5);
-  assert.equal(Object.keys(result.answers.choice.probabilities).length, optionCount);
-  assert.equal(Object.keys(result.answers.choice.probabilities)[0], 'choice-0');
-  assert.equal(Object.keys(result.answers.choice.probabilities).at(-1), 'choice-199999');
+  assert.equal(result.answers.choice!.type, 'choice');
+  assert.equal(result.answers.choice!.choice, 'choice-0');
+  assert.equal(result.answers.choice!.confidence, 0.5);
+  assert.equal(Object.keys(result.answers.choice!.probabilities).length, optionCount);
+  assert.equal(Object.keys(result.answers.choice!.probabilities)[0], 'choice-0');
+  assert.equal(Object.keys(result.answers.choice!.probabilities).at(-1), 'choice-199999');
 });
 
 test('TAMEV rejects unsupported typed questions, invalid lengths and cyclic JSON', () => {
@@ -475,24 +501,24 @@ test('TAMEV rejects unsupported typed questions, invalid lengths and cyclic JSON
     () => prepareTamevDecision(encoder, {state: 'state', questions: [{instructions: '', options: ['only one']}]}),
     {code: 'INVALID_INPUT'}
   );
-  const cyclic = {};
+  const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
   assert.throws(() => renderTamevValue(cyclic), {code: 'INVALID_INPUT'});
 });
 
 test('TAMEV runner sends dynamic int64 context and option tensors to the pinned graph', async () => {
   class Tensor {
-    constructor(type, data, dims) {
+    constructor(type: string, data: TamevMockTensorData, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
   }
-  let inputs;
+  let inputs: TamevRunnerInputs | undefined;
   let releases = 0;
   const runner = createTamevRunner(
     {Tensor},
     {
-      async run(value) {
-        inputs = value;
+      async run(value: Record<string, unknown>) {
+        inputs = value as TamevRunnerInputs;
         return {
           logits: new Tensor('float32', Float32Array.of(0.5, 1.5), [1, 2]),
           probs: new Tensor('float32', Float32Array.of(0.25, 0.75), [1, 2])
@@ -511,10 +537,10 @@ test('TAMEV runner sends dynamic int64 context and option tensors to the pinned 
       [101, 4, 5, 102]
     ]
   );
-  assert.deepEqual(inputs.ctx_input_ids.dims, [1, 3]);
-  assert.deepEqual(inputs.opt_input_ids.dims, [1, 2, 4]);
-  assert.deepEqual(Array.from(inputs.opt_input_ids.data), [101n, 3n, 102n, 0n, 101n, 4n, 5n, 102n]);
-  assert.deepEqual(Array.from(inputs.opt_attention_mask.data), [1n, 1n, 1n, 0n, 1n, 1n, 1n, 1n]);
+  assert.deepEqual(inputs!.ctx_input_ids!.dims, [1, 3]);
+  assert.deepEqual(inputs!.opt_input_ids!.dims, [1, 2, 4]);
+  assert.deepEqual(Array.from(inputs!.opt_input_ids!.data), [101n, 3n, 102n, 0n, 101n, 4n, 5n, 102n]);
+  assert.deepEqual(Array.from(inputs!.opt_attention_mask!.data), [1n, 1n, 1n, 0n, 1n, 1n, 1n, 1n]);
   assert.deepEqual(result, {logits: [0.5, 1.5], probabilities: [0.25, 0.75]});
   await runner.releaseCachedMemory();
   await Promise.all([runner.dispose(), runner.dispose()]);
@@ -523,17 +549,17 @@ test('TAMEV runner sends dynamic int64 context and option tensors to the pinned 
 
 test('TAMEV runner preserves a 78-row option axis and output order', async () => {
   class Tensor {
-    constructor(type, data, dims) {
+    constructor(type: string, data: TamevMockTensorData, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
   }
   const optionRows = Array.from({length: 78}, (_, index) => [101, index + 200, 102]);
-  let inputs;
+  let inputs: TamevRunnerInputs | undefined;
   const runner = createTamevRunner(
     {Tensor},
     {
-      async run(value) {
-        inputs = value;
+      async run(value: Record<string, unknown>) {
+        inputs = value as TamevRunnerInputs;
         return {
           logits: new Tensor(
             'float32',
@@ -553,8 +579,8 @@ test('TAMEV runner preserves a 78-row option axis and output order', async () =>
   );
 
   const result = await runner.run([101, 2, 102], optionRows);
-  assert.deepEqual(inputs.opt_input_ids.dims, [1, 78, 3]);
-  assert.deepEqual(Array.from(inputs.opt_input_ids.data).slice(0, 9), [
+  assert.deepEqual(inputs!.opt_input_ids!.dims, [1, 78, 3]);
+  assert.deepEqual(Array.from(inputs!.opt_input_ids!.data).slice(0, 9), [
     101n,
     200n,
     102n,
@@ -565,7 +591,7 @@ test('TAMEV runner preserves a 78-row option axis and output order', async () =>
     202n,
     102n
   ]);
-  assert.deepEqual(Array.from(inputs.opt_input_ids.data).slice(-3), [101n, 277n, 102n]);
+  assert.deepEqual(Array.from(inputs!.opt_input_ids!.data).slice(-3), [101n, 277n, 102n]);
   assert.equal(result.logits.length, 78);
   assert.deepEqual(result.logits.slice(0, 3), [0, 1, 2]);
   assert.equal(result.logits.at(-1), 77);
@@ -574,14 +600,15 @@ test('TAMEV runner preserves a 78-row option axis and output order', async () =>
 
 test('TAMEV runner batches 200k option rows without an argument-count ceiling', async () => {
   const optionCount = 200_000;
-  const optionRows = Array(optionCount).fill([101, 202, 102]);
+  const optionRow = [101, 202, 102];
+  const optionRows = Array.from({length: optionCount}, () => optionRow);
   const logits = new Float32Array(optionCount);
   const probabilities = new Float32Array(optionCount);
   probabilities[0] = 1;
-  let inputs;
+  let inputs: TamevRunnerInputs | undefined;
 
   class Tensor {
-    constructor(type, data, dims) {
+    constructor(type: string, data: TamevMockTensorData, dims: number[]) {
       Object.assign(this, {type, data, dims});
     }
   }
@@ -589,8 +616,8 @@ test('TAMEV runner batches 200k option rows without an argument-count ceiling', 
   const runner = createTamevRunner(
     {Tensor},
     {
-      async run(value) {
-        inputs = value;
+      async run(value: Record<string, unknown>) {
+        inputs = value as TamevRunnerInputs;
         return {
           logits: new Tensor('float32', logits, [1, optionCount]),
           probs: new Tensor('float32', probabilities, [1, optionCount])
@@ -602,8 +629,8 @@ test('TAMEV runner batches 200k option rows without an argument-count ceiling', 
   );
 
   const result = await runner.run([101, 2, 102], optionRows);
-  assert.deepEqual(inputs.opt_input_ids.dims, [1, optionCount, 3]);
-  assert.equal(inputs.opt_input_ids.data.length, optionCount * 3);
+  assert.deepEqual(inputs!.opt_input_ids!.dims, [1, optionCount, 3]);
+  assert.equal(inputs!.opt_input_ids!.data.length, optionCount * 3);
   assert.equal(result.logits.length, optionCount);
   assert.equal(result.probabilities[0], 1);
   assert.equal(result.probabilities.at(-1), 0);
@@ -611,9 +638,9 @@ test('TAMEV runner batches 200k option rows without an argument-count ceiling', 
 });
 
 test('TAMEV session calibrates generic choices and preserves the raw typed protocol', async () => {
-  const calls = [];
+  const calls: Array<{contextIds: readonly number[]; optionRows: readonly (readonly number[])[]}> = [];
   let disposed = 0;
-  const runner = {
+  const runner: TamevSessionRunner = {
     async run(contextIds, optionRows) {
       calls.push({contextIds, optionRows});
       return {logits: [1, 2], probabilities: [0.7, 0.3]};
@@ -635,9 +662,9 @@ test('TAMEV session calibrates generic choices and preserves the raw typed proto
   const typed = await model.systemOne('state', {
     pick: {type: 'choice', instructions: 'pick', criteria: {first: null, second: null}}
   });
-  assert.notEqual(generic.answers[0].probabilities[0].probability, 0.7);
-  assert.ok(generic.answers[0].probabilities[0].probability < 0.7);
-  assert.equal(typed.answers.pick.probabilities.first, 0.7);
+  assert.notEqual(itemAt(itemAt(generic.answers, 0).probabilities, 0).probability, 0.7);
+  assert.ok(itemAt(itemAt(generic.answers, 0).probabilities, 0).probability! < 0.7);
+  assert.equal(typed.answers.pick!.probabilities!.first, 0.7);
   assert.equal(calls.length, 2);
   await Promise.all([model.dispose(), model.dispose()]);
   assert.equal(disposed, 1);
@@ -693,8 +720,8 @@ test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a
     ...TAMEV_NANO_FLASH_PROFILE.expectedConfig,
     calibration_by_k: TAMEV_NANO_FLASH_PROFILE.calibrationByK
   };
-  const source = {
-    async read(name) {
+  const source: TamevMockAssetSource = {
+    async read(name: string) {
       if (name === 'tokenizer.json') return new TextEncoder().encode(JSON.stringify(tokenizerData)).buffer;
       if (name === 'tokenizer_config.json') return new TextEncoder().encode(JSON.stringify(tokenizerConfig)).buffer;
       if (name === 'config.json') return new TextEncoder().encode(JSON.stringify(config)).buffer;
@@ -704,16 +731,16 @@ test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a
   };
 
   for (const assetsUrl of [undefined, 'https://mirror.example.test/tamev/nano-flash']) {
-    let sourceBase;
-    let sessionOptions;
+    let sourceBase: string | undefined;
+    let sessionOptions: unknown;
     const ort = {
       Tensor: class {
-        constructor(type, data, dims) {
+        constructor(type: string, data: TamevMockTensorData, dims: number[]) {
           Object.assign(this, {type, data, dims});
         }
       },
       InferenceSession: {
-        async create(bytes, options) {
+        async create(bytes: Uint8Array, options: unknown) {
           assert.equal(bytes.byteLength, 3);
           sessionOptions = options;
           return {
@@ -730,16 +757,18 @@ test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a
         }
       }
     };
-    const options = {model: TAMEV_NANO_FLASH_MODEL};
+    const options: Record<string, unknown> = {model: TAMEV_NANO_FLASH_MODEL};
     if (assetsUrl !== undefined) options.assetsUrl = assetsUrl;
-    const loaded = await loadTamev(options, {
-      ort,
-      Tokenizer: FakeTokenizer,
-      openSource: async (checked) => {
-        sourceBase = checked.base.href;
-        return source;
-      }
-    });
+    const loaded = asTestSession(
+      await loadTamev(options, {
+        ort,
+        Tokenizer: FakeTokenizer,
+        openSource: async (checked: TamevCheckedOptions) => {
+          sourceBase = checked.base.href;
+          return source;
+        }
+      })
+    );
 
     const expectedBase =
       assetsUrl ??
@@ -755,7 +784,7 @@ test('TAMEV Nano Flash loads by ID, keeps typed behavior and WASM, and accepts a
       route: {type: 'choice', criteria: {billing: 'billing', fraud: 'fraud'}}
     });
     assert.equal(result.model, TAMEV_NANO_FLASH_MODEL);
-    assert.equal(result.answers.route.choice, 'fraud');
+    assert.equal(result.answers.route!.choice, 'fraud');
     await loaded.dispose();
   }
 });
@@ -771,18 +800,19 @@ test('TAMEV stable load failures report the public ID', async () => {
         }
       }
     ),
-    (error) => {
-      assert.equal(error.code, 'MODEL_LOAD_FAILED');
-      assert.equal(error.message, 'Could not load tamev-nano-flash-tinybert-int8.');
-      assert.equal(error.message.includes('experimental-'), false);
+    (error: unknown) => {
+      const loadError = error as {code: unknown; message: string};
+      assert.equal(loadError.code, 'MODEL_LOAD_FAILED');
+      assert.equal(loadError.message, 'Could not load tamev-nano-flash-tinybert-int8.');
+      assert.equal(loadError.message.includes('experimental-'), false);
       return true;
     }
   );
 });
 
-test('TAMEV Nano Flash verifies default and mirror bytes and stays offline on cache misses', async (t) => {
-  const requests = [];
-  t.mock.method(globalThis, 'fetch', async (url) => {
+test('TAMEV Nano Flash verifies default and mirror bytes and stays offline on cache misses', async (t: TestContext) => {
+  const requests: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: Parameters<typeof fetch>[0]) => {
     requests.push(String(url));
     return new Response(new Uint8Array(TAMEV_NANO_FLASH_FILES['config.json'].bytes));
   });
@@ -822,7 +852,7 @@ test('TAMEV Nano Flash verifies default and mirror bytes and stays offline on ca
   });
   t.after(() => {
     if (previousCaches) Object.defineProperty(globalThis, 'caches', previousCaches);
-    else delete globalThis.caches;
+    else Reflect.deleteProperty(globalThis, 'caches');
   });
   const offline = validateTamevLoadOptions({model: TAMEV_NANO_FLASH_MODEL, offline: true}, TAMEV_NANO_FLASH_PROFILE);
   const offlineSource = await openTamevSource(offline, TAMEV_NANO_FLASH_PROFILE);
@@ -838,8 +868,8 @@ test('TAMEV loader checks pinned configuration and ONNX interface before returni
     ...TAMEV_MICRO_PROFILE.expectedConfig,
     calibration_by_k: TAMEV_MICRO_CALIBRATION_BY_K
   };
-  const source = {
-    async read(name) {
+  const source: TamevMockAssetSource = {
+    async read(name: string) {
       if (name === 'tokenizer.json') return new TextEncoder().encode(JSON.stringify(tokenizerData)).buffer;
       if (name === 'tokenizer_config.json') return new TextEncoder().encode(JSON.stringify(tokenizerConfig)).buffer;
       if (name === 'config.json') return new TextEncoder().encode(JSON.stringify(config)).buffer;
@@ -847,16 +877,16 @@ test('TAMEV loader checks pinned configuration and ONNX interface before returni
       throw new Error(`unexpected asset ${name}`);
     }
   };
-  let sessionOptions;
+  let sessionOptions: unknown;
   let released = 0;
   const ort = {
     Tensor: class {
-      constructor(type, data, dims) {
+      constructor(type: string, data: TamevMockTensorData, dims: number[]) {
         Object.assign(this, {type, data, dims});
       }
     },
     InferenceSession: {
-      async create(bytes, options) {
+      async create(bytes: Uint8Array, options: unknown) {
         assert.equal(bytes.byteLength, 3);
         sessionOptions = options;
         return {
@@ -875,17 +905,19 @@ test('TAMEV loader checks pinned configuration and ONNX interface before returni
       }
     }
   };
-  let sourceBase;
-  const loaded = await loadTamevMicro(
-    {model: TAMEV_MICRO_MODEL, cache: false},
-    {
-      ort,
-      Tokenizer: FakeTokenizer,
-      openSource: async (checked) => {
-        sourceBase = checked.base.href;
-        return source;
+  let sourceBase: string | undefined;
+  const loaded = asTestSession(
+    await loadTamevMicro(
+      {model: TAMEV_MICRO_MODEL, cache: false},
+      {
+        ort,
+        Tokenizer: FakeTokenizer,
+        openSource: async (checked: TamevCheckedOptions) => {
+          sourceBase = checked.base.href;
+          return source;
+        }
       }
-    }
+    )
   );
   assert.equal(
     sourceBase,
@@ -898,7 +930,7 @@ test('TAMEV loader checks pinned configuration and ONNX interface before returni
     graphOptimizationLevel: 'all'
   });
   const result = await loaded.decide({state: 'state', questions: [{instructions: 'pick', options: ['a', 'b']}]});
-  assert.equal(result.answers[0].selected, 'b');
+  assert.equal(itemAt(result.answers, 0).selected, 'b');
   await loaded.dispose();
   assert.equal(released, 1);
 });
@@ -908,8 +940,8 @@ test('TAMEV Nano loader accepts the pinned cross-fusion ONNX graph and typed API
     ...TAMEV_NANO_PROFILE.expectedConfig,
     calibration_by_k: TAMEV_NANO_PROFILE.calibrationByK
   };
-  const source = {
-    async read(name) {
+  const source: TamevMockAssetSource = {
+    async read(name: string) {
       if (name === 'tokenizer.json') return new TextEncoder().encode(JSON.stringify(tokenizerData)).buffer;
       if (name === 'tokenizer_config.json') {
         return new TextEncoder().encode(
@@ -924,7 +956,7 @@ test('TAMEV Nano loader accepts the pinned cross-fusion ONNX graph and typed API
   let released = 0;
   const ort = {
     Tensor: class {
-      constructor(type, data, dims) {
+      constructor(type: string, data: TamevMockTensorData, dims: number[]) {
         Object.assign(this, {type, data, dims});
       }
     },
@@ -946,17 +978,19 @@ test('TAMEV Nano loader accepts the pinned cross-fusion ONNX graph and typed API
       }
     }
   };
-  let sourceBase;
-  const loaded = await loadTamevNano(
-    {model: TAMEV_NANO_MODEL},
-    {
-      ort,
-      Tokenizer: FakeTokenizer,
-      openSource: async (checked) => {
-        sourceBase = checked.base.href;
-        return source;
+  let sourceBase: string | undefined;
+  const loaded = asTestSession(
+    await loadTamevNano(
+      {model: TAMEV_NANO_MODEL},
+      {
+        ort,
+        Tokenizer: FakeTokenizer,
+        openSource: async (checked: TamevCheckedOptions) => {
+          sourceBase = checked.base.href;
+          return source;
+        }
       }
-    }
+    )
   );
   assert.equal(
     sourceBase,
@@ -966,7 +1000,7 @@ test('TAMEV Nano loader accepts the pinned cross-fusion ONNX graph and typed API
     route: {type: 'choice', criteria: {billing: 'billing', fraud: 'fraud'}}
   });
   assert.equal(typed.model, TAMEV_NANO_MODEL);
-  assert.equal(typed.answers.route.choice, 'fraud');
+  assert.equal(typed.answers.route!.choice, 'fraud');
   await loaded.dispose();
   assert.equal(released, 1);
 });
