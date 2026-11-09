@@ -1,25 +1,50 @@
 import {WebDecisionError} from '../kev.js';
 import {packMapikaRequest} from '../mapika.js';
 
+type ObjectEntry = [string, unknown];
+type QuestionFields = Record<string, unknown>;
+type QuestionMetadata =
+  | {name: string; type: 'choice'; options: string[]}
+  | {name: string; type: 'noul'}
+  | {name: string; type: 'score'; levels: string[]; isolated: boolean};
+type MapikaLabels = Parameters<typeof packMapikaRequest>[1];
+type MapikaLimits = Parameters<typeof packMapikaRequest>[3];
+type PackedRequest = ReturnType<typeof packMapikaRequest>;
+type DecisionResult = ReturnType<typeof import('../mapika.js').unpackMapikaScores>;
+interface PreparedQuestion {
+  metadata: QuestionMetadata;
+  requests: {instructions: string; options: string[]}[];
+}
+interface PreparedRow {
+  metadata: QuestionMetadata;
+  levelIndex: number | undefined;
+  packed: PackedRequest;
+}
+interface PreparedRequest {
+  rows: PreparedRow[];
+  questions: QuestionMetadata[];
+  tokenCount: number;
+}
+
 const MAX_OPTIONS = 255;
 const MAX_SCORE_LEVELS = 10;
 const MAX_ROWS = 512;
 const NOUL_WITHOUT_INSTRUCTIONS = 'Which answer fits the context?';
 const orderedEntries = Symbol('ordered entries');
 
-function invalid(message) {
+function invalid(message: string): never {
   throw new WebDecisionError('INVALID_INPUT', message);
 }
 
-function isRecord(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function recordEntries(value, label) {
+function recordEntries(value: unknown, label: string): ObjectEntry[] {
   if (!isRecord(value)) invalid(`${label} must be an object.`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== null && prototype !== Object.prototype) invalid(`${label} must be a plain object.`);
-  const entries = [];
+  const entries: ObjectEntry[] = [];
   for (const key of Reflect.ownKeys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor?.enumerable || !Object.hasOwn(descriptor, 'value'))
@@ -29,12 +54,12 @@ function recordEntries(value, label) {
   return entries;
 }
 
-function objectEntries(value, label) {
-  const descriptor = value && Object.getOwnPropertyDescriptor(value, orderedEntries);
-  return descriptor ? descriptor.value : recordEntries(value, label);
+function objectEntries(value: unknown, label: string): ObjectEntry[] {
+  const descriptor = value && Object.getOwnPropertyDescriptor(value as object, orderedEntries);
+  return descriptor ? (descriptor as PropertyDescriptor).value : recordEntries(value, label);
 }
 
-function arrayValues(value, label) {
+function arrayValues(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) invalid(`${label} must be an array.`);
   const values = [];
   for (let index = 0; index < value.length; index++) {
@@ -48,7 +73,7 @@ function arrayValues(value, label) {
   return values;
 }
 
-function jsonNumber(value) {
+function jsonNumber(value: number) {
   if (!Number.isFinite(value)) invalid('JSON numbers must be finite.');
   if (Object.is(value, -0)) return '-0.0';
   const magnitude = Math.abs(value);
@@ -58,7 +83,7 @@ function jsonNumber(value) {
   return String(value);
 }
 
-function pythonQuote(value) {
+function pythonQuote(value: string) {
   const quote = value.includes("'") && !value.includes('"') ? '"' : "'";
   const escaped = value
     .replaceAll('\\', '\\\\')
@@ -69,7 +94,7 @@ function pythonQuote(value) {
   return `${quote}${escaped}${quote}`;
 }
 
-function pythonRepr(value, ancestors = new Set(), depth = 0) {
+function pythonRepr(value: unknown, ancestors = new Set<object>(), depth = 0): string {
   if (typeof value === 'string') return pythonQuote(value);
   if (value === null) return 'None';
   if (value === true) return 'True';
@@ -94,12 +119,12 @@ function pythonRepr(value, ancestors = new Set(), depth = 0) {
   return text;
 }
 
-function orderedRecord(entries) {
+function orderedRecord(entries: ObjectEntry[]) {
   return {[orderedEntries]: entries};
 }
 
-function indexedRecord(entries, index) {
-  const indexed = [['_index', index]];
+function indexedRecord(entries: ObjectEntry[], index: number) {
+  const indexed: ObjectEntry[] = [['_index', index]];
   for (const [key, value] of entries) {
     const existing = indexed.findIndex(([current]) => current === key);
     if (existing < 0) indexed.push([key, value]);
@@ -108,7 +133,7 @@ function indexedRecord(entries, index) {
   return orderedRecord(indexed);
 }
 
-function jsonText(value, ancestors = new Set(), depth = 0) {
+function jsonText(value: unknown, ancestors = new Set<object>(), depth = 0): string {
   if (value === null) return 'null';
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'boolean') return value ? 'true' : 'false';
@@ -135,7 +160,7 @@ function jsonText(value, ancestors = new Set(), depth = 0) {
   return text;
 }
 
-function annotateIndices(value, ancestors = new Set(), depth = 0) {
+function annotateIndices(value: unknown, ancestors = new Set<object>(), depth = 0): unknown {
   if (!value || typeof value !== 'object') return value;
   if (ancestors.has(value)) invalid('JSON values cannot contain cycles.');
   if (depth > 256) invalid('JSON values are nested too deeply.');
@@ -167,34 +192,34 @@ function annotateIndices(value, ancestors = new Set(), depth = 0) {
   return result;
 }
 
-function renderState(state) {
+function renderState(state: unknown) {
   if (typeof state === 'string') return state;
   return jsonText(annotateIndices(state));
 }
 
-function renderValue(value) {
+function renderValue(value: unknown) {
   return typeof value === 'string' ? value : jsonText(value);
 }
 
-function sourceString(value) {
+function sourceString(value: unknown) {
   return typeof value === 'string' ? value : pythonRepr(value);
 }
 
-function selectField(fields, primary, alias, label) {
+function selectField(fields: QuestionFields, primary: string, alias: string | null, label: string) {
   if (Object.hasOwn(fields, primary)) return fields[primary];
   if (alias && Object.hasOwn(fields, alias)) return fields[alias];
   invalid(`${label} is required.`);
 }
 
-function questionFields(value, name) {
+function questionFields(value: unknown, name: string): QuestionFields {
   const entries = recordEntries(value, `Question ${name}`);
   const allowed = new Set(['type', 'instructions', 'question', 'criteria', 'options', 'isolated']);
   if (entries.some(([key]) => !allowed.has(key))) invalid(`Question ${name} has an unsupported field.`);
   return Object.fromEntries(entries);
 }
 
-function choiceOptions(criteria, name) {
-  let entries;
+function choiceOptions(criteria: unknown, name: string) {
+  let entries: ObjectEntry[];
   if (Array.isArray(criteria)) {
     entries = arrayValues(criteria, `Question ${name} criteria`).map((value) => [sourceString(value), null]);
   } else {
@@ -216,7 +241,7 @@ function choiceOptions(criteria, name) {
   return options;
 }
 
-function scoreLevels(criteria, name) {
+function scoreLevels(criteria: unknown, name: string) {
   let values;
   if (Array.isArray(criteria)) {
     values = arrayValues(criteria, `Question ${name} criteria`);
@@ -233,13 +258,13 @@ function scoreLevels(criteria, name) {
   return values.map((value) => renderValue(value));
 }
 
-function hasNoulDescription(criteria, name) {
+function hasNoulDescription(criteria: unknown, name: string) {
   if (criteria == null) return false;
   const entries = recordEntries(criteria, `Question ${name} criteria`);
   return entries.some(([key, value]) => (key === 'true' || key === 'false') && value !== null && value !== '');
 }
 
-function questionInstructions(fields, name, type, criteria) {
+function questionInstructions(fields: QuestionFields, name: string, type: unknown, criteria: unknown) {
   const value = Object.hasOwn(fields, 'instructions')
     ? fields.instructions
     : Object.hasOwn(fields, 'question')
@@ -255,7 +280,7 @@ function questionInstructions(fields, name, type, criteria) {
   return instructions;
 }
 
-function noulOptions(criteria, name) {
+function noulOptions(criteria: unknown, name: string) {
   const descriptions = criteria == null ? [] : recordEntries(criteria, `Question ${name} criteria`);
   if (descriptions.some(([key]) => key !== 'true' && key !== 'false'))
     invalid(`Question ${name} Noul criteria can only describe true and false.`);
@@ -266,7 +291,7 @@ function noulOptions(criteria, name) {
   ];
 }
 
-function questionCriteria(fields, type, name) {
+function questionCriteria(fields: QuestionFields, type: unknown, name: string) {
   if (type === 'noul' || type === 'bool') {
     if (Object.hasOwn(fields, 'criteria')) return fields.criteria;
     if (Object.hasOwn(fields, 'options')) return fields.options;
@@ -275,7 +300,12 @@ function questionCriteria(fields, type, name) {
   return selectField(fields, 'criteria', 'options', `Question ${name} criteria`);
 }
 
-function prepareScoreQuestion(name, fields, instructions, criteria) {
+function prepareScoreQuestion(
+  name: string,
+  fields: QuestionFields,
+  instructions: string,
+  criteria: unknown
+): PreparedQuestion {
   const levels = scoreLevels(criteria, name);
   if (Object.hasOwn(fields, 'isolated') && typeof fields.isolated !== 'boolean')
     invalid(`Question ${name} isolated must be a boolean.`);
@@ -289,7 +319,13 @@ function prepareScoreQuestion(name, fields, instructions, criteria) {
   return {metadata: {name, type: 'score', levels, isolated}, requests};
 }
 
-function prepareTypedQuestion(name, fields, type, instructions, criteria) {
+function prepareTypedQuestion(
+  name: string,
+  fields: QuestionFields,
+  type: unknown,
+  instructions: string,
+  criteria: unknown
+): PreparedQuestion {
   if (type === 'choice') {
     const options = choiceOptions(criteria, name);
     return {
@@ -304,7 +340,15 @@ function prepareTypedQuestion(name, fields, type, instructions, criteria) {
   invalid(`Question ${name} type must be choice, score, noul, or bool.`);
 }
 
-function prepareQuestion(name, value, state, tokenizer, labels, limits, remainingRows) {
+function prepareQuestion(
+  name: string,
+  value: unknown,
+  state: string,
+  tokenizer: unknown,
+  labels: MapikaLabels,
+  limits: MapikaLimits,
+  remainingRows: number
+) {
   const fields = questionFields(value, name);
   const type = Object.hasOwn(fields, 'type') ? fields.type : 'choice';
   const criteria = questionCriteria(fields, type, name);
@@ -322,21 +366,27 @@ function prepareQuestion(name, value, state, tokenizer, labels, limits, remainin
   };
 }
 
-function uniqueTokenCount(rows) {
+function uniqueTokenCount(rows: PreparedRow[]) {
   const ids = rows.map(({packed}) => packed.ids);
-  if (ids.length === 1) return ids[0].length;
+  if (ids.length === 1) return ids[0]!.length;
   const short = Math.min(...ids.map((row) => row.length));
   let common = 0;
-  while (common < short && ids.every((row) => row[common] === ids[0][common])) common++;
+  while (common < short && ids.every((row) => row[common] === ids[0]![common])) common++;
   return common + ids.reduce((total, row) => total + row.length - common, 0);
 }
 
-export function prepareMapikaSystemOne(state, questions, tokenizer, labels, limits) {
+export function prepareMapikaSystemOne(
+  state: unknown,
+  questions: unknown,
+  tokenizer: unknown,
+  labels: MapikaLabels,
+  limits: MapikaLimits
+) {
   const stateText = renderState(state);
   const entries = recordEntries(questions, 'Questions');
   if (!entries.length) invalid('Provide at least one named question.');
-  const prepared = [];
-  const rows = [];
+  const prepared: QuestionMetadata[] = [];
+  const rows: PreparedRow[] = [];
   for (const [name, question] of entries) {
     const next = prepareQuestion(name, question, stateText, tokenizer, labels, limits, MAX_ROWS - rows.length);
     prepared.push(next.metadata);
@@ -349,7 +399,7 @@ export function prepareMapikaSystemOne(state, questions, tokenizer, labels, limi
   };
 }
 
-function certainty(probabilities) {
+function certainty(probabilities: number[]) {
   const entropy = -probabilities.reduce(
     (sum, probability) => (probability > 0 ? sum + probability * Math.log(probability) : sum),
     0
@@ -357,23 +407,23 @@ function certainty(probabilities) {
   return Math.max(0, 1 - entropy / Math.log(probabilities.length));
 }
 
-function rounded(value, digits) {
+function rounded(value: number, digits: number) {
   return Number(value.toFixed(digits));
 }
 
-function normalized(probabilities) {
+function normalized(probabilities: number[]) {
   const total = probabilities.reduce((sum, probability) => sum + probability, 0);
   return total === 0 ? probabilities.map(() => 1 / probabilities.length) : probabilities.map((value) => value / total);
 }
 
-function choiceConfidence(probabilities) {
+function choiceConfidence(probabilities: number[]) {
   const values = normalized(probabilities);
   const count = values.length;
   if (count <= 1) return 1;
   return Math.max(0, Math.min(1, (count * Math.max(...values) - 1) / (count - 1)));
 }
 
-function scoreConfidence(probabilities) {
+function scoreConfidence(probabilities: number[]) {
   const values = normalized(probabilities);
   if (values.length <= 1) return 1;
   const mode = values.indexOf(Math.max(...values));
@@ -383,14 +433,14 @@ function scoreConfidence(probabilities) {
   return Math.max(0, Math.min(1, 1 - spread / uniform));
 }
 
-function answerProbabilities(result, index) {
+function answerProbabilities(result: DecisionResult | undefined, index: number): number[] {
   const answer = result?.answers?.[0];
   if (!answer || !Array.isArray(answer.probabilities) || answer.probabilities.length !== index)
     throw new WebDecisionError('INFERENCE_ERROR', 'Mapika returned an unexpected typed answer.');
   return answer.probabilities.map(({probability}) => probability);
 }
 
-function finishQuestion(question, results) {
+function finishQuestion(question: QuestionMetadata, results: DecisionResult[]) {
   if (question.type === 'choice') {
     const probabilities = answerProbabilities(results[0], question.options.length);
     const selectedIndex = probabilities.indexOf(Math.max(...probabilities));
@@ -398,12 +448,12 @@ function finishQuestion(question, results) {
       type: 'choice',
       choice: question.options[selectedIndex],
       confidence: rounded(choiceConfidence(probabilities), 4),
-      x_p_max: rounded(probabilities[selectedIndex], 4),
+      x_p_max: rounded(probabilities[selectedIndex]!, 4),
       certainty: rounded(certainty(probabilities), 4),
-      probabilities: Object.fromEntries(question.options.map((key, index) => [key, rounded(probabilities[index], 4)]))
+      probabilities: Object.fromEntries(question.options.map((key, index) => [key, rounded(probabilities[index]!, 4)]))
     };
   }
-  if (question.type === 'noul') return {type: 'noul', noul: rounded(answerProbabilities(results[0], 2)[1], 4)};
+  if (question.type === 'noul') return {type: 'noul', noul: rounded(answerProbabilities(results[0], 2)[1]!, 4)};
 
   if (!question.isolated) {
     const probabilities = answerProbabilities(results[0], question.levels.length);
@@ -424,7 +474,7 @@ function finishQuestion(question, results) {
     };
   }
 
-  const levelFit = results.map((result) => answerProbabilities(result, 2)[1]);
+  const levelFit = results.map((result) => answerProbabilities(result, 2)[1]!);
   const fitMass = levelFit.reduce((sum, probability) => sum + probability, 0);
   const probabilities = fitMass > 0 ? levelFit.map((probability) => probability / fitMass) : levelFit.map(() => 0);
   const confidence = scoreConfidence(probabilities);
@@ -447,7 +497,7 @@ function finishQuestion(question, results) {
   };
 }
 
-export function finishMapikaSystemOne(prepared, results, model) {
+export function finishMapikaSystemOne(prepared: PreparedRequest, results: DecisionResult[], model: string) {
   if (results.length !== prepared.rows.length)
     throw new WebDecisionError('INFERENCE_ERROR', 'Mapika returned an unexpected number of typed rows.');
   let offset = 0;

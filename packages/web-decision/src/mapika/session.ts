@@ -134,7 +134,7 @@ export class ExperimentalMapikaSession {
     const signal = options?.signal;
     signal?.throwIfAborted();
     validateDecisionFields(options);
-    const prepared = prepareMapikaSystemOne(state, questions, this.tokenizer, this.labels, this.limits);
+    const prepared = prepareMapikaSystemOne(state, questions, this.tokenizer, this.labels!, this.limits);
     if (this.closed) throw new WebDecisionError('SESSION_CLOSED', 'The model has been disposed.');
 
     const schedule = () => {
