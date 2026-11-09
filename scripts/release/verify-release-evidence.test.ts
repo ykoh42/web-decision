@@ -624,7 +624,7 @@ test('rejects any skip, failure, retry, or omitted required browser case', async
   assert.throws(() => validatePlaywrightReport(omitted, context), /pass count differs/u);
 });
 
-test('requires every pinned representative decision and typed System One run without cross-runtime tolerances', async (t) => {
+test('requires pinned runs and reference selections without new numerical tolerances', async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));
   const valid = await prepareValidReport(fixture);
@@ -677,10 +677,9 @@ test('requires every pinned representative decision and typed System One run wit
     assert.throws(() => validatePlaywrightReport(report, context));
   }
 
-  const observational = structuredClone(valid.report);
-  updateEvidenceRecord(observational, (record) => {
-    const expanded = record.expandedInference;
-    const decision = expanded.decisionCases[1];
+  const wrongDecision = structuredClone(valid.report);
+  updateEvidenceRecord(wrongDecision, (record) => {
+    const decision = record.expandedInference.decisionCases[1];
     decision.observed.logits = [0, 3, 0];
     decision.observed.probabilities = [0.1, 0.8, 0.1];
     decision.observed.selected = decision.request.questions[0].options[1];
@@ -690,14 +689,79 @@ test('requires every pinned representative decision and typed System One run wit
       decision.observed.probabilities,
       decision.reference.probabilities
     );
+  });
+  assert.throws(() => validatePlaywrightReport(wrongDecision, context), /reference selection/u);
 
-    const team = expanded.typedSystemOne.packed.observed.answers.team;
+  const wrongChoice = structuredClone(valid.report);
+  updateEvidenceRecord(wrongChoice, (record) => {
+    const packed = record.expandedInference.typedSystemOne.packed;
+    const team = packed.observed.answers.team;
     team.choice = 'sales';
     team.probabilities = {billing: 0.1, support: 0.2, sales: 0.7};
     team.probabilityEntries = [
       ['billing', 0.1],
       ['support', 0.2],
       ['sales', 0.7]
+    ];
+    packed.observed.answerEntries[0][1] = structuredClone(team);
+    packed.comparison.team = maxDifference(
+      team.probabilityEntries.map((entry: [string, number]) => entry[1]),
+      packed.reference.answers.team.probabilities
+    );
+  });
+  assert.throws(() => validatePlaywrightReport(wrongChoice, context), /reference selection/u);
+
+  const wrongNoul = structuredClone(valid.report);
+  updateEvidenceRecord(wrongNoul, (record) => {
+    const single = record.expandedInference.typedSystemOne.single.refund;
+    single.observed.answers.refund.noul = 0.1;
+    single.observed.answerEntries[0][1] = structuredClone(single.observed.answers.refund);
+    single.comparison.refund = maxDifference([0.9, 0.1], single.reference.answers.refund.probabilities);
+  });
+  assert.throws(() => validatePlaywrightReport(wrongNoul, context), /reference selection/u);
+
+  const wrongScore = structuredClone(valid.report);
+  updateEvidenceRecord(wrongScore, (record) => {
+    const packed = record.expandedInference.typedSystemOne.packed;
+    const answer = packed.observed.answers.sentiment;
+    answer.score = 3.9;
+    answer.probabilities = {'0': 0.01, '1': 0.01, '2': 0.01, '3': 0.01, '4': 0.96};
+    answer.probabilityEntries = [
+      ['0', 0.01],
+      ['1', 0.01],
+      ['2', 0.01],
+      ['3', 0.01],
+      ['4', 0.96]
+    ];
+    packed.observed.answerEntries[2][1] = structuredClone(answer);
+    packed.comparison.sentiment = maxDifference(
+      answer.probabilityEntries.map((entry: [string, number]) => entry[1]),
+      packed.reference.answers.sentiment.probabilities
+    );
+  });
+  assert.throws(() => validatePlaywrightReport(wrongScore, context), /reference selection/u);
+
+  const observational = structuredClone(valid.report);
+  updateEvidenceRecord(observational, (record) => {
+    const expanded = record.expandedInference;
+    const decision = expanded.decisionCases[1];
+    decision.observed.logits = [3, 0, 0];
+    decision.observed.probabilities = [0.8, 0.1, 0.1];
+    decision.observed.selected = decision.request.questions[0].options[0];
+    decision.observed.selectedIndex = 0;
+    decision.comparison.maxAbsoluteLogitDifference = maxDifference(decision.observed.logits, decision.reference.logits);
+    decision.comparison.maxAbsoluteProbabilityDifference = maxDifference(
+      decision.observed.probabilities,
+      decision.reference.probabilities
+    );
+
+    const team = expanded.typedSystemOne.packed.observed.answers.team;
+    team.choice = 'billing';
+    team.probabilities = {billing: 0.7, support: 0.2, sales: 0.1};
+    team.probabilityEntries = [
+      ['billing', 0.7],
+      ['support', 0.2],
+      ['sales', 0.1]
     ];
     expanded.typedSystemOne.packed.observed.answerEntries[0][1] = structuredClone(team);
     expanded.typedSystemOne.packed.comparison.team = maxDifference(

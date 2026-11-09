@@ -10,7 +10,7 @@ import type {
 } from '../../packages/web-decision/src/index.d.ts';
 
 export const EXPANDED_INFERENCE_FIXTURE_PATH = 'tests/fixtures/kev06-expanded-inference.json';
-export const EXPANDED_INFERENCE_FIXTURE_SHA256 = 'e42c5882958ac78374f138a41f2eed78245810845d1f0fbf5af76188d669088b';
+export const EXPANDED_INFERENCE_FIXTURE_SHA256 = '05e7f81d2ec5e8a306c0a8034253e3daa3983c088b8ccd9c29b5130b2eecbd41';
 export const EXPANDED_DECISION_CASE_IDS = [
   'baseline-double-charge',
   'account-security',
@@ -148,7 +148,7 @@ export function validateExpandedInferenceFixture(fixture: ExpandedInferenceFixtu
   assert.equal(fixture.schemaVersion, 1, 'Unsupported expanded inference fixture schema.');
   assert.equal(
     fixture.scope,
-    'pinned-input-and-reference-observations; additional outputs are descriptive, not accuracy thresholds'
+    'pinned-input-and-reference-observations; selections match CPU reference, probability differences descriptive'
   );
   assert.equal(fixture.modelId, MODEL_ID, 'Expanded inference fixture model ID mismatch.');
   assert.equal(fixture.tokenizerSha256, EXPANDED_TOKENIZER_SHA256, 'Expanded inference tokenizer pin is invalid.');
@@ -383,6 +383,7 @@ function validateOneDecisionEvidence(evidence: Record<string, unknown>, fixture:
   const selectedIndex = selectMaximumIndex(probabilities);
   assert.equal(observed.selectedIndex, selectedIndex, `Decision selected index is not argmax for ${fixture.id}.`);
   assert.equal(selected, options[selectedIndex], `Decision selected option is not argmax for ${fixture.id}.`);
+  assert.equal(selected, fixture.reference.selected, `Decision reference selection differs for ${fixture.id}.`);
   assert.deepEqual(
     evidence.comparison,
     {
@@ -471,6 +472,7 @@ function validateChoiceAnswer(
   assert.deepEqual(Object.keys(distribution), options, `${description} probability keys mismatch.`);
   const entries = typedProbabilityEntries(answer.probabilityEntries, options, distribution, description);
   assert.equal(answer.choice, selectMaximum(options, entries), `${description} choice is not the probability argmax.`);
+  assert.equal(answer.choice, reference.selected, `${description} reference selection differs.`);
   assertUnitInterval(answer.confidence, `${description} confidence`);
   return maxAbsoluteDifference(entries, reference.probabilities);
 }
@@ -485,6 +487,11 @@ function validateNoulAnswer(
   const yesProbability = answer.noul as number;
   const probabilities = [1 - yesProbability, yesProbability];
   validateProbabilityVector(probabilities, false, `${description} derived probabilities`);
+  assert.equal(
+    selectMaximum(reference.options, probabilities),
+    reference.selected,
+    `${description} reference selection differs.`
+  );
   return maxAbsoluteDifference(probabilities, reference.probabilities);
 }
 
@@ -498,6 +505,7 @@ function validateScoreAnswer(
   const distribution = numericRecord(answer.probabilities, `${description} probabilities`);
   assert.deepEqual(Object.keys(distribution), options, `${description} score levels mismatch.`);
   const entries = typedProbabilityEntries(answer.probabilityEntries, options, distribution, description);
+  assert.equal(selectMaximum(options, entries), reference.selected, `${description} reference selection differs.`);
   assert.ok(Number.isFinite(answer.score), `${description} score must be finite.`);
   assert.ok((answer.score as number) >= 0 && (answer.score as number) <= criteria.length - 1);
   assertUnitInterval(answer.confidence, `${description} confidence`);

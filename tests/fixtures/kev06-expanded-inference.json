@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scope": "pinned-input-and-reference-observations; additional outputs are descriptive, not accuracy thresholds",
+  "scope": "pinned-input-and-reference-observations; selections match CPU reference, probability differences descriptive",
   "modelId": "kev-0.6b-q4f16",
   "tokenizerSha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
   "sourceGraphSha256": "26e059ddd954efd9897772b098db10b9eeda9b873984dc1c73b32a9ce177c7c8",

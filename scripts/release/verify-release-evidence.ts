@@ -178,7 +178,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(process.env.WEB_DECISION_WORKSPACE_ROOT ?? resolve(SCRIPT_DIRECTORY, '../..'));
 const RELEASE_SCRIPT_DIRECTORY = join(WORKSPACE_ROOT, 'scripts/release');
 const POLICY_PATH = join(RELEASE_SCRIPT_DIRECTORY, 'release-evidence-policy.json');
-export const RELEASE_EVIDENCE_POLICY_SHA256 = '47d4320285c8ed820e6d73d1046aeab9224679a1f75490b48e2080bcee86605e';
+export const RELEASE_EVIDENCE_POLICY_SHA256 = 'e9cc0f4ed17d22485057c3b213f6c8ba7694c94c95956d3afcb55440fe04d4bc';
 export const BASELINE_REFERENCE = Object.freeze({
   packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
   fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',

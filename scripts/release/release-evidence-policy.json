@@ -4,7 +4,7 @@
   "testFile": "tests/browser/kev06-default-source-real-webgpu.spec.ts",
   "expandedInference": {
     "fixturePath": "tests/fixtures/kev06-expanded-inference.json",
-    "fixtureSha256": "e42c5882958ac78374f138a41f2eed78245810845d1f0fbf5af76188d669088b",
+    "fixtureSha256": "05e7f81d2ec5e8a306c0a8034253e3daa3983c088b8ccd9c29b5130b2eecbd41",
     "decisionCaseIds": ["baseline-double-charge", "account-security", "delayed-package", "long-tracking-context"],
     "typedSystemOneId": "typed-system-one-probe",
     "typedQuestionNames": ["team", "refund", "sentiment"],
