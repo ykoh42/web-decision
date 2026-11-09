@@ -37,7 +37,6 @@
     "packages/web-decision/src/skejja/protocol.mjs",
     "packages/web-decision/src/skejja/source.mjs",
     "packages/web-decision/src/strands/loader-core.mjs",
-    "packages/web-decision/src/strands/scope.mjs",
     "packages/web-decision/src/tinydecide/inputs.mjs",
     "packages/web-decision/src/tinydecide/loader.mjs",
     "packages/web-decision/src/tinydecide/session.mjs",
