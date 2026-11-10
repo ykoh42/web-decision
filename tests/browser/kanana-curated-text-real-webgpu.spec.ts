@@ -107,8 +107,12 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
   const modelFile = await open(modelPath, 'r');
   const modelSize = (await stat(modelPath)).size;
   const fetched: {name: string; bytes: number; range?: string}[] = [];
+  const visionWasmRequests: string[] = [];
 
   try {
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.includes('kanana-vision-model')) visionWasmRequests.push(request.url());
+    });
     await page.route(`${kananaUpstreamBase}**`, async (route) => {
       const request = route.request();
       const name = new URL(request.url()).pathname.slice(upstreamPath.length);
@@ -339,6 +343,7 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
     expect(maximumContext.usage.input_tokens).toBeGreaterThan(20_480);
     expect(Object.keys(maximumContext.probabilities)).toEqual(['first', 'second']);
     expect(Object.values(maximumContext.probabilities).every(Number.isFinite)).toBe(true);
+    expect(visionWasmRequests).toEqual([]);
     expect(fetched.some(({name}) => name === 'model.safetensors')).toBe(true);
     expect(browserErrors).toEqual([]);
     console.log(

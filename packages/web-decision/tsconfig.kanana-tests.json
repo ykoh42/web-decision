@@ -31,6 +31,8 @@
     "test/kanana-mrope.test.mts",
     "test/kanana-vision-inputs.test.mts",
     "test/kanana-image-encoder.test.mts",
+    "test/kanana-lazy-wasm.test.mts",
+    "src/kanana/lazy-wasm.ts",
     "test/kanana-protocol.test.mts"
   ]
 }

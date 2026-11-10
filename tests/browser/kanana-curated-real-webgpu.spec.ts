@@ -45,8 +45,12 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
   const modelFile = await open(modelPath, 'r');
   const modelSize = (await stat(modelPath)).size;
   const fetched: {name: string; bytes: number; range?: string}[] = [];
+  const visionWasmRequests: string[] = [];
 
   try {
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.includes('kanana-vision-model')) visionWasmRequests.push(request.url());
+    });
     await page.route(`${kananaUpstreamBase}**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());
@@ -237,6 +241,7 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
     expect(Object.values(imageCountBoundary.probabilities).every(Number.isFinite)).toBe(true);
     expect(imageCountBoundary.rejected).toBe(11);
     expect(imageCountBoundary.rejectionCode).toBe('image_count');
+    expect(visionWasmRequests).toHaveLength(1);
     expect(fetched.some(({name}) => name === 'model.safetensors')).toBe(true);
     expect(browserErrors).toEqual([]);
     console.log(`KANANA_MAX_IMAGE_COUNT_GPU ${JSON.stringify(imageCountBoundary)}`);

@@ -17,6 +17,7 @@
     "src/kanana/scoring.ts",
     "src/kanana/tvm-session.ts",
     "src/kanana/image-encoder.ts",
+    "src/kanana/lazy-wasm.ts",
     "src/kanana/candidates.ts",
     "src/kanana/chat-template.ts",
     "src/kanana/tokenizer.ts",

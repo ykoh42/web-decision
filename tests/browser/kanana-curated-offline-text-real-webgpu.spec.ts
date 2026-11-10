@@ -72,6 +72,7 @@ test('the public Kanana package loader reuses cached text weights with network r
   const modelSize = (await stat(modelPath)).size;
   const fetched: {name: string; bytes: number; range?: string}[] = [];
   const networkAttempts: string[] = [];
+  const visionWasmRequests: string[] = [];
   let blockNetwork = false;
   let localOrigin: string | undefined;
   let profileDirectory: string | undefined;
@@ -89,6 +90,9 @@ test('the public Kanana package loader reuses cached text weights with network r
       ignoreDefaultArgs: ['--enable-unsafe-swiftshader']
     });
     const page = persistentContext.pages()[0] ?? (await persistentContext.newPage());
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.includes('kanana-vision-model')) visionWasmRequests.push(request.url());
+    });
     await page.route('**/*', async (route) => {
       if (!blockNetwork) return route.fallback();
       if (localOrigin && new URL(route.request().url()).origin === localOrigin) return route.fallback();
@@ -211,6 +215,7 @@ test('the public Kanana package loader reuses cached text weights with network r
     expect(onlineRun.result.checkpointSha256).toBe(kananaCheckpointSha256);
     expect(onlineRun.result.backend).toBe('tvm-webgpu');
     expect(onlineRun.result.choice).toBe(expected.choice);
+    expect(visionWasmRequests).toEqual([]);
     for (const [key, probability] of Object.entries(expected.probabilities)) {
       expect(Math.abs(onlineRun.result.probabilities[key]! - probability), key).toBeLessThan(probabilityTolerance);
     }
@@ -263,6 +268,7 @@ test('the public Kanana package loader reuses cached text weights with network r
     expect(offline.confidence).toBe(onlineRun.result.confidence);
     expect(offline.probabilities).toEqual(onlineRun.result.probabilities);
     expect(offline.probabilityEntries).toEqual(onlineRun.result.probabilityEntries);
+    expect(visionWasmRequests).toEqual([]);
     expect(browserErrors).toEqual([]);
 
     console.log(

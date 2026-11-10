@@ -29,6 +29,7 @@ const coreTests = [
   'test/kanana-mrope.test.mts',
   'test/kanana-vision-inputs.test.mts',
   'test/kanana-image-encoder.test.mts',
+  'test/kanana-lazy-wasm.test.mts',
   'test/kanana-magick-image.test.mts',
   'test/kanana-pnm-image.test.mts',
   'test/kanana-tiff16-image.test.mts'

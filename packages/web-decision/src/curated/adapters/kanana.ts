@@ -9,6 +9,7 @@ import {KANANA_ARTIFACT_SOURCES} from '../../kanana/artifacts.js';
 import {decodeKananaImageSource} from '../../kanana/browser-image.js';
 import {createKananaDecisionSession} from '../../kanana/decision-session.js';
 import {createKananaTvmImageEmbeddingEncoder} from '../../kanana/image-encoder.js';
+import {createLazyKananaWasmLoader} from '../../kanana/lazy-wasm.js';
 import {preprocessKananaImage} from '../../kanana/image-processing.js';
 import {KANANA_ASSETS_URL, KANANA_MODEL_ID, KANANA_REPOSITORY, KANANA_REVISION} from '../../kanana/contract.mjs';
 import {openKananaSource as openKananaSourceRuntime} from '../../kanana/source.mjs';
@@ -198,7 +199,8 @@ async function readArtifacts(
     [RANGE_MANIFEST, KANANA_ARTIFACT_SOURCES.rangeManifest]
   ] as const;
   let loadedBytes = 0;
-  const totalBytes = Object.values(artifact.files).reduce((total, file) => total + file.bytes, 0);
+  const totalBytes =
+    rawAssets.reduce((total, [name]) => total + artifact.files[name]!.bytes, 0) + artifact.files[TEXT_WASM]!.bytes;
   const report = (count: number) => {
     loadedBytes += count;
     onProgress?.({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes, phase: 'bundled-assets'});
@@ -210,12 +212,8 @@ async function readArtifacts(
     parsed.set(name, value);
     report(new TextEncoder().encode(source).byteLength);
   }
-  const [textWasm, visionWasm] = await Promise.all([
-    readWasm(KANANA_ARTIFACT_SOURCES.textWasmUrl, TEXT_WASM, artifact.files[TEXT_WASM]!, signal),
-    readWasm(KANANA_ARTIFACT_SOURCES.visionWasmUrl, VISION_WASM, artifact.files[VISION_WASM]!, signal)
-  ]);
+  const textWasm = await readWasm(KANANA_ARTIFACT_SOURCES.textWasmUrl, TEXT_WASM, artifact.files[TEXT_WASM]!, signal);
   report(textWasm.byteLength);
-  report(visionWasm.byteLength);
 
   const textManifest = parsed.get(TEXT_WEIGHTS) as ExternalWeightManifest;
   const visionManifest = parsed.get(VISION_WEIGHTS) as ExternalWeightManifest;
@@ -232,7 +230,21 @@ async function readArtifacts(
   return {
     artifact,
     textWasm,
-    visionWasm,
+    loadVisionWasm: createLazyKananaWasmLoader(async (visionSignal) => {
+      const bytes = await readWasm(
+        KANANA_ARTIFACT_SOURCES.visionWasmUrl,
+        VISION_WASM,
+        artifact.files[VISION_WASM]!,
+        visionSignal
+      );
+      onProgress?.({
+        loadedBytes: bytes.byteLength,
+        totalBytes: bytes.byteLength,
+        fraction: 1,
+        phase: 'vision-assets'
+      });
+      return bytes;
+    }),
     textManifest,
     visionManifest,
     rangeManifest: parsed.get(RANGE_MANIFEST) as RangeManifest
@@ -507,6 +519,8 @@ export async function loadModel(options: object, description: ModelDescription) 
         try {
           visionSignal.throwIfAborted();
           assertDeviceUsable();
+          const visionWasm = await artifacts.loadVisionWasm(visionSignal);
+          visionSignal.throwIfAborted();
           const visionWeightSource = await openKananaVisionWeights({
             base: KANANA_ASSETS_URL,
             manifest: artifacts.rangeManifest,
@@ -530,7 +544,7 @@ export async function loadModel(options: object, description: ModelDescription) 
                 instantiate: instantiate as never,
                 createPolyfillWASI,
                 device: device!,
-                bytes: artifacts.visionWasm
+                bytes: visionWasm
               }),
             visionSignal,
             (setup) => setup.dispose()
