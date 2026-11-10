@@ -56,8 +56,8 @@
       "bytes": 4477518,
       "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
     },
-    "reportSha256": "3d3defba791d19b906e956164395704e912447534c1d738cd2cae6889451c665",
-    "sequenceParityReportSha256": "2f7840e36809d9d60bfcbbeb722fd0372aee1162a0c271ea3a55289d7b324ba7"
+    "reportSha256": "ca16b8d607357fa9d8cbdf72b1f4ef734184c811e13c9420f3d4ae6edf85bc62",
+    "sequenceParityReportSha256": "be53443e9ada55240a743eba66d722546a85ee13fe567b3b80347ec74b9844ec"
   },
   "vision": {
     "script": "scripts/kanana/export_dynamic_vision_tvm.py",
@@ -73,9 +73,9 @@
     "output": {
       "artifact": "kanana-vision-model.wasm",
       "bytes": 4414887,
-      "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+      "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
     },
-    "reportSha256": "86750a3835b28e337df1cce93958b99d6e7bc58f90d1031042228e4395e967dd"
+    "reportSha256": "58672bb84d2edcb92abee26c7a7a31ab3f8affd1d8f71edd45889735b8c750f4"
   },
   "package": {
     "script": "scripts/kanana/package_tvm_artifacts.mts",
@@ -91,5 +91,15 @@
       "<vision-output>"
     ],
     "onnxImportOrExportUsed": false
+  },
+  "buildEnvironment": {
+    "project": "scripts/kanana/build-env/pyproject.toml",
+    "projectSha256": "102fb143b28fb36959e060f91048179dc34b4fbc735ae600df1bcd469c0421c7",
+    "versionFile": "scripts/kanana/build-env/.python-version",
+    "versionFileSha256": "35cafb8c702c5f217b67df5648dfb141cba38156c135a85cf5026d4d92d6bab3",
+    "lockfile": "scripts/kanana/build-env/uv.lock",
+    "lockfileSha256": "aa00ce4e3dd06a627a20fbd6582daa860d125b95fa38a893ff127694f8e6fdbf",
+    "evidenceScript": "scripts/kanana/build_evidence.py",
+    "evidenceScriptSha256": "427c1972119e4718e0a1b8896e2deb30058f7d15b8b358e662fa712890b76052"
   }
 }

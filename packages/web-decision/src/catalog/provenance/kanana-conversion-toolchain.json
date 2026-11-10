@@ -65,9 +65,226 @@
     "transformers": "5.22.2",
     "tvm": "0.27.0.post1"
   },
-  "notRecorded": [
-    "The exact Python interpreter version and executable digest used for the successful candidate build.",
-    "A hash-locked full Python dependency set for the successful candidate build.",
-    "The exact host OS build identifier."
-  ]
+  "observedBuildEnvironment": {
+    "python": {
+      "implementation": "CPython",
+      "version": "3.11.11",
+      "compiler": "Clang 20.1.0 ",
+      "executableSha256": "570b41051d135bcfc011b41272224f7cc66b0d0e7f735761dcb8611029f51d6d",
+      "uvVersion": "uv 0.13.7 (Homebrew 2026-11-03 aarch64-apple-darwin)"
+    },
+    "pythonBuild": {
+      "project": "scripts/kanana/build-env/pyproject.toml",
+      "projectSha256": "102fb143b28fb36959e060f91048179dc34b4fbc735ae600df1bcd469c0421c7",
+      "versionFile": "scripts/kanana/build-env/.python-version",
+      "versionFileSha256": "35cafb8c702c5f217b67df5648dfb141cba38156c135a85cf5026d4d92d6bab3",
+      "lockfile": "scripts/kanana/build-env/uv.lock",
+      "lockfileSha256": "aa00ce4e3dd06a627a20fbd6582daa860d125b95fa38a893ff127694f8e6fdbf",
+      "packages": {
+        "accelerate": "1.15.0",
+        "annotated-doc": "0.0.5",
+        "anyio": "4.16.0",
+        "apache-tvm": "0.27.0.post1",
+        "apache-tvm-ffi": "0.1.15.post1",
+        "certifi": "2026.10.23",
+        "click": "8.5.1",
+        "einops": "0.8.2",
+        "filelock": "4.2.10",
+        "flatbuffers": "25.12.19",
+        "fsspec": "2026.9.0",
+        "h11": "0.16.0",
+        "hf-xet": "1.8.0",
+        "httpcore": "1.0.9",
+        "httpx": "0.28.1",
+        "huggingface-hub": "1.33.0",
+        "idna": "3.20",
+        "jinja2": "3.1.6",
+        "markdown-it-py": "4.2.0",
+        "markupsafe": "3.0.4",
+        "mdurl": "0.1.2",
+        "ml-dtypes": "0.6.0",
+        "mpmath": "1.3.0",
+        "networkx": "3.6.1",
+        "numpy": "2.4.6",
+        "packaging": "26.3",
+        "pillow": "13.0.0",
+        "protobuf": "7.36.2",
+        "psutil": "7.2.2",
+        "pygments": "2.21.0",
+        "pyyaml": "6.0.3",
+        "regex": "2026.11.7",
+        "rich": "15.0.0",
+        "safetensors": "0.8.0",
+        "shellingham": "1.5.4",
+        "sympy": "1.14.0",
+        "tokenizers": "0.23.3",
+        "torch": "2.8.0",
+        "torchvision": "0.23.0",
+        "tqdm": "4.70.1",
+        "transformers": "5.22.2",
+        "typer": "0.28.0",
+        "typing-extensions": "4.16.0"
+      }
+    },
+    "host": {
+      "system": "Darwin",
+      "version": "27.2",
+      "kernel": "27.2.0",
+      "build": "26B123",
+      "machine": "arm64"
+    },
+    "javascript": {
+      "nodeVersion": "v26.11.1",
+      "nodeExecutableSha256": "72661776a737f5bbd7bc66af9dc5a5ef324819a53df518fdc7143127927c1378",
+      "pnpmVersion": "12.18.0",
+      "pnpmExecutableSha256": "5ee6bdb205d2fc5a7f6c1e28f174f037a0055cc161382045008042f159ce7424",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "a077da8963c65f133e8a3ae33ab22a6a7add4de0dc9d0e4337a5c9ec1feed3e2",
+      "projectSha256": "e4c687cb03ced93b7cf28125048b8a84c3155c4e420cee95c4d78e3a2f101ced"
+    },
+    "nativeTvm": {
+      "pythonPackage": {
+        "name": "apache-tvm",
+        "version": "0.27.0.post1",
+        "moduleSha256": "00d82f5c7661c3e19dd94352114648b19f15352fd39ac5b057f2bfbfc170e139",
+        "compilerLibrarySha256": "8bc04690ffab1e73cdb69e9cfc1544981511a8172fb630e4e2f9efae4239dbbb",
+        "runtimeLibrarySha256": "e99d2e4d2ab1861794b3e1fd1e4423d1ee5c97b308274bce227a65114dd5221d",
+        "ffiPackageVersion": "0.1.15.post1",
+        "ffiLibrarySha256": "d53f88f6265ec644c3674476613a895e50074af8b054587214bc7ea7d0a55363"
+      },
+      "source": {
+        "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+        "applyScriptSha256": "3f16956bd90af2b077988d626e31d38d3489a0516ef3c5a7180f17979f61a010",
+        "patches": [
+          {
+            "path": "patches/tvm-webgpu-safe-int64.patch",
+            "sha256": "d121f842a35b8bbf717583fad7b9098ba824a8aee44262d49a964f6e32eb4434"
+          },
+          {
+            "path": "patches/tvm-webgpu-adapter-limits.patch",
+            "sha256": "51fa5d820fce59c2d5eddd959c51fc6e362b3731caaf65e249558c07a0e109fb"
+          },
+          {
+            "path": "patches/tvm-webgpu-bool-storage-int32.patch",
+            "sha256": "5c83161021661adaaf52fb8bf1935fade7659fd7a3a64fab325a180702dd5adb"
+          },
+          {
+            "path": "patches/tvm-webgpu-int32-min-literal.patch",
+            "sha256": "75f9908d707a3bf604a4ed93723fdee96c889be42e7e98f36ff3bef8e3aa0384"
+          },
+          {
+            "path": "patches/tvm-webgpu-float-nonfinite.patch",
+            "sha256": "fc81d99144d4ce471e2ce4523b23a99a03727f34933bdabaf9188d0201b3a17b"
+          },
+          {
+            "path": "patches/tvm-webgpu-grid-bounds.patch",
+            "sha256": "5bce7a212dd907504c2d673d9d414ab135007faf616a4e4d1550dbde14b88f4b"
+          }
+        ],
+        "wasmRuntimeAssets": [
+          {
+            "name": "wasm_runtime.bc",
+            "bytes": 11242132,
+            "sha256": "1974cd7846e3735735fe48828856b7113257a426c24a49e44f45c79c412b972f"
+          },
+          {
+            "name": "tvmjs_support.bc",
+            "bytes": 173768,
+            "sha256": "24088d9f55002852d513af36b64770dacb1825e5dffebb95d23b43f104b19fc9"
+          },
+          {
+            "name": "webgpu_runtime.bc",
+            "bytes": 286844,
+            "sha256": "c4baf79ed300de425db4d81743ab89d36cee323e40e18904c4ef7f196f2fe0aa"
+          }
+        ]
+      },
+      "emscripten": {
+        "revision": "d7b4130688bfa348392b921ab04015aa15c4f154",
+        "version": "4.0.23",
+        "emccVersion": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 4.0.23 (7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed)",
+        "emccSha256": "498eba9b6aacffca1c358ba340fc7b37015d7867cb211c7f2d45784ee9310f03",
+        "clangSha256": "538e37cd01bf3acf8239b62e57ac05823c95d6e15e6f3963c4de6df1a4f4ce5f",
+        "wasmLdSha256": "78c27077265dca11635d5e3b53ed43f0b7640b9f7465ae629d3eb34aac78219d"
+      }
+    }
+  },
+  "observedBuilds": {
+    "text": {
+      "reportSha256": "ca16b8d607357fa9d8cbdf72b1f4ef734184c811e13c9420f3d4ae6edf85bc62",
+      "wasmBytes": 4477518,
+      "wasmSha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+    },
+    "vision": {
+      "reportSha256": "58672bb84d2edcb92abee26c7a7a31ab3f8affd1d8f71edd45889735b8c750f4",
+      "wasmBytes": 4414887,
+      "wasmSha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+    }
+  },
+  "rebuildVariance": {
+    "relaxModuleSha256": "8075a43be07cae054830bcd919787f59c612d4cf07fa0d15103f77c8cd83ed50",
+    "observedWasmSha256": [
+      {
+        "hashSeed": "unset-randomized",
+        "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+      },
+      {
+        "hashSeed": "python-hash-seed-unset",
+        "sha256": "c425cc5233e35867105c0902d2b3b6643c793ba90c76bcb647394a94b3ad3da4"
+      },
+      {
+        "hashSeed": "python-hash-seed-0",
+        "sha256": "5461e91c645c51ea5a8f8ed38c25edec01a303e1f61549fdd4684cbe71aee04b"
+      },
+      {
+        "hashSeed": "python-hash-seed-0",
+        "sha256": "254a63b7bf00dbf6ddbe598ce8dd2840bf033c6af7c4b0fe1dcb53f6604908e5"
+      }
+    ],
+    "note": "Repeated exports produced different WASM bytes while the Relax module bytes matched. The selected 6ddac artifact is pinned by the package manifest and passed the real WebGPU cases recorded below."
+  },
+  "realWebGpuValidation": {
+    "source": "tests/browser/kanana-vision-dynamic-real-webgpu.spec.ts",
+    "browser": "158.0.8127.18",
+    "model": "kakaocorp/kanana-2-v-decide-3b-2611",
+    "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+    "gpu": {
+      "vendor": "apple",
+      "architecture": "metal-3"
+    },
+    "weights": 333,
+    "loadedBytes": 969587936,
+    "cases": [
+      {
+        "name": "minimum-256",
+        "shape": [
+          64,
+          2560
+        ],
+        "maxAbsDelta": 0.000286102294921875,
+        "rmse": 1.8825509952911956e-05
+      },
+      {
+        "name": "middle-384",
+        "shape": [
+          96,
+          2560
+        ],
+        "maxAbsDelta": 0.0005893707275390625,
+        "rmse": 2.363615334114737e-05
+      },
+      {
+        "name": "large-512",
+        "shape": [
+          128,
+          2560
+        ],
+        "maxAbsDelta": 0.001064300537109375,
+        "rmse": 4.709130289033269e-05
+      }
+    ],
+    "webgpuErrors": [],
+    "originalPackageArtifactSha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6",
+    "originalPackageAndSelectedBuildResultsEqual": true
+  }
 }

@@ -4,7 +4,7 @@
     {
       "modelId": "kev-0.6b-q4f16",
       "status": "pending",
-      "artifactLockSha256": "ada7d1f94ff9e224cc00ea5e332a8645a0915fdf311f729e5488bf9a5ccc156b",
+      "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a",
       "evidence": {
         "path": "src/catalog/provenance/kev-0.6b-q4f16.json",
         "sha256": "818a66033384221399e11cec61a924791ab8449bdfae0d329a0f773a16e25f86"
@@ -13,10 +13,10 @@
     {
       "modelId": "kanana-2-v-decide-3b-2611",
       "status": "pending",
-      "artifactLockSha256": "ada7d1f94ff9e224cc00ea5e332a8645a0915fdf311f729e5488bf9a5ccc156b",
+      "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
-        "sha256": "95156abb5a1846439ddd62f8063bc2b7d0a02588ab878b97a6af8f86955fb3df"
+        "sha256": "db9be22cbc3d230d169868c3436bfb586e7aee75c17db9884eec19942018eaa6"
       }
     }
   ]

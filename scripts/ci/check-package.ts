@@ -12,7 +12,7 @@ import {withTemporaryDirectories} from './temporary-directories.ts';
 const stableKevModelId = 'kev-0.6b-q4f16';
 const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2';
 const kananaModelId = 'kanana-2-v-decide-3b-2611';
-const kananaManifestSha256 = 'b5e27c7b4ed9f3074ee7c65dfee64405057f73d6be4b4f079a1817739b9d2df9';
+const kananaManifestSha256 = '0e2b8ea3cd733e3fef807d574f68960b06cbfd4e0f919af408f4ca76a18bc801';
 const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
 const kananaRequiredNotice =
   'Kanana is licensed in accordance with the Kanana Open License Agreement. Copyright © KAKAO Corp. All Rights Reserved.';

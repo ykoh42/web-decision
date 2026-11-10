@@ -99,7 +99,7 @@ test('committed pending records pass integrity checks without becoming releasabl
   assert.deepEqual(result.pendingModelIds, ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']);
 });
 
-test('Kanana provenance pins the exact packaged license and records its unresolved deployment scope', async () => {
+test('Kanana provenance pins the license, captured build environment, and unresolved deployment scope', async () => {
   const evidenceBytes = await readFile(
     join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT, 'kanana-2-v-decide-3b-2611.json')
   );
@@ -115,6 +115,14 @@ test('Kanana provenance pins the exact packaged license and records its unresolv
     unresolved: string[];
   };
   const licenseBytes = await readFile(join(PACKAGE_ROOT, 'KANANA-OPEN-LICENSE.txt'));
+  const toolchainBytes = await readFile(join(WORKSPACE_ROOT, evidence.conversion.toolchain.path));
+  const toolchain = JSON.parse(toolchainBytes.toString('utf8')) as {
+    observedBuildEnvironment: {
+      python: {version: string; executableSha256: string};
+      pythonBuild: {lockfile: string; lockfileSha256: string; packages: Record<string, string>};
+      host: {system: string; build: string; machine: string};
+    };
+  };
   const licenseReference = evidence.knownReferences.find(({url}) => url.endsWith('/LICENSE'));
 
   assert.equal(evidence.status, 'pending');
@@ -123,7 +131,17 @@ test('Kanana provenance pins the exact packaged license and records its unresolv
   assert.equal(licenseReference.sha256, sha256(licenseBytes));
   assert.match(licenseReference.scope, /Section 4\.1\(iii\)/u);
   assert.ok(evidence.unresolved.some((item) => item.includes('Section 4.1(iii)')));
-  assert.ok(evidence.unresolved.some((item) => item.includes('hash-locked dependencies')));
+  assert.ok(!evidence.unresolved.some((item) => item.includes('hash-locked dependencies')));
+  assert.equal(toolchain.observedBuildEnvironment.python.version, '3.11.11');
+  assert.match(toolchain.observedBuildEnvironment.python.executableSha256, /^[a-f0-9]{64}$/u);
+  assert.equal(toolchain.observedBuildEnvironment.pythonBuild.lockfile, 'scripts/kanana/build-env/uv.lock');
+  assert.equal(
+    toolchain.observedBuildEnvironment.pythonBuild.lockfileSha256,
+    sha256(await readFile(join(WORKSPACE_ROOT, toolchain.observedBuildEnvironment.pythonBuild.lockfile)))
+  );
+  assert.equal(toolchain.observedBuildEnvironment.host.system, 'Darwin');
+  assert.equal(toolchain.observedBuildEnvironment.host.build, '26B123');
+  assert.equal(toolchain.observedBuildEnvironment.host.machine, 'arm64');
   assert.equal(evidence.conversion.artifactLockSha256, sha256(await readFile(ARTIFACT_LOCK_PATH)));
   for (const reference of [evidence.conversion.recipe, evidence.conversion.config, evidence.conversion.toolchain]) {
     const bytes = await readFile(join(WORKSPACE_ROOT, reference.path));

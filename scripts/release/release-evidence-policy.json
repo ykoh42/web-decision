@@ -18,7 +18,7 @@
     "schemaVersion": 1,
     "evidencePrefix": "WEB_DECISION_KANANA_RELEASE_EVIDENCE_V1:",
     "archive": {
-      "sha256": "2185124f0ffd0f92d8a58eb74f95a8f94d19bf4d12134c3fb0567ba1d313c948",
+      "sha256": "1593aeda2fee97ac89bc177c72ac103999aef061785deecc3a98231e5eeabeae",
       "packageName": "web-decision",
       "packageVersion": "0.4.0"
     },
@@ -28,8 +28,8 @@
       "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
       "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
       "manifestPath": "assets/kanana/manifest.json",
-      "manifestRawSha256": "8703f7eeaad4ad84fb2dbba671668774d88af652ecfb4014d2cebf821f73e968",
-      "manifestSha256": "b5e27c7b4ed9f3074ee7c65dfee64405057f73d6be4b4f079a1817739b9d2df9",
+      "manifestRawSha256": "0a97f2f3febed6b48be667c34c928891904efc2443dc4b95e0e78767b08eb858",
+      "manifestSha256": "0e2b8ea3cd733e3fef807d574f68960b06cbfd4e0f919af408f4ca76a18bc801",
       "artifactFiles": {
         "kanana-text-model.wasm": {
           "bytes": 4477518,
@@ -41,7 +41,7 @@
         },
         "kanana-vision-model.wasm": {
           "bytes": 4414887,
-          "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+          "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
         },
         "vision-weight-manifest.json": {
           "bytes": 100018,

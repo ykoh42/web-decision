@@ -114,8 +114,8 @@
       "schemaVersion": 1,
       "manifest": {
         "sourcePath": "assets/kanana/manifest.json",
-        "rawSha256": "8703f7eeaad4ad84fb2dbba671668774d88af652ecfb4014d2cebf821f73e968",
-        "canonicalSha256": "b5e27c7b4ed9f3074ee7c65dfee64405057f73d6be4b4f079a1817739b9d2df9",
+        "rawSha256": "0a97f2f3febed6b48be667c34c928891904efc2443dc4b95e0e78767b08eb858",
+        "canonicalSha256": "0e2b8ea3cd733e3fef807d574f68960b06cbfd4e0f919af408f4ca76a18bc801",
         "canonicalBytes": 1383,
         "experimental": false,
         "files": {
@@ -129,7 +129,7 @@
           },
           "kanana-vision-model.wasm": {
             "bytes": 4414887,
-            "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+            "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
           },
           "vision-weight-manifest.json": {
             "bytes": 100018,
@@ -158,7 +158,7 @@
           "manifestName": "kanana-vision-model.wasm",
           "sourcePath": "assets/kanana/kanana-vision-model.wasm",
           "bytes": 4414887,
-          "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+          "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
         },
         {
           "manifestName": "vision-weight-manifest.json",

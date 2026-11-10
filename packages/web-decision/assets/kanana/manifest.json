@@ -38,7 +38,7 @@
     },
     "kanana-vision-model.wasm": {
       "bytes": 4414887,
-      "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+      "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
     },
     "vision-weight-manifest.json": {
       "bytes": 100018,
