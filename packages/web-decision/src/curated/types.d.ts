@@ -21,7 +21,7 @@ export interface ModelProgress {
   readonly loadedBytes: number;
   readonly totalBytes: number;
   readonly fraction: number;
-  readonly phase?: 'bundled-assets' | 'upstream-source' | 'asset-verification';
+  readonly phase?: 'bundled-assets' | 'upstream-source' | 'asset-verification' | 'vision-weights';
 }
 
 export interface CommonLoadOptions {

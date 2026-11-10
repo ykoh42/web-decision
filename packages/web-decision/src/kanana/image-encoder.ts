@@ -19,7 +19,8 @@ type PreprocessedImage = Readonly<{
 type VisionInferenceSession = Readonly<{
   infer(
     pixelValues: ArrayLike<number>,
-    visionGridThw: ImageGrid
+    visionGridThw: ImageGrid,
+    signal?: AbortSignal
   ): PromiseLike<{
     shape: readonly number[];
     dtype: 'float32';
@@ -83,7 +84,7 @@ export function createKananaTvmImageEmbeddingEncoder({
       const grid = grids[index]!;
       if (!sameGrid(prepared.imageTokenThw, grid))
         throw new RangeError(`Kanana image ${index} preprocessor grid does not match the prompt token grid.`);
-      const encoded = await vision.infer(prepared.pixelValues, prepared.visionGridThw);
+      const encoded = await vision.infer(prepared.pixelValues, prepared.visionGridThw, signal);
       throwIfAborted(signal);
       const expectedTokens = grid[0] * grid[1] * grid[2];
       if (

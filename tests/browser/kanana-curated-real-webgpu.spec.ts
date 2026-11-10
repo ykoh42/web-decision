@@ -16,7 +16,8 @@ import {
   localKananaCandidateMode
 } from './kanana-release-evidence.ts';
 
-const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode;
+const localBuildMode = process.env.WEB_DECISION_KANANA_LOCAL_BUILD_GPU === '1';
+const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode || localBuildMode;
 const upstreamPath = new URL(kananaUpstreamBase).pathname;
 
 async function readRange(file: Awaited<ReturnType<typeof open>>, start: number, end: number) {
@@ -38,7 +39,7 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
   test.skip(!enabled, 'Set WEB_DECISION_KANANA_CURATED_REAL_GPU=1 to run the full package consumer GPU check.');
   test.setTimeout(45 * 60 * 1000);
 
-  const releaseInputs = await collectInstalledKananaReleaseInputs();
+  const releaseInputs = localBuildMode ? null : await collectInstalledKananaReleaseInputs();
   await verifyPinnedKananaSnapshot();
   const modelPath = resolve(kananaSnapshotDirectory, 'model.safetensors');
   const modelFile = await open(modelPath, 'r');
@@ -242,6 +243,7 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
     console.log(
       `KANANA_CURATED_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), adapterInfo, result, fetchedRanges: fetched.length, fetchedBytes: fetched.reduce((sum, item) => sum + item.bytes, 0)})}`
     );
+    if (releaseInputs === null) return;
     if (localKananaCandidateMode && process.env.WEB_DECISION_KANANA_EMIT_EVIDENCE !== '1') return;
     const evidence = createKananaReleaseEvidenceEnvelope({
       inputs: releaseInputs,

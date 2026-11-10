@@ -8,8 +8,18 @@ const baseURL = `http://127.0.0.1:${port}`;
 const realGPU =
   process.env.WEB_DECISION_REAL_GPU === '1' ||
   process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' ||
-  process.env.WEB_DECISION_KANANA_LOCAL_GPU === '1';
-const requestedBrowser = process.env.WEB_DECISION_BROWSER_NAME || 'chromium';
+  process.env.WEB_DECISION_KANANA_LOCAL_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_LOCAL_BUILD_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_REAL_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_FIREFOX_INFERENCE === '1' ||
+  process.env.WEB_DECISION_KANANA_EXPECT_RESOURCE_LIMIT === '1';
+const kananaFirefoxMode =
+  process.env.WEB_DECISION_KANANA_FIREFOX_INFERENCE === '1' ||
+  process.env.WEB_DECISION_KANANA_EXPECT_RESOURCE_LIMIT === '1';
+const requestedBrowser = process.env.WEB_DECISION_BROWSER_NAME || (kananaFirefoxMode ? 'firefox' : 'chromium');
+if (kananaFirefoxMode && requestedBrowser !== 'firefox') {
+  throw new Error('Kanana Firefox inference and resource-limit modes require Firefox.');
+}
 if (!['chromium', 'firefox', 'webkit'].includes(requestedBrowser)) {
   throw new Error(`Unsupported browser: ${requestedBrowser}`);
 }

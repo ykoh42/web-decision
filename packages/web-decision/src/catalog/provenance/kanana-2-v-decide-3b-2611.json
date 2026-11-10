@@ -22,7 +22,7 @@
     },
     "toolchain": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json",
-      "sha256": "da3051455e6d7335db3508cccd6c9dd2c878721dad77c3f9da076aa9a18f9b80"
+      "sha256": "82b4f7f51627d69baf2ed44e20a5c4b7a5af206db3078f3c2ea45478f6a8e725"
     },
     "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a"
   },

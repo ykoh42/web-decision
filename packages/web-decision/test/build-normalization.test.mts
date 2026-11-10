@@ -56,10 +56,14 @@ test('build fails when the expected TVM marker format is missing', () => {
 });
 
 test('the package build rejects a changed TVM WebGPU source', () => {
-  assert.doesNotThrow(() => assertPinnedWebgpuHash('f9dcc047285dfe7d0b9d3eee0ce81df3c20cd5935cd34db581f6bce1ac887f23'));
+  assert.doesNotThrow(() => assertPinnedWebgpuHash('01e67c6e6f0dd887bd12dac03619866456e2a9caf72e8c8a9dc249ed3bcf83e1'));
+  assert.throws(
+    () => assertPinnedWebgpuHash('b8f58d5abafc2d32d5462bdfbaa4b4b53abf0fd5b3c0a09dbafd9d8ff58502b7'),
+    /differs from the verified patch set/
+  );
   assert.throws(
     () => assertPinnedWebgpuHash('92ba506841dc0eddedc8b1ea1ea64e37ff7dfce2d2f3fae297df6f9ec282bc5c'),
-    /differs from the verified patch/
+    /differs from the verified patch set/
   );
 });
 

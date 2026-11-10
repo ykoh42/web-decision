@@ -3,10 +3,10 @@ import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
-// This preview uses the exact pinned original TVM WebGPU source.
+// This preview uses the exact pinned TVM WebGPU source after its patch set.
 export function assertPinnedWebgpuHash(actual: string): void {
-  if (actual !== 'f9dcc047285dfe7d0b9d3eee0ce81df3c20cd5935cd34db581f6bce1ac887f23') {
-    throw new Error('The TVM WebGPU adapter-limits source differs from the verified patch.');
+  if (actual !== '01e67c6e6f0dd887bd12dac03619866456e2a9caf72e8c8a9dc249ed3bcf83e1') {
+    throw new Error('The TVM WebGPU source differs from the verified patch set.');
   }
 }
 

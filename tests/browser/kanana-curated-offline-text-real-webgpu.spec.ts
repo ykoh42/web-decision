@@ -19,7 +19,8 @@ import {
   localKananaCandidateMode
 } from './kanana-release-evidence.ts';
 
-const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode;
+const localBuildMode = process.env.WEB_DECISION_KANANA_LOCAL_BUILD_GPU === '1';
+const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode || localBuildMode;
 const upstreamPath = new URL(kananaUpstreamBase).pathname;
 const probabilityTolerance = 0.001;
 const fixtureBytes = readFileSync(new URL('../fixtures/kanana-decision-python-reference.json', import.meta.url));
@@ -57,9 +58,11 @@ test('the public Kanana package loader reuses cached text weights with network r
   test.skip(!enabled, 'Set WEB_DECISION_KANANA_CURATED_REAL_GPU=1 to run the full package consumer GPU check.');
   test.setTimeout(45 * 60 * 1000);
 
-  const releaseInputs = await collectInstalledKananaReleaseInputs();
-  expect(fixtureSha256).toBe(releaseInputs.policy.referenceFixture.sha256);
-  expect(reference.modelId).toBe(`${releaseInputs.policy.model.repository}`);
+  const releaseInputs = localBuildMode ? null : await collectInstalledKananaReleaseInputs();
+  expect(fixtureSha256).toBe(
+    releaseInputs?.policy.referenceFixture.sha256 ?? '822156454d468153cef23fde6fad8c88b59821d9da1b86897733fa906abfd420'
+  );
+  expect(reference.modelId).toBe(releaseInputs?.policy.model.repository ?? `kakaocorp/${kananaModelId}`);
   expect(reference.revision).toBe(kananaRevision);
   expect(reference.checkpointSha256).toBe(kananaCheckpointSha256);
   await verifyPinnedKananaSnapshot();
@@ -219,7 +222,9 @@ test('the public Kanana package loader reuses cached text weights with network r
       const cacheNames = await caches.keys();
       if (!cacheNames.includes(cacheName)) return false;
       const cache = await caches.open(cacheName);
-      return (await cache.keys()).some((key) => new URL(key.url).pathname.endsWith('/kanana-offline-complete-v1.json'));
+      return (await cache.keys()).some((key) =>
+        new URL(key.url).pathname.endsWith('/kanana-text-offline-complete-v1.json')
+      );
     });
     expect(hasCompletionMarker).toBe(true);
 
@@ -263,6 +268,7 @@ test('the public Kanana package loader reuses cached text weights with network r
     console.log(
       `KANANA_CURATED_OFFLINE_TEXT_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), online: onlineRun.result, offline, fetchedRanges: fetchedRanges.length, fetchedBytes: fetchedRanges.reduce((sum, item) => sum + item.bytes, 0), networkAttempts})}`
     );
+    if (releaseInputs === null) return;
     if (localKananaCandidateMode && process.env.WEB_DECISION_KANANA_EMIT_EVIDENCE !== '1') return;
     const evidence = createKananaReleaseEvidenceEnvelope({
       inputs: releaseInputs,

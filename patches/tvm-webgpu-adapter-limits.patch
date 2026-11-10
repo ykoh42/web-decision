@@ -1,11 +1,8 @@
 diff --git a/web/src/webgpu.ts b/web/src/webgpu.ts
-index 038f9ac..1946d68 100644
+index 038f9ac..6520de3 100644
 --- a/web/src/webgpu.ts
 +++ b/web/src/webgpu.ts
-@@ -61,53 +61,8 @@ export async function detectGPUDevice(powerPreference: "low-power" | "high-perfo
-           "For more information about WebGPU support in your browser, visit https://webgpureport.org/"
-       );
-     }
+@@ -64,47 +64,2 @@ export async function detectGPUDevice(powerPreference: "low-power" | "high-perfo
 -    const computeMB = (value: number) => {
 -      return Math.ceil(value / (1 << 20)) + "MB";
 -    }
@@ -55,6 +52,13 @@ index 038f9ac..1946d68 100644
 -    }
 +    const requiredMaxBufferSize = adapter.limits.maxBufferSize;
 +    const requiredMaxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
- 
-     const requiredMaxComputeWorkgroupStorageSize = 32 << 10;
-     if (requiredMaxComputeWorkgroupStorageSize > adapter.limits.maxComputeWorkgroupStorageSize) {
+@@ -121,8 +76 @@ export async function detectGPUDevice(powerPreference: "low-power" | "high-perfo
+-    const requiredMaxStorageBuffersPerShaderStage = 10;  // default is 8
+-    if (requiredMaxStorageBuffersPerShaderStage > adapter.limits.maxStorageBuffersPerShaderStage) {
+-      throw Error(
+-        `Cannot initialize runtime because of requested maxStorageBuffersPerShaderStage ` +
+-        `exceeds limit. requested=${requiredMaxStorageBuffersPerShaderStage}, ` +
+-        `limit=${adapter.limits.maxStorageBuffersPerShaderStage}. `
+-      );
+-    }
++    const requiredMaxStorageBuffersPerShaderStage = adapter.limits.maxStorageBuffersPerShaderStage;

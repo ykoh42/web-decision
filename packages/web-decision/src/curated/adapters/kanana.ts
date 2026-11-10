@@ -14,10 +14,15 @@ import {KANANA_ASSETS_URL, KANANA_MODEL_ID, KANANA_REPOSITORY, KANANA_REVISION} 
 import {openKananaSource as openKananaSourceRuntime} from '../../kanana/source.mjs';
 import {createKananaTokenizer} from '../../kanana/tokenizer-asset.mjs';
 import {missingKananaWeightLimits} from '../../kanana/device-limits.js';
-import {KANANA_SAFETENSORS_SPEC, openKananaModelWeightSource} from '../../kanana/weight-source.mjs';
+import {
+  KANANA_SAFETENSORS_SPEC,
+  openKananaVisionWeightSource,
+  openKananaWeightSource
+} from '../../kanana/weight-source.mjs';
 import {convertFp16ToFp32} from '../../kanana/safetensors.mjs';
 import {createKananaTvmInferenceSession, createKananaTvmVisionInferenceSession} from '../../kanana/tvm-session.js';
 import {setupKananaTvmRuntime} from '../../kanana/tvm-runtime.js';
+import {mapKananaTvmResourceError} from '../../kanana/tvm-resource-error.js';
 
 type ArtifactFile = Readonly<{bytes: number; sha256: string}>;
 type ArtifactManifest = Readonly<{
@@ -63,8 +68,7 @@ type OpenKananaSource = (options: {
 type OpenKananaWeights = (options: {
   base: string;
   manifest: RangeManifest;
-  textWeights: readonly ExternalWeight[];
-  visionWeights: readonly ExternalWeight[];
+  requiredWeights: readonly ExternalWeight[];
   cache: Cache | null;
   offline: boolean;
   signal?: AbortSignal | undefined;
@@ -84,7 +88,8 @@ const VISION_WASM = 'kanana-vision-model.wasm';
 const VISION_WEIGHTS = 'vision-weight-manifest.json';
 const RANGE_MANIFEST = 'safetensors-range-manifest.json';
 const openKananaSource = openKananaSourceRuntime as unknown as OpenKananaSource;
-const openKananaWeights = openKananaModelWeightSource as unknown as OpenKananaWeights;
+const openKananaWeights = openKananaWeightSource as unknown as OpenKananaWeights;
+const openKananaVisionWeights = openKananaVisionWeightSource as unknown as OpenKananaWeights;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -265,6 +270,16 @@ function expectedWeightBytes(text: readonly ExternalWeight[], vision: readonly E
   return count;
 }
 
+function expectedWeightReadBytes(weights: readonly ExternalWeight[], manifest: RangeManifest): number {
+  const headerLength = manifest['headerLength'];
+  if (!Number.isSafeInteger(headerLength) || (headerLength as number) < 2)
+    throw new WebDecisionError('INVALID_ASSET', 'Kanana Safetensors header length is invalid.');
+  const total = expectedWeightBytes(weights, []) + (headerLength as number) + 8;
+  if (!Number.isSafeInteger(total))
+    throw new WebDecisionError('INVALID_ASSET', 'Kanana weight read size exceeds the safe range.');
+  return total;
+}
+
 function imageCache() {
   const entries = new Map<unknown, Promise<ImageCacheEntry>>();
   const preparedByPixels = new WeakMap<Uint8Array, ReturnType<typeof preprocessKananaImage>>();
@@ -300,16 +315,21 @@ function imageCache() {
   };
 }
 
-function disposeBoth(text: TvmTextSession, vision: TvmVisionSession): Promise<void> {
-  return Promise.allSettled([text.dispose(), vision.dispose()]).then((results) => {
-    const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1)
-      throw new AggregateError(errors, 'Kanana TVM sessions failed to dispose.', {cause: errors[0]});
-  });
+function disposeBoth(text: TvmTextSession | undefined, vision: TvmVisionSession | undefined): Promise<void> {
+  const sessions = [text, vision].filter(
+    (session): session is TvmTextSession | TvmVisionSession => session !== undefined
+  );
+  return Promise.allSettled(sessions.map((session) => Promise.resolve().then(() => session.dispose()))).then(
+    (results) => {
+      const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1)
+        throw new AggregateError(errors, 'Kanana TVM sessions failed to dispose.', {cause: errors[0]});
+    }
+  );
 }
 
-/** Load the full pinned Kanana text and vision graphs from the curated package catalog. */
+/** Load Kanana text weights now and verified vision weights when an image is used. */
 export async function loadModel(options: object, description: ModelDescription) {
   const loadOptions = options as KananaLoadOptions;
   const {cache = true, offline = false, signal, onProgress} = loadOptions;
@@ -324,11 +344,13 @@ export async function loadModel(options: object, description: ModelDescription) 
   let visionSetup: TvmSetup | undefined;
   let textInference: TvmTextSession | undefined;
   let visionInference: TvmVisionSession | undefined;
+  let visionLoading: Promise<TvmVisionSession> | undefined;
   let decision: KananaSession | undefined;
   let removeDeviceListener: (() => void) | undefined;
   let disposed = false;
   let deviceFailure: unknown;
   const gpuErrors: string[] = [];
+  const modelAbort = new AbortController();
 
   try {
     const detected = await waitForAbort(
@@ -411,22 +433,22 @@ export async function loadModel(options: object, description: ModelDescription) 
       throw new WebDecisionError('INVALID_ASSET', 'Kanana vision configuration differs from the pinned graph inputs.');
 
     const visionSourceWeights = fp16VisionWeights(artifacts.visionManifest.weights);
-    const totalWeightBytes = expectedWeightBytes(artifacts.textManifest.weights, visionSourceWeights);
-    let loadedWeightBytes = 0;
-    const weightSource = await openKananaWeights({
+    const textWeightBytes = expectedWeightReadBytes(artifacts.textManifest.weights, artifacts.rangeManifest);
+    let loadedTextWeightBytes = 0;
+    const cacheStore = await openAssetCache(cache, signal);
+    const textWeightSource = await openKananaWeights({
       base: KANANA_ASSETS_URL,
       manifest: artifacts.rangeManifest,
-      textWeights: artifacts.textManifest.weights,
-      visionWeights: visionSourceWeights,
-      cache: await openAssetCache(cache, signal),
+      requiredWeights: artifacts.textManifest.weights,
+      cache: cacheStore,
       offline,
       signal,
       onBytes(bytes: number) {
-        loadedWeightBytes += bytes;
+        loadedTextWeightBytes += bytes;
         onProgress?.({
-          loadedBytes: loadedWeightBytes,
-          totalBytes: totalWeightBytes,
-          fraction: Math.min(1, loadedWeightBytes / totalWeightBytes),
+          loadedBytes: loadedTextWeightBytes,
+          totalBytes: textWeightBytes,
+          fraction: Math.min(1, loadedTextWeightBytes / textWeightBytes),
           phase: 'asset-verification'
         });
       }
@@ -443,43 +465,15 @@ export async function loadModel(options: object, description: ModelDescription) 
       signal,
       (setup) => setup.dispose()
     );
-    visionSetup = await waitForAbort(
-      () =>
-        setupKananaTvmRuntime({
-          instantiate: instantiate as never,
-          createPolyfillWASI,
-          device: device!,
-          bytes: artifacts.visionWasm
-        }),
-      signal,
-      (setup) => setup.dispose()
-    );
     signal?.throwIfAborted();
 
     const assertDeviceUsable = () => {
+      modelAbort.signal.throwIfAborted();
       if (deviceFailure)
         throw new WebDecisionError('INFERENCE_ERROR', 'The Kanana WebGPU device was lost.', {cause: deviceFailure});
       if (gpuErrors.length)
         throw new WebDecisionError('INFERENCE_ERROR', `Kanana WebGPU reported an error: ${gpuErrors[0]}`);
     };
-
-    visionInference = await createKananaTvmVisionInferenceSession({
-      setup: visionSetup as never,
-      weightSource: {
-        manifest: {weights: visionRuntimeWeights(artifacts.visionManifest.weights)},
-        async readWeight(record) {
-          signal?.throwIfAborted();
-          const tensor = await weightSource.readTensor(record.name, {signal});
-          signal?.throwIfAborted();
-          return convertFp16ToFp32(tensor.bytes);
-        }
-      },
-      patchValues: visionConfig.in_channels! * visionConfig.temporal_patch_size! * visionConfig.patch_size! ** 2,
-      numPositionEmbeddings: visionConfig.num_position_embeddings!,
-      spatialMergeSize: visionConfig.spatial_merge_size!,
-      maxPatchCount: artifacts.artifact.runtime.visionGraph.maxPatchCount
-    });
-    visionSetup = undefined;
 
     textInference = await createKananaTvmInferenceSession({
       setup: textSetup as never,
@@ -487,21 +481,124 @@ export async function loadModel(options: object, description: ModelDescription) 
         manifest: {weights: artifacts.textManifest.weights},
         async readWeight(record) {
           signal?.throwIfAborted();
-          const tensor = await weightSource.readTensor(record.name, {signal});
+          const tensor = await textWeightSource.readTensor(record.name, {signal});
           signal?.throwIfAborted();
           return tensor.bytes;
         }
       }
     });
     textSetup = undefined;
-    await weightSource.commit({signal});
+    await textWeightSource.commit({signal});
+
+    const loadVisionInference = (requestSignal?: AbortSignal): Promise<TvmVisionSession> => {
+      requestSignal?.throwIfAborted();
+      if (visionLoading) return visionLoading;
+      if (visionInference) return Promise.resolve(visionInference);
+      const visionWeightBytes = expectedWeightReadBytes(visionSourceWeights, artifacts.rangeManifest);
+      let loadedVisionWeightBytes = 0;
+      const pending = (async () => {
+        let session: TvmVisionSession | undefined;
+        const visionAbort = new AbortController();
+        const abortVisionLoad = () => visionAbort.abort();
+        modelAbort.signal.addEventListener('abort', abortVisionLoad, {once: true});
+        requestSignal?.addEventListener('abort', abortVisionLoad, {once: true});
+        if (modelAbort.signal.aborted || requestSignal?.aborted) abortVisionLoad();
+        const visionSignal = visionAbort.signal;
+        try {
+          visionSignal.throwIfAborted();
+          assertDeviceUsable();
+          const visionWeightSource = await openKananaVisionWeights({
+            base: KANANA_ASSETS_URL,
+            manifest: artifacts.rangeManifest,
+            requiredWeights: visionSourceWeights,
+            cache: cacheStore,
+            offline,
+            signal: visionSignal,
+            onBytes(bytes: number) {
+              loadedVisionWeightBytes += bytes;
+              onProgress?.({
+                loadedBytes: loadedVisionWeightBytes,
+                totalBytes: visionWeightBytes,
+                fraction: Math.min(1, loadedVisionWeightBytes / visionWeightBytes),
+                phase: 'vision-weights'
+              });
+            }
+          });
+          visionSetup = await waitForAbort(
+            () =>
+              setupKananaTvmRuntime({
+                instantiate: instantiate as never,
+                createPolyfillWASI,
+                device: device!,
+                bytes: artifacts.visionWasm
+              }),
+            visionSignal,
+            (setup) => setup.dispose()
+          );
+          session = await createKananaTvmVisionInferenceSession({
+            setup: visionSetup as never,
+            weightSource: {
+              manifest: {weights: visionRuntimeWeights(artifacts.visionManifest.weights)},
+              async readWeight(record) {
+                visionSignal.throwIfAborted();
+                const tensor = await visionWeightSource.readTensor(record.name, {signal: visionSignal});
+                visionSignal.throwIfAborted();
+                return convertFp16ToFp32(tensor.bytes);
+              }
+            },
+            patchValues: visionConfig.in_channels! * visionConfig.temporal_patch_size! * visionConfig.patch_size! ** 2,
+            numPositionEmbeddings: visionConfig.num_position_embeddings!,
+            spatialMergeSize: visionConfig.spatial_merge_size!,
+            maxPatchCount: artifacts.artifact.runtime.visionGraph.maxPatchCount
+          });
+          visionSetup = undefined;
+          visionInference = session;
+          await visionWeightSource.commit({signal: visionSignal});
+          assertDeviceUsable();
+          return session;
+        } catch (cause) {
+          const setup = visionSetup;
+          visionSetup = undefined;
+          visionInference = undefined;
+          const cleanup = await Promise.allSettled([
+            Promise.resolve().then(() => session?.dispose()),
+            Promise.resolve().then(() => setup?.dispose())
+          ]);
+          const cleanupErrors = cleanup.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+          const failure = cleanupErrors.length
+            ? new AggregateError([cause, ...cleanupErrors], 'Kanana vision loading and cleanup both failed.', {
+                cause
+              })
+            : cause;
+          throw mapKananaTvmResourceError(failure);
+        } finally {
+          modelAbort.signal.removeEventListener('abort', abortVisionLoad);
+          requestSignal?.removeEventListener('abort', abortVisionLoad);
+        }
+      })();
+      visionLoading = pending;
+      void pending.then(
+        () => {
+          if (visionLoading === pending) visionLoading = undefined;
+        },
+        () => {
+          if (visionLoading === pending) visionLoading = undefined;
+        }
+      );
+      return pending;
+    };
 
     const images = imageCache();
     const prepareImageEmbeddings = createKananaTvmImageEmbeddingEncoder({
       vision: {
-        async infer(pixelValues, visionGridThw) {
+        async infer(pixelValues, visionGridThw, requestSignal) {
           assertDeviceUsable();
-          const result = await visionInference!.infer(pixelValues, visionGridThw);
+          requestSignal?.throwIfAborted();
+          const inference = await loadVisionInference(requestSignal);
+          requestSignal?.throwIfAborted();
+          assertDeviceUsable();
+          const result = await inference.infer(pixelValues, visionGridThw);
+          requestSignal?.throwIfAborted();
           assertDeviceUsable();
           return result;
         }
@@ -540,19 +637,25 @@ export async function loadModel(options: object, description: ModelDescription) 
         return result;
       },
       dispose: async () => {
-        if (textInference && visionInference) await disposeBoth(textInference, visionInference);
+        await visionLoading?.catch(() => undefined);
+        await disposeBoth(textInference, visionInference);
       }
     });
 
     const session = decision;
+    const runDecision: KananaSession['systemOne'] = (...args) =>
+      session.systemOne(...args).catch((cause) => {
+        throw mapKananaTvmResourceError(cause);
+      });
     let disposal: Promise<void> | undefined;
     return {
       modelId: KANANA_MODEL_ID,
-      decide: session.decide,
-      systemOne: session.systemOne,
+      decide: runDecision,
+      systemOne: runDecision,
       dispose() {
         if (!disposal) {
           disposed = true;
+          modelAbort.abort();
           disposal = session.dispose().finally(() => {
             removeDeviceListener?.();
             device?.destroy();
@@ -563,6 +666,7 @@ export async function loadModel(options: object, description: ModelDescription) 
     };
   } catch (cause) {
     disposed = true;
+    modelAbort.abort();
     removeDeviceListener?.();
     const cleanup = await Promise.allSettled([
       Promise.resolve().then(() => decision?.dispose()),
@@ -573,9 +677,9 @@ export async function loadModel(options: object, description: ModelDescription) 
     ]);
     device?.destroy();
     const cleanupErrors = cleanup.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
-    if (cleanupErrors.length) {
-      throw new AggregateError([cause, ...cleanupErrors], 'Kanana model loading and cleanup both failed.', {cause});
-    }
-    throw cause;
+    const failure = cleanupErrors.length
+      ? new AggregateError([cause, ...cleanupErrors], 'Kanana model loading and cleanup both failed.', {cause})
+      : cause;
+    throw mapKananaTvmResourceError(failure);
   }
 }

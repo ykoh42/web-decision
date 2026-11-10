@@ -27,6 +27,8 @@
     "kanana-curated-real-webgpu.spec.ts",
     "kanana-curated-offline-text-real-webgpu.spec.ts",
     "kanana-curated-text-real-webgpu.spec.ts",
+    "kanana-kernel-compat.spec.ts",
+    "kanana-local-text-real-webgpu.spec.ts",
     "kanana-release-evidence.ts",
     "kev06-default-source-real-webgpu.spec.ts",
     "kev06-expanded-inference.ts",

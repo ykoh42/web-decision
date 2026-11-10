@@ -112,6 +112,7 @@ type OpenSafetensorsWeightSourceOptions = Readonly<{
   offline?: boolean | undefined;
   signal?: AbortSignal | null | undefined;
   onBytes?: ((count: number) => void) | undefined;
+  markerPath?: string | undefined;
 }>;
 type ReadTensorChunksOptions = Readonly<{
   dtype?: string | undefined;
@@ -341,7 +342,8 @@ export async function openSafetensorsWeightSource({
   cache,
   offline = false,
   signal,
-  onBytes
+  onBytes,
+  markerPath = 'kanana-offline-complete-v1.json'
 }: OpenSafetensorsWeightSourceOptions) {
   const resolvedBase = checkedBase(base);
   const manifest = checkedManifest(value);
@@ -380,7 +382,7 @@ export async function openSafetensorsWeightSource({
     offline,
     signal,
     markerId: `kanana-safetensors:${manifest.headerSha256}:${requiredIdentity}`,
-    markerPath: 'kanana-offline-complete-v1.json'
+    markerPath
   });
   await transaction.open();
   transaction.require(rangeSpecs);
@@ -508,6 +510,7 @@ type PinnedWeightSourceOptions = Readonly<{
   cache?: AssetCache | null | undefined;
   offline?: boolean | undefined;
   signal?: AbortSignal | null | undefined;
+  onBytes?: ((count: number) => void) | undefined;
 }>;
 
 /** Open the revision-pinned upstream BF16 checkpoint, given its generated per-range hash manifest. */
@@ -517,12 +520,22 @@ export async function openKananaWeightSource({
   requiredWeights,
   cache,
   offline = false,
-  signal
+  signal,
+  onBytes
 }: PinnedWeightSourceOptions) {
   validatePinnedManifest(manifest);
   if (!Array.isArray(requiredWeights) || requiredWeights.length !== KANANA_TEXT_GRAPH_WEIGHT_COUNT)
     throw invalid(`The current Kanana text TVM graph requires exactly ${KANANA_TEXT_GRAPH_WEIGHT_COUNT} weights.`);
-  return openSafetensorsWeightSource({base, manifest, requiredWeights, cache, offline, signal});
+  return openSafetensorsWeightSource({
+    base,
+    manifest,
+    requiredWeights,
+    cache,
+    offline,
+    signal,
+    onBytes,
+    markerPath: 'kanana-text-offline-complete-v1.json'
+  });
 }
 
 /** Open only the revision-pinned Safetensors ranges used by the native TVM vision graph. */
@@ -532,12 +545,22 @@ export async function openKananaVisionWeightSource({
   requiredWeights,
   cache,
   offline = false,
-  signal
+  signal,
+  onBytes
 }: PinnedWeightSourceOptions) {
   validatePinnedManifest(manifest);
   if (!Array.isArray(requiredWeights) || requiredWeights.length !== KANANA_VISION_GRAPH_WEIGHT_COUNT)
     throw invalid(`The current Kanana vision TVM graph requires exactly ${KANANA_VISION_GRAPH_WEIGHT_COUNT} weights.`);
-  return openSafetensorsWeightSource({base, manifest, requiredWeights, cache, offline, signal});
+  return openSafetensorsWeightSource({
+    base,
+    manifest,
+    requiredWeights,
+    cache,
+    offline,
+    signal,
+    onBytes,
+    markerPath: 'kanana-vision-offline-complete-v1.json'
+  });
 }
 
 /** Open one verified cache transaction covering both pinned Kanana TVM graphs. */
@@ -575,6 +598,7 @@ export async function openKananaModelWeightSource({
     cache,
     offline,
     signal,
-    onBytes
+    onBytes,
+    markerPath: 'kanana-offline-complete-v1.json'
   });
 }

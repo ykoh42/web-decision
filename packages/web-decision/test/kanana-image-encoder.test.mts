@@ -74,6 +74,64 @@ test('rejects image grid and vision output mismatches without changing prompt or
   await assert.rejects(encoder(['first'], [[1, 1, 1]]), /prompt token grid/);
 });
 
+test('forwards distinct AbortSignals to concurrent vision inference calls', async () => {
+  const firstController = new AbortController();
+  const secondController = new AbortController();
+  const signals: AbortSignal[] = [];
+  const resolutions = new Map<
+    AbortSignal,
+    (result: {shape: readonly number[]; dtype: 'float32'; values: Float32Array}) => void
+  >();
+  let resolveBothStarted!: () => void;
+  const bothStarted = new Promise<void>((resolve) => {
+    resolveBothStarted = resolve;
+  });
+  let decoderCount = 0;
+  let resolveDecoders!: () => void;
+  const bothDecoded = new Promise<void>((resolve) => {
+    resolveDecoders = resolve;
+  });
+
+  const encoder = createKananaTvmImageEmbeddingEncoder({
+    async decode(source: unknown) {
+      decoderCount++;
+      if (decoderCount === 2) resolveDecoders();
+      await bothDecoded;
+      return {rgb: new Uint8Array([source === 'first' ? 1 : 2]), width: 1, height: 1};
+    },
+    preprocess(rgb: Uint8Array) {
+      return {
+        imageTokenThw: [1, 1, 1],
+        pixelValues: Float32Array.from([rgb[0]!]),
+        visionGridThw: [1, 2, 2]
+      };
+    },
+    vision: {
+      infer(_pixels: ArrayLike<number>, _grid: readonly [number, number, number], signal?: AbortSignal) {
+        if (!signal) throw new Error('vision inference did not receive a request signal');
+        signals.push(signal);
+        const pending = new Promise<{shape: readonly number[]; dtype: 'float32'; values: Float32Array}>((resolve) =>
+          resolutions.set(signal, resolve)
+        );
+        if (signals.length === 2) resolveBothStarted();
+        return pending;
+      }
+    }
+  });
+
+  const first = encoder(['first'], [[1, 1, 1]], firstController.signal);
+  const second = encoder(['second'], [[1, 1, 1]], secondController.signal);
+  await bothStarted;
+
+  assert.deepEqual(signals, [firstController.signal, secondController.signal]);
+  firstController.abort(new Error('first request cancelled'));
+  for (const resolve of resolutions.values())
+    resolve({shape: [1, 2_560], dtype: 'float32', values: new Float32Array(2_560)});
+
+  await assert.rejects(first, /first request cancelled/);
+  await assert.doesNotReject(second);
+});
+
 test('aborts before starting the next image and rejects unsupported aggregate token counts', async () => {
   const controller = new AbortController();
   const encoder = createKananaTvmImageEmbeddingEncoder({

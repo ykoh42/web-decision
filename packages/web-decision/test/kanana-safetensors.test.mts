@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
@@ -12,6 +12,7 @@ import {
 } from '../src/kanana/safetensors.mjs';
 import {
   KANANA_SAFETENSORS_SPEC,
+  openKananaVisionWeightSource,
   openKananaWeightSource,
   openSafetensorsWeightSource
 } from '../src/kanana/weight-source.mjs';
@@ -385,6 +386,207 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     await offline.readTensor('weights.bf16', {dtype: 'float16'});
     await offline.readTensor('scale.f32');
     assert.equal(requests.length, requestCount);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('opens text and vision caches independently with distinct completion markers', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kanana-safetensors-'));
+  const fixture = tinyModel();
+  const filePath = join(directory, 'model.safetensors');
+  await writeFile(filePath, fixture.file);
+  const manifest = await hashSafetensorsFile(filePath, {path: 'model.safetensors', chunkBytes: 8});
+  const cacheEntries = new Map<string, Response>();
+  const cache = {
+    async match(key: string) {
+      return cacheEntries.get(key)?.clone();
+    },
+    async put(key: string, response: Response) {
+      cacheEntries.set(key, response.clone());
+    }
+  };
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const range = new Headers(init?.headers).get('Range');
+    assert.ok(range);
+    const match = /^bytes=(\d+)-(\d+)$/.exec(range);
+    assert.ok(match);
+    const start = Number(match[1]!);
+    const end = Number(match[2]!);
+    const bytes = fixture.file.subarray(start, end + 1);
+    return new Response(bytes, {
+      status: 206,
+      headers: {
+        'Content-Range': `bytes ${start}-${end}/${fixture.file.byteLength}`,
+        'Content-Length': String(bytes.byteLength)
+      }
+    });
+  };
+
+  const textWeights = [{name: 'weights.bf16', shape: [4], dtype: 'float16', length: 8}];
+  const visionWeights = [{name: 'model.visual.patch_embed.proj.weight', shape: [2], dtype: 'float16', length: 4}];
+  const base = new URL('https://fixture.invalid/checkpoint/');
+  try {
+    const text = await openSafetensorsWeightSource({
+      base,
+      manifest,
+      requiredWeights: textWeights,
+      cache,
+      markerPath: 'kanana-text-offline-complete-v1.json'
+    });
+    await text.readTensor('weights.bf16');
+    assert.equal(await text.commit(), true);
+
+    await assert.rejects(
+      openSafetensorsWeightSource({
+        base,
+        manifest,
+        requiredWeights: visionWeights,
+        cache,
+        offline: true,
+        markerPath: 'kanana-vision-offline-complete-v1.json'
+      }),
+      {code: 'ASSET_LOAD_FAILED'}
+    );
+
+    const textOffline = await openSafetensorsWeightSource({
+      base,
+      manifest,
+      requiredWeights: textWeights,
+      cache,
+      offline: true,
+      markerPath: 'kanana-text-offline-complete-v1.json'
+    });
+    await textOffline.readTensor('weights.bf16');
+
+    const vision = await openSafetensorsWeightSource({
+      base,
+      manifest,
+      requiredWeights: visionWeights,
+      cache,
+      markerPath: 'kanana-vision-offline-complete-v1.json'
+    });
+    await vision.readTensor('model.visual.patch_embed.proj.weight');
+    assert.equal(await vision.commit(), true);
+
+    const visionOffline = await openSafetensorsWeightSource({
+      base,
+      manifest,
+      requiredWeights: visionWeights,
+      cache,
+      offline: true,
+      markerPath: 'kanana-vision-offline-complete-v1.json'
+    });
+    await visionOffline.readTensor('model.visual.patch_embed.proj.weight');
+
+    const markerPaths = [...cacheEntries.keys()].map((key) => new URL(key).pathname);
+    assert.ok(markerPaths.includes('/checkpoint/kanana-text-offline-complete-v1.json'));
+    assert.ok(markerPaths.includes('/checkpoint/kanana-vision-offline-complete-v1.json'));
+    assert.equal(markerPaths.includes('/checkpoint/kanana-offline-complete-v1.json'), false);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('uses separate pinned offline markers for the public text and vision sources', async () => {
+  const readJson = async (path: string) => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
+  const [manifest, textManifest, visionManifest] = await Promise.all([
+    readJson('../assets/kanana/safetensors-range-manifest.json'),
+    readJson('../assets/kanana/text-weight-manifest.json'),
+    readJson('../assets/kanana/vision-weight-manifest.json')
+  ]);
+  const textWeights = textManifest.weights;
+  const visionWeights = visionManifest.weights.map(({name, shape}: {name: string; shape: number[]}) => ({
+    name,
+    shape,
+    dtype: 'float16',
+    length: shape.reduce((count, dimension) => count * dimension, 1) * 2
+  }));
+  const markerLookups: string[] = [];
+  const cache = {
+    async match(key: string) {
+      markerLookups.push(new URL(key).pathname);
+      return undefined;
+    },
+    async put() {}
+  };
+
+  await assert.rejects(openKananaWeightSource({manifest, requiredWeights: textWeights, cache, offline: true}), {
+    code: 'ASSET_LOAD_FAILED'
+  });
+  await assert.rejects(openKananaVisionWeightSource({manifest, requiredWeights: visionWeights, cache, offline: true}), {
+    code: 'ASSET_LOAD_FAILED'
+  });
+
+  assert.equal(markerLookups.length, 2);
+  assert.match(markerLookups[0]!, /kanana-text-offline-complete-v1\.json$/);
+  assert.match(markerLookups[1]!, /kanana-vision-offline-complete-v1\.json$/);
+});
+
+test('does not mark a graph complete when a requested tensor read is cancelled', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kanana-safetensors-'));
+  const fixture = tinyModel();
+  const filePath = join(directory, 'model.safetensors');
+  await writeFile(filePath, fixture.file);
+  const manifest = await hashSafetensorsFile(filePath, {path: 'model.safetensors', chunkBytes: 8});
+  const cacheEntries = new Map<string, Response>();
+  const cache = {
+    async match(key: string) {
+      return cacheEntries.get(key)?.clone();
+    },
+    async put(key: string, response: Response) {
+      cacheEntries.set(key, response.clone());
+    }
+  };
+  let resolveRangeStarted!: () => void;
+  const rangeStarted = new Promise<void>((resolve) => {
+    resolveRangeStarted = resolve;
+  });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const range = new Headers(init?.headers).get('Range');
+    assert.ok(range);
+    if (range === `bytes=0-${fixture.dataOffset - 1}`) {
+      return new Response(fixture.headerRange, {
+        status: 206,
+        headers: {
+          'Content-Range': `bytes 0-${fixture.dataOffset - 1}/${fixture.file.byteLength}`,
+          'Content-Length': String(fixture.headerRange.byteLength)
+        }
+      });
+    }
+    resolveRangeStarted();
+    return await new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal?.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      signal?.addEventListener('abort', () => reject(signal.reason), {once: true});
+    });
+  };
+
+  try {
+    const source = await openSafetensorsWeightSource({
+      base: new URL('https://fixture.invalid/checkpoint/'),
+      manifest,
+      requiredWeights: [{name: 'weights.bf16', shape: [4], dtype: 'float16', length: 8}],
+      cache,
+      markerPath: 'kanana-text-offline-complete-v1.json'
+    });
+    const controller = new AbortController();
+    const pendingRead = source.readTensor('weights.bf16', {signal: controller.signal});
+    await rangeStarted;
+    controller.abort();
+    await assert.rejects(pendingRead, {name: 'AbortError'});
+    assert.equal(await source.commit(), false);
+    assert.equal(
+      [...cacheEntries.keys()].some((key) => new URL(key).pathname.endsWith('kanana-text-offline-complete-v1.json')),
+      false
+    );
   } finally {
     globalThis.fetch = previousFetch;
     await rm(directory, {recursive: true, force: true});

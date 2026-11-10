@@ -181,6 +181,29 @@ test('reports the real WebGPU features available to Kanana', async ({page, brows
     ).toBe(invalidShaderCases.has(name));
 });
 
+test('TVM requests the storage-buffer limit reported by the local adapter', async ({page}) => {
+  test.skip(!enabled, 'Set WEB_DECISION_KANANA_REAL_GPU=1 to inspect the local WebGPU adapter.');
+  await page.goto('/');
+  await page.addScriptTag({path: resolve('.toolchains/apache-tvm-src/web/lib/index.js')});
+  const limits = await page.evaluate(async () => {
+    const runtime = (
+      window as unknown as {
+        tvmjs: {
+          detectGPUDevice(): Promise<{adapter: GPUAdapter; device: GPUDevice}>;
+        };
+      }
+    ).tvmjs;
+    const {adapter, device} = await runtime.detectGPUDevice();
+    const result = {
+      adapter: adapter.limits.maxStorageBuffersPerShaderStage,
+      device: device.limits.maxStorageBuffersPerShaderStage
+    };
+    device.destroy();
+    return result;
+  });
+  expect(limits.device).toBe(limits.adapter);
+});
+
 test('Kanana runs the pinned text decision on the local TVM WebGPU runtime', async ({page, browserName, browser}) => {
   test.skip(
     !enabled || !process.env.WEB_DECISION_KANANA_VALIDATION_ASSETS || !process.env.WEB_DECISION_KANANA_CHECKPOINT,
