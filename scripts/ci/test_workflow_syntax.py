@@ -35,7 +35,5 @@ def test_package_jobs_build_the_pinned_tvm_source_without_local_patches():
         assert "apply_tvm_webgpu" not in script
         assert "submodule update --init --recursive 3rdparty/tvm-ffi" in script
         assert "emsdk activate 4.0.23 --embedded" in script
-        assert (
-            "make -C .toolchains/apache-tvm-src/web -j4 src/tvmjs_runtime_wasi.js"
-            in script
-        )
+        assert "make -C .toolchains/apache-tvm-src/web -f Makefile" in script
+        assert '-f "$GITHUB_WORKSPACE/scripts/tvm-browser-runtime.mk"' in script

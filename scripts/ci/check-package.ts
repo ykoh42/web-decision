@@ -231,7 +231,8 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
       'assets/kanana/kanana-text-model.wasm',
       'assets/kanana/kanana-vision-model.wasm',
       'dist/kanana-text-model.wasm',
-      'dist/kanana-vision-model.wasm'
+      'dist/kanana-vision-model.wasm',
+      'dist/model.wasm'
     ].sort()
   );
 

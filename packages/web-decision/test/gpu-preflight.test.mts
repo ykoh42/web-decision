@@ -41,7 +41,14 @@ test('accepts a supported adapter without creating a device', async () => {
 
 test('both model loaders obtain a fresh adapter before requesting a device', async () => {
   for (const [detect, limits] of [
-    [detectKevGPUDevice, KEV_REQUIRED_LIMITS],
+    [
+      detectKevGPUDevice,
+      {
+        ...KEV_REQUIRED_LIMITS,
+        maxBufferSize: 256 * 1024 * 1024,
+        maxStorageBufferBindingSize: 128 * 1024 * 1024
+      }
+    ],
     [detectDebertaGPUDevice, DEBERTA_REQUIRED_LIMITS]
   ] as const) {
     const device = {},
@@ -58,6 +65,27 @@ test('both model loaders obtain a fresh adapter before requesting a device', asy
     assert.equal((await detect(gpu as unknown as GPU))!.device, device);
     assert.equal(calls, 2);
   }
+});
+
+test('Kev requests independent maximum buffer and storage-binding limits from the adapter', async () => {
+  const maxBufferSize = 2 ** 31;
+  const maxStorageBufferBindingSize = maxBufferSize - 4;
+  let requestedLimits: Record<string, number> | undefined;
+  const adapter = {
+    features: new Set(['shader-f16']),
+    limits: {
+      ...KEV_REQUIRED_LIMITS,
+      maxBufferSize,
+      maxStorageBufferBindingSize
+    },
+    async requestDevice(options: {requiredLimits: Record<string, number>}) {
+      requestedLimits = options.requiredLimits;
+      return {};
+    }
+  };
+  await detectKevGPUDevice({requestAdapter: async () => adapter} as unknown as GPU);
+  assert.equal(requestedLimits?.maxBufferSize, maxBufferSize);
+  assert.equal(requestedLimits?.maxStorageBufferBindingSize, maxStorageBufferBindingSize);
 });
 
 test('maps missing and rejected adapters to model initialization errors', async () => {

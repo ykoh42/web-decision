@@ -110,6 +110,31 @@ export function validateManifest(manifest: unknown): KevAssetManifest {
   return manifest as KevAssetManifest;
 }
 
+/** Validate the shared file inventory for a model-specific pinned manifest. */
+export function validateManifestFiles(
+  files: unknown,
+  requiredFiles: readonly string[],
+  modelName: string
+): asserts files is Readonly<Record<string, AssetFileMetadata>> {
+  if (!files || typeof files !== 'object' || Array.isArray(files))
+    throw error(`The ${modelName} manifest has no files.`);
+  const inventory = files as Record<string, unknown>;
+  for (const name of requiredFiles) {
+    if (!Object.hasOwn(inventory, name)) throw error(`Missing ${modelName} asset: ${name}`);
+  }
+  for (const [name, entry] of Object.entries(inventory)) {
+    const metadata = entry as AssetFileMetadata | null | undefined;
+    if (
+      !metadata ||
+      !/^[0-9a-f]{64}$/.test(metadata.sha256) ||
+      !Number.isSafeInteger(metadata.bytes) ||
+      metadata.bytes < 0
+    ) {
+      throw error(`Invalid ${modelName} asset metadata: ${name}`);
+    }
+  }
+}
+
 /** Parse the manifest without turning a cancelled response body into a format error. */
 export async function readManifestResponse(
   response: Pick<Response, 'body'>,

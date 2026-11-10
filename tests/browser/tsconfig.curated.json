@@ -22,6 +22,7 @@
     }
   },
   "files": [
+    "../../packages/web-decision/src/runtime/tvm-source.d.ts",
     "harness.ts",
     "curated-harness.spec.ts",
     "kanana-curated-real-webgpu.spec.ts",
@@ -30,6 +31,10 @@
     "kanana-kernel-compat.spec.ts",
     "kanana-local-text-real-webgpu.spec.ts",
     "kanana-release-evidence.ts",
+    "kev06-default-source-real-webgpu.spec.ts",
+    "direct-kev-package.spec.ts",
+    "direct-kev-package-harness.ts",
+    "kev06-expanded-inference.ts",
     "kev06-release-evidence.ts",
     "kev06-release-evidence.test.ts"
   ]

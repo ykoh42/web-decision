@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "synthetic single-query single-head attention row",
+  "runtimeIntegrated": false,
+  "modelWeightsUsed": false,
+  "tvm": "0.27.0.post1",
+  "browser": "Chrome 157.0.8103.39",
+  "source": {
+    "file": "../kev_attention_tiled.py",
+    "sha256": "2879ccb5add1d8a4b97725a3a52e84a47bdcaf59625e2f25c939d73603f8c8d8"
+  },
+  "generatedWgsl": {
+    "bytes": 6255,
+    "sha256": "f0609bdd086501fbdf6a565698d58afb8ed8284c2d9ede1e077d4c2c627f8d91",
+    "workgroupSize": [128, 1, 1],
+    "workgroupStorageBytes": 2304,
+    "squaredSequenceBuffer": false
+  },
+  "gpuLimits": {
+    "maxComputeWorkgroupStorageSize": 32768,
+    "maxComputeInvocationsPerWorkgroup": 1024,
+    "maxStorageBuffersPerShaderStage": 16,
+    "maxBufferSize": 2147483648,
+    "maxStorageBufferBindingSize": 2147483644
+  },
+  "harnessSha256": "4256a5f67c0e319d8aa40286ad403880e0722597e4dcd429c66cc007fbf66c7c",
+  "acceptance": "max absolute output error < 0.001 against dense FP32 reference",
+  "cases": [
+    {
+      "sequenceLength": 7,
+      "dispatchAndReadbackMs": 10.4,
+      "maxAbsoluteError": 4.470348358154297e-8
+    },
+    {
+      "sequenceLength": 17,
+      "dispatchAndReadbackMs": 4.7,
+      "maxAbsoluteError": 2.2351741790771484e-8
+    },
+    {
+      "sequenceLength": 33,
+      "dispatchAndReadbackMs": 4.7,
+      "maxAbsoluteError": 1.1175870895385742e-8
+    },
+    {
+      "sequenceLength": 8192,
+      "dispatchAndReadbackMs": 25.7,
+      "maxAbsoluteError": 7.916241884231567e-9
+    }
+  ],
+  "limitations": [
+    "The test used synthetic query, key, value, segment, and validity arrays.",
+    "It does not establish full-model accuracy, PyTorch FP16 rounding parity, GQA integration, multi-query dispatch cost, or package runtime behavior."
+  ]
+}

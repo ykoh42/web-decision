@@ -29,6 +29,7 @@
     "**/node_modules/**",
     "**/dist/**",
     ".toolchains/**",
+    "models/**",
     "releases/**",
     "tests/types/**",
     "tests/browser/kev-upstream-provider.ts",

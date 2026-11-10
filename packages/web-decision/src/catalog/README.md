@@ -6,6 +6,17 @@ This package candidate exposes `kanana-2-v-decide-3b-2611`. Its entry pins the K
 
 `packages/web-decision/scripts/build-model-catalog.mts` validates each adapter's pinned artifacts and regenerates the lock, runtime catalog, and declaration files. Run it with `--check` to confirm generated files match their sources. Kanana ships native TVM text and vision graphs and their manifests; tokenizer/configuration files and only graph-required Safetensors ranges load from its pinned Hugging Face revision. It supports choice, Noul, and ordered score questions, image choice, a 20,480-token limit per query and candidate prompt, and up to 10 images per request. Images in state messages and the `images` field count together.
 
-Artifact integrity, model provenance, license terms, and runtime evidence are separate records. The artifact lock records pinned hashes; it does not establish hardware verification or determine how license terms apply to a user's activities. Users and distributors are responsible for meeting the license terms described in the package notice and agreement.
+When Kev is pinned to its direct source checkpoint, the generator reads the
+self-converted package from `assets/kev06-direct`. Use
+`--kev-direct-artifact-dir` to select another directory inside this package;
+the generator checks its manifest against every local file. Configure the
+catalog's `assets.directArtifactRoot` only when that package has a real hosted
+directory.
+
+Artifact integrity, model provenance, license terms, and runtime evidence are
+separate records. The artifact lock records pinned hashes; it does not establish
+hardware verification or determine how license terms apply to a user's
+activities. Users and distributors are responsible for meeting the license
+terms described in the package notice and agreement.
 
 To add a model, add its curated ID and TVM WebGPU description, then add an adapter-specific artifact validation recipe and source-integrity/capability assertions. Unknown adapters and non-TVM backends fail closed.

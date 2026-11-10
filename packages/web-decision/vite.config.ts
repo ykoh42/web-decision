@@ -35,10 +35,6 @@ export function resolveTvmTypeBoundary(): Plugin {
 
 export default defineConfig({
   base: './',
-  // TVM's generated Emscripten glue probes Node globals. This package is
-  // browser-only; leave those globals undefined before a consumer bundler can
-  // replace `typeof __filename` with "string" and make the branch unconditional.
-  define: {__filename: 'undefined', __dirname: 'undefined'},
   plugins: [
     resolveTvmTypeBoundary(),
     {

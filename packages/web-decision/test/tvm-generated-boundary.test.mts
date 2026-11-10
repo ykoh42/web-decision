@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {existsSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -8,7 +8,19 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const runtime = new URL('../../../.toolchains/apache-tvm-src/web/src/runtime.ts', import.meta.url);
 const compact = new URL('../../../.toolchains/apache-tvm-src/web/src/compact.ts', import.meta.url);
+const generatedWasi = new URL('../../../.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js', import.meta.url);
 const hasPinnedSource = existsSync(fileURLToPath(runtime)) && existsSync(fileURLToPath(compact));
+const hasGeneratedWasi = existsSync(fileURLToPath(generatedWasi));
+
+test(
+  'pinned TVM WASI glue is emitted for browsers and workers without Node compatibility code',
+  {skip: !hasGeneratedWasi},
+  () => {
+    const source = readFileSync(fileURLToPath(generatedWasi), 'utf8');
+    assert.doesNotMatch(source, /module\["exports"\]=Module/);
+    assert.doesNotMatch(source, /__filename|__dirname|require\(/);
+  }
+);
 
 test(
   'generated and TypeScript boundaries preserve their pinned TVM module identities',
