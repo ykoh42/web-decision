@@ -23,11 +23,6 @@
       "sha256": "424847460e0de262dae3ca1e4dbcaad2a403bbaa244a8755b1f83ab4b8025df6"
     },
     {
-      "path": "patches/tvm-webgpu-safe-int64.patch",
-      "bytes": 13428,
-      "sha256": "d121f842a35b8bbf717583fad7b9098ba824a8aee44262d49a964f6e32eb4434"
-    },
-    {
       "path": "pnpm-lock.yaml",
       "bytes": 73771,
       "sha256": "8f2aa8f95e6ef24589bbc05e029c5c9508a5bc73a6ffc48d05909278422c94f8"
@@ -411,11 +406,6 @@
       "path": "requirements-preview-build.txt",
       "bytes": 483,
       "sha256": "ecb8acd901939448cb4ec341ce92938ff0e4423cea5c29448ffd73463716d20a"
-    },
-    {
-      "path": "scripts/apply_tvm_webgpu_safe_int64_patch.sh",
-      "bytes": 2940,
-      "sha256": "3ccf7e3b34cb572cd15b85492ff547f834624142086bda7d130ad2f6a187443a"
     },
     {
       "path": "scripts/build_tvm_q4.py",

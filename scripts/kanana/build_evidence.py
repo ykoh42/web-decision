@@ -134,12 +134,11 @@ def collect_native_tvm(workspace_root: Path) -> dict:
     ffi_library = Path(tvm_ffi.libinfo.find_libtvm_ffi()).resolve(strict=True)
     module_path = Path(tvm.__file__).resolve(strict=True)
 
-    source_changes = expected_tvm["sourceChanges"]
-    changed_files = [source_changes["applyScript"], *source_changes["patches"]]
-    for item in changed_files:
-        path = workspace_root / item["path"]
-        if sha256_file(path) != item["sha256"]:
-            raise RuntimeError(f"The pinned TVM patch source changed: {item['path']}")
+    if expected_tvm["sourceChanges"] != []:
+        raise RuntimeError("Kanana builds require unmodified pinned TVM source.")
+    source_status = command_output("git", "-C", str(tvm_source), "status", "--porcelain")
+    if source_status:
+        raise RuntimeError(f"Kanana TVM source checkout is modified:\n{source_status}")
 
     runtime_assets = []
     for item in expected_tvm["wasmRuntimeAssets"]:
@@ -168,11 +167,7 @@ def collect_native_tvm(workspace_root: Path) -> dict:
         },
         "source": {
             "revision": expected_tvm["revision"],
-            "applyScriptSha256": source_changes["applyScript"]["sha256"],
-            "patches": [
-                {"path": item["path"], "sha256": item["sha256"]}
-                for item in source_changes["patches"]
-            ],
+            "patches": [],
             "wasmRuntimeAssets": runtime_assets,
         },
         "emscripten": {

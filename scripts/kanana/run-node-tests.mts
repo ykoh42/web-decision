@@ -15,6 +15,7 @@ const allTests = (await readdir(testDirectory))
 const coreTests = [
   'test/kanana-decision-session.test.mts',
   'test/kanana-device-limits.test.mts',
+  'test/kanana-tvm-webgpu.test.mts',
   'test/kanana-tvm-session.test.mts',
   'test/kanana-source-tokenizer.test.mts',
   'test/kanana-protocol.test.mts',

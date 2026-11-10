@@ -3,10 +3,10 @@ import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
-// This preview uses the exact pinned TVM WebGPU source after its patch set.
+// The package builds against the exact pinned upstream TVM WebGPU source.
 export function assertPinnedWebgpuHash(actual: string): void {
-  if (actual !== '01e67c6e6f0dd887bd12dac03619866456e2a9caf72e8c8a9dc249ed3bcf83e1') {
-    throw new Error('The TVM WebGPU source differs from the verified patch set.');
+  if (actual !== '77003ab2bc6c7ae103b38fb52c12a5a7a3d49597260b43f010deaacc5d65b7c1') {
+    throw new Error('The TVM WebGPU source differs from the pinned upstream revision.');
   }
 }
 
@@ -75,7 +75,7 @@ export default defineConfig({
     resolveTvmTypeBoundary(),
     browserOnlyTvmWasiExport(),
     {
-      name: 'verify-preview-webgpu-source',
+      name: 'verify-pinned-webgpu-source',
       buildStart() {
         const path = fileURLToPath(new URL('../../.toolchains/apache-tvm-src/web/src/webgpu.ts', import.meta.url));
         assertPinnedWebgpuHash(createHash('sha256').update(readFileSync(path)).digest('hex'));

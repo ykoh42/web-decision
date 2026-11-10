@@ -52,7 +52,6 @@ if [[ "$(git -C "$tvm" rev-parse HEAD)" != "$revision" ]] || ! git -C "$tvm" dif
   exit 1
 fi
 git -C "$tvm" submodule update --init --recursive 3rdparty/tvm-ffi
-bash scripts/apply_tvm_webgpu_safe_int64_patch.sh
 sdk=.toolchains/emsdk
 git clone https://github.com/emscripten-core/emsdk.git "$sdk"
 emsdk_revision=d7b4130688bfa348392b921ab04015aa15c4f154

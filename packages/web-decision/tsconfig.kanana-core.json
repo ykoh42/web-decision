@@ -12,6 +12,7 @@
   "files": [
     "src/kanana/tvm-runtime.ts",
     "src/kanana/device-limits.ts",
+    "src/kanana/tvm-webgpu.ts",
     "src/kanana/decision-session.ts",
     "src/kanana/protocol.ts",
     "src/kanana/scoring.ts",

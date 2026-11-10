@@ -23,7 +23,6 @@ import {
 import {convertFp16ToFp32} from '../../kanana/safetensors.mjs';
 import {createKananaTvmInferenceSession, createKananaTvmVisionInferenceSession} from '../../kanana/tvm-session.js';
 import {setupKananaTvmRuntime} from '../../kanana/tvm-runtime.js';
-import {mapKananaTvmResourceError} from '../../kanana/tvm-resource-error.js';
 
 type ArtifactFile = Readonly<{bytes: number; sha256: string}>;
 type ArtifactManifest = Readonly<{
@@ -388,11 +387,11 @@ export async function loadModel(options: object, description: ModelDescription) 
       ...artifacts.textManifest.weights.map(({length}) => length),
       ...visionRuntimeWeights(artifacts.visionManifest.weights).map(({length}) => length)
     );
-    const missingLimits = missingKananaWeightLimits(detected.adapter.limits, weightBufferBytes);
+    const missingLimits = missingKananaWeightLimits(device.limits, weightBufferBytes);
     if (missingLimits.length)
       throw new WebDecisionError(
         'DEVICE_RESOURCE_LIMIT',
-        `Kanana needs ${weightBufferBytes} bytes for one TVM weight buffer; the WebGPU adapter cannot meet ${missingLimits.join(', ')}.`
+        `Kanana needs ${weightBufferBytes} bytes for one TVM weight buffer; the requested WebGPU device cannot meet ${missingLimits.join(', ')}.`
       );
     const source = await openKananaSource({
       signal,
@@ -584,7 +583,7 @@ export async function loadModel(options: object, description: ModelDescription) 
                 cause
               })
             : cause;
-          throw mapKananaTvmResourceError(failure);
+          throw failure;
         } finally {
           modelAbort.signal.removeEventListener('abort', abortVisionLoad);
           requestSignal?.removeEventListener('abort', abortVisionLoad);
@@ -657,10 +656,7 @@ export async function loadModel(options: object, description: ModelDescription) 
     });
 
     const session = decision;
-    const runDecision: KananaSession['systemOne'] = (...args) =>
-      session.systemOne(...args).catch((cause) => {
-        throw mapKananaTvmResourceError(cause);
-      });
+    const runDecision: KananaSession['systemOne'] = (...args) => session.systemOne(...args);
     let disposal: Promise<void> | undefined;
     return {
       modelId: KANANA_MODEL_ID,
@@ -694,6 +690,6 @@ export async function loadModel(options: object, description: ModelDescription) 
     const failure = cleanupErrors.length
       ? new AggregateError([cause, ...cleanupErrors], 'Kanana model loading and cleanup both failed.', {cause})
       : cause;
-    throw mapKananaTvmResourceError(failure);
+    throw failure;
   }
 }

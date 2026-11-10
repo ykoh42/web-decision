@@ -18,7 +18,8 @@ import {
   localKananaCandidateMode
 } from './kanana-release-evidence.ts';
 
-const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode;
+const localBuildMode = process.env.WEB_DECISION_KANANA_LOCAL_BUILD_GPU === '1';
+const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode || localBuildMode;
 const upstreamPath = new URL(kananaUpstreamBase).pathname;
 const probabilityTolerance = 0.001;
 const fixtureBytes = readFileSync(new URL('../fixtures/kanana-decision-python-reference.json', import.meta.url));
@@ -89,7 +90,7 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
   test.skip(!enabled, 'Set WEB_DECISION_KANANA_CURATED_REAL_GPU=1 to run the full package consumer GPU check.');
   test.setTimeout(45 * 60 * 1000);
 
-  const releaseInputs = await collectInstalledKananaReleaseInputs();
+  const releaseInputs = localBuildMode ? null : await collectInstalledKananaReleaseInputs();
   await verifyPinnedKananaSnapshot();
   expect(fixtureSha256).toBe('822156454d468153cef23fde6fad8c88b59821d9da1b86897733fa906abfd420');
   expect(reference.modelId).toBe(`kakaocorp/${kananaModelId}`);
@@ -200,29 +201,42 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
         const isFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
         if (isFallback !== false) throw new Error(`Expected a hardware WebGPU adapter; got ${String(isFallback)}.`);
 
-        const model = await window.webDecision.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', cache: false});
+        const model = await window.webDecision
+          .loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', cache: false})
+          .catch((cause) => {
+            const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+            throw new Error(`Kanana model loading failed: ${detail}`, {cause});
+          });
         try {
-          const output = await model.systemOne(input);
+          const output = await model.systemOne(input).catch((cause) => {
+            const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+            throw new Error(`Kanana systemOne inference failed: ${detail}`, {cause});
+          });
           const answer = output.answers.delivery_status;
           if (!answer || answer.type !== 'choice') throw new Error('Kanana returned no choice result.');
           const noulAnswer = output.answers.needs_immediate_page;
           if (!noulAnswer || noulAnswer.type !== 'noul') throw new Error('Kanana returned no noul result.');
           const scoreAnswer = output.answers.delay_severity;
           if (!scoreAnswer || scoreAnswer.type !== 'score') throw new Error('Kanana returned no score result.');
-          const maximumContextOutput = await model.systemOne(
-            {
-              state: 'x '.repeat(30_000),
-              stateFormat: 'text',
-              questions: {
-                maximum_context: {
-                  type: 'choice',
-                  instructions: 'Choose the label for this boundary test.',
-                  criteria: {first: 'First option', second: 'Second option'}
+          const maximumContextOutput = await model
+            .systemOne(
+              {
+                state: 'x '.repeat(30_000),
+                stateFormat: 'text',
+                questions: {
+                  maximum_context: {
+                    type: 'choice',
+                    instructions: 'Choose the label for this boundary test.',
+                    criteria: {first: 'First option', second: 'Second option'}
+                  }
                 }
-              }
-            },
-            {maxLength: 20_480}
-          );
+              },
+              {maxLength: 20_480}
+            )
+            .catch((cause) => {
+              const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+              throw new Error(`Kanana maximum-context inference failed: ${detail}`, {cause});
+            });
           const maximumContextAnswer = maximumContextOutput.answers.maximum_context;
           if (!maximumContextAnswer || maximumContextAnswer.type !== 'choice')
             throw new Error('Kanana returned no choice for the maximum context input.');
@@ -352,6 +366,7 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
     console.log(
       `KANANA_CURATED_TEXT_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), adapterInfo, result, probabilityTolerance, fetchedRanges: fetched.length, fetchedBytes: fetched.reduce((sum, item) => sum + item.bytes, 0)})}`
     );
+    if (releaseInputs === null) return;
     if (localKananaCandidateMode && process.env.WEB_DECISION_KANANA_EMIT_EVIDENCE !== '1') return;
     const evidence = createKananaReleaseEvidenceEnvelope({
       inputs: releaseInputs,

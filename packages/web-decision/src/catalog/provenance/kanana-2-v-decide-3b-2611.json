@@ -22,12 +22,12 @@
     },
     "toolchain": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json",
-      "sha256": "9a57f971159179cc9c90ca062bd36b0fcc540ea4448781aae0c460ab7444f923"
+      "sha256": "8fd7fe94dcb0ff3449e5bd1859c0740333416f6cfc9466ea5594087211339f0b"
     },
     "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a"
   },
   "unresolved": [
-    "No project-level determination is recorded on whether distributing web-decision\u2019s compiled TVM graph assets for browser and on-device use falls within Section 4.1(iii) or requires a separate Kakao commercial license.",
+    "No project-level determination is recorded on whether distributing web-decision's compiled TVM graph assets for browser and on-device use falls within Section 4.1(iii) or requires a separate Kakao commercial license.",
     "An independent review of all third-party attribution obligations for the model source code and derived TVM graph assets is not recorded."
   ],
   "knownReferences": [

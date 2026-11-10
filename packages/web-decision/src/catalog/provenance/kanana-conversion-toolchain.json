@@ -5,30 +5,7 @@
     "repository": "https://github.com/apache/tvm.git",
     "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
     "version": "0.27.0.post1",
-    "sourceChanges": {
-      "applyScript": {
-        "path": "scripts/apply_tvm_webgpu_kanana_patches.sh",
-        "sha256": "64ff1ddadb79c6e363f9e746d84ca2a43fb6f41200381d2761ecb9fb1be4ab31"
-      },
-      "patches": [
-        {
-          "path": "patches/tvm-webgpu-safe-int64.patch",
-          "sha256": "d121f842a35b8bbf717583fad7b9098ba824a8aee44262d49a964f6e32eb4434"
-        },
-        {
-          "path": "patches/tvm-webgpu-adapter-limits.patch",
-          "sha256": "fa79e8e1924f952ae67c2ce7155ff7e3b338753eb10baffcbf18d075c59d1276"
-        },
-        {
-          "path": "patches/tvm-webgpu-resource-errors.patch",
-          "sha256": "58ebe9d953ae04678746ee4c6ca7770745561f8865281b4423946fa8b463fc55"
-        },
-        {
-          "path": "patches/tvm-webgpu-grid-bounds.patch",
-          "sha256": "5bce7a212dd907504c2d673d9d414ab135007faf616a4e4d1550dbde14b88f4b"
-        }
-      ]
-    },
+    "sourceChanges": [],
     "wasmRuntimeAssets": [
       {
         "name": "wasm_runtime.bc",
@@ -146,25 +123,7 @@
       },
       "source": {
         "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
-        "applyScriptSha256": "64ff1ddadb79c6e363f9e746d84ca2a43fb6f41200381d2761ecb9fb1be4ab31",
-        "patches": [
-          {
-            "path": "patches/tvm-webgpu-safe-int64.patch",
-            "sha256": "d121f842a35b8bbf717583fad7b9098ba824a8aee44262d49a964f6e32eb4434"
-          },
-          {
-            "path": "patches/tvm-webgpu-adapter-limits.patch",
-            "sha256": "fa79e8e1924f952ae67c2ce7155ff7e3b338753eb10baffcbf18d075c59d1276"
-          },
-          {
-            "path": "patches/tvm-webgpu-resource-errors.patch",
-            "sha256": "58ebe9d953ae04678746ee4c6ca7770745561f8865281b4423946fa8b463fc55"
-          },
-          {
-            "path": "patches/tvm-webgpu-grid-bounds.patch",
-            "sha256": "5bce7a212dd907504c2d673d9d414ab135007faf616a4e4d1550dbde14b88f4b"
-          }
-        ],
+        "patches": [],
         "wasmRuntimeAssets": [
           {
             "name": "wasm_runtime.bc",

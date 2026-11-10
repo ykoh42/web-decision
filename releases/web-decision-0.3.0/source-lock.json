@@ -28,11 +28,6 @@
       "sha256": "424847460e0de262dae3ca1e4dbcaad2a403bbaa244a8755b1f83ab4b8025df6"
     },
     {
-      "path": "patches/tvm-webgpu-safe-int64.patch",
-      "bytes": 13428,
-      "sha256": "d121f842a35b8bbf717583fad7b9098ba824a8aee44262d49a964f6e32eb4434"
-    },
-    {
       "path": "playwright.config.mjs",
       "bytes": 1841,
       "sha256": "59fbacead7ca8a964fc5a899b046ae6ea009f280abdefea73f382908b7c77d8a"
