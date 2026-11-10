@@ -10,7 +10,8 @@
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
-    "web-decision": "file:../../packages/web-decision"
+    "web-decision": "file:../../packages/web-decision",
+    "web-decision-release-workspace": "file:../.."
   },
   "devDependencies": {
     "@types/node": "20.19.43",

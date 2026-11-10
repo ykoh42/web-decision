@@ -4,6 +4,7 @@ import {expect, test} from '@playwright/test';
 
 const enabled = process.env.WEB_DECISION_KANANA_REAL_GPU === '1';
 const shaderMarker = Buffer.from('@group(0) @binding(0)');
+const computeMarker = Buffer.from('@compute ');
 const graphFiles = [
   'packages/web-decision/assets/kanana/kanana-text-model.wasm',
   'packages/web-decision/assets/kanana/kanana-vision-model.wasm'
@@ -13,31 +14,42 @@ function isWgslByte(value: number): boolean {
   return (value >= 32 && value <= 126) || value === 9 || value === 10 || value === 13;
 }
 
+function findShaderStart(wasm: Buffer, marker: number): number {
+  let start = marker;
+  while (start > 0 && isWgslByte(wasm[start - 1]!)) start--;
+  return start;
+}
+
+function findShaderEnd(wasm: Buffer, compute: number): number {
+  let depth = 0;
+  for (let end = compute; end < wasm.length; end++) {
+    if (wasm[end] === 123) depth++;
+    if (wasm[end] === 125) {
+      depth--;
+      if (depth === 0) return end + 1;
+    }
+  }
+  return wasm.length;
+}
+
+function findNextShader(wasm: Buffer, offset: number): {source: string; nextOffset: number} | undefined {
+  const marker = wasm.indexOf(shaderMarker, offset);
+  if (marker < 0) return undefined;
+  const compute = wasm.indexOf(computeMarker, marker);
+  if (compute < 0) return undefined;
+  const start = findShaderStart(wasm, marker);
+  const end = findShaderEnd(wasm, compute);
+  return {source: wasm.subarray(start, end).toString('utf8'), nextOffset: end + 1};
+}
+
 function extractComputeShaders(wasm: Buffer): string[] {
   const shaders: string[] = [];
   let offset = 0;
-  while (true) {
-    const marker = wasm.indexOf(shaderMarker, offset);
-    if (marker < 0) break;
-    const compute = wasm.indexOf(Buffer.from('@compute '), marker);
-    if (compute < 0) break;
-    let start = marker;
-    let depth = 0;
-    let end = compute;
-    while (start > 0 && isWgslByte(wasm[start - 1]!)) start--;
-    for (; end < wasm.length; end++) {
-      if (wasm[end] === 123) depth++;
-      if (wasm[end] === 125) {
-        depth--;
-        if (depth === 0) {
-          end++;
-          break;
-        }
-      }
-    }
-    const source = wasm.subarray(start, end).toString('utf8');
-    shaders.push(source);
-    offset = end + 1;
+  let next = findNextShader(wasm, offset);
+  while (next) {
+    shaders.push(next.source);
+    offset = next.nextOffset;
+    next = findNextShader(wasm, offset);
   }
   return shaders;
 }

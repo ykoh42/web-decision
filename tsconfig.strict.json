@@ -25,5 +25,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
-  "exclude": ["**/node_modules/**", "**/dist/**", ".toolchains/**", "releases/**", "tests/types/**"]
+  "exclude": ["**/node_modules/**", "**/dist/**", ".toolchains/**", "models/**", "releases/**", "tests/types/**"]
 }

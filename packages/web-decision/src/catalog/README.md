@@ -17,6 +17,13 @@ choice, a 20,480-token limit for each query and candidate prompt, and up to 10
 images per request. Images in state messages and the `images` field count
 together.
 
+When Kev is pinned to its direct source checkpoint, the generator reads the
+self-converted package from `assets/kev06-direct`. Use
+`--kev-direct-artifact-dir` to select another directory inside this package;
+the generator checks its manifest against every local file. Configure the
+catalog's `assets.directArtifactRoot` only when that package has a real hosted
+directory.
+
 Artifact integrity and runtime evidence are separate gates. The lock records
 pinned hashes; it does not establish current hardware verification or infer a
 release state. Keep evidence and capability status model-specific in the spec.

@@ -18,6 +18,8 @@
     "src/kev.ts",
     "src/kev-loader.ts",
     "src/kev06/upstream-source.mts",
+    "src/kev06/direct-contract.ts",
+    "src/kev06/direct-source.mts",
     "src/runtime/tvm-source.d.ts",
     "src/deberta/contract.mts",
     "src/deberta/model.mts",
@@ -25,6 +27,7 @@
     "src/deberta/validate.mts",
     "test/kev-loader.test.mts",
     "test/kev06-asset-import-loader.mts",
-    "test/kev06-upstream-source.test.mts"
+    "test/kev06-upstream-source.test.mts",
+    "test/kev06-direct-contract.test.mts"
   ]
 }

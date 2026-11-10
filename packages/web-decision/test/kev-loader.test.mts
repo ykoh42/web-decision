@@ -244,7 +244,11 @@ if (registerHooks) {
   }
 }
 
-function setup(t: TestContext): {
+function setup(
+  t: TestContext,
+  parameterCount = 394,
+  parameterDtypes: readonly string[] = []
+): {
   readonly state: LoaderState;
   readonly fake: LoaderFixture;
   readonly runtime: FakeRuntime;
@@ -318,14 +322,17 @@ function setup(t: TestContext): {
       };
     }
   };
-  const records: TensorRecord[] = Array.from({length: 394}, (_, i) => ({
-    name: `param_${i}`,
-    dtype: 'uint32',
-    format: 'raw',
-    shape: [1],
-    byteOffset: i * 4,
-    nbytes: 4
-  }));
+  const records: TensorRecord[] = Array.from({length: parameterCount}, (_, i) => {
+    const dtype = parameterDtypes[i] ?? 'uint32';
+    return {
+      name: `param_${i}`,
+      dtype,
+      format: 'raw',
+      shape: [dtype === 'float16' ? 2 : 1],
+      byteOffset: i * 4,
+      nbytes: 4
+    };
+  });
   const fake: LoaderFixture = {
     ...state,
     helperLoads: 0,
@@ -352,20 +359,42 @@ function setup(t: TestContext): {
     pending,
     started: markStarted,
     manifest: {
-      files: {'weights/shard.bin': {bytes: 394 * 4}},
-      parameterCount: 394,
+      files: {'weights/shard.bin': {bytes: parameterCount * 4}},
+      parameterCount,
       maxStateTokens: 8192,
       maxBranchTokens: 8192
     },
     modelConfig: {max_position_embeddings: 32768, kev: {delimiter_ids: KEV_DELIMITERS}},
     cacheManifest: {
-      metadata: {numParams: 394},
-      records: [{dataPath: 'shard.bin', format: 'raw-shard', nbytes: 394 * 4, records}]
+      metadata: {numParams: parameterCount},
+      records: [{dataPath: 'shard.bin', format: 'raw-shard', nbytes: parameterCount * 4, records}]
     }
   };
   Object.defineProperty(fakeGlobal, '__fakeKevLoader', {configurable: true, value: fake});
   return {state, fake, runtime, started, resolveRuntime, rejectRuntime, lose};
 }
+
+test('Kev loader validates tensor count from the pinned model manifest', {skip: !supportsHooks}, async (t) => {
+  const f = setup(t, 511);
+  const loading = loadDecisionModel({});
+  await f.started;
+  f.resolveRuntime(f.runtime);
+  const model = await loading;
+  assert.equal(f.fake.manifest.parameterCount, 511);
+  assert.equal(f.fake.cacheManifest.metadata.numParams, 511);
+  assert.equal(f.fake.uploads, 1);
+  disposeModel(model);
+});
+
+test('Kev loader accepts mixed float16, float32, and uint32 parameter records', {skip: !supportsHooks}, async (t) => {
+  const f = setup(t, 3, ['float16', 'float32', 'uint32']);
+  const loading = loadDecisionModel({});
+  await f.started;
+  f.resolveRuntime(f.runtime);
+  const model = await loading;
+  assert.equal(f.fake.uploads, 1);
+  disposeModel(model);
+});
 
 test(
   'Kev loader abort or device loss during instantiation releases the GPU and disposes the late runtime',
@@ -445,6 +474,22 @@ test(
     assert.equal(f.fake.uploads, 0);
   }
 );
+
+test('Kev loader rejects model config with different delimiter IDs', {skip: !supportsHooks}, async (t) => {
+  const f = setup(t);
+  f.fake.modelConfig = {
+    max_position_embeddings: 32768,
+    kev: {
+      delimiter_ids: {...KEV_DELIMITERS, state: KEV_DELIMITERS.state + 1} as unknown as typeof KEV_DELIMITERS
+    }
+  };
+  await assert.rejects(loadDecisionModel({}), {
+    code: 'INVALID_ASSET',
+    message: 'Unexpected model delimiter IDs.'
+  });
+  assert.equal(f.state.initialized, 0);
+  assert.equal(f.fake.uploads, 0);
+});
 
 test(
   'experimental upstream Kev imports its immutable data URLs lazily after prepare on a cache miss',

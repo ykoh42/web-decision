@@ -1,7 +1,7 @@
 import {Tokenizer} from '@huggingface/tokenizers';
 import {createPolyfillWASI, instantiate} from './runtime/tvm.generated.mjs';
 import type {DLDevice, Instance, PackedFunc, Tensor} from './runtime/tvm.js';
-import {detectKevGPUDevice} from './kev-gpu.js';
+import {detectKevGPUDevice, type KevAttentionProfile} from './kev-gpu.js';
 import {
   commitCachedManifest as commitManifest,
   parseJson as parseAssetJson,
@@ -16,6 +16,7 @@ import {readAssetBatch} from './asset-batch.js';
 import {prepareModelSource} from './model-source.js';
 import {createModelAssetReader, uploadModelShards} from './model-assets.js';
 import {readKev06ManifestResponse} from './kev06/contract.js';
+import {hasDirectKev06CatalogPin, readDirectKev06ManifestResponse} from './kev06/direct-contract.js';
 import {
   createKev06StableReconstructedSource,
   createKevReconstructedSource,
@@ -53,7 +54,10 @@ type KevLoaderDescription = {
   };
 };
 
-type KevCuratedDescription = ModelDescription & {readonly model: ModelId};
+type KevCuratedDescription = ModelDescription & {
+  readonly model: ModelId;
+  readonly assets: ModelDescription['assets'] & {readonly directArtifactRoot?: string};
+};
 type LoadedKevModel = Omit<DecisionModel, 'description'>;
 
 type KevAssetMetadata = {readonly bytes: number; readonly sha256: string};
@@ -169,7 +173,8 @@ type KevGpuDevice = {
 };
 type DetectKevGpuDevice = (
   gpu?: GPU | undefined,
-  signal?: AbortSignal | undefined
+  signal?: AbortSignal | undefined,
+  profile?: KevAttentionProfile | undefined
 ) => Promise<KevGpuDevice | undefined>;
 type DecisionModelConstructor = new (
   runtime: Instance,
@@ -179,6 +184,7 @@ type DecisionModelConstructor = new (
   weights: Tensor[],
   tokenizer: Tokenizer,
   limits: {
+    readonly attentionProfile?: KevAttentionProfile;
     readonly maxInputTokens: number | undefined;
     readonly maxStateTokens: number;
     readonly maxBranchTokens: number;
@@ -260,7 +266,7 @@ function cacheRecordIndex(record: unknown): number {
 
 function cacheRecordElementBytes(record: unknown): number {
   const dtype = isRecord(record) ? record.dtype : undefined;
-  return dtype === 'uint32' ? 4 : dtype === 'float16' ? 2 : 0;
+  return dtype === 'uint32' || dtype === 'float32' ? 4 : dtype === 'float16' ? 2 : 0;
 }
 
 function validCacheShard(
@@ -306,7 +312,8 @@ function validCacheRecordRange(record: Record<string, unknown>, shard: {readonly
 function validCacheRecord(
   record: unknown,
   shard: {readonly nbytes: number},
-  seen: ReadonlySet<number>
+  seen: ReadonlySet<number>,
+  parameterCount: number
 ): record is KevTensorRecord {
   if (!isRecord(record)) return false;
   if (!record || record.format !== 'raw') return false;
@@ -314,7 +321,7 @@ function validCacheRecord(
   const bytesPerElement = cacheRecordElementBytes(record);
   return (
     index >= 0 &&
-    index < 394 &&
+    index < parameterCount &&
     !seen.has(index) &&
     validCacheRecordShape(record, bytesPerElement) &&
     validCacheRecordRange(record, shard)
@@ -322,10 +329,12 @@ function validCacheRecord(
 }
 
 function checkCacheManifest(manifest: KevAssetManifest, value: unknown): asserts value is KevTensorCacheManifest {
+  const parameterCount = manifest.parameterCount;
   if (
+    !isPositiveSafeInteger(parameterCount) ||
     !isRecord(value) ||
     !isRecord(value.metadata) ||
-    value.metadata.numParams !== 394 ||
+    value.metadata.numParams !== parameterCount ||
     !isUnknownArray(value.records)
   )
     throw new WebDecisionError('INVALID_ASSET', 'Invalid TVM tensor cache metadata.');
@@ -334,12 +343,12 @@ function checkCacheManifest(manifest: KevAssetManifest, value: unknown): asserts
     if (!validCacheShard(shard, manifest.files))
       throw new WebDecisionError('INVALID_ASSET', 'Invalid tensor shard metadata.');
     for (const record of shard.records) {
-      if (!validCacheRecord(record, shard, seen))
+      if (!validCacheRecord(record, shard, seen, parameterCount))
         throw new WebDecisionError('INVALID_ASSET', 'Invalid model parameter metadata.');
       seen.add(cacheRecordIndex(record));
     }
   }
-  if (seen.size !== 394) throw new WebDecisionError('INVALID_ASSET', 'Missing model parameters.');
+  if (seen.size !== parameterCount) throw new WebDecisionError('INVALID_ASSET', 'Missing model parameters.');
 }
 
 function validateOptionalLimit(value: number | undefined, name: string): void {
@@ -347,12 +356,21 @@ function validateOptionalLimit(value: number | undefined, name: string): void {
     throw new WebDecisionError('INVALID_INPUT', `${name} must be a non-negative safe integer.`);
 }
 
+async function createDirectKevPackageSource(
+  manifestSha256: string,
+  directArtifactRoot: string
+): Promise<ModelSourceProvider> {
+  const source = await import('./kev06/direct-source.mjs');
+  return source.createDirectKevPackageSource(manifestSha256, directArtifactRoot) as ModelSourceProvider;
+}
+
 async function loadKevModel(
   options: KevLoaderOptions,
   description: KevLoaderDescription,
   readManifest: ReadManifest,
   uploadHeads?: UploadReflexes | undefined,
-  sourceProvider?: ModelSourceProvider | undefined
+  sourceProvider?: ModelSourceProvider | undefined,
+  attentionProfile: KevAttentionProfile = 'dense-scores'
 ): Promise<LoadedKevModel> {
   validateOptionalLimit(options?.maxInputCharacters, 'maxInputCharacters');
   validateOptionalLimit(options?.maxInputTokens, 'maxInputTokens');
@@ -410,7 +428,7 @@ async function loadKevModel(
     if (sourceProvider?.assetProgressPhase) assetReader.setProgressPhase(sourceProvider.assetProgressPhase);
     let gpu;
     try {
-      gpu = await detectGPUDevice(undefined, signal);
+      gpu = await detectGPUDevice(undefined, signal, attentionProfile);
     } catch (cause) {
       signal?.throwIfAborted();
       throw new WebDecisionError('MODEL_LOAD_FAILED', 'Could not initialize a compatible WebGPU device.', {cause});
@@ -483,6 +501,7 @@ async function loadKevModel(
       weights,
       tokenizer,
       {
+        attentionProfile,
         maxInputTokens: options?.maxInputTokens ?? manifest.maxInputTokens,
         maxStateTokens: manifest.maxStateTokens,
         maxBranchTokens: manifest.maxBranchTokens,
@@ -519,9 +538,35 @@ export function loadKev06DecisionModel(
   return loadKevModel(options, description, readStableManifest);
 }
 
-/** Load the curated stable artifact using its pinned upstream source. */
-export function loadCuratedKevModel(options: object, description: KevCuratedDescription): Promise<LoadedKevModel> {
-  return loadKevModel(options as KevLoaderOptions, description, readStableManifest, undefined, createStableSource());
+/** Load the curated artifact from the package selected by its checkpoint pin. */
+export async function loadCuratedKevModel(
+  options: object,
+  description: KevCuratedDescription,
+  directSourceForTest?: ModelSourceProvider
+): Promise<LoadedKevModel> {
+  if (!hasDirectKev06CatalogPin(description))
+    return loadKevModel(
+      options as KevLoaderOptions,
+      description,
+      readStableManifest,
+      undefined,
+      createStableSource(),
+      'dense-scores'
+    );
+
+  const readManifest: ReadManifest = (response, signal) =>
+    readDirectKev06ManifestResponse(response, description.assets.manifestSha256, signal);
+  const sourceProvider =
+    directSourceForTest ??
+    (await createDirectKevPackageSource(description.assets.manifestSha256, description.assets.directArtifactRoot!));
+  return loadKevModel(
+    options as KevLoaderOptions,
+    description,
+    readManifest,
+    undefined,
+    sourceProvider,
+    'linear-scratch'
+  );
 }
 
 export async function loadKevDecisionModel(

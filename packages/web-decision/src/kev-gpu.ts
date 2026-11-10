@@ -3,6 +3,9 @@ import {WebDecisionError} from './kev.js';
 
 const KEV_ATTENTION_HEADS = 16n;
 const KEV_ATTENTION_SCORE_BYTES = 2n;
+const DIRECT_KEV_ATTENTION_BYTES_PER_TOKEN = 16n * 128n * 4n;
+
+export type KevAttentionProfile = 'dense-scores' | 'linear-scratch';
 
 /** Experimental limits for the pinned Kev 0.6B Q4 WebGPU build only. */
 export const KEV_REQUIRED_LIMITS = Object.freeze({
@@ -17,18 +20,27 @@ export const KEV_REQUIRED_LIMITS = Object.freeze({
   maxComputeWorkgroupsPerDimension: 65535
 });
 
-export function requiredKevAttentionBytes(sequenceLength: number) {
+/** Public TIRX attention uses a 128-lane row and linear FP32 scratch. */
+export const DIRECT_KEV_REQUIRED_LIMITS = Object.freeze({
+  ...KEV_REQUIRED_LIMITS,
+  maxComputeWorkgroupSizeX: 128
+});
+
+export function requiredKevAttentionBytes(sequenceLength: number, profile: KevAttentionProfile = 'dense-scores') {
   if (!Number.isSafeInteger(sequenceLength) || sequenceLength < 0)
     throw new RangeError('sequenceLength must be a non-negative safe integer.');
   const tokens = BigInt(sequenceLength);
-  return tokens * tokens * KEV_ATTENTION_HEADS * KEV_ATTENTION_SCORE_BYTES;
+  return profile === 'linear-scratch'
+    ? tokens * DIRECT_KEV_ATTENTION_BYTES_PER_TOKEN
+    : tokens * tokens * KEV_ATTENTION_HEADS * KEV_ATTENTION_SCORE_BYTES;
 }
 
 export function assertKevAttentionFits(
   sequenceLength: number,
-  limits?: {maxBufferSize?: number; maxStorageBufferBindingSize?: number} | null
+  limits?: {maxBufferSize?: number; maxStorageBufferBindingSize?: number} | null,
+  profile: KevAttentionProfile = 'dense-scores'
 ) {
-  const required = requiredKevAttentionBytes(sequenceLength);
+  const required = requiredKevAttentionBytes(sequenceLength, profile);
   const maxBufferSize = limits?.maxBufferSize;
   const maxStorageBufferBindingSize = limits?.maxStorageBufferBindingSize;
   if (
@@ -51,7 +63,8 @@ export function assertKevAttentionFits(
 /** Return an adapter/device pair compatible with the current loader's interface. */
 export async function detectKevGPUDevice(
   gpu: GPU | null | undefined = globalThis.navigator?.gpu,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  profile: KevAttentionProfile = 'dense-scores'
 ) {
   signal?.throwIfAborted();
   if (!gpu) return undefined;
@@ -64,14 +77,16 @@ export async function detectKevGPUDevice(
     signal?.throwIfAborted();
     return {adapter, device: undefined, adapterInfo: adapter.info};
   }
-  for (const [name, required] of Object.entries(KEV_REQUIRED_LIMITS)) {
+  const modelLimits = profile === 'linear-scratch' ? DIRECT_KEV_REQUIRED_LIMITS : KEV_REQUIRED_LIMITS;
+  for (const [name, required] of Object.entries(modelLimits)) {
     const available = (adapter.limits as unknown as Record<string, unknown>)[name];
     if (typeof available !== 'number' || !Number.isFinite(available) || available < required)
       throw new Error(`WebGPU ${name} requires ${required}; adapter reports ${available}.`);
   }
-  // Dynamic sequence buffers can exceed the model's minimum device limits.
   const requiredLimits = {
-    ...KEV_REQUIRED_LIMITS,
+    ...modelLimits,
+    // Preserve the adapter's independent maxima; maxBufferSize can exceed its
+    // storage-binding limit and TVM may use both kinds of allocations.
     maxBufferSize: adapter.limits.maxBufferSize,
     maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize
   };

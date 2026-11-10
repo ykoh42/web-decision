@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {readFile} from 'node:fs/promises';
+import {copyFile, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
 import {getModelRegistration} from '../src/model-registry.js';
 import {createModelArtifactLock, validateSpec} from '../scripts/build-model-catalog.mts';
+import {
+  DIRECT_KEV06_BASE,
+  DIRECT_KEV06_CHECKPOINT,
+  DIRECT_KEV06_PARAMETER_COUNT
+} from '../src/kev06/direct-contract.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageFile = (relativePath: string): string => path.join(packageRoot, relativePath);
@@ -59,6 +64,7 @@ test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
     assert.equal(Object.hasOwn(entry.description.assets, 'assetsUrl'), false);
     assert.equal(Object.hasOwn(entry.description.assets, 'manifestSha256'), true);
   }
+  assert.equal(Object.hasOwn(MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'].description.assets, 'directArtifactRoot'), false);
 });
 
 test('Kev catalog description retains its existing contract', () => {
@@ -114,6 +120,102 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
     }),
     /No artifact recipe/u
   );
+  assert.throws(
+    () =>
+      validateSpec({
+        ...spec,
+        models: [
+          {
+            ...model,
+            description: {
+              ...model.description,
+              assets: {...model.description.assets, directArtifactRoot: ''}
+            }
+          }
+        ]
+      }),
+    /Direct artifact roots require the direct Kev checkpoint/u
+  );
+});
+
+test('direct Kev recipe derives manifest and file digests from a repository-local package directory', async () => {
+  const spec = JSON.parse(await readFile(packageFile('src/catalog/model-spec.json'), 'utf8'));
+  const [sourceModel] = spec.models;
+  const directModel = {
+    ...sourceModel,
+    description: {...sourceModel.description, checkpoint: {...DIRECT_KEV06_CHECKPOINT}}
+  };
+  const fixtureSource = packageFile('test/fixtures/direct-kev-package');
+  const fixtureDirectory = await mkdtemp(packageFile('test/fixtures/.direct-kev-package-'));
+  const fileNames = [
+    'model.wasm',
+    'model_config.json',
+    'tokenizer.json',
+    'tokenizer_config.json',
+    'weights/params_shard_0000.bin',
+    'weights/tensor-cache.json'
+  ];
+
+  try {
+    await assert.rejects(
+      createModelArtifactLock(directModel, {directKevArtifactDirectory: path.resolve(packageRoot, '..')}),
+      /inside the web-decision package/u
+    );
+    for (const name of fileNames) {
+      const destination = path.join(fixtureDirectory, ...name.split('/'));
+      await mkdir(path.dirname(destination), {recursive: true});
+      await copyFile(path.join(fixtureSource, ...name.split('/')), destination);
+    }
+    const files = Object.fromEntries(
+      await Promise.all(
+        fileNames.map(async (name) => {
+          const bytes = await readFile(path.join(fixtureDirectory, ...name.split('/')));
+          return [name, {bytes: bytes.byteLength, sha256: sha256(bytes)}] as const;
+        })
+      )
+    );
+    const manifestFixture = {
+      formatVersion: 1,
+      model: 'kev-0.6b-q4f16',
+      backend: 'tvm-webgpu',
+      experimental: true,
+      parameterCount: DIRECT_KEV06_PARAMETER_COUNT,
+      maxStateTokens: 8192,
+      maxBranchTokens: 8192,
+      checkpoint: {...DIRECT_KEV06_CHECKPOINT},
+      base: {...DIRECT_KEV06_BASE},
+      files
+    };
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify(manifestFixture, null, 2) + '\n');
+    const undeclaredPath = path.join(fixtureDirectory, 'undeclared.txt');
+    await writeFile(undeclaredPath, 'fixture-only file\n');
+    await assert.rejects(
+      createModelArtifactLock(directModel, {directKevArtifactDirectory: fixtureDirectory}),
+      /file inventory differs from its manifest/u
+    );
+    await rm(undeclaredPath);
+
+    const lock = await createModelArtifactLock(directModel, {directKevArtifactDirectory: fixtureDirectory});
+    const manifestBytes = await readFile(path.join(fixtureDirectory, 'manifest.json'));
+    const canonicalBytes = Buffer.from(JSON.stringify(canonical(manifestFixture)) + '\n');
+
+    assert.match(lock.manifest.sourcePath, /^test\/fixtures\/.direct-kev-package-[^/]+\/manifest\.json$/u);
+    assert.equal(lock.manifest.rawSha256, sha256(manifestBytes));
+    assert.equal(lock.manifest.canonicalSha256, sha256(canonicalBytes));
+    assert.equal(lock.manifest.canonicalBytes, canonicalBytes.byteLength);
+    assert.equal(lock.manifest.experimental, true);
+    assert.deepEqual(lock.manifest.files, files);
+    assert.deepEqual(lock.bundledRuntimeFiles, []);
+    assert.equal(lock.upstream, undefined);
+
+    for (const [name, metadata] of Object.entries(files) as [string, {bytes: number; sha256: string}][]) {
+      const bytes = await readFile(path.join(fixtureDirectory, ...name.split('/')));
+      assert.equal(metadata.bytes, bytes.byteLength);
+      assert.equal(metadata.sha256, sha256(bytes));
+    }
+  } finally {
+    await rm(fixtureDirectory, {recursive: true, force: true});
+  }
 });
 
 test('artifact locks hash packaged manifests, runtime files, and model ranges', async () => {
@@ -146,11 +248,11 @@ test('artifact locks hash packaged manifests, runtime files, and model ranges', 
       assert.equal(artifact.sha256, lock.manifest.files[artifact.manifestName]!.sha256);
     }
 
-    if (lock.upstream.shardMapPath) {
+    if (lock.upstream?.shardMapPath) {
       const mapBytes = await readFile(packageFile(lock.upstream.shardMapPath));
       assert.equal(lock.upstream.shardMapSha256, sha256(mapBytes));
     }
-    if (lock.upstream.rangeManifestPath) {
+    if (lock.upstream?.rangeManifestPath) {
       const rangeBytes = await readFile(packageFile(lock.upstream.rangeManifestPath));
       assert.equal(lock.upstream.rangeManifestSha256, sha256(rangeBytes));
     }

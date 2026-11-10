@@ -33,47 +33,10 @@ export function resolveTvmTypeBoundary(): Plugin {
   };
 }
 
-// The generated TVM WASI glue is imported by this browser-only bundle. Its
-// CommonJS export is in the Node branch and has no browser consumer. Change
-// only the exact pinned glue sequence; if that sequence changes, the build
-// must be reviewed rather than silently rewritten.
-export function stripNodeOnlyWasiExport(code: string): string {
-  const target = 'if(typeof module!="undefined"){module["exports"]=Module}';
-  if (code.split(target).length !== 2) {
-    throw new Error('Expected exactly one Node-only export in the TVM WASI glue.');
-  }
-  return code.replace(target, '');
-}
-
-export function browserOnlyTvmWasiExport(): Plugin {
-  let seen = false;
-  return {
-    name: 'browser-only-tvm-wasi-export',
-    enforce: 'pre',
-    buildStart() {
-      seen = false;
-    },
-    transform(code, id) {
-      const path = (id.split('?', 1)[0] ?? '').replaceAll('\\', '/');
-      if (!path.endsWith('/.toolchains/apache-tvm-src/web/src/tvmjs_runtime_wasi.js')) return null;
-      seen = true;
-      return {code: stripNodeOnlyWasiExport(code), map: null};
-    },
-    generateBundle() {
-      if (!seen) throw new Error('Expected TVM WASI glue in bundle');
-    }
-  };
-}
-
 export default defineConfig({
   base: './',
-  // TVM's generated Emscripten glue probes Node globals. This package is
-  // browser-only; leave those globals undefined before a consumer bundler can
-  // replace `typeof __filename` with "string" and make the branch unconditional.
-  define: {__filename: 'undefined', __dirname: 'undefined'},
   plugins: [
     resolveTvmTypeBoundary(),
-    browserOnlyTvmWasiExport(),
     {
       name: 'verify-pinned-webgpu-source',
       buildStart() {

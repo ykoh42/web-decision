@@ -91,7 +91,9 @@ jobs:
           .toolchains/emsdk/emsdk install 4.0.23
           .toolchains/emsdk/emsdk activate 4.0.23 --embedded
           source .toolchains/emsdk/emsdk_env.sh
-          make -C .toolchains/apache-tvm-src/web -j4 src/tvmjs_runtime_wasi.js
+          make -C .toolchains/apache-tvm-src/web -f Makefile \
+            -f "$GITHUB_WORKSPACE/scripts/tvm-browser-runtime.mk" \
+            -j4 src/tvmjs_runtime_wasi.js
       - name: Install workspace
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run the complete package test suite
@@ -133,7 +135,9 @@ jobs:
           .toolchains/emsdk/emsdk install 4.0.23
           .toolchains/emsdk/emsdk activate 4.0.23 --embedded
           source .toolchains/emsdk/emsdk_env.sh
-          make -C .toolchains/apache-tvm-src/web -j4 src/tvmjs_runtime_wasi.js
+          make -C .toolchains/apache-tvm-src/web -f Makefile \
+            -f "$GITHUB_WORKSPACE/scripts/tvm-browser-runtime.mk" \
+            -j4 src/tvmjs_runtime_wasi.js
       - name: Install workspace
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Check formatting and lint

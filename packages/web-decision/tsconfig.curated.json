@@ -43,6 +43,7 @@
     "test/imajev-result-getter.test.mts",
     "test/imajev-loader.test.mts",
     "test/kev06-contract.test.mts",
+    "test/kev06-direct-contract.test.mts",
     "test/kev08-contract.test.mts",
     "test/kev-systemone-render-depth.test.mts",
     "test/load-device-loss.test.mts",

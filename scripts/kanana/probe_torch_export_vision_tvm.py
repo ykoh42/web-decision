@@ -42,7 +42,9 @@ DEFAULT_MODEL_DIR = (
     / "snapshots"
     / MODEL_REVISION
 )
-DEFAULT_INPUTS = Path.home() / ".cache/web-decision/kanana-vision-probe/prepared-inputs.npz"
+DEFAULT_INPUTS = (
+    Path.home() / ".cache/web-decision/kanana-vision-probe/prepared-inputs.npz"
+)
 PACKAGE = "kanana_cached_vision_probe"
 PINNED_PYTHON_MODULES = frozenset(
     Path(name).stem for name in PINNED_KANANA_MODEL_FILES if name.endswith(".py")
@@ -58,7 +60,9 @@ class PinnedPythonSourceLoader(importlib.machinery.SourceFileLoader):
         expected = PINNED_KANANA_MODEL_FILES[filename]
         actual = hashlib.sha256(source).hexdigest()
         if actual != expected:
-            raise ImportError(f"Kanana custom source changed before execution: {filename}")
+            raise ImportError(
+                f"Kanana custom source changed before execution: {filename}"
+            )
         return compile(source, self.path, "exec", dont_inherit=True)
 
 
@@ -74,10 +78,14 @@ class PinnedPythonSourceFinder(importlib.abc.MetaPathFinder):
             return None
         module_name = fullname[len(prefix) :]
         if "." in module_name or module_name not in PINNED_PYTHON_MODULES:
-            raise ModuleNotFoundError(f"Unpinned Kanana custom module: {fullname}", name=fullname)
+            raise ModuleNotFoundError(
+                f"Unpinned Kanana custom module: {fullname}", name=fullname
+            )
         source_path = self.model_dir / f"{module_name}.py"
         loader = PinnedPythonSourceLoader(fullname, str(source_path))
-        return importlib.util.spec_from_loader(fullname, loader, origin=str(source_path))
+        return importlib.util.spec_from_loader(
+            fullname, loader, origin=str(source_path)
+        )
 
 
 def import_pinned_vision_classes(model_dir: Path):
@@ -92,7 +100,9 @@ def import_pinned_vision_classes(model_dir: Path):
     finder = PinnedPythonSourceFinder(model_dir)
     sys.meta_path.insert(0, finder)
     try:
-        config_module = importlib.import_module(f"{PACKAGE}.configuration_kanana_v_decide")
+        config_module = importlib.import_module(
+            f"{PACKAGE}.configuration_kanana_v_decide"
+        )
         model_module = importlib.import_module(f"{PACKAGE}.modeling_kanana_v_decide")
     except Exception:
         for name in tuple(sys.modules):
@@ -101,7 +111,10 @@ def import_pinned_vision_classes(model_dir: Path):
         raise
     finally:
         sys.meta_path.remove(finder)
-    return config_module.KananaVDecideVisionConfig, model_module.KananaVDecideVisionModel
+    return (
+        config_module.KananaVDecideVisionConfig,
+        model_module.KananaVDecideVisionModel,
+    )
 
 
 def summarize_error(error: BaseException) -> dict[str, str]:
@@ -145,7 +158,7 @@ def make_export_module(torch, vision_model, precomputed=None):
     return VisionOutput().eval()
 
 
-def main():
+def _parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--prepared-inputs", type=Path, default=DEFAULT_INPUTS)
@@ -154,8 +167,10 @@ def main():
     parser.add_argument("--intermediate-size", type=int, default=128)
     parser.add_argument("--num-heads", type=int, default=4)
     parser.add_argument("--depth", type=int, default=1)
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def _load_probe_dependencies():
     import numpy as np
     import torch
     import tvm
@@ -168,18 +183,33 @@ def main():
         get_vision_position_ids,
     )
 
-    if not tvm.__version__.startswith("0.27."):
-        raise SystemExit(f"expected TVM 0.27, found {tvm.__version__}")
+    return {
+        "np": np,
+        "torch": torch,
+        "tvm": tvm,
+        "attentionFunctions": ALL_ATTENTION_FUNCTIONS,
+        "eagerAttention": eager_attention_forward,
+        "getInterpolation": get_vision_interpolation_indices_and_weights,
+        "getPositionIds": get_vision_position_ids,
+    }
+
+
+def _read_probe_inputs(args, dependencies):
+    tvm_version = dependencies["tvm"].__version__
+    if not tvm_version.startswith("0.27."):
+        raise SystemExit(f"expected TVM 0.27, found {tvm_version}")
     model_dir = args.model_dir.resolve()
     if model_dir.name != MODEL_REVISION or not (model_dir / "config.json").is_file():
-        raise SystemExit(f"expected pinned local model config at revision {MODEL_REVISION}: {model_dir}")
+        raise SystemExit(
+            f"expected pinned local model config at revision {MODEL_REVISION}: {model_dir}"
+        )
     if not args.prepared_inputs.is_file():
         raise SystemExit(f"cached processor fixture is missing: {args.prepared_inputs}")
-
     with (model_dir / "config.json").open() as file:
         full_config = json.load(file)
-    if full_config.get("model_type") != "kanana_v_decide":
-        raise SystemExit(f"unexpected pinned custom model type: {full_config.get('model_type')}")
+    model_type = full_config.get("model_type")
+    if model_type != "kanana_v_decide":
+        raise SystemExit(f"unexpected pinned custom model type: {model_type}")
     vision_values = dict(full_config["vision_config"])
     vision_values.pop("model_type", None)
     vision_values.update(
@@ -192,25 +222,60 @@ def main():
             "deepstack_visual_indexes": [],
         }
     )
-    with np.load(args.prepared_inputs) as stored:
-        pixels_np = np.asarray(stored["pixel_values"], dtype=np.float32)
-        grid_np = np.asarray(stored["image_grid_thw"], dtype=np.int64)
-    if pixels_np.shape != (256, 1536) or grid_np.shape != (1, 3) or tuple(grid_np[0]) != (1, 16, 16):
-        raise SystemExit(f"cached image patch geometry changed: pixels={pixels_np.shape}, grid={grid_np}")
-    if pixels_np.shape[0] != int(np.prod(grid_np[0])):
+    with dependencies["np"].load(args.prepared_inputs) as stored:
+        pixels_np = dependencies["np"].asarray(
+            stored["pixel_values"], dtype=dependencies["np"].float32
+        )
+        grid_np = dependencies["np"].asarray(
+            stored["image_grid_thw"], dtype=dependencies["np"].int64
+        )
+    valid_geometry = (
+        pixels_np.shape == (256, 1536)
+        and grid_np.shape == (1, 3)
+        and tuple(grid_np[0]) == (1, 16, 16)
+    )
+    if not valid_geometry:
+        raise SystemExit(
+            f"cached image patch geometry changed: pixels={pixels_np.shape}, grid={grid_np}"
+        )
+    if pixels_np.shape[0] != int(dependencies["np"].prod(grid_np[0])):
         raise SystemExit("cached patch count does not match image_grid_thw")
+    return model_dir, full_config, vision_values, pixels_np, grid_np
 
+
+def _make_probe_model(args, dependencies, inputs):
+    model_dir, full_config, vision_values, pixels_np, grid_np = inputs
     VisionConfig, VisionModel = import_pinned_vision_classes(model_dir)
     config = VisionConfig(**vision_values)
     config._attn_implementation = "eager"
+    torch = dependencies["torch"]
     torch.manual_seed(0)
     torch.set_num_threads(1)
     vision = VisionModel(config).eval().to(dtype=torch.bfloat16)
     pixel_values = torch.from_numpy(pixels_np)
     image_grid_thw = torch.from_numpy(grid_np)
+    return config, vision, pixel_values, image_grid_thw
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    report = {
+
+def _make_probe_report(
+    args, dependencies, config, vision, vision_values, pixels_np, grid_np
+):
+    torch, tvm = dependencies["torch"], dependencies["tvm"]
+    reduced_config = {
+        key: vision_values.get(key)
+        for key in (
+            "depth",
+            "hidden_size",
+            "intermediate_size",
+            "num_heads",
+            "in_channels",
+            "patch_size",
+            "temporal_patch_size",
+            "spatial_merge_size",
+            "out_hidden_size",
+        )
+    }
+    return {
         "model": MODEL_ID,
         "revision": MODEL_REVISION,
         "scope": "pinned custom vision module, reduced one-layer/96-wide config, random init",
@@ -221,215 +286,299 @@ def main():
         "tvm_version": tvm.__version__,
         "frontend": "torch.export.export -> tvm.relax.frontend.torch.from_exported_program",
         "processor_fixture": str(args.prepared_inputs.resolve()),
-        "inputs": {"pixel_values": list(pixels_np.shape), "image_grid_thw": list(grid_np.shape)},
-        "reduced_config": {
-            key: vision_values.get(key)
-            for key in (
-                "depth",
-                "hidden_size",
-                "intermediate_size",
-                "num_heads",
-                "in_channels",
-                "patch_size",
-                "temporal_patch_size",
-                "spatial_merge_size",
-                "out_hidden_size",
-            )
+        "inputs": {
+            "pixel_values": list(pixels_np.shape),
+            "image_grid_thw": list(grid_np.shape),
         },
+        "reduced_config": reduced_config,
         "parameter_dtype": str(next(vision.parameters()).dtype),
-        "random_parameter_count": sum(parameter.numel() for parameter in vision.parameters()),
-        "random_parameter_bytes": sum(parameter.numel() * parameter.element_size() for parameter in vision.parameters()),
+        "random_parameter_count": sum(
+            parameter.numel() for parameter in vision.parameters()
+        ),
+        "random_parameter_bytes": sum(
+            parameter.numel() * parameter.element_size()
+            for parameter in vision.parameters()
+        ),
     }
 
-    # Baseline: the pinned Transformers utility reads tensor values with .tolist().
-    baseline = make_export_module(torch, vision)
-    baseline_result = {"status": "failed"}
+
+def _prepare_probe(args):
+    dependencies = _load_probe_dependencies()
+    inputs = _read_probe_inputs(args, dependencies)
+    config, vision, pixels, grid = _make_probe_model(args, dependencies, inputs)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    report = _make_probe_report(
+        args, dependencies, config, vision, inputs[2], inputs[3], inputs[4]
+    )
+    return {
+        "args": args,
+        "dependencies": dependencies,
+        "modelDir": inputs[0],
+        "config": config,
+        "vision": vision,
+        "pixelValues": pixels,
+        "imageGrid": grid,
+        "pixelsNumpy": inputs[3],
+        "gridNumpy": inputs[4],
+        "report": report,
+    }
+
+
+def _run_baseline_capture(state):
+    torch = state["dependencies"]["torch"]
+    baseline = make_export_module(torch, state["vision"])
+    result = {"status": "failed"}
     try:
         started = time.perf_counter()
-        baseline_ep = torch.export.export(baseline, (pixel_values, image_grid_thw), strict=True)
-        baseline_result["status"] = "passed"
-        baseline_result["seconds"] = round(time.perf_counter() - started, 3)
-        baseline_result["graph"] = baseline_ep.graph_module.code
+        exported = torch.export.export(
+            baseline, (state["pixelValues"], state["imageGrid"]), strict=True
+        )
+        result["status"] = "passed"
+        result["seconds"] = round(time.perf_counter() - started, 3)
+        result["graph"] = exported.graph_module.code
     except Exception as error:
-        baseline_result["failure_phase"] = "torch.export.export"
-        baseline_result["error"] = summarize_error(error)
-    report["baseline_capture"] = baseline_result
+        result["failure_phase"] = "torch.export.export"
+        result["error"] = summarize_error(error)
+    return result
 
-    # Retry only the fixed single-image fixture. Transformers explicitly lets
-    # callers supply these grid-derived tensors in kwargs to bypass host .tolist().
-    grid = image_grid_thw
-    position_ids = get_vision_position_ids(grid, config.spatial_merge_size)
-    interp_indices, interp_weights = get_vision_interpolation_indices_and_weights(
+
+def _precompute_fixed_grid(state):
+    deps = state["dependencies"]
+    torch, config = deps["torch"], state["config"]
+    grid = state["imageGrid"]
+    positions = deps["getPositionIds"](grid, config.spatial_merge_size)
+    indices, weights = deps["getInterpolation"](
         grid,
         num_grid_per_side=int(math.sqrt(config.num_position_embeddings)),
         mode="bilinear",
         align_corners=True,
         spatial_merge_size=config.spatial_merge_size,
     )
-    patch_count = int(pixels_np.shape[0])
+    patch_count = int(state["pixelsNumpy"].shape[0])
     precomputed = {
-        "position_ids": position_ids,
-        "interp_indices": interp_indices,
-        "interp_weights": interp_weights,
+        "position_ids": positions,
+        "interp_indices": indices,
+        "interp_weights": weights,
         "cu_seqlens": torch.tensor([0, patch_count], dtype=torch.int32),
         "max_seqlen": patch_count,
     }
-    # The custom attention has a Python split based on cu_seqlens.tolist(). For
-    # one image there is one attention segment, so route the flash control path
-    # to eager attention; this is an export-only fixed-fixture specialization.
-    previous_flash = ALL_ATTENTION_FUNCTIONS.get("flash_attention_2")
-    ALL_ATTENTION_FUNCTIONS.register("flash_attention_2", eager_attention_forward)
+    attention_functions = deps["attentionFunctions"]
+    previous_flash = attention_functions.get("flash_attention_2")
+    attention_functions.register("flash_attention_2", deps["eagerAttention"])
     config._attn_implementation = "flash_attention_2"
-    fixed_module = make_export_module(torch, vision, precomputed)
-    fixed_result = {"capture_status": "failed"}
-    try:
-        started = time.perf_counter()
-        exported_program = torch.export.export(fixed_module, (pixel_values, image_grid_thw), strict=True)
-        fixed_result["capture_status"] = "passed"
-        fixed_result["capture_seconds"] = round(time.perf_counter() - started, 3)
-        graph_nodes = list(exported_program.graph_module.graph.nodes)
-        operators = collections.Counter(
-            str(node.target)
-            for node in graph_nodes
-            if node.op in ("call_function", "call_method", "call_module")
-        )
-        fixed_result["exported_graph"] = {
-            "node_count": len(graph_nodes),
-            "operator_count": sum(operators.values()),
-            "top_operators": operators.most_common(40),
-            "output": str(exported_program.graph_signature.user_outputs),
-        }
-        (args.output_dir / "vision_exported_graph.py.txt").write_text(exported_program.graph_module.code)
+    return precomputed, previous_flash
 
-        from tvm.relax.frontend.torch import from_exported_program
 
-        started = time.perf_counter()
-        mod = from_exported_program(exported_program, keep_params_as_input=True)
-        fixed_result["import_status"] = "passed"
-        fixed_result["import_seconds"] = round(time.perf_counter() - started, 3)
-        fixed_result["relax_return_type"] = str(mod["main"].ret_ty)
-        fixed_result["relax_parameter_count"] = len(mod["main"].params)
-        (args.output_dir / "vision_relax_main.r").write_text(mod["main"].script())
+def _restore_attention_function(state, previous_flash):
+    attention_functions = state["dependencies"]["attentionFunctions"]
+    if previous_flash is None:
+        attention_functions.pop("flash_attention_2", None)
+    else:
+        attention_functions.register("flash_attention_2", previous_flash)
 
-        started = time.perf_counter()
-        tvm.relax.build(mod, target="llvm")
-        fixed_result["cpu_build_status"] = "passed"
-        fixed_result["cpu_build_seconds"] = round(time.perf_counter() - started, 3)
-        fixed_result["status"] = "passed"
-    except Exception as error:
-        fixed_result["failure_phase"] = (
-            "torch.export.export"
-            if fixed_result["capture_status"] == "failed"
-            else "from_exported_program"
-            if "import_status" not in fixed_result
-            else "relax_cpu_build"
-        )
-        fixed_result["error"] = summarize_error(error)
-        fixed_result["status"] = "failed"
-        if fixed_result.get("capture_status") == "passed":
-            # The PyTorch frontend currently models Conv3d accumulation as
-            # float32, which conflicts with the pinned model's bfloat16 bias.
-            # A full-float32 reduced model is a diagnostic follow-up: it tests
-            # the later vision operators without changing the primary result.
-            followup = {"parameter_dtype": "torch.float32", "checkpoint_opened": False}
-            try:
-                float32_vision = copy.deepcopy(vision).to(dtype=torch.float32)
-                float32_module = make_export_module(torch, float32_vision, precomputed).to(dtype=torch.float32)
-                started = time.perf_counter()
-                float32_ep = torch.export.export(
-                    float32_module, (pixel_values, image_grid_thw), strict=True
-                )
-                followup["capture_status"] = "passed"
-                followup["capture_seconds"] = round(time.perf_counter() - started, 3)
-                (args.output_dir / "vision_exported_graph_float32.py.txt").write_text(
-                    float32_ep.graph_module.code
-                )
-                started = time.perf_counter()
-                float32_mod = from_exported_program(float32_ep, keep_params_as_input=True)
-                followup["import_status"] = "passed"
-                followup["import_seconds"] = round(time.perf_counter() - started, 3)
-                followup["relax_return_type"] = str(float32_mod["main"].ret_ty)
-                followup["relax_parameter_count"] = len(float32_mod["main"].params)
-                (args.output_dir / "vision_relax_main_float32.r").write_text(
-                    float32_mod["main"].script()
-                )
-                started = time.perf_counter()
-                float32_executable = tvm.relax.build(float32_mod, target="llvm")
-                followup["cpu_build_status"] = "passed"
-                followup["cpu_build_seconds"] = round(time.perf_counter() - started, 3)
-                followup["status"] = "passed"
 
-                with torch.no_grad():
-                    torch_output = float32_module(pixel_values, image_grid_thw).detach().cpu().numpy()
-                parameter_by_target = dict(float32_module.named_parameters())
-                parameter_tensors = []
-                for input_spec in float32_ep.graph_signature.input_specs:
-                    if input_spec.kind.name != "PARAMETER":
-                        continue
-                    target_name = str(input_spec.target)
-                    parameter = parameter_by_target[target_name]
-                    parameter_tensors.append(
-                        tvm.runtime.tensor(np.ascontiguousarray(parameter.detach().cpu().numpy()))
-                    )
-                vm = tvm.relax.VirtualMachine(float32_executable, tvm.cpu())
-                vm_result = vm["main"](
-                    tvm.runtime.tensor(pixels_np),
-                    tvm.runtime.tensor(grid_np),
-                    *parameter_tensors,
-                )
-                tvm_output = np.asarray(vm_result[0].numpy())
-                if tvm_output.shape != torch_output.shape:
-                    raise RuntimeError(
-                        f"TVM/PyTorch output shape mismatch: {tvm_output.shape} != {torch_output.shape}"
-                    )
-                difference = tvm_output.astype(np.float64) - torch_output.astype(np.float64)
-                reference_norm = float(np.linalg.norm(torch_output.astype(np.float64)))
-                output_cosine = float(
-                    np.dot(tvm_output.reshape(-1), torch_output.reshape(-1))
-                    / (
-                        np.linalg.norm(tvm_output.reshape(-1))
-                        * np.linalg.norm(torch_output.reshape(-1))
-                        + 1e-30
-                    )
-                )
-                followup["cpu_dispatch_status"] = "passed"
-                followup["torch_output_shape"] = list(torch_output.shape)
-                followup["tvm_output_shape"] = list(tvm_output.shape)
-                followup["max_abs_error"] = float(np.max(np.abs(difference)))
-                followup["mean_abs_error"] = float(np.mean(np.abs(difference)))
-                followup["cosine_similarity"] = output_cosine
-                followup["torch_output_l2_norm"] = reference_norm
-            except Exception as followup_error:
-                followup["failure_phase"] = (
-                    "torch.export.export"
-                    if "capture_status" not in followup
-                    else "from_exported_program"
-                    if "import_status" not in followup
-                    else "relax_cpu_build"
-                    if "cpu_build_status" not in followup
-                    else "relax_cpu_dispatch"
-                )
-                followup["error"] = summarize_error(followup_error)
-                followup["status"] = "failed"
-            fixed_result["float32_followup_probe"] = followup
-    finally:
-        if previous_flash is None:
-            ALL_ATTENTION_FUNCTIONS.pop("flash_attention_2", None)
-        else:
-            ALL_ATTENTION_FUNCTIONS.register("flash_attention_2", previous_flash)
-    report["fixed_grid_precompute_probe"] = fixed_result
-    float32_result = fixed_result.get("float32_followup_probe", {})
-    report["status"] = (
-        "passed"
-        if fixed_result.get("status") == "passed"
-        else "passed_with_float32_diagnostic"
-        if float32_result.get("status") == "passed"
-        else "failed"
+def _capture_fixed_program(state, result):
+    torch = state["dependencies"]["torch"]
+    started = time.perf_counter()
+    exported = torch.export.export(
+        make_export_module(torch, state["vision"], state["precomputed"]),
+        (state["pixelValues"], state["imageGrid"]),
+        strict=True,
     )
-    (args.output_dir / "probe-report.json").write_text(json.dumps(report, indent=2) + "\n")
+    result["capture_status"] = "passed"
+    result["capture_seconds"] = round(time.perf_counter() - started, 3)
+    nodes = list(exported.graph_module.graph.nodes)
+    operators = collections.Counter(
+        str(node.target)
+        for node in nodes
+        if node.op in ("call_function", "call_method", "call_module")
+    )
+    result["exported_graph"] = {
+        "node_count": len(nodes),
+        "operator_count": sum(operators.values()),
+        "top_operators": operators.most_common(40),
+        "output": str(exported.graph_signature.user_outputs),
+    }
+    path = state["args"].output_dir / "vision_exported_graph.py.txt"
+    path.write_text(exported.graph_module.code)
+    return exported
+
+
+def _import_fixed_program(state, result, exported):
+    from tvm.relax.frontend.torch import from_exported_program
+
+    started = time.perf_counter()
+    module = from_exported_program(exported, keep_params_as_input=True)
+    result["import_status"] = "passed"
+    result["import_seconds"] = round(time.perf_counter() - started, 3)
+    result["relax_return_type"] = str(module["main"].ret_ty)
+    result["relax_parameter_count"] = len(module["main"].params)
+    path = state["args"].output_dir / "vision_relax_main.r"
+    path.write_text(module["main"].script())
+    return module
+
+
+def _build_fixed_cpu(tvm, result, module):
+    started = time.perf_counter()
+    tvm.relax.build(module, target="llvm")
+    result["cpu_build_status"] = "passed"
+    result["cpu_build_seconds"] = round(time.perf_counter() - started, 3)
+    result["status"] = "passed"
+
+
+def _fixed_failure_phase(result):
+    if result["capture_status"] == "failed":
+        return "torch.export.export"
+    if "import_status" not in result:
+        return "from_exported_program"
+    return "relax_cpu_build"
+
+
+def _run_fixed_probe(state, previous_flash):
+    result = {"capture_status": "failed"}
+    try:
+        exported = _capture_fixed_program(state, result)
+        module = _import_fixed_program(state, result, exported)
+        _build_fixed_cpu(state["dependencies"]["tvm"], result, module)
+    except Exception as error:
+        result["failure_phase"] = _fixed_failure_phase(result)
+        result["error"] = summarize_error(error)
+        result["status"] = "failed"
+        if result.get("capture_status") == "passed":
+            result["float32_followup_probe"] = _run_float32_followup(state)
+    finally:
+        _restore_attention_function(state, previous_flash)
+    return result
+
+
+def _export_float32_followup(state, followup):
+    torch = state["dependencies"]["torch"]
+    tvm = state["dependencies"]["tvm"]
+    vision = copy.deepcopy(state["vision"]).to(dtype=torch.float32)
+    module = make_export_module(torch, vision, state["precomputed"]).to(
+        dtype=torch.float32
+    )
+    started = time.perf_counter()
+    exported = torch.export.export(
+        module, (state["pixelValues"], state["imageGrid"]), strict=True
+    )
+    followup["capture_status"] = "passed"
+    followup["capture_seconds"] = round(time.perf_counter() - started, 3)
+    graph_path = state["args"].output_dir / "vision_exported_graph_float32.py.txt"
+    graph_path.write_text(exported.graph_module.code)
+    started = time.perf_counter()
+    relax_module = tvm.relax.frontend.torch.from_exported_program(
+        exported, keep_params_as_input=True
+    )
+    followup["import_status"] = "passed"
+    followup["import_seconds"] = round(time.perf_counter() - started, 3)
+    followup["relax_return_type"] = str(relax_module["main"].ret_ty)
+    followup["relax_parameter_count"] = len(relax_module["main"].params)
+    relax_path = state["args"].output_dir / "vision_relax_main_float32.r"
+    relax_path.write_text(relax_module["main"].script())
+    started = time.perf_counter()
+    executable = tvm.relax.build(relax_module, target="llvm")
+    followup["cpu_build_status"] = "passed"
+    followup["cpu_build_seconds"] = round(time.perf_counter() - started, 3)
+    followup["status"] = "passed"
+    return module, exported, executable
+
+
+def _dispatch_float32_followup(state, followup, module, exported, executable):
+    torch, tvm, np = (
+        state["dependencies"]["torch"],
+        state["dependencies"]["tvm"],
+        state["dependencies"]["np"],
+    )
+    with torch.no_grad():
+        torch_output = (
+            module(state["pixelValues"], state["imageGrid"]).detach().cpu().numpy()
+        )
+    parameter_by_target = dict(module.named_parameters())
+    parameters = []
+    for input_spec in exported.graph_signature.input_specs:
+        if input_spec.kind.name != "PARAMETER":
+            continue
+        parameter = parameter_by_target[str(input_spec.target)]
+        parameters.append(
+            tvm.runtime.tensor(np.ascontiguousarray(parameter.detach().cpu().numpy()))
+        )
+    vm = tvm.relax.VirtualMachine(executable, tvm.cpu())
+    result = vm["main"](
+        tvm.runtime.tensor(state["pixelsNumpy"]),
+        tvm.runtime.tensor(state["gridNumpy"]),
+        *parameters,
+    )
+    tvm_output = np.asarray(result[0].numpy())
+    if tvm_output.shape != torch_output.shape:
+        raise RuntimeError(
+            f"TVM/PyTorch output shape mismatch: {tvm_output.shape} != {torch_output.shape}"
+        )
+    difference = tvm_output.astype(np.float64) - torch_output.astype(np.float64)
+    torch_flat = torch_output.reshape(-1).astype(np.float64)
+    tvm_flat = tvm_output.reshape(-1).astype(np.float64)
+    followup["cpu_dispatch_status"] = "passed"
+    followup["torch_output_shape"] = list(torch_output.shape)
+    followup["tvm_output_shape"] = list(tvm_output.shape)
+    followup["max_abs_error"] = float(np.max(np.abs(difference)))
+    followup["mean_abs_error"] = float(np.mean(np.abs(difference)))
+    followup["cosine_similarity"] = float(
+        np.dot(tvm_flat, torch_flat)
+        / (np.linalg.norm(tvm_flat) * np.linalg.norm(torch_flat) + 1e-30)
+    )
+    followup["torch_output_l2_norm"] = float(np.linalg.norm(torch_flat))
+
+
+def _float32_failure_phase(followup):
+    if "capture_status" not in followup:
+        return "torch.export.export"
+    if "import_status" not in followup:
+        return "from_exported_program"
+    if "cpu_build_status" not in followup:
+        return "relax_cpu_build"
+    return "relax_cpu_dispatch"
+
+
+def _run_float32_followup(state):
+    followup = {"parameter_dtype": "torch.float32", "checkpoint_opened": False}
+    try:
+        module, exported, executable = _export_float32_followup(state, followup)
+        _dispatch_float32_followup(state, followup, module, exported, executable)
+    except Exception as error:
+        followup["failure_phase"] = _float32_failure_phase(followup)
+        followup["error"] = summarize_error(error)
+        followup["status"] = "failed"
+    return followup
+
+
+def _final_probe_status(fixed_result):
+    float32_result = fixed_result.get("float32_followup_probe", {})
+    if fixed_result.get("status") == "passed":
+        return "passed"
+    if float32_result.get("status") == "passed":
+        return "passed_with_float32_diagnostic"
+    return "failed"
+
+
+def _write_probe_report(state, fixed_result):
+    report = state["report"]
+    report["fixed_grid_precompute_probe"] = fixed_result
+    report["status"] = _final_probe_status(fixed_result)
+    report_path = state["args"].output_dir / "probe-report.json"
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
     if report["status"] == "failed":
         raise SystemExit(1)
+
+
+def main():
+    args = _parse_arguments()
+    state = _prepare_probe(args)
+    baseline = _run_baseline_capture(state)
+    state["report"]["baseline_capture"] = baseline
+    state["precomputed"], previous_flash = _precompute_fixed_grid(state)
+    fixed_result = _run_fixed_probe(state, previous_flash)
+    _write_probe_report(state, fixed_result)
 
 
 if __name__ == "__main__":

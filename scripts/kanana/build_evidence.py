@@ -24,7 +24,9 @@ def sha256_file(path: Path) -> str:
 
 
 def command_output(*command: str) -> str:
-    return subprocess.run(command, check=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(
+        command, check=True, capture_output=True, text=True
+    ).stdout.strip()
 
 
 def installed_python_packages() -> dict[str, str]:
@@ -65,17 +67,31 @@ def locked_python_packages(workspace_root: Path) -> dict[str, str]:
         requirement = Requirement(requirement_text)
         if requirement.marker and not requirement.marker.evaluate():
             continue
-        exact_versions = [specifier.version for specifier in requirement.specifier if specifier.operator == "=="]
+        exact_versions = [
+            specifier.version
+            for specifier in requirement.specifier
+            if specifier.operator == "=="
+        ]
         if requirement.url or len(exact_versions) != 1:
-            raise RuntimeError(f"Kanana build lock has a non-exact package pin: {requirement_text}")
+            raise RuntimeError(
+                f"Kanana build lock has a non-exact package pin: {requirement_text}"
+            )
         packages[canonicalize_name(requirement.name)] = exact_versions[0]
     return dict(sorted(packages.items()))
 
 
-def verify_locked_python_packages(expected: dict[str, str], installed: dict[str, str]) -> dict[str, str]:
+def verify_locked_python_packages(
+    expected: dict[str, str], installed: dict[str, str]
+) -> dict[str, str]:
     if installed != expected:
-        missing = {name: version for name, version in expected.items() if installed.get(name) != version}
-        extra = {name: version for name, version in installed.items() if name not in expected}
+        missing = {
+            name: version
+            for name, version in expected.items()
+            if installed.get(name) != version
+        }
+        extra = {
+            name: version for name, version in installed.items() if name not in expected
+        }
         raise RuntimeError(
             "The active Python environment does not match scripts/kanana/build-env/uv.lock: "
             f"missingOrMismatched={missing}, extra={extra}. Run uv sync --locked --project scripts/kanana/build-env."
@@ -84,7 +100,9 @@ def verify_locked_python_packages(expected: dict[str, str], installed: dict[str,
 
 
 def verify_locked_python_environment(workspace_root: Path) -> dict[str, str]:
-    expected_version = (BUILD_ENV / ".python-version").read_text(encoding="utf-8").strip()
+    expected_version = (
+        (BUILD_ENV / ".python-version").read_text(encoding="utf-8").strip()
+    )
     if platform.python_version() != expected_version:
         raise RuntimeError(
             f"Kanana build requires Python {expected_version}; found {platform.python_version()}."
@@ -113,16 +131,23 @@ def collect_native_tvm(workspace_root: Path) -> dict:
     import tvm
     import tvm_ffi
 
-    toolchain_path = workspace_root / "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json"
+    toolchain_path = (
+        workspace_root
+        / "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json"
+    )
     toolchain = json.loads(toolchain_path.read_text(encoding="utf-8"))
     tvm_source = workspace_root / ".toolchains/apache-tvm-src"
     emsdk = workspace_root / ".toolchains/emsdk"
     expected_tvm = toolchain["tvm"]
     expected_emscripten = toolchain["emscripten"]
     if git_revision(tvm_source) != expected_tvm["revision"]:
-        raise RuntimeError("The TVM source checkout differs from the Kanana toolchain pin.")
+        raise RuntimeError(
+            "The TVM source checkout differs from the Kanana toolchain pin."
+        )
     if git_revision(emsdk) != expected_emscripten["revision"]:
-        raise RuntimeError("The Emscripten source checkout differs from the Kanana toolchain pin.")
+        raise RuntimeError(
+            "The Emscripten source checkout differs from the Kanana toolchain pin."
+        )
     if tvm.__version__ != expected_tvm["version"]:
         raise RuntimeError(
             f"Kanana build requires TVM {expected_tvm['version']}; found {tvm.__version__}."
@@ -136,16 +161,24 @@ def collect_native_tvm(workspace_root: Path) -> dict:
 
     if expected_tvm["sourceChanges"] != []:
         raise RuntimeError("Kanana builds require unmodified pinned TVM source.")
-    source_status = command_output("git", "-C", str(tvm_source), "status", "--porcelain")
+    source_status = command_output(
+        "git", "-C", str(tvm_source), "status", "--porcelain"
+    )
     if source_status:
         raise RuntimeError(f"Kanana TVM source checkout is modified:\n{source_status}")
 
     runtime_assets = []
     for item in expected_tvm["wasmRuntimeAssets"]:
         path = tvm_source / "web/dist/wasm" / item["name"]
-        actual = {"name": item["name"], "bytes": path.stat().st_size, "sha256": sha256_file(path)}
+        actual = {
+            "name": item["name"],
+            "bytes": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
         if actual != item:
-            raise RuntimeError(f"The built TVM WebAssembly runtime asset differs: {item['name']}")
+            raise RuntimeError(
+                f"The built TVM WebAssembly runtime asset differs: {item['name']}"
+            )
         runtime_assets.append(actual)
 
     emcc = emsdk / "upstream/emscripten/emcc"
@@ -153,7 +186,9 @@ def collect_native_tvm(workspace_root: Path) -> dict:
     wasm_ld = emsdk / "upstream/bin/wasm-ld"
     emcc_version = command_output(str(emcc), "--version").splitlines()[0]
     if expected_emscripten["version"] not in emcc_version:
-        raise RuntimeError(f"Kanana build requires Emscripten {expected_emscripten['version']}.")
+        raise RuntimeError(
+            f"Kanana build requires Emscripten {expected_emscripten['version']}."
+        )
 
     return {
         "pythonPackage": {
@@ -191,7 +226,11 @@ def collect_build_environment(workspace_root: Path) -> dict:
     pnpm_lock = workspace_root / "pnpm-lock.yaml"
     package_json = workspace_root / "package.json"
     system = platform.system()
-    os_build = command_output("sw_vers", "-buildVersion") if system == "Darwin" else platform.version()
+    os_build = (
+        command_output("sw_vers", "-buildVersion")
+        if system == "Darwin"
+        else platform.version()
+    )
 
     return {
         "python": {
@@ -212,7 +251,9 @@ def collect_build_environment(workspace_root: Path) -> dict:
         },
         "host": {
             "system": system,
-            "version": platform.mac_ver()[0] if system == "Darwin" else platform.release(),
+            "version": platform.mac_ver()[0]
+            if system == "Darwin"
+            else platform.release(),
             "kernel": platform.release(),
             "build": os_build,
             "machine": platform.machine(),
@@ -270,7 +311,9 @@ def add_tvm_build_evidence(
             "buildBackend": "native-tvm",
             "weightSource": "pinned-safetensors",
             "onnxImportOrExportUsed": False,
-            "buildEnvironment": collect_build_environment(Path(__file__).resolve().parents[2]),
+            "buildEnvironment": collect_build_environment(
+                Path(__file__).resolve().parents[2]
+            ),
         }
     )
     return evidence

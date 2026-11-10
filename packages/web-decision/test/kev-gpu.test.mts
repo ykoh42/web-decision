@@ -38,8 +38,14 @@ interface TestAdapterOptions {
   failure?: unknown;
 }
 
+const DEFAULT_ADAPTER_LIMITS: TestLimits = {
+  ...KEV_REQUIRED_LIMITS,
+  maxBufferSize: 256 * 1024 * 1024,
+  maxStorageBufferBindingSize: 128 * 1024 * 1024
+};
+
 function mockAdapter({
-  limits = KEV_REQUIRED_LIMITS,
+  limits = DEFAULT_ADAPTER_LIMITS,
   features = ['shader-f16', 'subgroups'],
   failure
 }: TestAdapterOptions = {}) {
@@ -79,40 +85,37 @@ test('accepts an adapter with the audited limits and does not require optional s
   } as unknown as GPU);
   assert.equal(result!.device, x.device);
   assert.deepEqual(requests, [{powerPreference: 'high-performance'}]);
-  assert.deepEqual(x.request!.requiredLimits, KEV_REQUIRED_LIMITS);
+  assert.deepEqual(x.request!.requiredLimits, {
+    ...KEV_REQUIRED_LIMITS,
+    maxBufferSize: x.adapter.limits.maxBufferSize,
+    maxStorageBufferBindingSize: x.adapter.limits.maxStorageBufferBindingSize
+  });
+  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeX, 256);
   assert.deepEqual(x.request!.requiredFeatures, ['shader-f16']);
 });
-test('requests larger adapter buffer limits while keeping fixed compute requirements', async () => {
+test('requests adapter buffer maxima instead of the WebGPU device defaults', async () => {
   const limits = {
-      ...KEV_REQUIRED_LIMITS,
-      maxBufferSize: KEV_REQUIRED_LIMITS.maxBufferSize * 2,
-      maxStorageBufferBindingSize: KEV_REQUIRED_LIMITS.maxStorageBufferBindingSize * 2
+      ...DEFAULT_ADAPTER_LIMITS,
+      maxBufferSize: 2 * 1024 * 1024 * 1024,
+      maxStorageBufferBindingSize: 2 * 1024 * 1024 * 1024,
+      maxComputeWorkgroupStorageSize: KEV_REQUIRED_LIMITS.maxComputeWorkgroupStorageSize * 2,
+      maxStorageBuffersPerShaderStage: KEV_REQUIRED_LIMITS.maxStorageBuffersPerShaderStage * 2,
+      maxComputeInvocationsPerWorkgroup: KEV_REQUIRED_LIMITS.maxComputeInvocationsPerWorkgroup * 2,
+      maxComputeWorkgroupSizeX: KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeX * 2,
+      maxComputeWorkgroupSizeY: KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeY * 2,
+      maxComputeWorkgroupSizeZ: KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeZ * 2,
+      maxComputeWorkgroupsPerDimension: KEV_REQUIRED_LIMITS.maxComputeWorkgroupsPerDimension * 2
     },
     x = mockAdapter({limits});
   const result = await detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU);
 
   assert.equal(result!.device, x.device);
-  assert.deepEqual(x.request!.requiredLimits, limits);
+  assert.deepEqual(x.request!.requiredLimits, {
+    ...KEV_REQUIRED_LIMITS,
+    maxBufferSize: limits.maxBufferSize,
+    maxStorageBufferBindingSize: limits.maxStorageBufferBindingSize
+  });
   assert.deepEqual(x.request!.requiredFeatures, ['shader-f16']);
-  assert.equal(
-    x.request!.requiredLimits.maxComputeWorkgroupStorageSize,
-    KEV_REQUIRED_LIMITS.maxComputeWorkgroupStorageSize
-  );
-  assert.equal(
-    x.request!.requiredLimits.maxStorageBuffersPerShaderStage,
-    KEV_REQUIRED_LIMITS.maxStorageBuffersPerShaderStage
-  );
-  assert.equal(
-    x.request!.requiredLimits.maxComputeInvocationsPerWorkgroup,
-    KEV_REQUIRED_LIMITS.maxComputeInvocationsPerWorkgroup
-  );
-  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeX, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeX);
-  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeY, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeY);
-  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeZ, KEV_REQUIRED_LIMITS.maxComputeWorkgroupSizeZ);
-  assert.equal(
-    x.request!.requiredLimits.maxComputeWorkgroupsPerDimension,
-    KEV_REQUIRED_LIMITS.maxComputeWorkgroupsPerDimension
-  );
 });
 test('reports missing f16 without creating a device', async () => {
   const x = mockAdapter({features: []});
@@ -121,13 +124,21 @@ test('reports missing f16 without creating a device', async () => {
   assert.equal(result!.device, undefined);
   assert.equal(x.calls, 0);
 });
-test('rejects an insufficient limit before creating a device', async () => {
-  const x = mockAdapter({limits: {...KEV_REQUIRED_LIMITS, maxStorageBuffersPerShaderStage: 7}});
+test('rejects an insufficient compute limit before creating a device', async () => {
+  const x = mockAdapter({limits: {...DEFAULT_ADAPTER_LIMITS, maxStorageBuffersPerShaderStage: 7}});
   await assert.rejects(
     detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU),
     /maxStorageBuffersPerShaderStage requires 8/
   );
   assert.equal(x.calls, 0);
+});
+test('keeps small-input support when adapter storage bindings are below 256 MiB', async () => {
+  const x = mockAdapter(),
+    result = await detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU);
+  assert.equal(result!.device, x.device);
+  assert.equal(x.request!.requiredLimits.maxStorageBufferBindingSize, 128 * 1024 * 1024);
+  assert.doesNotThrow(() => assertKevAttentionFits(2048, x.adapter.limits));
+  assert.throws(() => assertKevAttentionFits(2049, x.adapter.limits), {code: 'DEVICE_RESOURCE_LIMIT'});
 });
 test('handles unavailable adapter and preserves requestDevice errors', async () => {
   assert.equal(await detectKevGPUDevice(null), undefined);
@@ -140,28 +151,45 @@ test('handles unavailable adapter and preserves requestDevice errors', async () 
   );
 });
 
-test('calculates the exact FP16 attention buffer at the native sequence boundary', () => {
+test('preserves dense-score memory requirements for the legacy artifact', () => {
   assert.equal(requiredKevAttentionBytes(8191), 2_146_959_392n);
   assert.equal(requiredKevAttentionBytes(8192), 2_147_483_648n);
   assert.equal(requiredKevAttentionBytes(0), 0n);
 });
 
-test('reports a device buffer limit without imposing a model token cap', () => {
+test('uses linear FP32 scratch and a 128-lane workgroup for the direct TVM kernel', async () => {
+  const x = mockAdapter({
+    limits: {
+      ...DEFAULT_ADAPTER_LIMITS,
+      maxBufferSize: 2 * 1024 * 1024 * 1024,
+      maxStorageBufferBindingSize: 2 * 1024 * 1024 * 1024
+    }
+  });
+  await detectKevGPUDevice({requestAdapter: async () => x.adapter} as unknown as GPU, undefined, 'linear-scratch');
+
+  assert.equal(x.request!.requiredLimits.maxComputeWorkgroupSizeX, 128);
+  assert.equal(requiredKevAttentionBytes(8192, 'linear-scratch'), 67_108_864n);
+  assert.doesNotThrow(() => assertKevAttentionFits(8192, x.request!.requiredLimits, 'linear-scratch'));
+});
+
+test('reports per-buffer capacity without truncating either attention profile', () => {
   const limits = {
-    maxBufferSize: 2_147_483_644,
-    maxStorageBufferBindingSize: 2_147_483_644
+    maxBufferSize: 268_435_455,
+    maxStorageBufferBindingSize: 268_435_455
   };
-  assert.doesNotThrow(() => assertKevAttentionFits(8191, limits));
-  assert.throws(() => assertKevAttentionFits(8192, limits), {
-    code: 'DEVICE_RESOURCE_LIMIT',
-    message:
-      'This request needs a 2,147,483,648-byte Kev attention buffer, but this WebGPU device allows 2,147,483,644 bytes per buffer. No input was truncated.'
+  assert.doesNotThrow(() => assertKevAttentionFits(32_767, limits, 'linear-scratch'));
+  assert.throws(() => assertKevAttentionFits(32_768, limits, 'linear-scratch'), {
+    code: 'DEVICE_RESOURCE_LIMIT'
   });
   assert.doesNotThrow(() =>
-    assertKevAttentionFits(8192, {
-      maxBufferSize: 4_294_967_292,
-      maxStorageBufferBindingSize: 4_294_967_292
-    })
+    assertKevAttentionFits(
+      32_768,
+      {
+        maxBufferSize: 268_435_456,
+        maxStorageBufferBindingSize: 268_435_456
+      },
+      'linear-scratch'
+    )
   );
 });
 
@@ -177,8 +205,8 @@ test('checks device capacity before starting the TVM graph', async () => {
     {} as ConstructorParameters<typeof DecisionModel>[1],
     {
       limits: {
-        maxBufferSize: 2_147_483_644,
-        maxStorageBufferBindingSize: 2_147_483_644
+        maxBufferSize: 268_435_455,
+        maxStorageBufferBindingSize: 268_435_455
       }
     } as unknown as ConstructorParameters<typeof DecisionModel>[2],
     () => {
@@ -192,7 +220,7 @@ test('checks device capacity before starting the TVM graph', async () => {
   );
 
   // oxlint-disable-next-line unicorn/no-new-array -- Keep the native sparse-array boundary fixture intact.
-  await assert.rejects(model.run({ids: new Array(8192)} as unknown as Parameters<typeof model.run>[0]), {
+  await assert.rejects(model.run({ids: new Array(32768)} as unknown as Parameters<typeof model.run>[0]), {
     code: 'DEVICE_RESOURCE_LIMIT'
   });
   assert.equal(runtimeCalls, 0);

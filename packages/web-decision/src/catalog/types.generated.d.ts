@@ -16,6 +16,7 @@ export interface CatalogModelDescription {
     integrity: 'pinned-manifest';
     manifestSha256: string;
     location: string;
+    directArtifactRoot?: string;
     requiredFiles: readonly string[];
     additionalFiles: string;
   }>;
@@ -57,7 +58,7 @@ export interface ModelArtifactLock {
     bytes: number;
     sha256: string;
   }>[];
-  readonly upstream: Readonly<{
+  readonly upstream?: Readonly<{
     repository: string;
     revision: string;
     sourcePath: string;

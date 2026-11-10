@@ -9,7 +9,19 @@ test('the release entry exposes only Kev 0.6B Q4F16', () => {
   assert.equal(isDecisionModel('experimental-strands-qwen-2b-fp16'), false);
   assert.equal(describeModel('kev-0.6b-q4f16').model, 'kev-0.6b-q4f16');
   assert.deepEqual(describeModel('kev-0.6b-q4f16').features.typedTextQuestionTypes, ['choice', 'noul', 'score']);
-  assert.equal(Object.isFrozen(describeModel('kev-0.6b-q4f16').backend.requiredLimits), true);
+  const requiredLimits = describeModel('kev-0.6b-q4f16').backend.requiredLimits;
+  assert.equal(Object.isFrozen(requiredLimits), true);
+  assert.deepEqual(requiredLimits, {
+    maxComputeWorkgroupStorageSize: 16384,
+    maxStorageBuffersPerShaderStage: 8,
+    maxComputeInvocationsPerWorkgroup: 256,
+    maxComputeWorkgroupSizeX: 32,
+    maxComputeWorkgroupSizeY: 8,
+    maxComputeWorkgroupSizeZ: 1,
+    maxComputeWorkgroupsPerDimension: 65535
+  });
+  assert.equal(Object.hasOwn(requiredLimits, 'maxBufferSize'), false);
+  assert.equal(Object.hasOwn(requiredLimits, 'maxStorageBufferBindingSize'), false);
   const limits = describeModel('kev-0.6b-q4f16').features.textChoice.limits;
   assert.deepEqual(
     limits.find((limit: {resource: string}) => limit.resource === 'questions'),

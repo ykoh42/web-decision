@@ -28,12 +28,10 @@
     "name": "tvm-webgpu",
     "requiredFeatures": ["shader-f16"],
     "requiredLimits": {
-      "maxBufferSize": 268435456,
-      "maxStorageBufferBindingSize": 134217728,
       "maxComputeWorkgroupStorageSize": 16384,
       "maxStorageBuffersPerShaderStage": 8,
       "maxComputeInvocationsPerWorkgroup": 256,
-      "maxComputeWorkgroupSizeX": 256,
+      "maxComputeWorkgroupSizeX": 32,
       "maxComputeWorkgroupSizeY": 8,
       "maxComputeWorkgroupSizeZ": 1,
       "maxComputeWorkgroupsPerDimension": 65535

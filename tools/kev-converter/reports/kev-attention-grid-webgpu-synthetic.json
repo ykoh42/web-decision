@@ -1,0 +1,95 @@
+{
+  "status": "passed",
+  "runtimeIntegrated": false,
+  "modelWeightsUsed": false,
+  "tested": "synthetic TIRX-generated WebGPU kernel in Windows Chrome",
+  "tvmVersion": "0.27.0.post1",
+  "chromeVersion": "157",
+  "adapter": {
+    "vendor": "intel",
+    "architecture": "gen-12lp",
+    "feature": "shader-f16"
+  },
+  "wgslBytes": 9330,
+  "wgslSha256": "96e40b9fa910e579003d8195e3fc036225ac9e8c07aba509b05e723062e53b8c",
+  "kernelSource": {
+    "path": "tools/kev-converter/kev_attention_grid.py",
+    "sha256": "3d5f199c1fd9dbdc053445c214c04cda11573120e4f3ca5728b7cf96e1c8be47"
+  },
+  "harness": "tools/kev-converter/reports/kev-attention-grid-webgpu-synthetic-harness.ts",
+  "inputs": {
+    "query": "16 heads, FP16",
+    "keyValue": "8 KV heads repeated 2x to 16, FP16 K / FP32 V",
+    "validSegment": "compact O(S) vectors",
+    "probabilityBoundary": "FP32 softmax probability cast to FP16 and back to FP32"
+  },
+  "reference": "same-order FP32 tiled online-softmax reference with explicit FP16 probability rounding and FP32 PV accumulation",
+  "cases": [
+    {
+      "sequenceLength": 1,
+      "allInvalid": false,
+      "maxAbsoluteError": 0.0,
+      "rmsError": 0.0,
+      "elements": 2048
+    },
+    {
+      "sequenceLength": 7,
+      "allInvalid": false,
+      "maxAbsoluteError": 0.00012040138244628906,
+      "rmsError": 3.2725261757569866e-5,
+      "elements": 14336
+    },
+    {
+      "sequenceLength": 65,
+      "allInvalid": false,
+      "maxAbsoluteError": 0.00012120604515075684,
+      "rmsError": 1.5398540258378257e-5,
+      "elements": 133120
+    },
+    {
+      "sequenceLength": 129,
+      "allInvalid": false,
+      "maxAbsoluteError": 0.00012177228927612305,
+      "rmsError": 1.2132749668651052e-5,
+      "elements": 264192
+    },
+    {
+      "sequenceLength": 7,
+      "allInvalid": true,
+      "maxAbsoluteError": 0.00011580251157283783,
+      "rmsError": 2.728493624246355e-5,
+      "elements": 14336
+    }
+  ],
+  "limitations": [
+    "Synthetic tensors only; this report does not validate full model weights or the packaged browser runtime.",
+    "The GPU parity reference uses the same tilewise reduction order. On the same S=129 GQA fixture, a separate dense-order comparison found max absolute order delta 1.8343329429626465e-5 and RMS 1.8390477407592698e-7; 189180 of 264192 outputs differ after FP16 P rounding."
+  ],
+  "deviceLimits": {
+    "adapter": {
+      "maxStorageBufferBindingSize": 2147483644,
+      "maxBufferSize": 2147483648
+    },
+    "defaultDevice": {
+      "maxStorageBufferBindingSize": 134217728,
+      "maxBufferSize": 268435456,
+      "largestTestedSequence": 16384,
+      "failsAtSequence": 16385
+    },
+    "raisedDevice": {
+      "maxStorageBufferBindingSize": 2147483644,
+      "maxBufferSize": 2147483648,
+      "largestTestedSequence": 32770
+    },
+    "testedAggregateSequence": {
+      "sequenceLength": 32770,
+      "queryAndKeyBytesEach": 134225920,
+      "valueAndOutputBytesEach": 268451840,
+      "defaultDeviceValueAndOutputBinding": "rejected",
+      "raisedDeviceAllBindings": "accepted"
+    },
+    "request": {
+      "requiredLimits": "maxStorageBufferBindingSize and maxBufferSize set to the adapter-reported limits"
+    }
+  }
+}

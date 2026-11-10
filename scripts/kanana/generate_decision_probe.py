@@ -31,35 +31,8 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-
-    import torch
-    from transformers import AutoModel
-
-    model_dir = args.model_dir.expanduser().resolve(strict=True)
-    checkpoint = model_dir / "model.safetensors"
-    if model_dir.name != MODEL_REVISION:
-        raise SystemExit(f"expected pinned model revision {MODEL_REVISION}: {model_dir}")
-    verify_pinned_model_files(model_dir)
-    if checkpoint.stat().st_size != CHECKPOINT_BYTES or sha256_file(checkpoint) != CHECKPOINT_SHA256:
-        raise SystemExit("the local checkpoint does not match the pinned Kanana artifact")
-
-    torch.set_num_threads(1)
-    model = AutoModel.from_pretrained(
-        model_dir,
-        trust_remote_code=True,
-        local_files_only=True,
-        dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-    ).eval()
-
-    original_embed_messages = model.embed_messages
-
-    request = {
+def make_request():
+    return {
         "state": {
             "incident": "Database connections are refusing every checkout request.",
             "impact": "Customers cannot complete purchases.",
@@ -93,55 +66,78 @@ def main():
         },
     }
 
-    cases = []
-    for question_id, question in request["questions"].items():
-        captured_batches = []
 
-        def capture_embeddings(messages_list):
-            vectors, tokens = original_embed_messages(messages_list)
-            batch = []
-            for messages, vector in zip(messages_list, vectors, strict=True):
-                inputs = model._inputs(messages)
-                if "pixel_values" in inputs:
-                    raise RuntimeError("the text-only decision fixture unexpectedly contains image pixels")
-                batch.append(
-                    {
-                        "inputIds": inputs["input_ids"][0].tolist(),
-                        "referenceVector": vector.detach().float().cpu().tolist(),
-                    }
+def capture_decision_case(model, original_embed_messages, state, question_id, question):
+    captured_batches = []
+
+    def capture_embeddings(messages_list):
+        vectors, tokens = original_embed_messages(messages_list)
+        batch = []
+        for messages, vector in zip(messages_list, vectors, strict=True):
+            inputs = model._inputs(messages)
+            if "pixel_values" in inputs:
+                raise RuntimeError(
+                    "the text-only decision fixture unexpectedly contains image pixels"
                 )
-            captured_batches.append(batch)
-            return vectors, tokens
+            batch.append(
+                {
+                    "inputIds": inputs["input_ids"][0].tolist(),
+                    "referenceVector": vector.detach().float().cpu().tolist(),
+                }
+            )
+        captured_batches.append(batch)
+        return vectors, tokens
 
-        model._candidate_cache.clear()
-        model.embed_messages = capture_embeddings
-        result = model.system_one(request["state"], {question_id: question})
-        model.embed_messages = original_embed_messages
+    model._candidate_cache.clear()
+    model.embed_messages = capture_embeddings
+    result = model.system_one(state, {question_id: question})
+    model.embed_messages = original_embed_messages
 
-        candidate_keys = list(question["criteria"] if isinstance(question["criteria"], dict) else map(str, range(len(question["criteria"]))))
-        if (
-            len(captured_batches) != 2
-            or len(captured_batches[0]) != 1
-            or len(captured_batches[1]) != len(candidate_keys)
-        ):
-            raise RuntimeError(f"captured invalid query/candidate batches for {question_id}")
-        inputs = [captured_batches[0][0], *captured_batches[1]]
-        if any(not item["inputIds"] for item in inputs):
-            raise RuntimeError(f"the {question_id} decision fixture produced an empty token sequence")
-        cases.append(
-            {
-                "questionId": question_id,
-                "question": question,
-                "candidateKeys": candidate_keys,
-                "answer": result["answers"][question_id],
-                "inputs": [
-                    {"role": "query" if index == 0 else "candidate", **item}
-                    for index, item in enumerate(inputs)
-                ],
-            }
+    candidate_keys = list(
+        question["criteria"]
+        if isinstance(question["criteria"], dict)
+        else map(str, range(len(question["criteria"])))
+    )
+    if (
+        len(captured_batches) != 2
+        or len(captured_batches[0]) != 1
+        or len(captured_batches[1]) != len(candidate_keys)
+    ):
+        raise RuntimeError(
+            f"captured invalid query/candidate batches for {question_id}"
         )
+    inputs = [captured_batches[0][0], *captured_batches[1]]
+    if any(not item["inputIds"] for item in inputs):
+        raise RuntimeError(
+            f"the {question_id} decision fixture produced an empty token sequence"
+        )
+    return {
+        "questionId": question_id,
+        "question": question,
+        "candidateKeys": candidate_keys,
+        "answer": result["answers"][question_id],
+        "inputs": [
+            {"role": "query" if index == 0 else "candidate", **item}
+            for index, item in enumerate(inputs)
+        ],
+    }
 
-    fixture = {
+
+def collect_decision_cases(model, request, original_embed_messages):
+    return [
+        capture_decision_case(
+            model,
+            original_embed_messages,
+            request["state"],
+            question_id,
+            question,
+        )
+        for question_id, question in request["questions"].items()
+    ]
+
+
+def make_fixture(model, request, cases):
+    return {
         "modelId": MODEL_ID,
         "revision": MODEL_REVISION,
         "checkpointSha256": CHECKPOINT_SHA256,
@@ -150,21 +146,68 @@ def main():
         "embeddingDimension": int(model.config.embedding_dimension),
         "cases": cases,
     }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(fixture, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def write_fixture(output, fixture):
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(fixture, separators=(",", ":")) + "\n", encoding="utf-8"
+    )
     print(
         json.dumps(
             {
-                "output": str(args.output),
+                "output": str(output),
                 "inputLengths": [
                     [len(item["inputIds"]) for item in case["inputs"]]
                     for case in fixture["cases"]
                 ],
-                "answers": {case["questionId"]: case["answer"] for case in fixture["cases"]},
+                "answers": {
+                    case["questionId"]: case["answer"] for case in fixture["cases"]
+                },
             },
             indent=2,
         )
     )
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+
+    import torch
+    from transformers import AutoModel
+
+    model_dir = args.model_dir.expanduser().resolve(strict=True)
+    checkpoint = model_dir / "model.safetensors"
+    if model_dir.name != MODEL_REVISION:
+        raise SystemExit(
+            f"expected pinned model revision {MODEL_REVISION}: {model_dir}"
+        )
+    verify_pinned_model_files(model_dir)
+    if (
+        checkpoint.stat().st_size != CHECKPOINT_BYTES
+        or sha256_file(checkpoint) != CHECKPOINT_SHA256
+    ):
+        raise SystemExit(
+            "the local checkpoint does not match the pinned Kanana artifact"
+        )
+
+    torch.set_num_threads(1)
+    model = AutoModel.from_pretrained(
+        model_dir,
+        trust_remote_code=True,
+        local_files_only=True,
+        dtype=torch.bfloat16,
+        low_cpu_mem_usage=True,
+    ).eval()
+
+    original_embed_messages = model.embed_messages
+    request = make_request()
+    cases = collect_decision_cases(model, request, original_embed_messages)
+    fixture = make_fixture(model, request, cases)
+    write_fixture(args.output, fixture)
 
 
 if __name__ == "__main__":

@@ -36,8 +36,12 @@ class PinnedModelFilesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             model_dir = Path(temporary_directory)
             expected = self._model_directory(model_dir, b"verified source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                self.assertEqual(pinned_model_files.verify_pinned_model_files(model_dir), expected)
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                self.assertEqual(
+                    pinned_model_files.verify_pinned_model_files(model_dir), expected
+                )
 
     def test_rejects_a_tampered_custom_model_file(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -45,7 +49,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             tampered_name = "modeling_kanana_v_decide.py"
             (model_dir / tampered_name).write_bytes(b"tampered source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with self.assertRaisesRegex(SystemExit, tampered_name):
                     pinned_model_files.verify_pinned_model_files(model_dir)
 
@@ -55,7 +61,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             missing_name = "configuration_kanana_v_decide.py"
             (model_dir / missing_name).unlink()
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with self.assertRaisesRegex(SystemExit, missing_name):
                     pinned_model_files.verify_pinned_model_files(model_dir)
 
@@ -64,8 +72,12 @@ class PinnedModelFilesTests(unittest.TestCase):
             model_dir = Path(temporary_directory)
             expected = self._model_directory(model_dir, b"verified source")
             (model_dir / "modeling_kanana_v_decide.py").write_bytes(b"tampered source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                with patch.object(vision_probe.importlib, "import_module") as import_module:
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                with patch.object(
+                    vision_probe.importlib, "import_module"
+                ) as import_module:
                     with self.assertRaises(SystemExit):
                         vision_probe.import_pinned_vision_classes(model_dir)
                     import_module.assert_not_called()
@@ -100,8 +112,12 @@ class PinnedModelFilesTests(unittest.TestCase):
             )
             pyc_path.write_bytes(header + marshal.dumps(malicious_code))
 
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                config_class, model_class = vision_probe.import_pinned_vision_classes(model_dir)
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                config_class, model_class = vision_probe.import_pinned_vision_classes(
+                    model_dir
+                )
 
             self.assertEqual(config_class.__name__, "KananaVDecideVisionConfig")
             self.assertEqual(model_class.__name__, "KananaVDecideVisionModel")
@@ -112,7 +128,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             config_module = SimpleNamespace(KananaVDecideVisionConfig=object)
             model_module = SimpleNamespace(KananaVDecideVisionModel=object)
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with patch.object(
                     vision_probe.importlib,
                     "import_module",

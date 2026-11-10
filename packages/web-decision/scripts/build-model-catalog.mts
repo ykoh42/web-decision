@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {readFile, writeFile} from 'node:fs/promises';
+import {lstat, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {
@@ -10,6 +10,12 @@ import type {
   ModelId
 } from '../src/catalog/types.generated.js';
 import {KEV06_MANIFEST_SHA256} from '../src/kev06/contract.js';
+import {
+  DIRECT_KEV06_BASE,
+  DIRECT_KEV06_CHECKPOINT,
+  DIRECT_KEV06_PARAMETER_COUNT,
+  readDirectKev06ManifestResponse
+} from '../src/kev06/direct-contract.js';
 import {KANANA_MODEL_ID, KANANA_REPOSITORY, KANANA_REVISION} from '../src/kanana/contract.mjs';
 import {KANANA_SAFETENSORS_SPEC} from '../src/kanana/safetensors-spec.mjs';
 import {
@@ -41,6 +47,19 @@ interface KevManifest {
   readonly files: Readonly<Record<string, ManifestFile>>;
 }
 
+interface DirectKevManifest {
+  readonly model: string;
+  readonly backend: string;
+  readonly experimental: boolean;
+  readonly files: Readonly<Record<string, ManifestFile>>;
+  readonly formatVersion: number;
+  readonly maxStateTokens: number;
+  readonly maxBranchTokens: number;
+  readonly parameterCount: number;
+  readonly checkpoint: Readonly<{repository: string; revision: string}>;
+  readonly base: Readonly<{repository: string; revision: string}>;
+}
+
 interface ArtifactLockFile {
   readonly schemaVersion: 1;
   readonly byModelId: Readonly<Record<string, ModelArtifactLock>>;
@@ -51,11 +70,16 @@ interface JsonFile {
   readonly value: unknown;
 }
 
+interface CatalogGenerationOptions {
+  readonly directKevArtifactDirectory?: string;
+}
+
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(packageRoot, '../..');
 const catalogRoot = path.join(packageRoot, 'src/catalog');
 const specPath = path.join(catalogRoot, 'model-spec.json');
 const manifestPath = 'assets/kev06-stable/manifest.json';
+const directKevArtifactDirectory = path.join(packageRoot, 'assets/kev06-direct');
 const mapPath = 'assets/experimental-kev-upstream/source-shard-map.json';
 const bundledFiles: readonly (readonly [string, string])[] = [
   ['model.wasm', 'assets/kev06-stable/model.wasm'],
@@ -94,6 +118,149 @@ function canonicalManifestBytes(value: unknown): Buffer {
   return Buffer.from(serialized + '\n');
 }
 
+function isDirectKevCheckpoint(model: CuratedModel): boolean {
+  const checkpoint = model.description.checkpoint;
+  return (
+    checkpoint.repository === DIRECT_KEV06_CHECKPOINT.repository ||
+    checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision
+  );
+}
+
+function isHttpsDirectory(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      url.pathname.endsWith('/') &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+
+function safeManifestPath(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value !== 'manifest.json' &&
+    !value.startsWith('/') &&
+    !value.includes(':') &&
+    !value.includes('\\') &&
+    value.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
+  );
+}
+
+async function listLocalFiles(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  const visit = async (current: string, relative: string): Promise<void> => {
+    for (const entry of await readdir(current, {withFileTypes: true})) {
+      const name = relative ? `${relative}/${entry.name}` : entry.name;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) throw new Error('Direct Kev package must not contain symbolic links.');
+      if (entry.isDirectory()) await visit(fullPath, name);
+      else if (entry.isFile()) files.push(name);
+      else throw new Error('Direct Kev package contains a non-regular entry: ' + name + '.');
+    }
+  };
+  await visit(directory, '');
+  return files.sort();
+}
+
+function validateDirectKevModel(model: CuratedModel): void {
+  failUnless(model.modelId === 'kev-0.6b-q4f16', 'Direct Kev package model ID differs from the curated model.');
+  failUnless(model.description.adapter === 'kev06', 'Direct Kev package requires the Kev adapter.');
+  failUnless(
+    model.description.checkpoint.repository === DIRECT_KEV06_CHECKPOINT.repository &&
+      model.description.checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision,
+    'Direct Kev catalog checkpoint differs from the direct source pin.'
+  );
+}
+
+export async function createDirectKev06ArtifactLockFromDirectory(
+  model: CuratedModel,
+  artifactDirectory: string
+): Promise<ModelArtifactLock> {
+  validateDirectKevModel(model);
+  const absoluteDirectory = path.resolve(artifactDirectory);
+  const relativeDirectory = path.relative(packageRoot, absoluteDirectory);
+  failUnless(
+    relativeDirectory !== '' && !relativeDirectory.startsWith('..') && !path.isAbsolute(relativeDirectory),
+    'Direct Kev artifacts must be inside the web-decision package.'
+  );
+  const directoryInfo = await lstat(absoluteDirectory);
+  failUnless(
+    directoryInfo.isDirectory() && !directoryInfo.isSymbolicLink(),
+    'Direct Kev artifact directory is invalid.'
+  );
+
+  const sourceManifestPath = path.join(absoluteDirectory, 'manifest.json');
+  const manifestInfo = await lstat(sourceManifestPath);
+  failUnless(manifestInfo.isFile() && !manifestInfo.isSymbolicLink(), 'Direct Kev manifest must be a regular file.');
+  const manifestFile = await readJson(sourceManifestPath);
+  failUnless(isRecord(manifestFile.value), 'Direct Kev manifest must be an object.');
+  const canonicalBytes = canonicalManifestBytes(manifestFile.value);
+  const manifest = (await readDirectKev06ManifestResponse(
+    new Response(manifestFile.bytes.toString('utf8')),
+    sha256(canonicalBytes)
+  )) as DirectKevManifest;
+  failUnless(typeof manifest.experimental === 'boolean', 'Direct Kev manifest must preserve its experimental flag.');
+  failUnless(manifest.model === model.modelId, 'Direct Kev manifest model differs from the curated model.');
+  failUnless(
+    manifest.backend === model.description.backend.name,
+    'Direct Kev manifest backend differs from the catalog.'
+  );
+  failUnless(
+    manifest.parameterCount === DIRECT_KEV06_PARAMETER_COUNT,
+    'Direct Kev parameter count differs from its pin.'
+  );
+  failUnless(
+    manifest.checkpoint.repository === model.description.checkpoint.repository &&
+      manifest.checkpoint.revision === model.description.checkpoint.revision,
+    'Direct Kev checkpoint differs from the catalog.'
+  );
+  failUnless(
+    manifest.base.repository === DIRECT_KEV06_BASE.repository && manifest.base.revision === DIRECT_KEV06_BASE.revision,
+    'Direct Kev base checkpoint differs from its pin.'
+  );
+
+  const declaredNames = Object.keys(manifest.files);
+  for (const name of declaredNames) {
+    failUnless(safeManifestPath(name), 'Direct Kev manifest contains an unsafe file path: ' + name + '.');
+  }
+  const actualNames = await listLocalFiles(absoluteDirectory);
+  const expectedNames = ['manifest.json', ...declaredNames].sort();
+  failUnless(
+    JSON.stringify(actualNames) === JSON.stringify(expectedNames),
+    'Direct Kev package file inventory differs from its manifest.'
+  );
+  const files: Record<string, ManifestFile> = {};
+  for (const name of declaredNames) {
+    const metadata = manifest.files[name];
+    failUnless(metadata, 'Direct Kev manifest is missing file metadata: ' + name + '.');
+    const bytes = await readFile(path.join(absoluteDirectory, ...name.split('/')));
+    failUnless(metadata.bytes === bytes.byteLength, 'Direct Kev file size differs from manifest: ' + name + '.');
+    failUnless(metadata.sha256 === sha256(bytes), 'Direct Kev file hash differs from manifest: ' + name + '.');
+    files[name] = {bytes: bytes.byteLength, sha256: metadata.sha256};
+  }
+  const sourcePath = path.posix.join(relativeDirectory.split(path.sep).join('/'), 'manifest.json');
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath,
+      rawSha256: sha256(manifestFile.bytes),
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: manifest.experimental,
+      files
+    },
+    bundledRuntimeFiles: []
+  };
+}
+
 async function readJson(filePath: string): Promise<JsonFile> {
   const bytes = await readFile(filePath);
   return {bytes, value: JSON.parse(bytes.toString('utf8'))};
@@ -127,6 +294,23 @@ export function validateSpec(spec: unknown): CuratedModel[] {
     }
     for (const key of ['manifestSha256', 'wasmSha256', 'sourceDataSha256', 'requiredFiles']) {
       failUnless(!Object.hasOwn(description.assets, key), 'Artifact hashes must be generated, not curated.');
+    }
+    if (Object.hasOwn(description.assets, 'directArtifactRoot')) {
+      const checkpoint = description.checkpoint;
+      failUnless(
+        model.modelId === 'kev-0.6b-q4f16' && description.adapter === 'kev06',
+        'Direct artifact roots are Kev-only.'
+      );
+      failUnless(
+        isRecord(checkpoint) &&
+          checkpoint.repository === DIRECT_KEV06_CHECKPOINT.repository &&
+          checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision,
+        'Direct artifact roots require the direct Kev checkpoint.'
+      );
+      failUnless(
+        isHttpsDirectory(description.assets.directArtifactRoot),
+        'Direct artifact root must be an HTTPS directory.'
+      );
     }
   }
   return spec.models as CuratedModel[];
@@ -189,7 +373,13 @@ function validateManifest(
   };
 }
 
-async function createKev06ArtifactLock(model: CuratedModel): Promise<ModelArtifactLock> {
+async function createKev06ArtifactLock(
+  model: CuratedModel,
+  localDirectArtifactDirectory: string = directKevArtifactDirectory
+): Promise<ModelArtifactLock> {
+  if (isDirectKevCheckpoint(model)) {
+    return createDirectKev06ArtifactLockFromDirectory(model, localDirectArtifactDirectory);
+  }
   const [manifestFile, runtimeBytes, mapBytes] = await Promise.all([
     readJson(path.join(packageRoot, manifestPath)),
     Promise.all(bundledFiles.map(([, sourcePath]) => readFile(path.join(packageRoot, sourcePath)))),
@@ -304,20 +494,41 @@ async function createKananaArtifactLock(model: CuratedModel): Promise<ModelArtif
   };
 }
 
-export async function createModelArtifactLock(model: CuratedModel): Promise<ModelArtifactLock> {
-  if (model.description.adapter === 'kev06') return createKev06ArtifactLock(model);
+export async function createModelArtifactLock(
+  model: CuratedModel,
+  options: Readonly<{directKevArtifactDirectory?: string}> = {}
+): Promise<ModelArtifactLock> {
+  if (model.description.adapter === 'kev06')
+    return createKev06ArtifactLock(model, options.directKevArtifactDirectory ?? directKevArtifactDirectory);
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
-async function createArtifactLock(models: readonly CuratedModel[]): Promise<ArtifactLockFile> {
+async function createArtifactLock(
+  models: readonly CuratedModel[],
+  options: CatalogGenerationOptions
+): Promise<ArtifactLockFile> {
   const records = await Promise.all(
     models.map(async (model): Promise<readonly [ModelId, ModelArtifactLock]> => [
       model.modelId,
-      await createModelArtifactLock(model)
+      await createModelArtifactLock(model, options)
     ])
   );
   return {schemaVersion: 1, byModelId: Object.fromEntries(records)};
+}
+
+function readDirectKevArtifactDirectory(args: readonly string[]): string {
+  const option = '--kev-direct-artifact-dir';
+  const index = args.indexOf(option);
+  if (index < 0) return directKevArtifactDirectory;
+  failUnless(args.indexOf(option, index + 1) < 0, 'Direct Kev artifact directory option must appear once.');
+  const value = args[index + 1];
+  failUnless(
+    typeof value === 'string' && value.length > 0 && !value.startsWith('--'),
+    'Direct Kev artifact directory is missing.'
+  );
+  failUnless(!value.includes('://'), 'Direct Kev artifact directory must be a local filesystem path.');
+  return path.resolve(packageRoot, value);
 }
 
 function renderCatalogModule(): string {
@@ -396,6 +607,7 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       "    integrity: 'pinned-manifest';",
       '    manifestSha256: string;',
       '    location: string;',
+      '    directArtifactRoot?: string;',
       '    requiredFiles: readonly string[];',
       '    additionalFiles: string;',
       '  }>;',
@@ -437,7 +649,7 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       '    bytes: number;',
       '    sha256: string;',
       '  }>[];',
-      '  readonly upstream: Readonly<{',
+      '  readonly upstream?: Readonly<{',
       '    repository: string;',
       '    revision: string;',
       '    sourcePath: string;',
@@ -487,7 +699,9 @@ async function writeOutputs(outputs: readonly (readonly [string, string])[], che
 async function main(): Promise<void> {
   const {value: rawSpec} = await readJson(specPath);
   const models = validateSpec(rawSpec);
-  const artifactLock = await createArtifactLock(models);
+  const artifactLock = await createArtifactLock(models, {
+    directKevArtifactDirectory: readDirectKevArtifactDirectory(process.argv.slice(2))
+  });
   const types = renderTypeFiles(models);
   const outputs: readonly (readonly [string, string])[] = [
     [path.join(catalogRoot, 'artifacts.lock.json'), renderJson(artifactLock)],

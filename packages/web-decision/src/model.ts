@@ -1,6 +1,6 @@
 import {validateDecisionFields, validateRequestFields} from './request-fields.mjs';
 import {KEV_MAX_OPTIONS, WebDecisionError, decodeFloat16, packKevRequest, unpackKevScores} from './kev.js';
-import {assertKevAttentionFits} from './kev-gpu.js';
+import {assertKevAttentionFits, type KevAttentionProfile} from './kev-gpu.js';
 import {waitForAbort} from './assets.js';
 import {finishKevSystemOne, prepareKevSystemOne} from './kev/system-one.mjs';
 import type {KevLimits, KevPackOptions, KevScoreResult, KevTokenizer} from './kev.js';
@@ -12,6 +12,7 @@ const noFailure = Symbol('no failure');
 type DecisionOptions = Readonly<{signal?: AbortSignal | undefined; [key: string]: unknown}>;
 type DecisionModelLimits = KevLimits &
   Readonly<{
+    attentionProfile?: KevAttentionProfile;
     maxInputTokens: number | undefined;
     maxStateTokens: number;
     maxBranchTokens: number;
@@ -48,7 +49,11 @@ type ValidateRequestFields = (
 ) => unknown;
 type ValidateDecisionFields = (options: unknown) => void;
 type WaitForAbort = <Value>(operation: () => Value | Promise<Value>, signal?: AbortSignal) => Promise<Value>;
-type AssertKevAttentionFits = (sequenceLength: number, limits?: GPUSupportedLimits | undefined) => void;
+type AssertKevAttentionFits = (
+  sequenceLength: number,
+  limits?: GPUSupportedLimits | undefined,
+  profile?: KevAttentionProfile | undefined
+) => void;
 type PrepareKevSystemOne = (
   state: KevValue,
   questions: NamedKevQuestions,
@@ -247,7 +252,7 @@ export class DecisionModel {
     const session = captureModelState(this);
     assertNoUncapturedErrors(this);
     const n = packed.ids.length;
-    assertKevAttentionFitsForModel(n, session.gpu.limits);
+    assertKevAttentionFitsForModel(n, session.gpu.limits, this.limits?.attentionProfile);
     const result = await withValidationScope(session, 'Model inference failed.', async () => {
       const ids = session.runtime.empty([1, n], 'int32', session.device);
       const mask = session.runtime.empty([1, n], 'int32', session.device);
