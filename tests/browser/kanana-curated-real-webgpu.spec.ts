@@ -104,93 +104,122 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
     const browserErrors: string[] = [];
     page.on('pageerror', (error) => browserErrors.push(error.message));
     await page.goto('/');
-    const {result, adapterInfo, isFallbackAdapter, adapterFeatures, adapterLimits, userAgent, input} =
-      await page.evaluate(async () => {
-        const adapter = await navigator.gpu?.requestAdapter({powerPreference: 'high-performance'});
-        if (!adapter) throw new Error('Chromium did not provide a WebGPU adapter.');
-        const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
-        const isFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
-        if (isFallback !== false) throw new Error(`Expected a hardware WebGPU adapter; got ${String(isFallback)}.`);
-        const model = await window.webDecision.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', cache: false});
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 256;
-          canvas.height = 256;
-          const context = canvas.getContext('2d');
-          if (!context) throw new Error('A 2D canvas is required for the local image fixture.');
-          context.fillStyle = '#172b4d';
-          context.fillRect(0, 0, 256, 256);
-          context.fillStyle = '#e9b44c';
-          context.fillRect(32, 32, 96, 128);
-          context.fillStyle = '#4b9aaa';
-          context.beginPath();
-          context.arc(184, 144, 48, 0, Math.PI * 2);
-          context.fill();
-          const image = await new Promise<Blob>((resolve, reject) =>
-            canvas.toBlob(
-              (blob) => (blob ? resolve(blob) : reject(new Error('Could not encode image fixture.'))),
-              'image/png'
-            )
-          );
-          canvas.width = 0;
-          canvas.height = 0;
-          const output = await model.systemOne({
-            state: 'Inspect this synthetic illustration and decide which description fits best.',
-            images: [image],
-            questions: {
-              action: {
-                type: 'choice',
-                instructions: 'Which object is most prominent?',
-                criteria: {
-                  rectangle: 'A gold rectangle on the left is prominent.',
-                  circle: 'A teal circle on the right is prominent.'
-                }
+    const {
+      result,
+      imageCountBoundary,
+      adapterInfo,
+      isFallbackAdapter,
+      adapterFeatures,
+      adapterLimits,
+      userAgent,
+      input
+    } = await page.evaluate(async () => {
+      const adapter = await navigator.gpu?.requestAdapter({powerPreference: 'high-performance'});
+      if (!adapter) throw new Error('Chromium did not provide a WebGPU adapter.');
+      const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
+      const isFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
+      if (isFallback !== false) throw new Error(`Expected a hardware WebGPU adapter; got ${String(isFallback)}.`);
+      const model = await window.webDecision.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', cache: false});
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('A 2D canvas is required for the local image fixture.');
+        context.fillStyle = '#172b4d';
+        context.fillRect(0, 0, 256, 256);
+        context.fillStyle = '#e9b44c';
+        context.fillRect(32, 32, 96, 128);
+        context.fillStyle = '#4b9aaa';
+        context.beginPath();
+        context.arc(184, 144, 48, 0, Math.PI * 2);
+        context.fill();
+        const image = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob(
+            (blob) => (blob ? resolve(blob) : reject(new Error('Could not encode image fixture.'))),
+            'image/png'
+          )
+        );
+        canvas.width = 0;
+        canvas.height = 0;
+        const request = (images: Blob[]) => ({
+          state: 'Inspect this synthetic illustration and decide which description fits best.',
+          images,
+          questions: {
+            action: {
+              type: 'choice' as const,
+              instructions: 'Which object is most prominent?',
+              criteria: {
+                rectangle: 'A gold rectangle on the left is prominent.',
+                circle: 'A teal circle on the right is prominent.'
               }
             }
-          });
-          const answer = output.answers.action;
-          if (!answer || answer.type !== 'choice') throw new Error('Kanana returned no choice result.');
-          const imageDigest = await crypto.subtle.digest('SHA-256', await image.arrayBuffer());
-          const imageSha256 = Array.from(new Uint8Array(imageDigest), (byte) =>
-            byte.toString(16).padStart(2, '0')
-          ).join('');
-          const checkpointSha256 = model.description.checkpoint.weightSha256;
-          if (!checkpointSha256) throw new Error('Kanana descriptor omitted the checkpoint digest.');
-          return {
-            adapterInfo: {
-              vendor: adapter.info?.vendor ?? '',
-              architecture: adapter.info?.architecture ?? '',
-              isFallback,
-              isFallbackAdapter: isFallback
-            },
-            isFallbackAdapter: isFallback,
-            adapterFeatures: [...adapter.features],
-            adapterLimits: {
-              maxBufferSize: adapter.limits.maxBufferSize,
-              maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
-              maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
-              maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage
-            },
-            userAgent: navigator.userAgent,
-            input: {kind: 'synthetic-canvas-v1', width: 256, height: 256, sha256: imageSha256},
-            result: {
-              modelId: model.modelId,
-              descriptionModelId: model.description.modelId,
-              checkpointRevision: model.description.checkpoint.revision,
-              checkpointSha256,
-              backend: model.description.backend.name,
-              assetManifestSha256: model.description.assets.manifestSha256,
-              answer: answer.choice,
-              confidence: answer.confidence,
-              probabilities: answer.probabilities,
-              probabilityEntries: answer.probabilityEntries,
-              usage: output.usage
-            }
-          };
-        } finally {
-          await model.dispose();
+          }
+        });
+        const output = await model.systemOne(request([image]));
+        const answer = output.answers.action;
+        if (!answer || answer.type !== 'choice') throw new Error('Kanana returned no choice result.');
+        const tenImages = Array.from({length: 10}, () => image.slice(0, image.size, 'image/png'));
+        const tenImageOutput = await model.systemOne(request(tenImages));
+        const tenImageAnswer = tenImageOutput.answers.action;
+        if (!tenImageAnswer || tenImageAnswer.type !== 'choice')
+          throw new Error('Kanana returned no choice result for ten images.');
+        let overLimitCode: unknown;
+        try {
+          await model.systemOne(request([...tenImages, image]));
+        } catch (error) {
+          overLimitCode = (error as {code?: unknown}).code;
         }
-      });
+        if (overLimitCode !== 'image_count')
+          throw new Error(`Kanana did not reject 11 images at the pinned model limit: ${String(overLimitCode)}.`);
+        const imageDigest = await crypto.subtle.digest('SHA-256', await image.arrayBuffer());
+        const imageSha256 = Array.from(new Uint8Array(imageDigest), (byte) => byte.toString(16).padStart(2, '0')).join(
+          ''
+        );
+        const checkpointSha256 = model.description.checkpoint.weightSha256;
+        if (!checkpointSha256) throw new Error('Kanana descriptor omitted the checkpoint digest.');
+        return {
+          adapterInfo: {
+            vendor: adapter.info?.vendor ?? '',
+            architecture: adapter.info?.architecture ?? '',
+            isFallback,
+            isFallbackAdapter: isFallback
+          },
+          isFallbackAdapter: isFallback,
+          adapterFeatures: [...adapter.features],
+          adapterLimits: {
+            maxBufferSize: adapter.limits.maxBufferSize,
+            maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+            maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+            maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage
+          },
+          userAgent: navigator.userAgent,
+          imageCountBoundary: {
+            accepted: tenImages.length,
+            answer: tenImageAnswer.choice,
+            probabilities: tenImageAnswer.probabilities,
+            rejected: tenImages.length + 1,
+            rejectionCode: overLimitCode
+          },
+          input: {kind: 'synthetic-canvas-v1', width: 256, height: 256, sha256: imageSha256},
+          result: {
+            modelId: model.modelId,
+            descriptionModelId: model.description.modelId,
+            checkpointRevision: model.description.checkpoint.revision,
+            checkpointSha256,
+            backend: model.description.backend.name,
+            assetManifestSha256: model.description.assets.manifestSha256,
+            answer: answer.choice,
+            confidence: answer.confidence,
+            probabilities: answer.probabilities,
+            probabilityEntries: answer.probabilityEntries,
+            usage: output.usage
+          }
+        };
+      } finally {
+        await model.dispose();
+      }
+    });
 
     expect(adapterInfo.isFallback).toBe(false);
     expect(result.modelId).toBe(kananaModelId);
@@ -203,8 +232,13 @@ test('the public Kanana package loader runs the pinned image decision on WebGPU'
     expect(Object.values(result.probabilities).every(Number.isFinite)).toBe(true);
     expect(Math.abs(Object.values(result.probabilities).reduce((sum, value) => sum + value, 0) - 1)).toBeLessThan(1e-6);
     expect(result.usage.input_tokens).toBeGreaterThan(0);
+    expect(imageCountBoundary.accepted).toBe(10);
+    expect(Object.values(imageCountBoundary.probabilities).every(Number.isFinite)).toBe(true);
+    expect(imageCountBoundary.rejected).toBe(11);
+    expect(imageCountBoundary.rejectionCode).toBe('image_count');
     expect(fetched.some(({name}) => name === 'model.safetensors')).toBe(true);
     expect(browserErrors).toEqual([]);
+    console.log(`KANANA_MAX_IMAGE_COUNT_GPU ${JSON.stringify(imageCountBoundary)}`);
     console.log(
       `KANANA_CURATED_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), adapterInfo, result, fetchedRanges: fetched.length, fetchedBytes: fetched.reduce((sum, item) => sum + item.bytes, 0)})}`
     );
