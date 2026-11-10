@@ -1,1 +1,1 @@
-["browser-only-ws.ts"]
+["browser-only-ws.ts","curated/adapters/kanana.ts","kanana/artifacts.ts","kanana/encoded-image.ts","kanana/magick-image.ts","kanana/tvm-webgpu.ts"]

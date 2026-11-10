@@ -15,6 +15,7 @@
     "src/kanana/magick-wasm-url.d.ts",
     "test/kanana-decision-session.test.mts",
     "test/kanana-device-limits.test.mts",
+    "test/kanana-tvm-session.test.mts",
     "test/kanana-source-tokenizer.test.mts",
     "test/kanana-scoring.test.mts",
     "test/kanana-chat-template.test.mts",
