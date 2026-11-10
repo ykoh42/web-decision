@@ -188,8 +188,8 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
       },
       temperature: reference.request.temperature
     };
-    const {adapterInfo, isFallbackAdapter, adapterFeatures, adapterLimits, userAgent, result} = await page.evaluate(
-      async (input: BrowserRequest) => {
+    const {adapterInfo, isFallbackAdapter, adapterFeatures, adapterLimits, userAgent, result, maximumContext} =
+      await page.evaluate(async (input: BrowserRequest) => {
         const adapter = await navigator.gpu?.requestAdapter({powerPreference: 'high-performance'});
         if (!adapter) throw new Error('Chromium did not provide a WebGPU adapter.');
         const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
@@ -205,6 +205,25 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
           if (!noulAnswer || noulAnswer.type !== 'noul') throw new Error('Kanana returned no noul result.');
           const scoreAnswer = output.answers.delay_severity;
           if (!scoreAnswer || scoreAnswer.type !== 'score') throw new Error('Kanana returned no score result.');
+          const maximumContextOutput = await model.systemOne(
+            {
+              state: 'x '.repeat(30_000),
+              stateFormat: 'text',
+              questions: {
+                maximum_context: {
+                  type: 'choice',
+                  instructions: 'Choose the label for this boundary test.',
+                  criteria: {first: 'First option', second: 'Second option'}
+                }
+              }
+            },
+            {maxLength: 20_480}
+          );
+          const maximumContextAnswer = maximumContextOutput.answers.maximum_context;
+          if (!maximumContextAnswer || maximumContextAnswer.type !== 'choice')
+            throw new Error('Kanana returned no choice for the maximum context input.');
+          if (!maximumContextOutput.inputTruncation)
+            throw new Error('Kanana did not report truncation for the maximum context input.');
           const checkpointSha256 = model.description.checkpoint.weightSha256;
           if (!checkpointSha256) throw new Error('Kanana descriptor omitted the checkpoint digest.');
           return {
@@ -223,6 +242,12 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
               maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage
             },
             userAgent: navigator.userAgent,
+            maximumContext: {
+              answer: maximumContextAnswer.choice,
+              probabilities: maximumContextAnswer.probabilities,
+              inputTruncation: maximumContextOutput.inputTruncation,
+              usage: maximumContextOutput.usage
+            },
             result: {
               modelId: model.modelId,
               descriptionModelId: model.description.modelId,
@@ -256,9 +281,7 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
         } finally {
           await model.dispose();
         }
-      },
-      request
-    );
+      }, request);
 
     const expected = reference.result.answers.delivery_status;
     if (!expected) throw new Error('Kanana Python reference is missing delivery_status.');
@@ -307,8 +330,20 @@ test('the public Kanana package loader matches the pinned text-only PyTorch choi
       (scoreEntries.length - 1);
     const expectedScoreConfidence = highestProbability - remainingProbabilityMean;
     expect(Math.abs(scoreAnswer.confidence - expectedScoreConfidence)).toBeLessThan(1e-9);
+    expect(maximumContext.inputTruncation).toEqual({
+      truncated: true,
+      maxLength: 20_480,
+      queryQuestionIds: ['maximum_context'],
+      candidateDocuments: []
+    });
+    expect(maximumContext.usage.input_tokens).toBeGreaterThan(20_480);
+    expect(Object.keys(maximumContext.probabilities)).toEqual(['first', 'second']);
+    expect(Object.values(maximumContext.probabilities).every(Number.isFinite)).toBe(true);
     expect(fetched.some(({name}) => name === 'model.safetensors')).toBe(true);
     expect(browserErrors).toEqual([]);
+    console.log(
+      `KANANA_MAX_CONTEXT_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), maximumContext})}`
+    );
     console.log(
       `KANANA_CURATED_TEXT_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), adapterInfo, result, probabilityTolerance, fetchedRanges: fetched.length, fetchedBytes: fetched.reduce((sum, item) => sum + item.bytes, 0)})}`
     );

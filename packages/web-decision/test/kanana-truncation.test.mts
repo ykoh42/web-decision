@@ -46,6 +46,17 @@ function charTokenizer() {
   };
 }
 
+function tokenizerRejectingEmptyDecode() {
+  const tokenizer = charTokenizer();
+  return {
+    ...tokenizer,
+    decode(ids: number[]) {
+      if (ids.length === 0) throw new Error('token_ids must be a non-empty array of integers.');
+      return tokenizer.decode(ids);
+    }
+  };
+}
+
 function boundaryTokenizer() {
   const tokens = new Map<string | number, string | number>([...SPECIAL_IDS, [100, '[u]\n'], [101, 'xb'], [102, 'ab']]);
   const tokensByValue = new Map([...tokens].map(([id, token]) => [token, id]));
@@ -161,6 +172,29 @@ test('truncates a query one token over the limit by preserving the state head an
   assert.equal(outputState.length, state.length - 1);
   assert.ok(outputState.startsWith('a'));
   assert.ok(outputState.endsWith('Z'));
+});
+
+test('does not decode an empty state slice when truncation removes the full state', () => {
+  const tokenizer = tokenizerRejectingEmptyDecode();
+  const overhead = fit(queryInput(), tokenizer).tokenCount;
+  const input = queryInput({state: 'x'});
+  const result = fit(input, tokenizer, [], {maxLength: overhead});
+
+  assert.equal(result.tokenCount, overhead);
+  assert.equal(result.truncated, true);
+  assert.equal(stateText(result, input.editableUserTextIndexes[0]), '');
+});
+
+test('reports a full candidate truncation without decoding an empty token slice', () => {
+  const tokenizer = tokenizerRejectingEmptyDecode();
+  const emptyCandidate = candidateRequest({candidate: ''});
+  const emptyInput = renderKananaQueryInput(emptyCandidate, 'route');
+  const maxLength = encodeKananaQuery(tokenizer, emptyInput.messages).tokenCount;
+  const prepared = candidateRequest({candidate: 'x'});
+
+  assert.throws(() => truncateKananaQuestionCandidate(tokenizer, prepared, 'route', [], {maxLength}), {
+    code: 'input_too_long'
+  });
 });
 
 test('truncates adjacent message text parts using their original token boundaries', () => {

@@ -112,6 +112,11 @@ function encodeText(tokenizer: KananaTokenizer, value: string): number[] {
   return result;
 }
 
+function decodeTokens(tokenizer: KananaTokenizer, ids: number[]): string {
+  if (ids.length === 0) return '';
+  return tokenizer.decode!(ids, {skip_special_tokens: false});
+}
+
 function renderRetainedText(
   tokenizer: KananaTokenizer,
   textParts: TextTokenPart[],
@@ -134,7 +139,7 @@ function renderRetainedText(
     const keptTailStart = Math.max(start, tailStart);
     if (keptTailStart < end) kept.push(...allIds.slice(keptTailStart, end));
 
-    return [index, tokenizer.decode!(kept, {skip_special_tokens: false})];
+    return [index, decodeTokens(tokenizer, kept)];
   });
 }
 
@@ -223,8 +228,8 @@ function renderCandidateInput(
 function decodeHeadTail(tokenizer: KananaTokenizer, ids: number[], keepCount: number): string {
   const headCount = Math.ceil(keepCount / 2);
   const tailCount = Math.floor(keepCount / 2);
-  const head = tokenizer.decode!(ids.slice(0, headCount), {skip_special_tokens: false});
-  const tail = tailCount ? tokenizer.decode!(ids.slice(-tailCount), {skip_special_tokens: false}) : '';
+  const head = decodeTokens(tokenizer, ids.slice(0, headCount));
+  const tail = tailCount ? decodeTokens(tokenizer, ids.slice(-tailCount)) : '';
   return head + tail;
 }
 

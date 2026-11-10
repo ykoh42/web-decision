@@ -18,7 +18,7 @@
     "schemaVersion": 1,
     "evidencePrefix": "WEB_DECISION_KANANA_RELEASE_EVIDENCE_V1:",
     "archive": {
-      "sha256": "1593aeda2fee97ac89bc177c72ac103999aef061785deecc3a98231e5eeabeae",
+      "sha256": "bdabd252712d4e600b1222cad6886716ab68266822c7125fb673d2d2f85a06c8",
       "packageName": "web-decision",
       "packageVersion": "0.4.0"
     },

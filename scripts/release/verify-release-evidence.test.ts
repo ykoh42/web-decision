@@ -755,7 +755,7 @@ test('rejects policy edits that drop browser requirements or leave the matrix em
 
 test('pins the exact Kanana npm archive, static manifest, and TVM artifact set', async (t) => {
   const policy = validateKananaEvidencePolicy(POLICY.kanana);
-  assert.equal(policy.archive.sha256, '1593aeda2fee97ac89bc177c72ac103999aef061785deecc3a98231e5eeabeae');
+  assert.equal(policy.archive.sha256, 'bdabd252712d4e600b1222cad6886716ab68266822c7125fb673d2d2f85a06c8');
   assert.equal(policy.archive.packageVersion, '0.4.0');
   const context = await makeKananaVerificationContext();
   assert.equal(context.manifest.manifestSha256, policy.model.manifestSha256);
