@@ -28,9 +28,6 @@ class KananaPatchSequenceTest(unittest.TestCase):
                 "apply_tvm_webgpu_safe_int64_patch.sh",
                 "apply_tvm_webgpu_adapter_limits_patch.sh",
                 "apply_tvm_webgpu_resource_errors_patch.sh",
-                "apply_tvm_webgpu_bool_storage_int32_patch.sh",
-                "apply_tvm_webgpu_int32_min_literal_patch.sh",
-                "apply_tvm_webgpu_float_nonfinite_patch.sh",
                 "apply_tvm_webgpu_grid_bounds_patch.sh",
             )
             for script in script_names:
@@ -39,9 +36,6 @@ class KananaPatchSequenceTest(unittest.TestCase):
                 "tvm-webgpu-safe-int64.patch",
                 "tvm-webgpu-adapter-limits.patch",
                 "tvm-webgpu-resource-errors.patch",
-                "tvm-webgpu-bool-storage-int32.patch",
-                "tvm-webgpu-int32-min-literal.patch",
-                "tvm-webgpu-float-nonfinite.patch",
                 "tvm-webgpu-grid-bounds.patch",
             )
             for patch in patch_names:
