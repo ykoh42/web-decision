@@ -87,6 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          scripts/apply_tvm_webgpu_adapter_limits_patch.sh
           git -C .toolchains/apache-tvm-src submodule update --init --recursive 3rdparty/tvm-ffi
           .toolchains/emsdk/emsdk install 4.0.23
           .toolchains/emsdk/emsdk activate 4.0.23 --embedded
@@ -129,6 +130,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libatomic1
+          scripts/apply_tvm_webgpu_adapter_limits_patch.sh
           git -C .toolchains/apache-tvm-src submodule update --init --recursive 3rdparty/tvm-ffi
           .toolchains/emsdk/emsdk install 4.0.23
           .toolchains/emsdk/emsdk activate 4.0.23 --embedded
