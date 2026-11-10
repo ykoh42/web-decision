@@ -2,7 +2,17 @@ import {WebDecisionError} from '../kev.js';
 import {openAssetCache, readVerifiedAsset} from '../assets.js';
 import {KANANA_ASSETS_URL, KANANA_SOURCE_SPEC} from './contract.mjs';
 
-function checkedBase(value) {
+type KananaSourceProgress = Readonly<{loadedBytes: number; totalBytes: number; fraction: number}>;
+type KananaSourceOptions = Readonly<{
+  base?: string | URL;
+  signal?: AbortSignal;
+  cacheEnabled?: boolean;
+  offline?: boolean;
+  onProgress?: (progress: KananaSourceProgress) => void;
+  fetchImpl?: typeof fetch;
+}>;
+
+function checkedBase(value: string | URL): URL {
   let base;
   try {
     base = value instanceof URL ? new URL(value.href) : new URL(value);
@@ -23,20 +33,20 @@ export async function openKananaSource({
   offline = false,
   onProgress,
   fetchImpl
-} = {}) {
+}: KananaSourceOptions = {}) {
   const resolvedBase = checkedBase(base);
   const cache = await openAssetCache(cacheEnabled, signal);
   let loadedBytes = 0;
 
   return Object.freeze({
-    async read(name) {
+    async read(name: keyof typeof KANANA_SOURCE_SPEC.files) {
       return readVerifiedAsset(resolvedBase, KANANA_SOURCE_SPEC.manifest, name, {
         cache,
         signal,
         offline,
         maxAssetBytes: KANANA_SOURCE_SPEC.maxAssetBytes,
         fetchImpl,
-        onBytes(bytes) {
+        onBytes(bytes: number) {
           loadedBytes += bytes;
           onProgress?.({
             loadedBytes,

@@ -11,6 +11,12 @@ import {withTemporaryDirectories} from './temporary-directories.ts';
 
 const stableKevModelId = 'kev-0.6b-q4f16';
 const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2';
+const kananaModelId = 'kanana-2-v-decide-3b-2611';
+const kananaManifestSha256 = 'b5e27c7b4ed9f3074ee7c65dfee64405057f73d6be4b4f079a1817739b9d2df9';
+const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
+const kananaRequiredNotice =
+  'Kanana is licensed in accordance with the Kanana Open License Agreement. Copyright © KAKAO Corp. All Rights Reserved.';
+const kananaWasmFiles = ['kanana-text-model.wasm', 'kanana-vision-model.wasm'] as const;
 type BundleChunk = Readonly<{name: string; text: string}>;
 type AssetInput = readonly [name: string, sourcePath: string];
 type ManifestFile = Readonly<{sha256: string; bytes: number}>;
@@ -27,6 +33,8 @@ const stableAssetInputs: readonly AssetInput[] = [
 ];
 const packagedSourceFiles = [
   'LICENSE',
+  'KANANA-NOTICE',
+  'KANANA-OPEN-LICENSE.txt',
   'KEV06-NOTICE',
   'KEV-NOTICE',
   'EMSCRIPTEN-LICENSE',
@@ -36,6 +44,12 @@ const packagedSourceFiles = [
   'TVM-LICENSE',
   'TVM-NOTICE',
   'README.md',
+  'assets/kanana/manifest.json',
+  'assets/kanana/kanana-text-model.wasm',
+  'assets/kanana/text-weight-manifest.json',
+  'assets/kanana/kanana-vision-model.wasm',
+  'assets/kanana/vision-weight-manifest.json',
+  'assets/kanana/safetensors-range-manifest.json',
   'assets/kev06-stable/manifest.json',
   'assets/kev06-stable/PROVENANCE.md',
   'assets/kev06-stable/notices/MODEL-APACHE-2.0.txt',
@@ -205,7 +219,7 @@ function runInstalledApiSmoke(consumer: string, requiredFiles: readonly string[]
     "assert.equal(typeof library.clearModelCache, 'function');",
     "assert.equal(typeof library.WebDecisionError, 'function');",
     'const models = library.listModels();',
-    "assert.deepEqual(models.map(({modelId}) => modelId), ['" + stableKevModelId + "']);",
+    "assert.deepEqual(models.map(({modelId}) => modelId), ['" + stableKevModelId + "', '" + kananaModelId + "']);",
     "assert.ok(models.every(({backend}) => backend?.name === 'tvm-webgpu'));",
     "const description = library.describeModel('" + stableKevModelId + "');",
     "assert.equal(description.modelId, '" + stableKevModelId + "');",
@@ -214,7 +228,37 @@ function runInstalledApiSmoke(consumer: string, requiredFiles: readonly string[]
     'assert.deepEqual([...description.assets.requiredFiles].sort(), ' +
       JSON.stringify([...requiredFiles].sort()) +
       ');',
+    "const kanana = library.describeModel('" + kananaModelId + "');",
+    "assert.equal(kanana.modelId, '" + kananaModelId + "');",
+    "assert.equal(kanana.backend.name, 'tvm-webgpu');",
+    "assert.equal(kanana.assets.manifestSha256, '" + kananaManifestSha256 + "');",
+    "assert.equal(kanana.verification.currentBundleGpu, 'verified');",
+    'assert.deepEqual([...kanana.assets.requiredFiles].sort(), ' +
+      JSON.stringify(
+        [
+          'manifest.json',
+          'kanana-text-model.wasm',
+          'text-weight-manifest.json',
+          'kanana-vision-model.wasm',
+          'vision-weight-manifest.json',
+          'safetensors-range-manifest.json'
+        ].sort()
+      ) +
+      ');',
     "const invalidInput = (error) => error instanceof library.WebDecisionError && error.code === 'INVALID_INPUT';",
+    'const originalFetch = globalThis.fetch;',
+    'let networkRequested = false;',
+    "globalThis.fetch = async () => { networkRequested = true; throw new Error('unexpected network access'); };",
+    'try {',
+    "  for (const option of ['maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']) {",
+    "    await assert.rejects(library.loadDecisionModel({modelId: '" +
+      kananaModelId +
+      "', [option]: 128}), invalidInput);",
+    '  }',
+    '  assert.equal(networkRequested, false);',
+    '} finally {',
+    '  globalThis.fetch = originalFetch;',
+    '}',
     "assert.throws(() => library.describeModel('unknown-model'), invalidInput);",
     'assert.throws(() => library.describeModel(null), invalidInput);',
     "await assert.rejects(library.loadDecisionModel({modelId: 'unknown-model'}), invalidInput);",
@@ -297,6 +341,54 @@ function expectedPackageFiles(distFiles: readonly string[]): string[] {
   return [...packagedSourceFiles, ...distFiles.map((name) => 'dist/' + name), 'package.json'].sort();
 }
 
+function verifyKananaArtifacts(distDirectory: string, distFiles: readonly string[]): void {
+  const sourceDirectory = join(pkg, 'assets/kanana');
+  const manifest = JSON.parse(readFileSync(join(sourceDirectory, 'manifest.json'), 'utf8')) as {
+    modelId: string;
+    files: Readonly<Record<string, ManifestFile>>;
+  };
+  assert.equal(manifest.modelId, kananaModelId);
+  for (const [name, metadata] of Object.entries(manifest.files)) {
+    const source = readFileSync(join(sourceDirectory, name));
+    assert.equal(source.byteLength, metadata.bytes, 'The Kanana source size differs from its manifest: ' + name + '.');
+    assert.equal(
+      createHash('sha256').update(source).digest('hex'),
+      metadata.sha256,
+      'The Kanana source differs from its manifest: ' + name + '.'
+    );
+    if (!(kananaWasmFiles as readonly string[]).includes(name)) continue;
+    assert.ok(distFiles.includes(name), 'The package build must emit dist/' + name + '.');
+    const built = readFileSync(join(distDirectory, name));
+    assert.equal(built.byteLength, metadata.bytes, 'The Kanana runtime size differs from its manifest: ' + name + '.');
+    assert.equal(
+      createHash('sha256').update(built).digest('hex'),
+      metadata.sha256,
+      'The Kanana runtime differs from its manifest: ' + name + '.'
+    );
+  }
+  assert.deepEqual(
+    Object.keys(manifest.files).sort(),
+    [
+      'kanana-text-model.wasm',
+      'text-weight-manifest.json',
+      'kanana-vision-model.wasm',
+      'vision-weight-manifest.json',
+      'safetensors-range-manifest.json'
+    ].sort()
+  );
+}
+
+function verifyKananaLicenseNotice(): void {
+  const licenseBytes = readFileSync(join(pkg, 'KANANA-OPEN-LICENSE.txt'));
+  assert.equal(licenseBytes.byteLength, 11_867, 'The pinned Kanana license size changed.');
+  assert.equal(createHash('sha256').update(licenseBytes).digest('hex'), kananaLicenseSha256);
+  const notice = readFileSync(join(pkg, 'KANANA-NOTICE'), 'utf8');
+  assert.ok(notice.startsWith(kananaRequiredNotice), 'The Kanana notice must include Kakao’s required attribution.');
+  const readme = readFileSync(join(pkg, 'README.md'), 'utf8');
+  for (const term of ['Guidelines For Responsible AI', 'copy of the agreement', 'modified files', 'on-device domains'])
+    assert.ok(readme.includes(term), 'The package README must pass on Kanana license requirements: ' + term + '.');
+}
+
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const pkg = join(root, 'packages/web-decision');
 withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
@@ -318,11 +410,18 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   const packageFiles = archive.files.map((file) => file.path).sort();
   const distDirectory = join(pkg, 'dist');
   const distFiles = readdirSync(distDirectory).sort();
+  verifyKananaArtifacts(distDirectory, distFiles);
+  verifyKananaLicenseNotice();
   const expectedFiles = expectedPackageFiles(distFiles);
   assert.deepEqual(packageFiles, expectedFiles);
-  assert.ok(
-    packageFiles.every((file) => !file.endsWith('.wasm')),
-    'WASM assets must be inline in the stable lazy chunk, not separate package files.'
+  assert.deepEqual(
+    packageFiles.filter((file) => file.endsWith('.wasm')).sort(),
+    [
+      'assets/kanana/kanana-text-model.wasm',
+      'assets/kanana/kanana-vision-model.wasm',
+      'dist/kanana-text-model.wasm',
+      'dist/kanana-vision-model.wasm'
+    ].sort()
   );
 
   const packageEntry = readFileSync(join(distDirectory, 'index.js'), 'utf8');
@@ -351,7 +450,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   for (const {name, text} of allDistChunks) {
     assert.doesNotMatch(
       text,
-      /\?url(?:&|["'])/u,
+      /\b(?:from\s*|import\s*\(\s*)["'][^"']*\?url(?:&|["'])/u,
       'The published chunk dist/' + name + ' must not depend on consumer asset plugins.'
     );
   }

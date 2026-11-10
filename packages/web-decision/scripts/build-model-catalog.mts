@@ -10,6 +10,8 @@ import type {
   ModelId
 } from '../src/catalog/types.generated.js';
 import {KEV06_MANIFEST_SHA256} from '../src/kev06/contract.js';
+import {KANANA_MODEL_ID, KANANA_REPOSITORY, KANANA_REVISION} from '../src/kanana/contract.mjs';
+import {KANANA_SAFETENSORS_SPEC} from '../src/kanana/safetensors-spec.mjs';
 import {
   EXPERIMENTAL_KEV_UPSTREAM_MAP_SHA256,
   EXPERIMENTAL_KEV_UPSTREAM_REPOSITORY,
@@ -62,6 +64,7 @@ const bundledFiles: readonly (readonly [string, string])[] = [
   ['model_config.json', 'assets/experimental-kev-upstream/model_config.json'],
   ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
 ];
+const kananaManifestPath = 'assets/kanana/manifest.json';
 
 function failUnless(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -224,8 +227,86 @@ async function createKev06ArtifactLock(model: CuratedModel): Promise<ModelArtifa
   };
 }
 
+async function createKananaArtifactLock(model: CuratedModel): Promise<ModelArtifactLock> {
+  const manifestFile = await readJson(path.join(packageRoot, kananaManifestPath));
+  failUnless(isRecord(manifestFile.value), 'Kanana package manifest must be an object.');
+  const manifest = manifestFile.value;
+  failUnless(manifest.format === 'web-decision-kanana-tvm-artifacts-v1', 'Kanana package manifest format is invalid.');
+  failUnless(model.modelId === KANANA_MODEL_ID, 'Kanana catalog model ID differs from the pinned model.');
+  failUnless(manifest.modelId === KANANA_MODEL_ID, 'Kanana artifact model ID differs from the catalog.');
+  failUnless(manifest.repository === KANANA_REPOSITORY, 'Kanana repository differs from the pinned model.');
+  failUnless(manifest.revision === KANANA_REVISION, 'Kanana revision differs from the pinned model.');
+  failUnless(
+    manifest.checkpointSha256 === KANANA_SAFETENSORS_SPEC.fileSha256,
+    'Kanana checkpoint hash differs from the pin.'
+  );
+  failUnless(isRecord(manifest.files), 'Kanana package manifest has no file inventory.');
+  const runtime = isRecord(manifest.runtime) ? manifest.runtime : {};
+  const textGraph = isRecord(runtime.textGraph) ? runtime.textGraph : {};
+  const visionGraph = isRecord(runtime.visionGraph) ? runtime.visionGraph : {};
+  failUnless(textGraph.mode === 'checkpoint_full', 'Kanana text graph must use the full checkpoint.');
+  failUnless(textGraph.graphWeights === 354, 'Kanana text graph must contain 354 graph weights.');
+  failUnless(visionGraph.graphWeights === 333, 'Kanana vision graph must contain 333 graph weights.');
+
+  const files: Record<string, ManifestFile> = {};
+  const bundledRuntimeFiles = [];
+  for (const name of Object.keys(manifest.files)) {
+    const declared = manifest.files[name];
+    failUnless(isRecord(declared), 'Kanana package file metadata is invalid: ' + name + '.');
+    const sourcePath = `assets/kanana/${name}`;
+    const bytes = await readFile(path.join(packageRoot, sourcePath));
+    const digest = sha256(bytes);
+    failUnless(
+      declared.bytes === bytes.byteLength,
+      'Kanana package file size differs from its manifest: ' + name + '.'
+    );
+    failUnless(declared.sha256 === digest, 'Kanana package file hash differs from its manifest: ' + name + '.');
+    files[name] = {bytes: bytes.byteLength, sha256: digest};
+    bundledRuntimeFiles.push({manifestName: name, sourcePath, bytes: bytes.byteLength, sha256: digest});
+  }
+  const rangeManifestPath = 'assets/kanana/safetensors-range-manifest.json';
+  const rangeManifest = await readJson(path.join(packageRoot, rangeManifestPath));
+  failUnless(isRecord(rangeManifest.value), 'Kanana range manifest must be an object.');
+  failUnless(
+    rangeManifest.value.model === KANANA_MODEL_ID &&
+      rangeManifest.value.repository === KANANA_REPOSITORY &&
+      rangeManifest.value.revision === KANANA_REVISION &&
+      rangeManifest.value.path === KANANA_SAFETENSORS_SPEC.path &&
+      rangeManifest.value.totalBytes === KANANA_SAFETENSORS_SPEC.totalBytes &&
+      rangeManifest.value.headerSha256 === KANANA_SAFETENSORS_SPEC.headerSha256 &&
+      rangeManifest.value.tensorCount === KANANA_SAFETENSORS_SPEC.tensorCount,
+    'Kanana range manifest differs from the pinned checkpoint.'
+  );
+  const canonicalBytes = canonicalManifestBytes(manifest);
+  const rangeManifestRecord = files['safetensors-range-manifest.json'];
+  failUnless(rangeManifestRecord, 'Kanana range manifest is missing from the package file inventory.');
+
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath: kananaManifestPath,
+      rawSha256: sha256(manifestFile.bytes),
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: false,
+      files
+    },
+    bundledRuntimeFiles,
+    upstream: {
+      repository: KANANA_REPOSITORY,
+      revision: KANANA_REVISION,
+      sourcePath: KANANA_SAFETENSORS_SPEC.path,
+      sourceBytes: KANANA_SAFETENSORS_SPEC.totalBytes,
+      sourceSha256: KANANA_SAFETENSORS_SPEC.fileSha256,
+      rangeManifestPath,
+      rangeManifestSha256: rangeManifestRecord.sha256
+    }
+  };
+}
+
 export async function createModelArtifactLock(model: CuratedModel): Promise<ModelArtifactLock> {
   if (model.description.adapter === 'kev06') return createKev06ArtifactLock(model);
+  if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
@@ -301,7 +382,7 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       'export type ModelIdTuple = readonly [' + tupleTypes + '];',
       'export type ModelAdapterId = ' + adapterTypes + ';',
       'export interface CatalogModelLimit {',
-      "  readonly resource: 'tokens' | 'options' | 'questions';",
+      "  readonly resource: 'tokens' | 'options' | 'questions' | 'images';",
       "  readonly scope: 'state' | 'question' | 'request';",
       '  readonly min?: number;',
       '  readonly max?: number;',
@@ -335,7 +416,7 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       '      score: Readonly<Record<string, unknown>>;',
       '    }>;',
       '    typedTextQuestionTypes?: readonly string[];',
-      "    imageChoice?: Readonly<{status: 'not-implemented'}>;",
+      "    imageChoice?: Readonly<{status: 'implemented' | 'not-implemented'; limits?: readonly CatalogModelLimit[]}>;",
       "    rating?: Readonly<{status: 'not-implemented'}>;",
       '  }>;',
       '  readonly verification: Readonly<Record<string, string>>;',
@@ -362,8 +443,10 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       '    sourcePath: string;',
       '    sourceBytes: number;',
       '    sourceSha256: string;',
-      '    shardMapPath: string;',
-      '    shardMapSha256: string;',
+      '    shardMapPath?: string;',
+      '    shardMapSha256?: string;',
+      '    rangeManifestPath?: string;',
+      '    rangeManifestSha256?: string;',
       '  }>;',
       '}',
       'export interface ModelCatalogEntry {',

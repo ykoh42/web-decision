@@ -1,0 +1,14 @@
+diff --git a/src/backend/webgpu/codegen/codegen_webgpu.h b/src/backend/webgpu/codegen/codegen_webgpu.h
+index 5c6b57d..2520875 100644
+--- a/src/backend/webgpu/codegen/codegen_webgpu.h
++++ b/src/backend/webgpu/codegen/codegen_webgpu.h
+@@ -98,7 +98,8 @@ class CodeGenWebGPU final : public CodeGenC {
+   /*!
+    * \brief Storage type of bool values.
+    */
+-  PrimType boolean_storage_type_{PrimType::Int(8)};
++  // WGSL storage arrays cannot contain bool or i8 elements.
++  PrimType boolean_storage_type_{PrimType::Int(32)};
+ 
+   // whether enable fp16
+   bool enable_fp16_{false};

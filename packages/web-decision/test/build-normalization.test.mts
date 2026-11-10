@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import config, {
-  assertPreviewWebgpuHash,
+  assertPinnedWebgpuHash,
   browserOnlyTvmWasiExport,
   stripNodeOnlyWasiExport,
   tvmRuntimeImportWithoutTypeMarker
@@ -55,13 +55,11 @@ test('build fails when the expected TVM marker format is missing', () => {
   );
 });
 
-test('preview build rejects a changed TVM WebGPU source', () => {
-  assert.doesNotThrow(() =>
-    assertPreviewWebgpuHash('77003ab2bc6c7ae103b38fb52c12a5a7a3d49597260b43f010deaacc5d65b7c1')
-  );
+test('the package build rejects a changed TVM WebGPU source', () => {
+  assert.doesNotThrow(() => assertPinnedWebgpuHash('f9dcc047285dfe7d0b9d3eee0ce81df3c20cd5935cd34db581f6bce1ac887f23'));
   assert.throws(
-    () => assertPreviewWebgpuHash('92ba506841dc0eddedc8b1ea1ea64e37ff7dfce2d2f3fae297df6f9ec282bc5c'),
-    /requires its verified TVM WebGPU source/
+    () => assertPinnedWebgpuHash('92ba506841dc0eddedc8b1ea1ea64e37ff7dfce2d2f3fae297df6f9ec282bc5c'),
+    /differs from the verified patch/
   );
 });
 

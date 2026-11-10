@@ -1,0 +1,52 @@
+{
+  "format": "web-decision-kanana-tvm-artifacts-v1",
+  "modelId": "kanana-2-v-decide-3b-2611",
+  "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+  "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+  "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+  "modifications": {
+    "modifiedBy": "web-decision",
+    "files": [
+      "kanana-text-model.wasm",
+      "text-weight-manifest.json",
+      "kanana-vision-model.wasm",
+      "vision-weight-manifest.json",
+      "safetensors-range-manifest.json"
+    ],
+    "description": "web-decision generated TVM WebGPU modules and weight manifests from the pinned Kanana checkpoint."
+  },
+  "runtime": {
+    "tvm": "0.27.0.post1",
+    "textGraph": {
+      "mode": "checkpoint_full",
+      "weights": 3180636672,
+      "graphWeights": 354
+    },
+    "visionGraph": {
+      "graphWeights": 333,
+      "maxPatchCount": 65536
+    }
+  },
+  "files": {
+    "kanana-text-model.wasm": {
+      "bytes": 4477518,
+      "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+    },
+    "text-weight-manifest.json": {
+      "bytes": 102978,
+      "sha256": "77e08b6da97ecff6ffdbc576c2afb7b614197e9f7d292e5229472379f6d36fed"
+    },
+    "kanana-vision-model.wasm": {
+      "bytes": 4414887,
+      "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+    },
+    "vision-weight-manifest.json": {
+      "bytes": 100018,
+      "sha256": "622ff1e944d3e41557e3a2a14bb071f8c3ce7ec13c291afdfcb60f0102dfc384"
+    },
+    "safetensors-range-manifest.json": {
+      "bytes": 632507,
+      "sha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+    }
+  }
+}

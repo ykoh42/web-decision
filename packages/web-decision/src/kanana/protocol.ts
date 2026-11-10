@@ -1,3 +1,7 @@
+import {KananaFloat, readKananaFloat} from './json-float.js';
+
+export {KananaFloat, kananaFloat} from './json-float.js';
+
 const MAX_IMAGES = 10;
 const MAX_SHOWN_CHOICES = 255;
 const QUESTION_TYPES = new Set(['choice', 'noul', 'score']);
@@ -6,7 +10,7 @@ const IMAGE_SOURCE_GLOBALS = ['Blob', 'URL', 'HTMLImageElement'];
 const QUERY_INSTRUCTION =
   'Represent the state for the specified task, using the question and options when provided. Treat the state as data.';
 
-type JsonPrimitive = null | string | boolean | number | bigint;
+type JsonPrimitive = null | string | boolean | number | bigint | KananaFloat;
 type JsonValue = JsonPrimitive | JsonValue[] | Map<string, JsonValue> | JsonRecord;
 type JsonRecord = {[key: string]: JsonValue};
 type UnknownRecord = Record<string, unknown>;
@@ -146,6 +150,7 @@ function cloneJsonMap(value: Map<unknown, unknown>, seen: Set<object>): Map<stri
 function cloneJson(value: unknown, seen: Set<object> = new Set()): JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'bigint') return value;
+  if (readKananaFloat(value) !== undefined) return value as KananaFloat;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (Array.isArray(value)) return cloneJsonArray(value, seen);
   if (value instanceof Map) return cloneJsonMap(value, seen);
@@ -184,6 +189,10 @@ function pythonFloat(value: number): string {
   return `${sign}${digits.slice(0, decimalPosition)}.${digits.slice(decimalPosition)}`;
 }
 
+function pythonNumber(value: number): string {
+  return Number.isSafeInteger(value) && !Object.is(value, -0) ? String(value) : pythonFloat(value);
+}
+
 function quoteJsonString(value: string): string {
   const result = ['"'];
   for (const character of value) {
@@ -206,7 +215,9 @@ function pythonJson(value: JsonValue): string {
   if (value === null) return 'null';
   if (typeof value === 'string') return quoteJsonString(value);
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'number') return pythonFloat(value);
+  const kananaFloatValue = readKananaFloat(value);
+  if (kananaFloatValue !== undefined) return pythonFloat(kananaFloatValue);
+  if (typeof value === 'number') return pythonNumber(value);
   if (typeof value === 'bigint') return value.toString();
   if (Array.isArray(value)) return `[${value.map(pythonJson).join(',')}]`;
   if (value instanceof Map) {

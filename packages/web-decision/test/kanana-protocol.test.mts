@@ -27,6 +27,7 @@ type OrderedAnswerResult = {
 const {
   answerKananaQuestion,
   finishKananaSystemOne,
+  kananaFloat,
   prepareKananaSystemOne,
   prepareKananaTextSystemOne,
   renderKananaQueryInput,
@@ -648,21 +649,30 @@ test('query input marks only state text editable without changing rendered promp
   assert.equal(renderKananaChatTemplate(input.messages), renderKananaChatTemplate(original));
 });
 
-test('JSON prompt rendering treats Number as Python float and BigInt as exact integer', () => {
+test('JSON prompt rendering preserves Python integer and float representations', () => {
+  assert.throws(() => kananaFloat(Number.POSITIVE_INFINITY), /requires a finite number/);
+  const forgedFloat = Object.create(Object.getPrototypeOf(kananaFloat(1))) as {value: number};
+  Object.defineProperty(forgedFloat, 'value', {value: Number.POSITIVE_INFINITY});
+  assert.throws(
+    () => prepareKananaSystemOne({state: new Map([['forgedFloat', forgedFloat]]), questions: {route: choice()}}),
+    /only finite JSON values/
+  );
   const unsafeNumber = Number('9007199254740993');
   assert.equal(unsafeNumber, 9007199254740992);
 
   const prepared = prepareKananaSystemOne({
     state: new Map<string, unknown>([
-      ['fraction', 1],
+      ['fraction', 1.5],
       ['integralNumber', 2],
       ['exactInteger', 2n],
+      ['integralFloat', kananaFloat(2)],
+      ['nested', {integralFloat: kananaFloat(2)}],
       ['negativeZero', -0],
       ['unsafeNumber', unsafeNumber],
       ['fixedSmall', 1e-4],
       ['exponentSmall', 1e-5],
       ['exponentSmallest', 1e-6],
-      ['fixedLarge', 1e15],
+      ['fixedLarge', kananaFloat(1e15)],
       ['exponentLarge', 1e16],
       ['smallest', Number.MIN_VALUE],
       ['integer', 123456789012345678901234567890n]
@@ -673,7 +683,8 @@ test('JSON prompt rendering treats Number as Python float and BigInt as exact in
 
   assert.ok(
     (user.content[0]! as {text: string}).text.startsWith(
-      'State:\n{"fraction":1.0,"integralNumber":2.0,"exactInteger":2,"negativeZero":-0.0,' +
+      'State:\n{"fraction":1.5,"integralNumber":2,"exactInteger":2,"integralFloat":2.0,' +
+        '"nested":{"integralFloat":2.0},"negativeZero":-0.0,' +
         '"unsafeNumber":9007199254740992.0,"fixedSmall":0.0001,"exponentSmall":1e-05,' +
         '"exponentSmallest":1e-06,"fixedLarge":1000000000000000.0,"exponentLarge":1e+16,' +
         '"smallest":5e-324,"integer":123456789012345678901234567890}\n\nTask:\n'

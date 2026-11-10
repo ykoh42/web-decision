@@ -5,9 +5,11 @@ import {WebDecisionError} from './errors.ts';
 import {readLoadOptions} from './load-options.ts';
 
 export {WebDecisionError};
+export {KananaFloat, kananaFloat} from '../kanana/json-float.ts';
 
 const adapters = Object.freeze({
-  kev06: () => import('./adapters/kev06.ts')
+  kev06: () => import('./adapters/kev06.ts'),
+  kanana: () => import('./adapters/kanana.ts')
 });
 
 const descriptions = Object.freeze(

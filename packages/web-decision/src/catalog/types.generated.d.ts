@@ -1,8 +1,8 @@
-export type ModelId = 'kev-0.6b-q4f16';
-export type ModelIdTuple = readonly ['kev-0.6b-q4f16'];
-export type ModelAdapterId = 'kev06';
+export type ModelId = 'kev-0.6b-q4f16' | 'kanana-2-v-decide-3b-2611';
+export type ModelIdTuple = readonly ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611'];
+export type ModelAdapterId = 'kev06' | 'kanana';
 export interface CatalogModelLimit {
-  readonly resource: 'tokens' | 'options' | 'questions';
+  readonly resource: 'tokens' | 'options' | 'questions' | 'images';
   readonly scope: 'state' | 'question' | 'request';
   readonly min?: number;
   readonly max?: number;
@@ -36,7 +36,7 @@ export interface CatalogModelDescription {
       score: Readonly<Record<string, unknown>>;
     }>;
     typedTextQuestionTypes?: readonly string[];
-    imageChoice?: Readonly<{status: 'not-implemented'}>;
+    imageChoice?: Readonly<{status: 'implemented' | 'not-implemented'; limits?: readonly CatalogModelLimit[]}>;
     rating?: Readonly<{status: 'not-implemented'}>;
   }>;
   readonly verification: Readonly<Record<string, string>>;
@@ -63,8 +63,10 @@ export interface ModelArtifactLock {
     sourcePath: string;
     sourceBytes: number;
     sourceSha256: string;
-    shardMapPath: string;
-    shardMapSha256: string;
+    shardMapPath?: string;
+    shardMapSha256?: string;
+    rangeManifestPath?: string;
+    rangeManifestSha256?: string;
   }>;
 }
 export interface ModelCatalogEntry {

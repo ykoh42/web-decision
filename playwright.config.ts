@@ -5,7 +5,10 @@ import {join} from 'node:path';
 
 const port = Number(process.env.WEB_DECISION_BROWSER_PORT || 41773);
 const baseURL = `http://127.0.0.1:${port}`;
-const realGPU = process.env.WEB_DECISION_REAL_GPU === '1';
+const realGPU =
+  process.env.WEB_DECISION_REAL_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_LOCAL_GPU === '1';
 const requestedBrowser = process.env.WEB_DECISION_BROWSER_NAME || 'chromium';
 if (!['chromium', 'firefox', 'webkit'].includes(requestedBrowser)) {
   throw new Error(`Unsupported browser: ${requestedBrowser}`);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,7 +8,8 @@ import {
   completionViolations,
   loadSonarBaseline,
   parseSonarBaseline,
-  requireComplete
+  requireComplete,
+  workingTreeSources
 } from './check_cognitive_complexity_completion.mts';
 
 function baseline(findings: unknown[]): string {
@@ -23,6 +25,20 @@ function baseline(findings: unknown[]): string {
 function completionFindings(text: string, sourcePaths: string[]) {
   return completionViolations(parseSonarBaseline(text), new Set(sourcePaths));
 }
+
+test('source inventory excludes only git-confirmed deletions and retains untracked TypeScript files', (context) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'complexity-completion-sources-'));
+  context.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  fs.mkdirSync(path.join(root, 'src'), {recursive: true});
+  fs.writeFileSync(path.join(root, 'src/legacy.js'), 'export const legacy = true;\n');
+  fs.writeFileSync(path.join(root, 'src/retained.mts'), 'export const retained = true;\n');
+  execFileSync('git', ['init', '--quiet'], {cwd: root});
+  execFileSync('git', ['add', '--', 'src/legacy.js', 'src/retained.mts'], {cwd: root});
+  fs.rmSync(path.join(root, 'src/legacy.js'));
+  fs.writeFileSync(path.join(root, 'src/new.ts'), 'export const browserSource = true;\n');
+
+  assert.deepEqual([...workingTreeSources(root)].sort(), ['src/new.ts', 'src/retained.mts']);
+});
 
 test('excludes only the fixed historical semver release directories', () => {
   const findings = [

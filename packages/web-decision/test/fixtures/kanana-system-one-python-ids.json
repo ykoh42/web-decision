@@ -1,7 +1,7 @@
 {
   "model": {
     "id": "kakaocorp/kanana-2-v-decide-3b-2611",
-    "revision": "1489062def4145ae3a0a9261fbac4f4d88a8c6d1",
+    "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
     "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
     "protocolSha256": "a4e33c66db53f50118005661dbc4354b0a259e01d243cc0f4afbe0e22106b3a2",
     "embeddingDimension": 2560,

@@ -5,20 +5,55 @@ import test from 'node:test';
 
 const outputDirectory = process.env.KANANA_TVM_SESSION_DIST;
 if (!outputDirectory) throw new Error('Compile the Kanana TVM session before running its focused tests.');
-const {createKananaTvmInferenceSession} = await import(pathToFileURL(join(outputDirectory, 'tvm-session.js')).href);
+const {createKananaTvmInferenceSession, createKananaTvmVisionInferenceSession} = await import(
+  pathToFileURL(join(outputDirectory, 'tvm-session.js')).href
+);
+const {KANANA_EMBEDDING_SIZE, KANANA_IMAGE_TOKEN_ID} = await import(
+  pathToFileURL(join(outputDirectory, 'contract.mjs')).href
+);
 
 function weightRecord(name = 'blocks.0.weight') {
   return {name, shape: [2], dtype: 'float16', length: 4};
 }
 
-function fakeSetup({
-  parameterNames = ['input_ids', 'attention_mask', 'blocks_0_weight'],
-  arity = parameterNames.length,
-  outputValues = [0.25, -2, 4.5],
-  inferenceError,
-  inferenceDelay = 0
-} = {}) {
-  const calls = {
+type FakeTensor = {
+  shape: number[];
+  dtype: string;
+  targetDevice: unknown;
+  value?: any;
+  bytes?: Uint8Array;
+  copyFrom(value: any): FakeTensor;
+  copyFromRawBytes(bytes: Uint8Array): FakeTensor;
+  toRawBytes(): Uint8Array;
+};
+type FakeSetupOptions = {
+  parameterNames?: string[];
+  arity?: number;
+  outputValues?: number[];
+  inferenceError?: unknown;
+  inferenceDelay?: number;
+};
+
+function fakeSetup(options: FakeSetupOptions = {}) {
+  const parameterNames = options.parameterNames ?? ['input_ids', 'attention_mask', 'blocks_0_weight'];
+  const arity = options.arity ?? parameterNames.length;
+  const outputValues = options.outputValues ?? [0.25, -2, 4.5];
+  const inferenceError = options.inferenceError;
+  const inferenceDelay = options.inferenceDelay ?? 0;
+  const calls: {
+    functions: string[];
+    mainArgs: any[];
+    inferenceInputs: number[][][];
+    scalar: Array<[number, string]>;
+    tensors: FakeTensor[];
+    sync: number;
+    scopeBegins: number;
+    scopeEnds: number;
+    scopeDepth: number;
+    activeInferences: number;
+    maxConcurrentInferences: number;
+    disposed: number;
+  } = {
     functions: [],
     mainArgs: [],
     inferenceInputs: [],
@@ -44,12 +79,12 @@ function fakeSetup({
     toRawBytes: () => outputBytes.slice()
   };
   const vm = {
-    getFunction(name) {
+    getFunction(name: string) {
       calls.functions.push(name);
       if (name === 'main')
-        return async (...args) => {
+        return async (...args: any[]) => {
           calls.mainArgs = args;
-          calls.inferenceInputs.push(args.slice(0, 2).map(({value}) => [...value]));
+          calls.inferenceInputs.push(args.slice(0, 2).map(({value}: {value: number[]}) => [...value]));
           calls.activeInferences++;
           calls.maxConcurrentInferences = Math.max(calls.maxConcurrentInferences, calls.activeInferences);
           try {
@@ -61,27 +96,28 @@ function fakeSetup({
           }
         };
       if (name === 'get_function_arity') return () => arity;
-      if (name === 'get_function_param_name') return (_functionName, index) => parameterNames[index.value];
+      if (name === 'get_function_param_name')
+        return (_functionName: string, index: {value: number}) => parameterNames[index.value];
       throw new Error(`Unexpected TVM function: ${name}`);
     }
   };
   const runtime = {
     cpu: () => ({kind: 'cpu'}),
     webgpu: () => device,
-    scalar(value, dtype) {
+    scalar(value: number, dtype: string) {
       calls.scalar.push([value, dtype]);
       return {value, dtype};
     },
-    empty(shape, dtype, targetDevice) {
-      const tensor = {
+    empty(shape: number[], dtype: string, targetDevice: unknown) {
+      const tensor: FakeTensor = {
         shape: [...shape],
         dtype,
         targetDevice,
-        copyFrom(value) {
+        copyFrom(value: any) {
           this.value = value;
           return this;
         },
-        copyFromRawBytes(bytes) {
+        copyFromRawBytes(bytes: Uint8Array) {
           this.bytes = bytes.slice();
           return this;
         },
@@ -144,17 +180,17 @@ test('runs short int32 inputs with manifest weights and returns hidden-state val
   const {calls, setup} = fakeSetup({
     parameterNames: ['input_ids', 'attention_mask', 'blocks_0_weight', 'blocks_1_weight']
   });
-  const sourceBytes = {
+  const sourceBytes: Record<string, Uint8Array> = {
     'blocks.0.weight': new Uint8Array([1, 2, 3, 4]),
     'blocks.1.weight': new Uint8Array([5, 6, 7, 8])
   };
   const records = [weightRecord('blocks.1.weight'), weightRecord('blocks.0.weight')];
-  const reads = [];
+  const reads: Array<[string, number]> = [];
   const session = await createKananaTvmInferenceSession({
     setup,
     weightSource: {
       manifest: {weights: records},
-      readWeight: async (requested, index) => {
+      readWeight: async (requested: {name: string}, index: number) => {
         reads.push([requested.name, index]);
         return sourceBytes[requested.name];
       }
@@ -190,6 +226,151 @@ test('runs short int32 inputs with manifest weights and returns hidden-state val
   assert.equal(calls.scopeEnds, 1);
   assert.equal(calls.scopeDepth, 0);
 
+  await session.dispose();
+  assert.equal(calls.disposed, 1);
+});
+
+test('runs multimodal text graphs with image embeddings, ordered positions, and four-axis positions', async () => {
+  const parameterNames = ['input_ids', 'attention_mask', 'image_embeddings', 'image_positions', 'position_ids'];
+  const {calls, setup} = fakeSetup({parameterNames, arity: parameterNames.length});
+  const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
+  const ids = [1, KANANA_IMAGE_TOKEN_ID, KANANA_IMAGE_TOKEN_ID, 2];
+  const embeddings = Float32Array.from({length: 2 * KANANA_EMBEDDING_SIZE}, (_, index) => index / 10);
+  const positionIds = Int32Array.from({length: 4 * ids.length}, (_, index) => index % ids.length);
+
+  await session.infer(ids, [1, 1, 1, 1], {
+    imageEmbeddings: {shape: [2, KANANA_EMBEDDING_SIZE], values: embeddings},
+    imagePositions: [1, 2],
+    positionIds
+  });
+
+  assert.deepEqual(
+    calls.mainArgs.slice(0, 5).map(({shape, dtype}) => [shape, dtype]),
+    [
+      [[1, 4], 'int32'],
+      [[1, 4], 'int32'],
+      [[2, KANANA_EMBEDDING_SIZE], 'float32'],
+      [[2], 'int32'],
+      [[4, 1, 4], 'int32']
+    ]
+  );
+  assert.deepEqual([...calls.mainArgs[2].value], [...embeddings]);
+  assert.deepEqual([...calls.mainArgs[3].value], [1, 2]);
+  assert.deepEqual([...calls.mainArgs[4].value], [...positionIds]);
+  await session.dispose();
+});
+
+test('uses empty image tensors and linear positions for text-only prompts on a multimodal graph', async () => {
+  const parameterNames = ['input_ids', 'attention_mask', 'image_embeddings', 'image_positions', 'position_ids'];
+  const {calls, setup} = fakeSetup({parameterNames, arity: parameterNames.length});
+  const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
+
+  await session.infer([7, 8], [1, 1]);
+
+  assert.deepEqual(calls.mainArgs[2].shape, [0, KANANA_EMBEDDING_SIZE]);
+  assert.deepEqual(calls.mainArgs[3].shape, [0]);
+  assert.deepEqual(calls.mainArgs[4].shape, [4, 1, 2]);
+  assert.deepEqual([...calls.mainArgs[4].value], [0, 1, 0, 1, 0, 1, 0, 1]);
+  await session.dispose();
+});
+
+test('rejects multimodal inputs that do not match the image tokens or embedding dimension', async () => {
+  const parameterNames = ['input_ids', 'attention_mask', 'image_embeddings', 'image_positions', 'position_ids'];
+  const {setup, calls} = fakeSetup({parameterNames, arity: parameterNames.length});
+  const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
+  const valid = {
+    imageEmbeddings: {shape: [1, KANANA_EMBEDDING_SIZE], values: new Float32Array(KANANA_EMBEDDING_SIZE)},
+    imagePositions: [1],
+    positionIds: new Int32Array(8)
+  };
+
+  await assert.rejects(session.infer([1, KANANA_IMAGE_TOKEN_ID], [1, 1], {...valid, imagePositions: [0]}), {
+    code: 'invalid_input'
+  });
+  await assert.rejects(
+    session.infer([1, KANANA_IMAGE_TOKEN_ID], [1, 1], {
+      ...valid,
+      imageEmbeddings: {shape: [1, KANANA_EMBEDDING_SIZE - 1], values: new Float32Array(KANANA_EMBEDDING_SIZE - 1)}
+    }),
+    {code: 'invalid_input'}
+  );
+  assert.equal(calls.mainArgs.length, 0);
+  await session.dispose();
+});
+
+test('runs a dynamic vision graph with model-derived patch and interpolation inputs', async () => {
+  const parameterNames = ['pixels', 'positions', 'indices', 'weights', 'merged_tokens'];
+  const outputValues = Array.from({length: 2_560}, () => 0.25);
+  const {calls, setup} = fakeSetup({parameterNames, arity: parameterNames.length, outputValues});
+  const session = await createKananaTvmVisionInferenceSession({
+    setup,
+    weightSource: {weights: []},
+    patchValues: 3,
+    numPositionEmbeddings: 9,
+    spatialMergeSize: 2,
+    maxPatchCount: 4
+  });
+  const pixels = Float32Array.from({length: 12}, (_, index) => index / 10);
+
+  const result = await session.infer(pixels, [1, 2, 2]);
+
+  assert.deepEqual(
+    calls.mainArgs.slice(0, 5).map(({shape, dtype}) => [shape, dtype]),
+    [
+      [[4, 3], 'float32'],
+      [[4, 2], 'int32'],
+      [[4, 4], 'int32'],
+      [[4, 4], 'float32'],
+      [[1], 'int32']
+    ]
+  );
+  assert.deepEqual(result.shape, [1, 2_560]);
+  assert.equal(result.values.length, 2_560);
+  assert.equal(calls.scopeBegins, 1);
+  assert.equal(calls.scopeEnds, 1);
+  await session.dispose();
+});
+
+test('rejects vision inputs beyond the compiled graph range or with the wrong pixel count', async () => {
+  const parameterNames = ['pixels', 'positions', 'indices', 'weights', 'merged_tokens'];
+  const {calls, setup} = fakeSetup({parameterNames, arity: parameterNames.length});
+  const session = await createKananaTvmVisionInferenceSession({
+    setup,
+    weightSource: {weights: []},
+    patchValues: 3,
+    numPositionEmbeddings: 9,
+    spatialMergeSize: 2,
+    maxPatchCount: 4
+  });
+
+  await assert.rejects(session.infer(new Float32Array(3), [1, 2, 2]), {code: 'invalid_input'});
+  await assert.rejects(session.infer(new Float32Array(5 * 3), [1, 2, 10]), {code: 'input_too_large'});
+  assert.equal(calls.mainArgs.length, 0);
+  await session.dispose();
+});
+
+test('matches a Safetensors source name to its explicit TVM parameter name', async () => {
+  const parameterName = 'p_language_model_layers_0_self_attn_q_proj_weight';
+  const {calls, setup} = fakeSetup({parameterNames: ['input_ids', 'attention_mask', parameterName]});
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+  const session = await createKananaTvmInferenceSession({
+    setup,
+    weightSource: {
+      manifest: {
+        weights: [
+          {
+            ...weightRecord('model.language_model.layers.0.self_attn.q_proj.weight'),
+            parameterName
+          }
+        ]
+      },
+      readWeight: async () => bytes
+    }
+  });
+
+  await session.infer([7], [1]);
+
+  assert.deepEqual(calls.mainArgs[2].bytes, bytes);
   await session.dispose();
   assert.equal(calls.disposed, 1);
 });

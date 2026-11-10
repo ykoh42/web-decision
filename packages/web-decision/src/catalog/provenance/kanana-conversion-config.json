@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "modelId": "kanana-2-v-decide-3b-2611",
+  "checkpoint": {
+    "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+    "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+    "bytes": 7330945212,
+    "sha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b"
+  },
+  "textGraph": {
+    "mode": "checkpoint_full",
+    "layers": 32,
+    "sourceParameterDtype": "bfloat16",
+    "runtimeParameterDtype": "float16",
+    "dynamicSequence": true,
+    "sequenceLengthBounds": [1, 20480],
+    "multimodalInputs": true,
+    "onnxImportOrExportUsed": false,
+    "parameters": 3180636672,
+    "graphWeights": 354
+  },
+  "visionGraph": {
+    "graphWeights": 333,
+    "maxPatchCount": 65536,
+    "dynamicAllocations": true,
+    "onnxImportOrExportUsed": false
+  },
+  "validation": {
+    "textCpuParityTolerance": {"maxAbsDelta": 0.03, "rmse": 0.005},
+    "textCpuParityObserved": {
+      "sequenceLength1WithinTolerance": true,
+      "sequenceLength8WithImageTokensMaxAbsDelta": 0.087890625,
+      "sequenceLength8WithImageTokensRmse": 0.015408012084662914,
+      "sequenceLength8TextOnlyMaxAbsDelta": 0.0546875,
+      "sequenceLength8TextOnlyRmse": 0.009534475393593311,
+      "sequenceLength9TextOnlyMaxAbsDelta": 0.0546875,
+      "sequenceLength9TextOnlyRmse": 0.009914416819810867,
+      "note": "Some CPU parity cases exceeded tolerance; the export continued with --continue-after-cpu-parity-delta. The separately recorded public-package WebGPU reference tests passed."
+    }
+  }
+}

@@ -146,13 +146,13 @@ jobs:
           fi
           pnpm check:quality
       - name: Prepare pinned Kanana tokenizer test assets
-        run: node scripts/kanana/prepare-tokenizer-test-assets.mjs
+        run: node --import tsx scripts/kanana/prepare-tokenizer-test-assets.mts
       - name: Run package tests
         run: pnpm test
       - name: Check package coverage
         run: pnpm test:coverage
       - name: Check released package types
-        run: pnpm test:types:0.3.0
+        run: pnpm test:types:0.4.0
       - name: Build and verify the package archive
         run: pnpm verify:package
       - name: Verify upstream provider in Chromium
@@ -177,5 +177,5 @@ jobs:
             export BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
           fi
           pnpm run check:complexity:complete
-      - name: Enforce committed model provenance and rights evidence
-        run: pnpm run check:model-provenance
+      - name: Verify committed model provenance records; pending models cannot be released
+        run: pnpm run check:model-provenance:main

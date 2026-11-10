@@ -1,10 +1,13 @@
 import {expect, test} from '@playwright/test';
+import type {KananaImageProcessingReport} from './kanana-image-processing-entry.js';
 
 test('Kanana image preprocessing module runs in the browser without model or GPU assets', async ({page}) => {
   await page.goto('/');
-  await page.addScriptTag({type: 'module', url: '/kanana-image-processing-entry.js'});
+  await page.addScriptTag({type: 'module', url: '/kanana-image-processing-entry.ts'});
 
-  const report = await page.evaluate(() => window.kananaImageProcessingReport);
+  const report = await page.evaluate(
+    () => (window as Window & {kananaImageProcessingReport?: KananaImageProcessingReport}).kananaImageProcessingReport
+  );
 
   expect(report).toEqual({
     imageTokenThw: [1, 4, 16],

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "modelId": "kanana-2-v-decide-3b-2611",
+  "source": {
+    "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+    "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+    "checkpoint": {
+      "path": "model.safetensors",
+      "bytes": 7330945212,
+      "sha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b"
+    }
+  },
+  "text": {
+    "script": "scripts/kanana/prototype_text_tvm_relax.py",
+    "scriptSha256": "7d52ba9d4c53272f3b166666e588e8b18dde732a05d8c9136db8d79285f113d6",
+    "reproductionCommandTemplate": [
+      "python",
+      "scripts/kanana/prototype_text_tvm_relax.py",
+      "--model-dir",
+      "<pinned-snapshot>",
+      "--output-dir",
+      "<text-output>",
+      "--checkpoint-full",
+      "--runtime-dtype",
+      "float16",
+      "--weight-source",
+      "safetensors",
+      "--dynamic-sequence",
+      "--multimodal-inputs",
+      "--sequence-lengths",
+      "1",
+      "8",
+      "9",
+      "--continue-after-cpu-parity-delta",
+      "--target",
+      "webgpu"
+    ],
+    "arguments": [
+      "--checkpoint-full",
+      "--runtime-dtype",
+      "float16",
+      "--weight-source",
+      "safetensors",
+      "--dynamic-sequence",
+      "--multimodal-inputs",
+      "--sequence-lengths",
+      "1",
+      "8",
+      "9",
+      "--continue-after-cpu-parity-delta",
+      "--target",
+      "webgpu"
+    ],
+    "output": {
+      "artifact": "kanana-text-model.wasm",
+      "bytes": 4477518,
+      "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+    },
+    "reportSha256": "3d3defba791d19b906e956164395704e912447534c1d738cd2cae6889451c665",
+    "sequenceParityReportSha256": "2f7840e36809d9d60bfcbbeb722fd0372aee1162a0c271ea3a55289d7b324ba7"
+  },
+  "vision": {
+    "script": "scripts/kanana/export_dynamic_vision_tvm.py",
+    "scriptSha256": "b07be3c34420f7bd1461285a26302932b680ba1a50e1442b0a8ed736a1efdefc",
+    "reproductionCommandTemplate": [
+      "python",
+      "scripts/kanana/export_dynamic_vision_tvm.py",
+      "--model-dir",
+      "<pinned-snapshot>",
+      "--output-dir",
+      "<vision-output>"
+    ],
+    "output": {
+      "artifact": "kanana-vision-model.wasm",
+      "bytes": 4414887,
+      "sha256": "931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38"
+    },
+    "reportSha256": "86750a3835b28e337df1cce93958b99d6e7bc58f90d1031042228e4395e967dd"
+  },
+  "package": {
+    "script": "scripts/kanana/package_tvm_artifacts.mts",
+    "scriptSha256": "c763eb616b8082c650e7fe8e92af294f4c82838cc280b34faff690b47669526e",
+    "arguments": [
+      "node",
+      "--import",
+      "tsx",
+      "scripts/kanana/package_tvm_artifacts.mts",
+      "--text-dir",
+      "<text-output>",
+      "--vision-dir",
+      "<vision-output>"
+    ],
+    "onnxImportOrExportUsed": false
+  }
+}

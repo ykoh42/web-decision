@@ -11,10 +11,12 @@
   },
   "files": [
     "src/kanana/tvm-runtime.ts",
+    "src/kanana/device-limits.ts",
     "src/kanana/decision-session.ts",
     "src/kanana/protocol.ts",
     "src/kanana/scoring.ts",
     "src/kanana/tvm-session.ts",
+    "src/kanana/image-encoder.ts",
     "src/kanana/candidates.ts",
     "src/kanana/chat-template.ts",
     "src/kanana/tokenizer.ts",

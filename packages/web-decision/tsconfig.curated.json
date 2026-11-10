@@ -11,6 +11,7 @@
     "checkJs": false,
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    "skipLibCheck": true,
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },

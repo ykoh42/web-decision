@@ -1,4 +1,4 @@
-import {listModels, loadDecisionModel, type DecisionModel} from 'web-decision';
+import {listModels, loadDecisionModel, type LoadedDecisionModel} from 'web-decision';
 import {loadOptions} from './model-options.ts';
 
 function element<T extends Element>(selector: string, kind: {new (): T}): T {
@@ -18,6 +18,7 @@ const decide = element('#decide', HTMLButtonElement);
 const status = element('#status', HTMLElement);
 const result = element('#result', HTMLElement);
 const selector = element('#model', HTMLSelectElement);
+const kananaAttribution = element('#kanana-attribution', HTMLParagraphElement);
 const models = listModels();
 
 for (const {modelId} of models) {
@@ -26,13 +27,47 @@ for (const {modelId} of models) {
   option.textContent = modelId;
   selector.append(option);
 }
+function updateKananaAttribution() {
+  kananaAttribution.hidden = selector.value !== 'kanana-2-v-decide-3b-2611';
+}
+selector.addEventListener('change', updateKananaAttribution);
+updateKananaAttribution();
 if (models.length === 0) {
   load.disabled = true;
   status.textContent = 'No models are available.';
 }
 
-let model: DecisionModel | undefined;
+let model: LoadedDecisionModel | undefined;
 let sessionBlocked = false;
+
+async function runDecision(model: LoadedDecisionModel) {
+  const state = element('#state', HTMLTextAreaElement).value;
+  const instructions = element('#question', HTMLInputElement).value;
+  const options = element('#options', HTMLTextAreaElement).value.split('\n');
+  if (options.some((option) => !option.trim())) throw new Error('Each option line must contain text.');
+
+  if (model.modelId === 'kanana-2-v-decide-3b-2611') {
+    const criteria = Object.fromEntries(options.map((option, index) => [`option-${index}`, option]));
+    const answer = await model.decide({
+      state,
+      questions: {decision: {type: 'choice', instructions, criteria}}
+    });
+    const selected = answer.answers.decision;
+    if (!selected || selected.type !== 'choice') throw new Error('The model returned no choice answer.');
+    const selectedIndex = Number(selected.choice.slice('option-'.length));
+    const selectedOption = options[selectedIndex];
+    if (selectedOption === undefined) throw new Error('The model returned an unknown option.');
+    return {selected: selectedOption, answer};
+  }
+
+  const answer = await model.decide({
+    state,
+    questions: [{instructions, options}]
+  });
+  const selected = answer.answers[0];
+  if (!selected) throw new Error('The model returned no answer.');
+  return {selected: selected.selected, answer};
+}
 
 load.addEventListener('click', async () => {
   load.disabled = true;
@@ -82,16 +117,9 @@ form.addEventListener('submit', async (event) => {
   unload.disabled = true;
   result.textContent = '';
   try {
-    const options = element('#options', HTMLTextAreaElement).value.split('\n');
-    if (options.some((option) => !option.trim())) throw new Error('Each option line must contain text.');
-    const answer = await model.decide({
-      state: element('#state', HTMLTextAreaElement).value,
-      questions: [{instructions: element('#question', HTMLInputElement).value, options}]
-    });
-    const first = answer.answers[0];
-    if (!first) throw new Error('The model returned no answer.');
-    status.textContent = `Selected: ${first.selected}`;
-    result.textContent = JSON.stringify(answer, null, 2);
+    const answer = await runDecision(model);
+    status.textContent = `Selected: ${answer.selected}`;
+    result.textContent = JSON.stringify(answer.answer, null, 2);
   } catch (error) {
     status.textContent = `Could not make a decision: ${message(error)}`;
   } finally {

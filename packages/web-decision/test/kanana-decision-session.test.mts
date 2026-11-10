@@ -8,6 +8,9 @@ import type {KananaDecisionInferenceInput, KananaDecisionInferenceOutput} from '
 const outputDirectory = process.env.KANANA_CORE_DIST;
 if (!outputDirectory) throw new Error('Compile the Kanana decision session before running its focused tests.');
 const {createKananaDecisionSession} = await import(pathToFileURL(join(outputDirectory, 'decision-session.js')).href);
+const {KANANA_IMAGE_TOKEN_ID, KANANA_MODEL_MAX_LENGTH} = await import(
+  pathToFileURL(join(outputDirectory, 'contract.mjs')).href
+);
 const {KANANA_DECISION_TEMPERATURE, scaleKananaLogits} = scoring;
 
 type ChoiceAnswer = {
@@ -26,6 +29,7 @@ type ScoreAnswer = {
 
 const SPECIAL_TOKENS = ['<|im_start|>', '<|im_end|>', '<|vision_start|>', '<|image_pad|>', '<|vision_end|>'];
 const SPECIAL_IDS = new Map(SPECIAL_TOKENS.map((token, index) => [token, index + 10]));
+SPECIAL_IDS.set('<|image_pad|>', KANANA_IMAGE_TOKEN_ID);
 const TOKENS_BY_ID = new Map([...SPECIAL_IDS].map(([token, id]) => [id, token]));
 const BOS_ID = 1;
 TOKENS_BY_ID.set(BOS_ID, '<|bos|>');
@@ -69,7 +73,11 @@ function hiddenState(inputIds: ArrayLike<number>, vector: number[]) {
 type InferenceCall = {
   attentionMask: Int32Array;
   image: readonly unknown[];
+  imageTokenThw: readonly (readonly [number, number, number])[];
+  imagePositions: Int32Array;
+  imageEmbeddings: {shape: readonly [number, number]; values: ArrayLike<number>};
   inputIds: Int32Array;
+  positionIds: Int32Array;
   prompt: string;
   signal: AbortSignal | undefined;
 };
@@ -86,7 +94,11 @@ function vectorInference(vectors: number[][], calls: InferenceCall[] = []) {
       calls.push({
         attentionMask: input.attentionMask.slice(),
         image: input.image,
+        imageTokenThw: input.imageTokenThw,
+        imagePositions: input.imagePositions.slice(),
+        imageEmbeddings: input.imageEmbeddings,
         inputIds: input.inputIds.slice(),
+        positionIds: input.positionIds.slice(),
         prompt: decodeInput(tokenizer, input.inputIds),
         signal: input.signal
       });
@@ -131,10 +143,10 @@ test('runs ordered Choice, Noul and Score questions with pinned scoring and requ
   const {calls, tokenizer, infer} = vectorInference([
     [1, 0],
     [1, 0],
-    [0, 1],
+    [1, 0],
     [1, 0],
     [0, 1],
-    [1, 0],
+    [0, 1],
     [1, 0],
     [1, 0],
     [0, 1],
@@ -146,6 +158,7 @@ test('runs ordered Choice, Noul and Score questions with pinned scoring and requ
     answerEntries: [string, unknown][];
     answers: {route: ChoiceAnswer; truth: NoulAnswer; severity: ScoreAnswer};
     usage: {input_tokens: number};
+    inputTruncation?: unknown;
   };
   const route = result.answers.route;
   const truth = result.answers.truth;
@@ -165,6 +178,7 @@ test('runs ordered Choice, Noul and Score questions with pinned scoring and requ
     route.probabilityEntries.map(([key]) => key),
     ['billing', 'support']
   );
+  assert.equal(result.inputTruncation, undefined);
   assert.ok(Math.abs((route.probabilities.billing ?? Number.NaN) - expectedProbability) < 1e-6);
   assert.ok(Math.abs(truth.noul - expectedProbability) < 1e-6);
   assert.deepEqual(
@@ -173,8 +187,8 @@ test('runs ordered Choice, Noul and Score questions with pinned scoring and requ
   );
   assert.deepEqual(severity.legend, {0: 'low', 1: 'middle', 2: 'high'});
   assert.ok(Math.abs(severity.score - 1.5 * (1 - expectedLowProbability)) < 1e-6);
-  assert.match(calls[1]!.prompt, /billing: Billing request/);
-  assert.match(calls[2]!.prompt, /support: Product support/);
+  assert.match(calls[3]!.prompt, /billing: Billing request/);
+  assert.match(calls[4]!.prompt, /support: Product support/);
   assert.ok(calls.every(({image}) => image.length === 0));
   assert.ok(calls.every(({attentionMask, inputIds}) => attentionMask.length === inputIds.length));
   assert.equal(
@@ -212,6 +226,129 @@ test('decide exposes the same pinned native answer semantics', async () => {
   await session.dispose();
 });
 
+test('reuses candidate embeddings across calls and counts only tokens embedded on the current call', async () => {
+  const calls: number[][] = [];
+  const tokenizer = charTokenizer();
+  const session = createKananaDecisionSession({
+    tokenizer,
+    infer(input: KananaDecisionInferenceInput) {
+      calls.push(Array.from(input.inputIds));
+      return hiddenState(input.inputIds, [1, 0]);
+    }
+  });
+  const request = {
+    state: 'Reuse candidate embeddings.',
+    questions: {
+      route: {
+        type: 'choice',
+        criteria: new Map([
+          ['first', 'First candidate'],
+          ['second', 'Second candidate']
+        ])
+      }
+    }
+  };
+
+  const first = (await session.systemOne(request)) as {usage: {input_tokens: number}};
+  const firstCallCount = calls.length;
+  const second = (await session.systemOne(request)) as {usage: {input_tokens: number}};
+
+  assert.equal(firstCallCount, 3);
+  assert.equal(calls.length, firstCallCount + 1);
+  assert.equal(
+    first.usage.input_tokens,
+    calls.slice(0, firstCallCount).reduce((total, ids) => total + ids.length, 0)
+  );
+  assert.equal(second.usage.input_tokens, calls.at(-1)!.length);
+  await session.dispose();
+});
+
+test('deduplicates candidate token IDs across questions while preserving query order and usage', async () => {
+  const calls: number[][] = [];
+  const tokenizer = charTokenizer();
+  const criteria = new Map([
+    ['yes', 'Yes'],
+    ['no', 'No']
+  ]);
+  const session = createKananaDecisionSession({
+    tokenizer,
+    infer(input: KananaDecisionInferenceInput) {
+      calls.push(Array.from(input.inputIds));
+      return hiddenState(input.inputIds, [1, 0]);
+    }
+  });
+  const result = (await session.systemOne({
+    state: 'Two questions use the same candidate documents.',
+    questions: new Map([
+      ['first', {type: 'choice', criteria}],
+      ['second', {type: 'choice', criteria: new Map(criteria)}]
+    ])
+  })) as {answerEntries: [string, unknown][]; usage: {input_tokens: number}};
+
+  assert.deepEqual(
+    result.answerEntries.map(([question]) => question),
+    ['first', 'second']
+  );
+  assert.equal(calls.length, 4);
+  assert.equal(
+    result.usage.input_tokens,
+    calls.reduce((total, ids) => total + ids.length, 0)
+  );
+  await session.dispose();
+});
+
+test('keeps the most recently used 4096 candidate embeddings and evicts the least recent', async () => {
+  const calls: number[][] = [];
+  const tokenizer = charTokenizer();
+  const session = createKananaDecisionSession({
+    tokenizer,
+    infer(input: KananaDecisionInferenceInput) {
+      calls.push(Array.from(input.inputIds));
+      return hiddenState(input.inputIds, [1, 0]);
+    }
+  });
+  const criteria = new Map(
+    Array.from({length: 4096}, (_, index) => {
+      const label = `candidate-${String(index).padStart(4, '0')}`;
+      return [label, `Description ${String(index).padStart(4, '0')}`] as const;
+    })
+  );
+  const first = (await session.systemOne({
+    state: 'Fill candidate cache.',
+    questions: {large: {type: 'choice', criteria}}
+  })) as {usage: {input_tokens: number}};
+  const firstCandidate = calls[1]!;
+  const secondCandidate = calls[2]!;
+  assert.equal(calls.length, 4097);
+  assert.equal(
+    first.usage.input_tokens,
+    calls.reduce((total, ids) => total + ids.length, 0)
+  );
+
+  const stableCandidate = new Map([['candidate-0000', 'Description 0000']]);
+  await session.systemOne({
+    state: 'Promote the oldest candidate, then insert a new candidate.',
+    questions: new Map([
+      ['promote', {type: 'choice', criteria: stableCandidate}],
+      ['insert', {type: 'choice', criteria: new Map([['candidate-new', 'Description new']])}]
+    ])
+  });
+  const afterPromotion = calls.length;
+  await session.systemOne({
+    state: 'The least recent candidate should be absent.',
+    questions: new Map([
+      ['retained', {type: 'choice', criteria: stableCandidate}],
+      ['evicted', {type: 'choice', criteria: new Map([['candidate-0001', 'Description 0001']])}]
+    ])
+  });
+
+  assert.equal(afterPromotion, 4100);
+  assert.equal(calls.length, afterPromotion + 3);
+  assert.deepEqual(calls.at(-1), secondCandidate);
+  assert.notDeepEqual(calls.at(-1), firstCandidate);
+  await session.dispose();
+});
+
 test('passes original image sources in prompt order and expands their merged image token grids', async () => {
   const {calls, tokenizer, infer} = vectorInference([
     [1, 0],
@@ -219,6 +356,7 @@ test('passes original image sources in prompt order and expands their merged ima
     [0, 1]
   ]);
   const grids: [unknown, number][] = [];
+  const encodedImages: unknown[][] = [];
   const images = [new Blob(['first']), new Blob(['second'])];
   const session = createKananaDecisionSession({
     tokenizer,
@@ -226,6 +364,14 @@ test('passes original image sources in prompt order and expands their merged ima
     imageTokenThw(image: unknown, index: number) {
       grids.push([image, index]);
       return index === 0 ? [1, 1, 1] : [1, 1, 2];
+    },
+    prepareImageEmbeddings(sources: readonly unknown[], imageTokenThw: readonly (readonly [number, number, number])[]) {
+      encodedImages.push([...sources]);
+      assert.deepEqual(imageTokenThw, [
+        [1, 1, 1],
+        [1, 1, 2]
+      ]);
+      return {shape: [3, 2_560], values: new Float32Array(3 * 2_560)};
     }
   });
   const result = (await session.systemOne({
@@ -248,13 +394,74 @@ test('passes original image sources in prompt order and expands their merged ima
     [images[0], 0],
     [images[1], 1]
   ]);
+  assert.deepEqual(encodedImages, [images]);
+  assert.deepEqual(calls[0]!.imageEmbeddings.shape, [3, 2_560]);
   assert.equal(calls[0]!.image[0], images[0]);
   assert.equal(calls[0]!.image[1], images[1]);
+  assert.deepEqual(calls[0]!.imageTokenThw, [
+    [1, 1, 1],
+    [1, 1, 2]
+  ]);
+  assert.deepEqual(
+    [...calls[0]!.imagePositions],
+    [...calls[0]!.inputIds].flatMap((id, index) => (id === KANANA_IMAGE_TOKEN_ID ? [index] : []))
+  );
+  assert.equal(calls[0]!.positionIds.length, calls[0]!.inputIds.length * 4);
   assert.equal((calls[0]!.prompt.match(/<\|image_pad\|>/g) ?? []).length, 3);
   assert.deepEqual(
     calls.slice(1).map(({image}) => image),
     [[], []]
   );
+  assert.ok(calls.slice(1).every(({imageEmbeddings}) => imageEmbeddings.shape[0] === 0));
+  await session.dispose();
+});
+
+test('forwards the active request signal to image grid resolution', async () => {
+  const {calls, tokenizer, infer} = vectorInference([
+    [1, 0],
+    [0, 1]
+  ]);
+  const controller = new AbortController();
+  const reason = new Error('image request cancelled');
+  const image = new Blob(['image']);
+  let receivedSignal: AbortSignal | undefined;
+  const session = createKananaDecisionSession({
+    tokenizer,
+    infer,
+    imageTokenThw(_source: unknown, _index: number, signal?: AbortSignal) {
+      receivedSignal = signal;
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), {once: true});
+      });
+    }
+  });
+  const request = session.systemOne(
+    {
+      state: 'Look at this image.',
+      images: [image],
+      questions: {visible: {type: 'noul', instructions: 'Is anything visible?'}}
+    },
+    {signal: controller.signal}
+  );
+
+  for (let attempt = 0; attempt < 10 && !receivedSignal; attempt++)
+    await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(receivedSignal, controller.signal);
+  controller.abort(reason);
+  await assert.rejects(request, (error: unknown) => error === reason);
+  assert.equal(calls.length, 0);
+  await session.dispose();
+});
+
+test('rejects a request maxLength above the pinned model limit before inference', async () => {
+  const {calls, tokenizer, infer} = vectorInference([]);
+  const session = createKananaDecisionSession({tokenizer, infer});
+
+  await assert.rejects(session.systemOne(nativeRequest(), {maxLength: KANANA_MODEL_MAX_LENGTH + 1}), {
+    name: 'RangeError',
+    message: `Kanana maxLength must be a positive safe integer no greater than ${KANANA_MODEL_MAX_LENGTH}.`
+  });
+  assert.equal(calls.length, 0);
   await session.dispose();
 });
 
@@ -284,7 +491,15 @@ test('applies one configured truncation boundary to query and candidate embeddin
       }
     },
     {maxLength: 600}
-  )) as {answers: {route: ChoiceAnswer}};
+  )) as {
+    answers: {route: ChoiceAnswer};
+    inputTruncation?: {
+      truncated: true;
+      maxLength: number;
+      queryQuestionIds: string[];
+      candidateDocuments: {questionId: string; keys: string[]}[];
+    };
+  };
 
   assert.ok(calls.length === 3);
   assert.ok(calls.every(({inputIds}) => inputIds.length <= 600));
@@ -293,6 +508,12 @@ test('applies one configured truncation boundary to query and candidate embeddin
   assert.ok(!calls[1]!.prompt.includes('A'.repeat(1_000)));
   assert.ok(!calls[2]!.prompt.includes('B'.repeat(900)));
   assert.equal(result.answers.route.choice, 'first');
+  assert.deepEqual(result.inputTruncation, {
+    truncated: true,
+    maxLength: 600,
+    queryQuestionIds: ['route'],
+    candidateDocuments: [{questionId: 'route', keys: ['first', 'second']}]
+  });
   await session.dispose();
 });
 

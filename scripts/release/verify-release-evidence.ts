@@ -21,6 +21,16 @@ import {
   type ExpandedInferenceFixture,
   type ExpandedInferencePolicy
 } from '../../tests/browser/kev06-expanded-inference.ts';
+import {
+  validateKananaEvidencePolicy,
+  validateKananaManifestBytes,
+  validateKananaPlaywrightReport,
+  verifyKananaTvmBuildEvidence,
+  type KananaEvidencePolicy,
+  type KananaReleaseEvidenceInputs,
+  type KananaVerificationContext
+} from './kanana-release-evidence.ts';
+export type {KananaReleaseEvidenceInputs} from './kanana-release-evidence.ts';
 
 type AnyRecord = Record<string, any>;
 type RequiredFiles = string[];
@@ -80,7 +90,7 @@ interface ArchiveManifestEvidence {
   files: Record<string, AssetMetadata>;
 }
 
-interface ArchiveInfo {
+export interface ArchiveInfo {
   archivePath: string;
   archiveSha256: string;
   installedRoot: string;
@@ -183,7 +193,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(process.env.WEB_DECISION_WORKSPACE_ROOT ?? resolve(SCRIPT_DIRECTORY, '../..'));
 const RELEASE_SCRIPT_DIRECTORY = join(WORKSPACE_ROOT, 'scripts/release');
 const POLICY_PATH = join(RELEASE_SCRIPT_DIRECTORY, 'release-evidence-policy.json');
-export const RELEASE_EVIDENCE_POLICY_SHA256 = 'e9cc0f4ed17d22485057c3b213f6c8ba7694c94c95956d3afcb55440fe04d4bc';
+export const RELEASE_EVIDENCE_POLICY_SHA256 = '5182279258cb72d8015e52685f0fababe417c9db8e15f1a4e60bf2ce0e37ef4a';
 export const BASELINE_REFERENCE = Object.freeze({
   packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
   fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',
@@ -323,14 +333,31 @@ export function validatePolicyBytes(bytes: Buffer, expectedSha256: string): Evid
   return validatePolicy(JSON.parse(bytes.toString('utf8')));
 }
 
-async function loadTrustedPolicy(workspaceRoot: string): Promise<EvidencePolicy> {
+async function readTrustedPolicyBytes(workspaceRoot: string): Promise<Buffer> {
   const policyPath = resolve(workspaceRoot, relative(WORKSPACE_ROOT, POLICY_PATH));
   const bytes = await readFile(policyPath);
   const relativePolicyPath = relative(workspaceRoot, policyPath).split(sep).join('/');
   execFileSync('git', ['ls-files', '--error-unmatch', relativePolicyPath], {cwd: workspaceRoot, stdio: 'ignore'});
   const committed = execFileSync('git', ['show', `HEAD:${relativePolicyPath}`], {cwd: workspaceRoot});
   assert.deepEqual(bytes, committed, 'Release evidence policy must match the committed version.');
-  return validatePolicyBytes(bytes, RELEASE_EVIDENCE_POLICY_SHA256);
+  return bytes;
+}
+
+async function loadTrustedPolicy(workspaceRoot: string): Promise<EvidencePolicy> {
+  return validatePolicyBytes(await readTrustedPolicyBytes(workspaceRoot), RELEASE_EVIDENCE_POLICY_SHA256);
+}
+
+async function loadTrustedKananaPolicy(workspaceRoot: string): Promise<KananaEvidencePolicy> {
+  const bytes = await readTrustedPolicyBytes(workspaceRoot);
+  validatePolicyBytes(bytes, RELEASE_EVIDENCE_POLICY_SHA256);
+  return validateKananaEvidencePolicy(JSON.parse(bytes.toString('utf8')).kanana);
+}
+
+async function loadCurrentKananaPolicy(workspaceRoot: string): Promise<KananaEvidencePolicy> {
+  const policyPath = resolve(workspaceRoot, relative(WORKSPACE_ROOT, POLICY_PATH));
+  const bytes = await readFile(policyPath);
+  validatePolicyBytes(bytes, RELEASE_EVIDENCE_POLICY_SHA256);
+  return validateKananaEvidencePolicy(JSON.parse(bytes.toString('utf8')).kanana);
 }
 
 function assertCommittedCatalogSources(workspaceRoot: string): void {
@@ -915,6 +942,33 @@ export async function collectReleaseEvidenceInputsForTestFixture({
   );
 }
 
+export async function collectKananaReleaseEvidenceInputs({
+  archivePath,
+  installedPackagePath,
+  workspaceRoot = WORKSPACE_ROOT,
+  localCandidate = false
+}: {
+  archivePath: string;
+  installedPackagePath: string;
+  workspaceRoot?: string;
+  localCandidate?: boolean;
+}): Promise<KananaReleaseEvidenceInputs> {
+  const root = resolve(workspaceRoot);
+  const policy = localCandidate ? await loadCurrentKananaPolicy(root) : await loadTrustedKananaPolicy(root);
+  const archive = await verifyArchiveInstall(archivePath, installedPackagePath);
+  assert.equal(archive.archiveSha256, policy.archive.sha256, 'Kanana browser tests require the pinned npm archive.');
+  assert.equal(archive.packageName, policy.archive.packageName, 'Kanana archive package name differs from its pin.');
+  assert.equal(archive.packageVersion, policy.archive.packageVersion, 'Kanana browser tests require package 0.4.0.');
+  assert.ok(archive.archiveFiles.includes(policy.model.manifestPath), 'Kanana archive is missing its pinned manifest.');
+  const manifestBytes = await readFile(join(archive.installedRoot, ...policy.model.manifestPath.split('/')));
+  const validated = validateKananaManifestBytes(manifestBytes, policy);
+  return {
+    archive,
+    policy,
+    manifest: {path: policy.model.manifestPath, ...validated}
+  };
+}
+
 function collectPlaywrightTests(
   suites: PlaywrightSuite[] | undefined,
   result: PlaywrightTestItem[] = []
@@ -1379,6 +1433,80 @@ export function validatePlaywrightReport(
   return {modelCount: models.length, browserCount: browsers.length, caseCount: cases.size};
 }
 
+interface KananaReleaseEvidenceOptions {
+  archivePath: string;
+  installedPackagePath: string;
+  playwrightReportPath: string;
+  buildEvidencePath: string;
+  workspaceRoot?: string;
+}
+
+export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidenceOptions): Promise<AnyRecord> {
+  const workspaceRoot = resolve(options.workspaceRoot ?? WORKSPACE_ROOT);
+  const policy = await loadTrustedKananaPolicy(workspaceRoot);
+  const fixture = await readCommittedFixture(
+    workspaceRoot,
+    policy.referenceFixture.path,
+    policy.referenceFixture.sha256
+  );
+  assert.equal(fixture.modelId, `${policy.model.repository}`, 'Kanana text fixture model ID differs from policy.');
+  assert.equal(fixture.revision, policy.model.revision, 'Kanana text fixture revision differs from policy.');
+  assert.equal(
+    fixture.checkpointSha256,
+    policy.model.checkpointSha256,
+    'Kanana text fixture checkpoint pin differs from policy.'
+  );
+
+  const inputs = await collectKananaReleaseEvidenceInputs({
+    archivePath: options.archivePath,
+    installedPackagePath: options.installedPackagePath,
+    workspaceRoot
+  });
+  const buildEvidencePath = resolve(options.buildEvidencePath);
+  const builds = await verifyKananaTvmBuildEvidence(
+    buildEvidencePath,
+    inputs,
+    join(workspaceRoot, 'packages/web-decision')
+  );
+  const report = JSON.parse(await readFile(options.playwrightReportPath, 'utf8')) as PlaywrightReport;
+  const browserResults = validateKananaPlaywrightReport(report, {
+    archive: inputs.archive,
+    manifest: inputs.manifest,
+    policy,
+    referenceFixture: fixture as KananaVerificationContext['referenceFixture'],
+    workspaceRoot
+  });
+  const finalArchive = await verifyArchiveInstall(options.archivePath, options.installedPackagePath);
+  assert.equal(finalArchive.archiveSha256, inputs.archive.archiveSha256, 'Kanana archive changed during verification.');
+  assert.equal(
+    finalArchive.packageTreeSha256,
+    inputs.archive.packageTreeSha256,
+    'Kanana installed package changed during verification.'
+  );
+  assert.equal(
+    finalArchive.bundleSha256,
+    inputs.archive.bundleSha256,
+    'Kanana installed bundle changed during verification.'
+  );
+  assert.deepEqual(
+    await verifyKananaTvmBuildEvidence(buildEvidencePath, inputs, join(workspaceRoot, 'packages/web-decision')),
+    builds,
+    'Kanana TVM build evidence changed during verification.'
+  );
+  return {
+    archiveSha256: inputs.archive.archiveSha256,
+    packageTreeSha256: inputs.archive.packageTreeSha256,
+    bundleSha256: inputs.archive.bundleSha256,
+    packageName: inputs.archive.packageName,
+    packageVersion: inputs.archive.packageVersion,
+    modelId: policy.model.modelId,
+    manifestSha256: inputs.manifest.manifestSha256,
+    artifacts: inputs.manifest.files,
+    builds,
+    browserResults
+  };
+}
+
 async function verifyReleaseArtifactsInternal(
   {
     archivePath,
@@ -1518,8 +1646,39 @@ function parseArguments(
   };
 }
 
+function parseKananaArguments(args: string[]): KananaReleaseEvidenceOptions {
+  const values = new Map<string, string>();
+  for (let index = 0; index < args.length; index += 2) {
+    const key = args[index];
+    const value = args[index + 1];
+    fail(typeof key === 'string', 'Missing option name.');
+    fail(
+      ['--archive', '--installed-package', '--playwright-report', '--build-evidence'].includes(key),
+      `Unknown Kanana verification option: ${key}`
+    );
+    fail(typeof value === 'string' && !value.startsWith('--'), `Missing value for ${key}.`);
+    fail(!values.has(key), `Duplicate option: ${key}`);
+    values.set(key, value);
+  }
+  const requiredValue = (key: string): string => {
+    const value = values.get(key);
+    fail(value, `Required option is missing: ${key}`);
+    return value;
+  };
+  return {
+    archivePath: requiredValue('--archive'),
+    installedPackagePath: requiredValue('--installed-package'),
+    playwrightReportPath: requiredValue('--playwright-report'),
+    buildEvidencePath: requiredValue('--build-evidence')
+  };
+}
+
 async function main() {
-  const result = await verifyReleaseEvidence(parseArguments(process.argv.slice(2)));
+  const args = process.argv.slice(2);
+  const result =
+    args[0] === '--kanana'
+      ? await verifyKananaReleaseEvidence(parseKananaArguments(args.slice(1)))
+      : await verifyReleaseEvidence(parseArguments(args));
   console.log(JSON.stringify(result, null, 2));
 }
 

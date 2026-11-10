@@ -3,7 +3,7 @@ import {readFileSync, realpathSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {expect, test} from '@playwright/test';
-import type {DecisionRequest, DecisionResult, ModelProgress} from 'web-decision';
+import type {DecisionModel, DecisionRequest, DecisionResult, ModelProgress} from 'web-decision';
 import type {LoadedKev06DecisionModel, KevSystemOneResult} from '../../packages/web-decision/src/index.d.ts';
 import {
   BASELINE_EXPECTED_OUTPUT,
@@ -485,7 +485,7 @@ async function runOnlineInference({
   }
 
   async function runDecisionCases(
-    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    activeModel: DecisionModel,
     cases: BrowserOnlineOptions['representativeCases'],
     reportProgress: (stage: string, details?: Record<string, unknown>) => void
   ): Promise<{runs: DecisionInferenceObservation[]; baselineAnswer: Answer}> {
@@ -521,7 +521,7 @@ async function runOnlineInference({
   }
 
   async function runTypedProbe(
-    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    activeModel: DecisionModel,
     probe: BrowserOnlineOptions['typedProbe'],
     reportProgress: (stage: string, details?: Record<string, unknown>) => void
   ): Promise<ExpandedInferenceObservation['typedSystemOne']> {
@@ -541,7 +541,7 @@ async function runOnlineInference({
   }
 
   async function runAggregateResourceProbe(
-    activeModel: Awaited<ReturnType<typeof window.webDecision.loadDecisionModel>>,
+    activeModel: DecisionModel,
     branchTokenTargets: readonly number[],
     reportProgress: (stage: string, details?: Record<string, unknown>) => void
   ): Promise<AggregateResourceObservation> {

@@ -8,6 +8,64 @@ The expected model IDs and artifact digests come from the committed `packages/we
 
 The provenance gate checks committed evidence hashes and binds any declared upstream source to the artifact lock. It does not independently authenticate the reviewer, verify remote source claims, or prove that the reviewed documents are true; those remain human review responsibilities.
 
+## Kanana exact-package GPU evidence
+
+The Kanana gate is separate from the Kev matrix and accepts only the npm-packed `web-decision@0.4.0` archive pinned in [release-evidence-policy.json](./release-evidence-policy.json). The policy binds the archive SHA-256, Kanana static manifest, checkpoint revision and digest, all five manifest file hashes, and the text reference fixture. The text test checks its recorded TVM WebGPU output against the pinned Python/PyTorch fixture. The image test records the actual synthetic PNG digest and requires the selected `rectangle` option with normalized probabilities. Every record carries the installed archive and entrypoint digests, exact text and vision Wasm hashes, the `navigator.gpu.requestAdapter().info` observation, adapter features and limits, and the model output. The gate requires the three policy-pinned Chromium cases to pass once, with no skip, failure, retry, or omission.
+
+The offline case loads the text model with `cache: true`, completes a reference inference, then loads with `offline: true` while Playwright routes abort requests. The record must show positive priming bytes, no attempted requests, and matching online/offline outputs. All three GPU tests remain opt-in.
+
+The Kanana gate also requires independent rebuild evidence for both packaged TVM modules: `kanana-text-model.wasm` and `kanana-vision-model.wasm`. Each evidence entry points to a successful `web-decision-tvm-build-v1` report and a rebuilt WASM inside a build directory outside both `packages/web-decision` and the installed archive. The verifier checks each artifact's byte count and SHA-256 against the archive-pinned manifest, checks the report's TVM version and output hash, and requires its repository, revision, checkpoint digest, graph name, `buildBackend: native-tvm`, `weightSource: pinned-safetensors`, and `onnxImportOrExportUsed: false` fields to match the Kanana pins. One record per artifact is required. Direct package paths and package hardlinks are rejected. Separate byte-for-byte copies cannot be distinguished from independent deterministic build outputs by hashes alone; retain the underlying build logs and review them with the report.
+
+For a local exact-archive inference run before the policy is committed, set `WEB_DECISION_KANANA_LOCAL_GPU=1`. This mode still checks the current policy bytes against the verifier pin, verifies the exact archive against its installed package, and runs the snapshot, GPU, and inference assertions. By default it skips structured evidence emission. Set `WEB_DECISION_KANANA_EMIT_EVIDENCE=1` to emit structured candidate records that can be checked against the current policy; these records still cannot pass production release verification until the policy and provenance inputs match committed bytes. For strict release evidence, leave both local variables unset and set `WEB_DECISION_KANANA_CURATED_REAL_GPU=1`.
+
+```sh
+export WEB_DECISION_RELEASE_ARCHIVE=/release/web-decision-0.4.0.tgz
+export WEB_DECISION_RELEASE_PACKAGE_DIR=/release/consumer/node_modules/web-decision
+export WEB_DECISION_INSTALLED_BUNDLE=/release/consumer/node_modules/web-decision/dist/index.js
+export WEB_DECISION_REAL_GPU=1
+export WEB_DECISION_KANANA_CURATED_REAL_GPU=1
+export WEB_DECISION_BROWSER_NAME=chromium
+export WEB_DECISION_BROWSER_CHANNEL=chrome
+export PLAYWRIGHT_JSON_OUTPUT_NAME=/release/kanana-playwright-report.json
+export WEB_DECISION_TVM_BUILD_EVIDENCE=/release/kanana-tvm-build-evidence.json
+pnpm exec playwright test \
+  tests/browser/kanana-curated-text-real-webgpu.spec.ts \
+  tests/browser/kanana-curated-real-webgpu.spec.ts \
+  tests/browser/kanana-curated-offline-text-real-webgpu.spec.ts \
+  --reporter=json
+node --import tsx scripts/release/verify-release-evidence.ts --kanana \
+  --archive "$WEB_DECISION_RELEASE_ARCHIVE" \
+  --installed-package "$WEB_DECISION_RELEASE_PACKAGE_DIR" \
+  --playwright-report "$PLAYWRIGHT_JSON_OUTPUT_NAME" \
+  --build-evidence "$WEB_DECISION_TVM_BUILD_EVIDENCE"
+```
+
+The Kanana build-evidence file has one entry for each packaged WASM. `buildRoot` is resolved relative to the evidence file; `wasm` and `report` are resolved inside that root. Keep the independent compiler outputs and reports outside the source and installed package trees. The following is the record shape; replace paths and report values with those emitted by the independent builds:
+
+```json
+{
+  "schemaVersion": 1,
+  "builds": [
+    {
+      "modelId": "kanana-2-v-decide-3b-2611",
+      "artifact": "kanana-text-model.wasm",
+      "buildRoot": "kanana-build/text",
+      "wasm": "kanana-text-model.wasm",
+      "report": "release-build-report.json"
+    },
+    {
+      "modelId": "kanana-2-v-decide-3b-2611",
+      "artifact": "kanana-vision-model.wasm",
+      "buildRoot": "kanana-build/vision",
+      "wasm": "kanana-vision-model.wasm",
+      "report": "release-build-report.json"
+    }
+  ]
+}
+```
+
+Each report uses `evidenceSchema: web-decision-tvm-build-v1` and records `modelId`, `artifact`, `wasm`, `status: success`, `target: webgpu / wasm32`, `tvmVersion`, `embeddedBuildRoot: false`, `wasmBytes`, and `wasmSha256`. It also records the pinned `repository`, `modelRevision`, `checkpointSha256`, `graph` (`text` or `vision`), `buildBackend: native-tvm`, `weightSource: pinned-safetensors`, and `onnxImportOrExportUsed: false`. Build reports and WASM bytes are checked twice during release verification to detect changes during the run.
+
 The archive must be an npm tarball with only regular files. The verifier compares every archive member byte-for-byte with the installed package directory, computes the archive SHA-256, package tree digest, and public bundle digest, then checks the static manifest at the path pinned in `artifacts.lock.json`. The manifest's complete `files` map is checked against the committed artifact lock. The public `assets.requiredFiles` list is derived as `['manifest.json', ...Object.keys(manifest.files)]`; the verifier derives the same full set from the committed lock and rejects a separately maintained source list. The bundled runtime files are a subset of this complete list and live in the lazy browser chunk. The record carries SHA-256 digests of the canonical installed package and entrypoint paths, not personal absolute paths; the gate recomputes both from its CLI input.
 
 Nine shard files are reconstructed by the browser loader from the pinned upstream source and are not separate tarball members. For that reason, the browser record must include a `verifiedFiles` item for every manifest entry. The browser spec independently reads the complete CacheStorage entries after a successful load, measures their byte lengths, and computes SHA-256 values. The gate compares that measured list against all 14 entries in the archive-pinned manifest. It also requires online inference, an offline repeat with identical results and zero network attempts, and matches against both the pinned Windows baseline fixture and the one-input upstream CPU reference fixture.
@@ -38,6 +96,16 @@ pnpm exec playwright test tests/browser/kev06-default-source-real-webgpu.spec.ts
 `WEB_DECISION_KEV06_DEFAULT_GPU=1` is required to enable this model test; without it, Playwright marks the case skipped. `WEB_DECISION_REAL_GPU=1` launches Chromium with the real-GPU settings. On Windows, the example selects installed Chrome; use the browser channel that matches the host being recorded.
 
 The Playwright project must be `chromium`. Its report must contain exactly one passing execution per curated model, with no skip, retry, flaky result, global error, or unrelated test. The browser spec must load the package at `WEB_DECISION_RELEASE_PACKAGE_DIR`.
+
+For Kanana, invoke the separate mode with the same exact archive, installed package, Playwright report, and required rebuild evidence:
+
+```powershell
+./scripts/release/run-release-evidence.ps1 -Mode verify-kanana `
+  -Archive $env:WEB_DECISION_RELEASE_ARCHIVE `
+  -InstalledPackage $env:WEB_DECISION_RELEASE_PACKAGE_DIR `
+  -PlaywrightReport $env:PLAYWRIGHT_JSON_OUTPUT_NAME `
+  -BuildEvidence $env:WEB_DECISION_TVM_BUILD_EVIDENCE
+```
 
 Supply a JSON build-evidence file with one entry for every `.wasm` in every curated model manifest. `buildRoot` is absolute or relative to the evidence file; `wasm` and `report` are resolved from that root. Both files must be inside the build root and outside the source and installed packages. Build the artifact independently from the pinned source and toolchain; do not copy the packaged WASM as a substitute. For the current build script, an entry has this shape:
 

@@ -1,0 +1,12 @@
+diff --git a/src/backend/webgpu/codegen/codegen_webgpu.cc b/src/backend/webgpu/codegen/codegen_webgpu.cc
+--- a/src/backend/webgpu/codegen/codegen_webgpu.cc
++++ b/src/backend/webgpu/codegen/codegen_webgpu.cc
+@@ -335,7 +335,7 @@
+                << "  @builtin(local_invocation_id) threadIdx : vec3<u32>\n"
+                << ") {\n";
+   // skip out of bound grids
+-  this->stream << "  if (blockIdx.z * gridDim.x + blockIdx.x > "  // NOLINT(*)
++  this->stream << "  if (blockIdx.z * gridDim.x + blockIdx.x >= "  // NOLINT(*)
+                << val_pod_args << "." << packGridDimX << ") { return; }\n";
+   // the function scope.
+   int func_scope = this->BeginScope();

@@ -4,18 +4,18 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import {KANANA_FILES} from '../src/kanana/contract.mjs';
-import {prepareKananaTokenizerTestAssets} from '../../../scripts/kanana/prepare-tokenizer-test-assets.mjs';
+import {prepareKananaTokenizerTestAssets} from '../../../scripts/kanana/prepare-tokenizer-test-assets.mts';
 
 test('prepares only pinned Kanana source assets and exports their directory', async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), 'kanana-test-support-'));
   try {
     const envFile = join(tempDirectory, 'github-env');
     await writeFile(envFile, 'EXISTING_VALUE=kept\n');
-    const reads = [];
-    const openSource = async (options) => {
+    const reads: string[] = [];
+    const openSource = async (options: {cacheEnabled: boolean}) => {
       assert.deepEqual(options, {cacheEnabled: false});
       return {
-        async read(name) {
+        async read(name: keyof typeof KANANA_FILES) {
           reads.push(name);
           return new TextEncoder().encode(`verified:${name}`).buffer;
         }
@@ -42,7 +42,7 @@ test('removes partial test assets when a pinned source read fails', async () => 
     const envFile = join(tempDirectory, 'github-env');
     await writeFile(envFile, '');
     const openSource = async () => ({
-      async read(name) {
+      async read(name: keyof typeof KANANA_FILES) {
         if (name === Object.keys(KANANA_FILES)[1]) throw new Error('asset fetch failed');
         return new TextEncoder().encode(`verified:${name}`).buffer;
       }

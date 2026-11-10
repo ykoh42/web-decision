@@ -1,4 +1,4 @@
-import type {ModelId} from '../catalog/types.generated.js';
+import type {CatalogModelLimit, ModelId} from '../catalog/types.generated.js';
 
 export type {ModelId} from '../catalog/types.generated.js';
 
@@ -24,16 +24,26 @@ export interface ModelProgress {
   readonly phase?: 'bundled-assets' | 'upstream-source' | 'asset-verification';
 }
 
-export interface LoadOptions {
+export interface CommonLoadOptions {
   readonly modelId: ModelId;
   readonly cache?: boolean;
   readonly offline?: boolean;
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: ModelProgress) => void;
+}
+
+export interface KevLoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
+  readonly modelId: 'kev-0.6b-q4f16';
   readonly maxPrefetchBytes?: number;
   readonly maxInputTokens?: number;
   readonly maxInputCharacters?: number;
 }
+
+export interface KananaLoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
+  readonly modelId: 'kanana-2-v-decide-3b-2611';
+}
+
+export type LoadOptions = KevLoadOptions | KananaLoadOptions;
 
 export interface DecisionQuestion {
   readonly instructions: string;
@@ -131,25 +141,20 @@ export interface ModelDescription {
     textChoice: Readonly<{
       status: 'implemented';
       abstention: string;
-      limits: readonly Readonly<{
-        resource: 'tokens' | 'options' | 'questions';
-        scope: 'state' | 'question' | 'request';
-        min?: number;
-        max?: number;
-        description?: string;
-      }>[];
+      limits: readonly CatalogModelLimit[];
       handling: string;
       tokenCount: string;
       score: Readonly<Record<string, unknown>>;
     }>;
     typedTextQuestionTypes?: readonly string[];
-    imageChoice?: Readonly<{status: 'not-implemented'}>;
+    imageChoice?: Readonly<{status: 'implemented' | 'not-implemented'; limits?: readonly CatalogModelLimit[]}>;
     rating?: Readonly<{status: 'not-implemented'}>;
   }>;
   readonly verification: Readonly<Record<string, string>>;
 }
 
 export interface DecisionModel {
+  readonly modelId: 'kev-0.6b-q4f16';
   readonly description: ModelDescription;
   decide(request: DecisionRequest, options?: {signal?: AbortSignal}): Promise<DecisionResult>;
   systemOne(
@@ -161,7 +166,116 @@ export interface DecisionModel {
   dispose(): Promise<void>;
 }
 
+export type KananaValue =
+  | null
+  | boolean
+  | number
+  | bigint
+  | KananaFloat
+  | string
+  | readonly KananaValue[]
+  | Readonly<{[key: string]: KananaValue}>
+  | Map<string, KananaValue>;
+
+export declare class KananaFloat {
+  private readonly kananaFloatBrand;
+  readonly value: number;
+  constructor(value: number);
+}
+
+export declare function kananaFloat(value: number): KananaFloat;
+
+export type KananaImageSource = string | URL | Blob | File | HTMLImageElement;
+
+export type KananaMessagePart =
+  | Readonly<{type: 'text' | 'input_text'; text: string}>
+  | Readonly<{type: 'image'; image: KananaImageSource}>
+  | Readonly<{type: 'image_url'; image_url: KananaImageSource | Readonly<{url: KananaImageSource; detail?: 'auto'}>}>
+  | Readonly<Record<string, unknown>>;
+
+export interface KananaMessage {
+  readonly role: string;
+  readonly content?: string | null | readonly KananaMessagePart[];
+  readonly tool_calls?: unknown;
+  readonly function_call?: unknown;
+  readonly [key: string]: unknown;
+}
+
+export type KananaQuestion =
+  | Readonly<{
+      type: 'choice';
+      instructions?: KananaValue;
+      criteria: Readonly<Record<string, KananaValue>> | Map<string, KananaValue>;
+    }>
+  | Readonly<{type: 'score'; instructions?: KananaValue; criteria: readonly KananaValue[]}>
+  | Readonly<{
+      type: 'noul';
+      instructions?: KananaValue;
+      criteria?: Readonly<Record<'false' | 'true', KananaValue>> | Map<'false' | 'true', KananaValue> | null;
+    }>;
+
+export interface KananaDecisionRequest {
+  readonly state?: KananaValue | readonly KananaMessage[];
+  readonly stateFormat?: 'text' | 'json' | 'messages';
+  readonly questions: Readonly<Record<string, KananaQuestion>> | Map<string, KananaQuestion>;
+  readonly images?: readonly KananaImageSource[];
+  readonly temperature?: number;
+  readonly querySchemas?: Readonly<Record<string, KananaQuestion | null>> | Map<string, KananaQuestion | null>;
+}
+
+export interface KananaRequestOptions {
+  readonly signal?: AbortSignal;
+  readonly maxLength?: number;
+  readonly truncateInputs?: boolean;
+  readonly truncateQuestionCandidates?: boolean;
+  readonly temperature?: number;
+}
+
+export type KananaAnswer =
+  | Readonly<{
+      type: 'choice';
+      choice: string;
+      confidence: number;
+      probabilities: Readonly<Record<string, number>>;
+      probabilityEntries: readonly (readonly [key: string, probability: number])[];
+    }>
+  | Readonly<{
+      type: 'score';
+      score: number;
+      confidence: number;
+      legend: Readonly<Record<string, KananaValue>>;
+      probabilities: Readonly<Record<string, number>>;
+      probabilityEntries: readonly (readonly [level: string, probability: number])[];
+    }>
+  | Readonly<{type: 'noul'; noul: number}>;
+
+export interface KananaDecisionResult {
+  readonly model: 'kanana-2-v-decide-3b-2611';
+  readonly answers: Readonly<Record<string, KananaAnswer>>;
+  readonly answerEntries: readonly (readonly [question: string, answer: KananaAnswer])[];
+  readonly usage: Readonly<{billing_units: number; input_tokens: number; output_tokens: 0}>;
+  readonly inputTruncation?: Readonly<{
+    truncated: true;
+    maxLength: number;
+    queryQuestionIds: readonly string[];
+    candidateDocuments: readonly Readonly<{questionId: string; keys: readonly string[]}>[];
+  }>;
+}
+
+export interface KananaDecisionModel {
+  readonly modelId: 'kanana-2-v-decide-3b-2611';
+  readonly description: ModelDescription;
+  decide(request: KananaDecisionRequest, options?: KananaRequestOptions): Promise<KananaDecisionResult>;
+  systemOne(request: KananaDecisionRequest, options?: KananaRequestOptions): Promise<KananaDecisionResult>;
+  dispose(): Promise<void>;
+}
+
+export type LoadedDecisionModel = DecisionModel | KananaDecisionModel;
+
 export function listModels(): readonly ModelDescription[];
 export function describeModel(modelId: ModelId): ModelDescription;
-export function loadDecisionModel(options: LoadOptions): Promise<DecisionModel>;
+export function loadDecisionModel(options: KevLoadOptions): Promise<DecisionModel>;
+export function loadDecisionModel(options: KananaLoadOptions): Promise<KananaDecisionModel>;
+export function loadDecisionModel(options: LoadOptions): Promise<LoadedDecisionModel>;
+export function loadDecisionModel(options: CommonLoadOptions): Promise<LoadedDecisionModel>;
 export function clearModelCache(): Promise<boolean>;

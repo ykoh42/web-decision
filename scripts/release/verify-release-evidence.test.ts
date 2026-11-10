@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
+import {copyFile, link, mkdir, mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import test from 'node:test';
@@ -20,10 +20,19 @@ import {
   validatePolicyBytes,
   verifyArchiveInstall,
   collectReleaseEvidenceInputs,
+  collectKananaReleaseEvidenceInputs,
   collectReleaseEvidenceInputsForTestFixture,
   verifyReleaseArtifactsForTestFixture,
   verifyReleaseEvidence
 } from './verify-release-evidence.ts';
+import {
+  validateKananaEvidencePolicy,
+  validateKananaManifestBytes,
+  validateKananaPlaywrightReport,
+  verifyKananaTvmBuildEvidence,
+  type KananaReleaseEvidenceInputs,
+  type KananaVerificationContext
+} from './kanana-release-evidence.ts';
 import {
   createExpandedInferenceEvidence,
   loadExpandedInferenceFixture,
@@ -440,6 +449,265 @@ function updateEvidenceRecord(report: AnyRecord, mutate: (record: AnyRecord) => 
   result.stdout[0] = `${POLICY.evidencePrefix}${JSON.stringify(record)}\n`;
 }
 
+async function makeKananaVerificationContext(): Promise<KananaVerificationContext> {
+  const policy = validateKananaEvidencePolicy(POLICY.kanana);
+  const manifestBytes = await readFile(join(WORKSPACE_ROOT, 'packages/web-decision', policy.model.manifestPath));
+  const manifest = {
+    path: policy.model.manifestPath,
+    ...validateKananaManifestBytes(manifestBytes, policy)
+  };
+  const fixtureBytes = await readFile(join(WORKSPACE_ROOT, policy.referenceFixture.path));
+  assert.equal(sha256(fixtureBytes), policy.referenceFixture.sha256);
+  const archive = {
+    archivePath: join(tmpdir(), 'pinned-web-decision-0.4.0.tgz'),
+    archiveSha256: policy.archive.sha256,
+    installedRoot: join(tmpdir(), 'pinned-web-decision-0.4.0'),
+    packageName: policy.archive.packageName,
+    packageVersion: policy.archive.packageVersion,
+    packageTreeSha256: '1'.repeat(64),
+    bundlePath: join(tmpdir(), 'pinned-web-decision-0.4.0', 'dist/index.js'),
+    bundleSha256: '2'.repeat(64),
+    installedPackagePathSha256: '3'.repeat(64),
+    entryPathSha256: '4'.repeat(64),
+    archiveFiles: [policy.model.manifestPath]
+  };
+  return {
+    archive,
+    manifest,
+    policy,
+    referenceFixture: JSON.parse(fixtureBytes.toString('utf8')),
+    workspaceRoot: WORKSPACE_ROOT
+  };
+}
+
+async function makeKananaBuildFixture() {
+  const root = await mkdtemp(join(tmpdir(), 'web-decision-kanana-build-evidence-'));
+  const installedRoot = join(root, 'installed');
+  const sourceRoot = join(root, 'source');
+  const buildRoot = join(root, 'independent-build');
+  const evidencePath = join(root, 'evidence', 'tvm-builds.json');
+  const artifactInputs = [
+    {artifact: 'kanana-text-model.wasm', graph: 'text', bytes: Buffer.from('independent text TVM build')},
+    {artifact: 'kanana-vision-model.wasm', graph: 'vision', bytes: Buffer.from('independent vision TVM build')}
+  ] as const;
+  const files: Record<string, {bytes: number; sha256: string}> = {};
+  const builds: Array<Record<string, string>> = [];
+  const reports = new Map<string, Record<string, unknown>>();
+  for (const item of artifactInputs) {
+    const packageArtifact = join(installedRoot, 'assets/kanana', item.artifact);
+    const artifactBuildRoot = join(buildRoot, item.graph);
+    const wasmPath = join(artifactBuildRoot, 'rebuilt.wasm');
+    const reportPath = join(artifactBuildRoot, 'report.json');
+    const digest = sha256(item.bytes);
+    const report = {
+      evidenceSchema: 'web-decision-tvm-build-v1',
+      modelId: 'kanana-2-v-decide-3b-2611',
+      artifact: item.artifact,
+      wasm: 'rebuilt.wasm',
+      status: 'success',
+      target: 'webgpu / wasm32',
+      tvmVersion: '0.27.0',
+      embeddedBuildRoot: false,
+      wasmBytes: item.bytes.length,
+      wasmSha256: digest,
+      repository: 'kakaocorp/kanana-2-v-decide-3b-2611',
+      modelRevision: '12820d654ed9789a0f7f48daeee1703c3483c464',
+      checkpointSha256: 'a'.repeat(64),
+      graph: item.graph,
+      buildBackend: 'native-tvm',
+      weightSource: 'pinned-safetensors',
+      onnxImportOrExportUsed: false
+    };
+    await mkdir(dirname(packageArtifact), {recursive: true});
+    await mkdir(artifactBuildRoot, {recursive: true});
+    await writeFile(packageArtifact, item.bytes);
+    await writeFile(wasmPath, item.bytes);
+    await writeFile(reportPath, JSON.stringify(report));
+    files[item.artifact] = {bytes: item.bytes.length, sha256: digest};
+    reports.set(item.artifact, report);
+    builds.push({
+      modelId: 'kanana-2-v-decide-3b-2611',
+      artifact: item.artifact,
+      buildRoot: `../independent-build/${item.graph}`,
+      wasm: 'rebuilt.wasm',
+      report: 'report.json'
+    });
+  }
+  await mkdir(sourceRoot, {recursive: true});
+  await mkdir(dirname(evidencePath), {recursive: true});
+  await writeFile(evidencePath, JSON.stringify({schemaVersion: 1, builds}));
+  const inputs = {
+    archive: {
+      archivePath: join(root, 'web-decision-0.4.0.tgz'),
+      archiveSha256: 'b'.repeat(64),
+      installedRoot,
+      packageName: 'web-decision',
+      packageVersion: '0.4.0',
+      packageTreeSha256: 'c'.repeat(64),
+      bundlePath: join(installedRoot, 'dist/index.js'),
+      bundleSha256: 'd'.repeat(64),
+      installedPackagePathSha256: 'e'.repeat(64),
+      entryPathSha256: 'f'.repeat(64),
+      archiveFiles: ['assets/kanana/manifest.json']
+    },
+    policy: {
+      model: {
+        modelId: 'kanana-2-v-decide-3b-2611',
+        repository: 'kakaocorp/kanana-2-v-decide-3b-2611',
+        revision: '12820d654ed9789a0f7f48daeee1703c3483c464',
+        checkpointSha256: 'a'.repeat(64)
+      }
+    },
+    manifest: {
+      path: 'assets/kanana/manifest.json',
+      manifest: {runtime: {tvm: '0.27.0'}},
+      files
+    }
+  } as unknown as KananaReleaseEvidenceInputs;
+  return {root, sourceRoot, installedRoot, buildRoot, evidencePath, inputs, builds, reports};
+}
+
+async function writeKananaBuildEvidence(path: string, builds: Array<Record<string, string>>): Promise<void> {
+  await writeFile(path, JSON.stringify({schemaVersion: 1, builds}));
+}
+
+function kananaResult(context: KananaVerificationContext): AnyRecord {
+  const expected = context.referenceFixture.result.answers.delivery_status;
+  if (!expected) throw new Error('Kanana reference fixture is missing delivery_status.');
+  return {
+    modelId: context.policy.model.modelId,
+    descriptionModelId: context.policy.model.modelId,
+    checkpointRevision: context.policy.model.revision,
+    checkpointSha256: context.policy.model.checkpointSha256,
+    backend: 'tvm-webgpu',
+    assetManifestSha256: context.manifest.manifestSha256,
+    choice: expected.choice,
+    confidence: expected.confidence,
+    probabilities: structuredClone(expected.probabilities),
+    probabilityEntries: Object.entries(expected.probabilities),
+    usage: {input_tokens: 10, output_tokens: 0}
+  };
+}
+
+function makeKananaEvidenceRecord(
+  context: KananaVerificationContext,
+  kind: keyof KananaVerificationContext['policy']['tests']
+): AnyRecord {
+  const {archive, manifest, policy} = context;
+  const imageProbabilities = {rectangle: 0.9, circle: 0.1};
+  const inference =
+    kind === 'image'
+      ? {
+          ...kananaResult(context),
+          answer: 'rectangle',
+          confidence: imageProbabilities.rectangle - imageProbabilities.circle,
+          probabilities: imageProbabilities,
+          probabilityEntries: Object.entries(imageProbabilities)
+        }
+      : kind === 'offline'
+        ? {online: kananaResult(context), offline: kananaResult(context)}
+        : kananaResult(context);
+  return {
+    schemaVersion: 1,
+    kind: policy.tests[kind].kind,
+    archive: {
+      sha256: archive.archiveSha256,
+      packageTreeSha256: archive.packageTreeSha256,
+      bundleSha256: archive.bundleSha256,
+      installedPackagePathSha256: archive.installedPackagePathSha256,
+      entryPathSha256: archive.entryPathSha256,
+      packageName: archive.packageName,
+      packageVersion: archive.packageVersion
+    },
+    artifact: {
+      modelId: policy.model.modelId,
+      manifestPath: manifest.path,
+      manifestRawSha256: manifest.rawSha256,
+      manifestSha256: manifest.manifestSha256,
+      filesSha256: manifest.filesSha256,
+      files: manifest.files,
+      runtimeArtifacts: policy.tests[kind].runtimeArtifacts.map((path) => ({path, ...manifest.files[path]}))
+    },
+    model: {
+      requestedId: policy.model.modelId,
+      loadedId: policy.model.modelId,
+      describedId: policy.model.modelId,
+      checkpointRevision: policy.model.revision,
+      checkpointSha256: policy.model.checkpointSha256
+    },
+    browser: {name: policy.browser.name, version: '158.0', userAgent: 'Chromium real WebGPU'},
+    gpu: {
+      api: 'webgpu',
+      isFallbackAdapter: false,
+      adapterInfo: {
+        source: 'navigator.gpu.requestAdapter() and GPUAdapterInfo',
+        value: {vendor: 'apple', architecture: 'apple-gpu', isFallbackAdapter: false}
+      },
+      features: [],
+      limits: structuredClone(policy.gpu.requiredLimits)
+    },
+    ...(kind === 'text'
+      ? {referenceFixtureSha256: policy.referenceFixture.sha256, probabilityTolerance: policy.textProbabilityTolerance}
+      : {}),
+    ...(kind === 'image'
+      ? {input: {kind: 'synthetic-canvas-v1', width: 256, height: 256, sha256: '5'.repeat(64)}}
+      : {}),
+    ...(kind === 'offline'
+      ? {
+          referenceFixtureSha256: policy.referenceFixture.sha256,
+          probabilityTolerance: policy.textProbabilityTolerance,
+          cache: {primedOnline: true, requestedOffline: true, blockedNetwork: true, fetchedRanges: 1, fetchedBytes: 5},
+          networkAttempts: []
+        }
+      : {}),
+    inference
+  };
+}
+
+function makeKananaPlaywrightReport(context: KananaVerificationContext): AnyRecord {
+  const specs = Object.entries(context.policy.tests).map(([kind, requirement]) => {
+    const record = makeKananaEvidenceRecord(context, kind as keyof KananaVerificationContext['policy']['tests']);
+    return {
+      file: requirement.file,
+      title: requirement.title,
+      tests: [
+        {
+          expectedStatus: 'passed',
+          status: 'expected',
+          projectName: context.policy.browser.project,
+          results: [
+            {
+              status: 'passed',
+              errors: [],
+              stdout: [`${context.policy.evidencePrefix}${JSON.stringify(record)}\n`]
+            }
+          ]
+        }
+      ]
+    };
+  });
+  return {
+    config: {rootDir: context.workspaceRoot},
+    errors: [],
+    stats: {expected: specs.length, skipped: 0, unexpected: 0, flaky: 0},
+    suites: [{title: 'Kanana exact package release evidence', specs}]
+  };
+}
+
+function updateKananaRecord(
+  report: AnyRecord,
+  kind: 'text' | 'image' | 'offline',
+  mutate: (record: AnyRecord) => void
+): void {
+  const spec = report.suites[0].specs.find((item: AnyRecord) => item.file === POLICY.kanana.tests[kind].file);
+  const result = required(spec?.tests[0]?.results[0], `Kanana ${kind} Playwright result`);
+  const stdout = required(result.stdout[0], `Kanana ${kind} evidence stdout`);
+  const prefix = POLICY.kanana.evidencePrefix;
+  const record = JSON.parse(stdout.slice(prefix.length));
+  mutate(record);
+  result.stdout[0] = `${prefix}${JSON.stringify(record)}\n`;
+}
+
 function maxDifference(left: number[], right: number[]): number {
   return Math.max(...left.map((value, index) => Math.abs(value - required(right[index], 'Reference value'))));
 }
@@ -483,6 +751,163 @@ test('rejects policy edits that drop browser requirements or leave the matrix em
   assert.throws(() => validatePolicyBytes(reduced, digest), /differs from its committed pin/u);
   assert.throws(() => validatePolicyBytes(empty, digest), /differs from its committed pin/u);
   assert.throws(() => validatePolicy({...POLICY, browsers: []}), /matrix must not be empty/u);
+});
+
+test('pins the exact Kanana npm archive, static manifest, and TVM artifact set', async (t) => {
+  const policy = validateKananaEvidencePolicy(POLICY.kanana);
+  assert.equal(policy.archive.sha256, '2185124f0ffd0f92d8a58eb74f95a8f94d19bf4d12134c3fb0567ba1d313c948');
+  assert.equal(policy.archive.packageVersion, '0.4.0');
+  const context = await makeKananaVerificationContext();
+  assert.equal(context.manifest.manifestSha256, policy.model.manifestSha256);
+  assert.deepEqual(context.manifest.files, policy.model.artifactFiles);
+  assert.equal(
+    context.manifest.files['kanana-text-model.wasm']?.sha256,
+    'f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09'
+  );
+  assert.equal(
+    context.manifest.files['kanana-vision-model.wasm']?.sha256,
+    '931ab048976f6b8e7df272f33b0a65abf253f19adbffb4503b7c3653b94b5e38'
+  );
+
+  const invalidManifest = Buffer.concat([
+    await readFile(join(WORKSPACE_ROOT, 'packages/web-decision', policy.model.manifestPath)),
+    Buffer.from(' ')
+  ]);
+  assert.throws(() => validateKananaManifestBytes(invalidManifest, policy), /raw artifact manifest/u);
+
+  const missingVision = structuredClone(POLICY.kanana);
+  missingVision.tests.image.runtimeArtifacts = ['kanana-text-model.wasm'];
+  assert.throws(() => validateKananaEvidencePolicy(missingVision), /runtime artifact set/u);
+
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  await assert.rejects(
+    collectKananaReleaseEvidenceInputs({
+      archivePath: fixture.archivePath,
+      installedPackagePath: fixture.packageRoot,
+      workspaceRoot: WORKSPACE_ROOT,
+      localCandidate: true
+    }),
+    /pinned npm archive/u
+  );
+});
+
+test('requires independent native TVM rebuild reports for both Kanana WASM artifacts', async (t) => {
+  const fixture = await makeKananaBuildFixture();
+  t.after(() => rm(fixture.root, {recursive: true, force: true}));
+  const builds = await verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot);
+  assert.deepEqual(
+    builds.map(({artifact}) => artifact),
+    ['kanana-text-model.wasm', 'kanana-vision-model.wasm']
+  );
+
+  await writeKananaBuildEvidence(fixture.evidencePath, fixture.builds.slice(0, 1));
+  await assert.rejects(
+    verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
+    /Every curated TVM WASM/u
+  );
+  await writeKananaBuildEvidence(fixture.evidencePath, fixture.builds);
+
+  const visionReportPath = join(fixture.buildRoot, 'vision/report.json');
+  const visionReport = fixture.reports.get('kanana-vision-model.wasm');
+  assert.ok(visionReport);
+  await writeFile(visionReportPath, JSON.stringify({...visionReport, onnxImportOrExportUsed: true}));
+  await assert.rejects(
+    verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
+    /onnxImportOrExportUsed differs/u
+  );
+  await writeFile(visionReportPath, JSON.stringify(visionReport));
+
+  const installedArtifact = join(fixture.installedRoot, 'assets/kanana/kanana-text-model.wasm');
+  const rebuiltArtifact = join(fixture.buildRoot, 'text/rebuilt.wasm');
+  await rm(rebuiltArtifact);
+  await link(installedArtifact, rebuiltArtifact);
+  await assert.rejects(
+    verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
+    /packaged source file/u
+  );
+});
+
+test('requires text, image, and cached-offline Kanana WebGPU evidence bound to the same archive', async () => {
+  const context = await makeKananaVerificationContext();
+  const valid = makeKananaPlaywrightReport(context);
+  assert.deepEqual(validateKananaPlaywrightReport(valid, context), {
+    caseCount: 3,
+    browser: 'chromium',
+    modelId: context.policy.model.modelId
+  });
+
+  const skipped = structuredClone(valid);
+  skipped.stats.skipped = 1;
+  assert.throws(() => validateKananaPlaywrightReport(skipped, context), /Skipped Kanana tests block/u);
+
+  const failed = structuredClone(valid);
+  failed.suites[0].specs[1].tests[0].results[0].status = 'failed';
+  assert.throws(() => validateKananaPlaywrightReport(failed, context), /did not pass/u);
+
+  const omitted = structuredClone(valid);
+  omitted.suites[0].specs.pop();
+  assert.throws(() => validateKananaPlaywrightReport(omitted, context), /required text, image, and offline cases/u);
+
+  const wrongArchive = structuredClone(valid);
+  updateKananaRecord(wrongArchive, 'text', (record) => {
+    record.archive.sha256 = '0'.repeat(64);
+  });
+  assert.throws(() => validateKananaPlaywrightReport(wrongArchive, context), /different package archive/u);
+
+  const wrongModelArtifact = structuredClone(valid);
+  updateKananaRecord(wrongModelArtifact, 'image', (record) => {
+    record.artifact.runtimeArtifacts[1].sha256 = '0'.repeat(64);
+  });
+  assert.throws(() => validateKananaPlaywrightReport(wrongModelArtifact, context), /runtime artifact differs/u);
+
+  const fallback = structuredClone(valid);
+  updateKananaRecord(fallback, 'text', (record) => {
+    record.gpu.isFallbackAdapter = true;
+  });
+  assert.throws(() => validateKananaPlaywrightReport(fallback, context), /fallback GPU adapter/u);
+
+  const noAdapterInfo = structuredClone(valid);
+  updateKananaRecord(noAdapterInfo, 'text', (record) => {
+    record.gpu.adapterInfo.value.vendor = '';
+  });
+  assert.throws(() => validateKananaPlaywrightReport(noAdapterInfo, context), /adapter vendor/u);
+
+  const wrongTextOutput = structuredClone(valid);
+  updateKananaRecord(wrongTextOutput, 'text', (record) => {
+    record.inference.choice = 'early';
+  });
+  assert.throws(() => validateKananaPlaywrightReport(wrongTextOutput, context), /text choice differs/u);
+
+  const wrongImageOutput = structuredClone(valid);
+  updateKananaRecord(wrongImageOutput, 'image', (record) => {
+    record.inference.answer = 'circle';
+  });
+  assert.throws(() => validateKananaPlaywrightReport(wrongImageOutput, context), /synthetic-image choice/u);
+
+  const wrongImageConfidence = structuredClone(valid);
+  updateKananaRecord(wrongImageConfidence, 'image', (record) => {
+    record.inference.confidence = record.inference.probabilities.rectangle;
+  });
+  assert.throws(() => validateKananaPlaywrightReport(wrongImageConfidence, context), /selected-option margin/u);
+
+  const offlineNetworkAttempt = structuredClone(valid);
+  updateKananaRecord(offlineNetworkAttempt, 'offline', (record) => {
+    record.networkAttempts.push('https://huggingface.co/example');
+  });
+  assert.throws(() => validateKananaPlaywrightReport(offlineNetworkAttempt, context), /attempted a network request/u);
+
+  const noFetchedRanges = structuredClone(valid);
+  updateKananaRecord(noFetchedRanges, 'offline', (record) => {
+    record.cache.fetchedRanges = 0;
+  });
+  assert.throws(() => validateKananaPlaywrightReport(noFetchedRanges, context), /fetched no verified ranges/u);
+
+  const offlineOutputMismatch = structuredClone(valid);
+  updateKananaRecord(offlineOutputMismatch, 'offline', (record) => {
+    record.inference.offline.probabilities.late = 0.5;
+  });
+  assert.throws(() => validateKananaPlaywrightReport(offlineOutputMismatch, context));
 });
 
 test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () => {
@@ -557,13 +982,20 @@ test('production release verification rejects the explicitly synthetic fixture s
 });
 
 test('the release verifier blocks committed pending provenance before checking build inputs', async () => {
+  const workingPolicy = await readFile(POLICY_PATH);
+  const committedPolicy = execFileSync('git', ['show', 'HEAD:scripts/release/release-evidence-policy.json'], {
+    cwd: WORKSPACE_ROOT
+  });
+  const policyIsCommitted = workingPolicy.equals(committedPolicy);
   await assert.rejects(
     verifyReleaseEvidence({
       archivePath: 'unused.tgz',
       installedPackagePath: 'unused-package',
       playwrightReportPath: 'unused-report.json'
     }),
-    /Model kev-0\.6b-q4f16 provenance is pending:/u
+    policyIsCommitted
+      ? /Model kev-0\.6b-q4f16 provenance is pending:/u
+      : /Release evidence policy must match the committed version/u
   );
 });
 

@@ -96,6 +96,91 @@
           "priorEvidence": "The M4 Pro report covers the preview.34 package bundle only; the bundle produced from this catalog has not been revalidated."
         }
       }
+    },
+    {
+      "modelId": "kanana-2-v-decide-3b-2611",
+      "description": {
+        "adapter": "kanana",
+        "precision": "bfloat16-source-to-float16-text-and-float32-vision",
+        "checkpoint": {
+          "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+          "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+          "weightSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b"
+        },
+        "assets": {
+          "integrity": "pinned-manifest",
+          "location": "package-and-pinned-upstream",
+          "additionalFiles": "The full native TVM text and vision graphs and their manifests ship in this package. Tokenizer/configuration files and only graph-required checkpoint ranges load from the revision-pinned Hugging Face repository."
+        },
+        "licenses": {
+          "project": "Apache-2.0",
+          "modelTerms": "KananaOpenLicense",
+          "modelCard": "https://huggingface.co/kakaocorp/kanana-2-v-decide-3b-2611/tree/12820d654ed9789a0f7f48daeee1703c3483c464"
+        },
+        "backend": {
+          "name": "tvm-webgpu",
+          "requiredFeatures": [],
+          "requiredLimits": {
+          "maxBufferSize": 656670720,
+          "maxStorageBufferBindingSize": 656670720,
+            "maxComputeWorkgroupStorageSize": 32768,
+            "maxStorageBuffersPerShaderStage": 10
+          },
+          "requiresNonFallbackAdapter": false
+        },
+        "features": {
+          "textChoice": {
+            "status": "implemented",
+            "abstention": "explicit-noul",
+            "limits": [
+              {
+                "resource": "tokens",
+                "scope": "question",
+                "max": 20480,
+                "description": "Pinned model configuration max_length; applies to each query and candidate prompt."
+              },
+              {
+                "resource": "questions",
+                "scope": "request",
+                "min": 1
+              }
+            ],
+            "handling": "query-and-candidate-embedding-similarity",
+            "tokenCount": "sum-of-query-and-candidate-tokens",
+            "score": {
+              "basis": "cosine-similarity",
+              "decisionTemperature": 0.056139365295102696,
+              "requestTemperature": 1,
+              "calibration": "not-guaranteed"
+            }
+          },
+          "typedTextQuestionTypes": [
+            "choice",
+            "noul",
+            "score"
+          ],
+          "imageChoice": {
+            "status": "implemented",
+            "limits": [
+              {
+                "resource": "images",
+                "scope": "request",
+                "max": 10,
+                "description": "Pinned model-card maximum across images in state messages and the images field."
+              }
+            ]
+          },
+          "rating": {
+            "status": "not-implemented"
+          }
+        },
+        "verification": {
+          "currentBundleGpu": "verified",
+          "currentBundleCpuWasm": "not-applicable",
+          "currentBundleJavascript": "not-applicable",
+          "priorEvidence": "On 2026-11-10, the web-decision@0.4.0 candidate passed text parity, synthetic-image choice, and cached-offline text inference on an M4 Pro Apple Metal WebGPU adapter in Chromium 158.0.8127.18. All three tests verified checkpoint revision 12820d654ed9789a0f7f48daeee1703c3483c464; each full-checkpoint run read approximately 7.34 GB, and the offline case reported zero network attempts. The release evidence policy pins the exact archive and artifact hashes."
+        }
+      }
     }
   ]
 }

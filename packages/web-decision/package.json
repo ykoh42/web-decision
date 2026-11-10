@@ -1,6 +1,6 @@
 {
   "name": "web-decision",
-  "version": "0.0.0-preview.35",
+  "version": "0.4.0",
   "description": "Curated browser-local decision models running on TVM",
   "type": "module",
   "exports": {
@@ -18,9 +18,12 @@
     "assets/kev06-stable/manifest.json",
     "assets/kev06-stable/PROVENANCE.md",
     "assets/kev06-stable/notices",
+    "assets/kanana",
     "assets/experimental-kev-upstream/notices",
     "README.md",
     "LICENSE",
+    "KANANA-NOTICE",
+    "KANANA-OPEN-LICENSE.txt",
     "KEV06-NOTICE",
     "KEV-NOTICE",
     "EMSCRIPTEN-LICENSE",

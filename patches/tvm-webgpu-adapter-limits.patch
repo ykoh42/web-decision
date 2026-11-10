@@ -1,0 +1,60 @@
+diff --git a/web/src/webgpu.ts b/web/src/webgpu.ts
+index 038f9ac..1946d68 100644
+--- a/web/src/webgpu.ts
++++ b/web/src/webgpu.ts
+@@ -61,53 +61,8 @@ export async function detectGPUDevice(powerPreference: "low-power" | "high-perfo
+           "For more information about WebGPU support in your browser, visit https://webgpureport.org/"
+       );
+     }
+-    const computeMB = (value: number) => {
+-      return Math.ceil(value / (1 << 20)) + "MB";
+-    }
+-
+-    // more detailed error message
+-    let requiredMaxBufferSize = 1 << 30;  // 1GB
+-    if (requiredMaxBufferSize > adapter.limits.maxBufferSize) {
+-      // If 1GB is too large, try 256MB (default size stated in WebGPU doc)
+-      const backupRequiredMaxBufferSize = 1 << 28;  // 256MB
+-      console.log(
+-        `Requested maxBufferSize exceeds limit. \n` +
+-        `requested=${computeMB(requiredMaxBufferSize)}, \n` +
+-        `limit=${computeMB(adapter.limits.maxBufferSize)}. \n` +
+-        `WARNING: Falling back to ${computeMB(backupRequiredMaxBufferSize)}...`
+-      );
+-      requiredMaxBufferSize = backupRequiredMaxBufferSize;
+-      if (backupRequiredMaxBufferSize > adapter.limits.maxBufferSize) {
+-        // Fail if 256MB is still too big
+-        throw Error(
+-          `Cannot initialize runtime because of requested maxBufferSize ` +
+-          `exceeds limit. requested=${computeMB(backupRequiredMaxBufferSize)}, ` +
+-          `limit=${computeMB(adapter.limits.maxBufferSize)}. ` +
+-          `Consider upgrading your browser.`
+-        );
+-      }
+-    }
+-
+-    let requiredMaxStorageBufferBindingSize = 1 << 30;  // 1GB
+-    if (requiredMaxStorageBufferBindingSize > adapter.limits.maxStorageBufferBindingSize) {
+-      // If 1GB is too large, try 128MB (default size stated in WebGPU doc)
+-      const backupRequiredMaxStorageBufferBindingSize = 1 << 27;  // 128MB
+-      console.log(
+-        `Requested maxStorageBufferBindingSize exceeds limit. \n` +
+-        `requested=${computeMB(requiredMaxStorageBufferBindingSize)}, \n` +
+-        `limit=${computeMB(adapter.limits.maxStorageBufferBindingSize)}. \n` +
+-        `WARNING: Falling back to ${computeMB(backupRequiredMaxStorageBufferBindingSize)}...`
+-      );
+-      requiredMaxStorageBufferBindingSize = backupRequiredMaxStorageBufferBindingSize;
+-      if (backupRequiredMaxStorageBufferBindingSize > adapter.limits.maxStorageBufferBindingSize) {
+-        // Fail if 128MB is still too big
+-        throw Error(
+-          `Cannot initialize runtime because of requested maxStorageBufferBindingSize ` +
+-          `exceeds limit. requested=${computeMB(backupRequiredMaxStorageBufferBindingSize)}, ` +
+-          `limit=${computeMB(adapter.limits.maxStorageBufferBindingSize)}. `
+-        );
+-      }
+-    }
++    const requiredMaxBufferSize = adapter.limits.maxBufferSize;
++    const requiredMaxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+ 
+     const requiredMaxComputeWorkgroupStorageSize = 32 << 10;
+     if (requiredMaxComputeWorkgroupStorageSize > adapter.limits.maxComputeWorkgroupStorageSize) {

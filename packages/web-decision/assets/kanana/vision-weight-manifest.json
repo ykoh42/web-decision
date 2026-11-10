@@ -1,0 +1,3782 @@
+{
+  "weights": [
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_patch_embed_proj_weight",
+      "target": "vision.patch_embed.proj.weight",
+      "shape": [
+        1152,
+        3,
+        2,
+        16,
+        16
+      ],
+      "dtype": "float32",
+      "length": 7077888,
+      "name": "model.visual.patch_embed.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_patch_embed_proj_bias",
+      "target": "vision.patch_embed.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.patch_embed.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_pos_embed_weight",
+      "target": "vision.pos_embed.weight",
+      "shape": [
+        2304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 10616832,
+      "name": "model.visual.pos_embed.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_norm1_weight",
+      "target": "vision.blocks.0.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_norm1_bias",
+      "target": "vision.blocks.0.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_norm2_weight",
+      "target": "vision.blocks.0.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_norm2_bias",
+      "target": "vision.blocks.0.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_attn_qkv_weight",
+      "target": "vision.blocks.0.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.0.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_attn_qkv_bias",
+      "target": "vision.blocks.0.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.0.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_attn_proj_weight",
+      "target": "vision.blocks.0.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.0.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_attn_proj_bias",
+      "target": "vision.blocks.0.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_mlp_linear_fc1_weight",
+      "target": "vision.blocks.0.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.0.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_mlp_linear_fc1_bias",
+      "target": "vision.blocks.0.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.0.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_mlp_linear_fc2_weight",
+      "target": "vision.blocks.0.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.0.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_0_mlp_linear_fc2_bias",
+      "target": "vision.blocks.0.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.0.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_norm1_weight",
+      "target": "vision.blocks.1.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_norm1_bias",
+      "target": "vision.blocks.1.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_norm2_weight",
+      "target": "vision.blocks.1.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_norm2_bias",
+      "target": "vision.blocks.1.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_attn_qkv_weight",
+      "target": "vision.blocks.1.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.1.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_attn_qkv_bias",
+      "target": "vision.blocks.1.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.1.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_attn_proj_weight",
+      "target": "vision.blocks.1.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.1.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_attn_proj_bias",
+      "target": "vision.blocks.1.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_mlp_linear_fc1_weight",
+      "target": "vision.blocks.1.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.1.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_mlp_linear_fc1_bias",
+      "target": "vision.blocks.1.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.1.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_mlp_linear_fc2_weight",
+      "target": "vision.blocks.1.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.1.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_1_mlp_linear_fc2_bias",
+      "target": "vision.blocks.1.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.1.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_norm1_weight",
+      "target": "vision.blocks.2.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_norm1_bias",
+      "target": "vision.blocks.2.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_norm2_weight",
+      "target": "vision.blocks.2.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_norm2_bias",
+      "target": "vision.blocks.2.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_attn_qkv_weight",
+      "target": "vision.blocks.2.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.2.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_attn_qkv_bias",
+      "target": "vision.blocks.2.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.2.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_attn_proj_weight",
+      "target": "vision.blocks.2.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.2.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_attn_proj_bias",
+      "target": "vision.blocks.2.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_mlp_linear_fc1_weight",
+      "target": "vision.blocks.2.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.2.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_mlp_linear_fc1_bias",
+      "target": "vision.blocks.2.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.2.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_mlp_linear_fc2_weight",
+      "target": "vision.blocks.2.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.2.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_2_mlp_linear_fc2_bias",
+      "target": "vision.blocks.2.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.2.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_norm1_weight",
+      "target": "vision.blocks.3.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_norm1_bias",
+      "target": "vision.blocks.3.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_norm2_weight",
+      "target": "vision.blocks.3.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_norm2_bias",
+      "target": "vision.blocks.3.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_attn_qkv_weight",
+      "target": "vision.blocks.3.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.3.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_attn_qkv_bias",
+      "target": "vision.blocks.3.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.3.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_attn_proj_weight",
+      "target": "vision.blocks.3.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.3.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_attn_proj_bias",
+      "target": "vision.blocks.3.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_mlp_linear_fc1_weight",
+      "target": "vision.blocks.3.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.3.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_mlp_linear_fc1_bias",
+      "target": "vision.blocks.3.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.3.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_mlp_linear_fc2_weight",
+      "target": "vision.blocks.3.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.3.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_3_mlp_linear_fc2_bias",
+      "target": "vision.blocks.3.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.3.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_norm1_weight",
+      "target": "vision.blocks.4.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_norm1_bias",
+      "target": "vision.blocks.4.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_norm2_weight",
+      "target": "vision.blocks.4.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_norm2_bias",
+      "target": "vision.blocks.4.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_attn_qkv_weight",
+      "target": "vision.blocks.4.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.4.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_attn_qkv_bias",
+      "target": "vision.blocks.4.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.4.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_attn_proj_weight",
+      "target": "vision.blocks.4.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.4.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_attn_proj_bias",
+      "target": "vision.blocks.4.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_mlp_linear_fc1_weight",
+      "target": "vision.blocks.4.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.4.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_mlp_linear_fc1_bias",
+      "target": "vision.blocks.4.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.4.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_mlp_linear_fc2_weight",
+      "target": "vision.blocks.4.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.4.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_4_mlp_linear_fc2_bias",
+      "target": "vision.blocks.4.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.4.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_norm1_weight",
+      "target": "vision.blocks.5.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_norm1_bias",
+      "target": "vision.blocks.5.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_norm2_weight",
+      "target": "vision.blocks.5.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_norm2_bias",
+      "target": "vision.blocks.5.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_attn_qkv_weight",
+      "target": "vision.blocks.5.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.5.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_attn_qkv_bias",
+      "target": "vision.blocks.5.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.5.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_attn_proj_weight",
+      "target": "vision.blocks.5.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.5.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_attn_proj_bias",
+      "target": "vision.blocks.5.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_mlp_linear_fc1_weight",
+      "target": "vision.blocks.5.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.5.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_mlp_linear_fc1_bias",
+      "target": "vision.blocks.5.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.5.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_mlp_linear_fc2_weight",
+      "target": "vision.blocks.5.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.5.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_5_mlp_linear_fc2_bias",
+      "target": "vision.blocks.5.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.5.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_norm1_weight",
+      "target": "vision.blocks.6.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_norm1_bias",
+      "target": "vision.blocks.6.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_norm2_weight",
+      "target": "vision.blocks.6.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_norm2_bias",
+      "target": "vision.blocks.6.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_attn_qkv_weight",
+      "target": "vision.blocks.6.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.6.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_attn_qkv_bias",
+      "target": "vision.blocks.6.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.6.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_attn_proj_weight",
+      "target": "vision.blocks.6.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.6.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_attn_proj_bias",
+      "target": "vision.blocks.6.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_mlp_linear_fc1_weight",
+      "target": "vision.blocks.6.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.6.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_mlp_linear_fc1_bias",
+      "target": "vision.blocks.6.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.6.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_mlp_linear_fc2_weight",
+      "target": "vision.blocks.6.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.6.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_6_mlp_linear_fc2_bias",
+      "target": "vision.blocks.6.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.6.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_norm1_weight",
+      "target": "vision.blocks.7.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_norm1_bias",
+      "target": "vision.blocks.7.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_norm2_weight",
+      "target": "vision.blocks.7.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_norm2_bias",
+      "target": "vision.blocks.7.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_attn_qkv_weight",
+      "target": "vision.blocks.7.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.7.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_attn_qkv_bias",
+      "target": "vision.blocks.7.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.7.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_attn_proj_weight",
+      "target": "vision.blocks.7.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.7.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_attn_proj_bias",
+      "target": "vision.blocks.7.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_mlp_linear_fc1_weight",
+      "target": "vision.blocks.7.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.7.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_mlp_linear_fc1_bias",
+      "target": "vision.blocks.7.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.7.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_mlp_linear_fc2_weight",
+      "target": "vision.blocks.7.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.7.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_7_mlp_linear_fc2_bias",
+      "target": "vision.blocks.7.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.7.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_norm1_weight",
+      "target": "vision.blocks.8.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_norm1_bias",
+      "target": "vision.blocks.8.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_norm2_weight",
+      "target": "vision.blocks.8.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_norm2_bias",
+      "target": "vision.blocks.8.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_attn_qkv_weight",
+      "target": "vision.blocks.8.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.8.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_attn_qkv_bias",
+      "target": "vision.blocks.8.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.8.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_attn_proj_weight",
+      "target": "vision.blocks.8.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.8.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_attn_proj_bias",
+      "target": "vision.blocks.8.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_mlp_linear_fc1_weight",
+      "target": "vision.blocks.8.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.8.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_mlp_linear_fc1_bias",
+      "target": "vision.blocks.8.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.8.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_mlp_linear_fc2_weight",
+      "target": "vision.blocks.8.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.8.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_8_mlp_linear_fc2_bias",
+      "target": "vision.blocks.8.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.8.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_norm1_weight",
+      "target": "vision.blocks.9.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_norm1_bias",
+      "target": "vision.blocks.9.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_norm2_weight",
+      "target": "vision.blocks.9.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_norm2_bias",
+      "target": "vision.blocks.9.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_attn_qkv_weight",
+      "target": "vision.blocks.9.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.9.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_attn_qkv_bias",
+      "target": "vision.blocks.9.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.9.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_attn_proj_weight",
+      "target": "vision.blocks.9.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.9.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_attn_proj_bias",
+      "target": "vision.blocks.9.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_mlp_linear_fc1_weight",
+      "target": "vision.blocks.9.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.9.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_mlp_linear_fc1_bias",
+      "target": "vision.blocks.9.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.9.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_mlp_linear_fc2_weight",
+      "target": "vision.blocks.9.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.9.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_9_mlp_linear_fc2_bias",
+      "target": "vision.blocks.9.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.9.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_norm1_weight",
+      "target": "vision.blocks.10.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_norm1_bias",
+      "target": "vision.blocks.10.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_norm2_weight",
+      "target": "vision.blocks.10.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_norm2_bias",
+      "target": "vision.blocks.10.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_attn_qkv_weight",
+      "target": "vision.blocks.10.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.10.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_attn_qkv_bias",
+      "target": "vision.blocks.10.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.10.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_attn_proj_weight",
+      "target": "vision.blocks.10.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.10.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_attn_proj_bias",
+      "target": "vision.blocks.10.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_mlp_linear_fc1_weight",
+      "target": "vision.blocks.10.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.10.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_mlp_linear_fc1_bias",
+      "target": "vision.blocks.10.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.10.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_mlp_linear_fc2_weight",
+      "target": "vision.blocks.10.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.10.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_10_mlp_linear_fc2_bias",
+      "target": "vision.blocks.10.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.10.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_norm1_weight",
+      "target": "vision.blocks.11.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_norm1_bias",
+      "target": "vision.blocks.11.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_norm2_weight",
+      "target": "vision.blocks.11.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_norm2_bias",
+      "target": "vision.blocks.11.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_attn_qkv_weight",
+      "target": "vision.blocks.11.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.11.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_attn_qkv_bias",
+      "target": "vision.blocks.11.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.11.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_attn_proj_weight",
+      "target": "vision.blocks.11.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.11.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_attn_proj_bias",
+      "target": "vision.blocks.11.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_mlp_linear_fc1_weight",
+      "target": "vision.blocks.11.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.11.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_mlp_linear_fc1_bias",
+      "target": "vision.blocks.11.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.11.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_mlp_linear_fc2_weight",
+      "target": "vision.blocks.11.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.11.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_11_mlp_linear_fc2_bias",
+      "target": "vision.blocks.11.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.11.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_norm1_weight",
+      "target": "vision.blocks.12.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_norm1_bias",
+      "target": "vision.blocks.12.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_norm2_weight",
+      "target": "vision.blocks.12.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_norm2_bias",
+      "target": "vision.blocks.12.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_attn_qkv_weight",
+      "target": "vision.blocks.12.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.12.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_attn_qkv_bias",
+      "target": "vision.blocks.12.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.12.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_attn_proj_weight",
+      "target": "vision.blocks.12.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.12.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_attn_proj_bias",
+      "target": "vision.blocks.12.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_mlp_linear_fc1_weight",
+      "target": "vision.blocks.12.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.12.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_mlp_linear_fc1_bias",
+      "target": "vision.blocks.12.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.12.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_mlp_linear_fc2_weight",
+      "target": "vision.blocks.12.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.12.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_12_mlp_linear_fc2_bias",
+      "target": "vision.blocks.12.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.12.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_norm1_weight",
+      "target": "vision.blocks.13.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_norm1_bias",
+      "target": "vision.blocks.13.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_norm2_weight",
+      "target": "vision.blocks.13.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_norm2_bias",
+      "target": "vision.blocks.13.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_attn_qkv_weight",
+      "target": "vision.blocks.13.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.13.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_attn_qkv_bias",
+      "target": "vision.blocks.13.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.13.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_attn_proj_weight",
+      "target": "vision.blocks.13.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.13.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_attn_proj_bias",
+      "target": "vision.blocks.13.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_mlp_linear_fc1_weight",
+      "target": "vision.blocks.13.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.13.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_mlp_linear_fc1_bias",
+      "target": "vision.blocks.13.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.13.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_mlp_linear_fc2_weight",
+      "target": "vision.blocks.13.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.13.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_13_mlp_linear_fc2_bias",
+      "target": "vision.blocks.13.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.13.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_norm1_weight",
+      "target": "vision.blocks.14.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_norm1_bias",
+      "target": "vision.blocks.14.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_norm2_weight",
+      "target": "vision.blocks.14.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_norm2_bias",
+      "target": "vision.blocks.14.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_attn_qkv_weight",
+      "target": "vision.blocks.14.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.14.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_attn_qkv_bias",
+      "target": "vision.blocks.14.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.14.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_attn_proj_weight",
+      "target": "vision.blocks.14.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.14.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_attn_proj_bias",
+      "target": "vision.blocks.14.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_mlp_linear_fc1_weight",
+      "target": "vision.blocks.14.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.14.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_mlp_linear_fc1_bias",
+      "target": "vision.blocks.14.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.14.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_mlp_linear_fc2_weight",
+      "target": "vision.blocks.14.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.14.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_14_mlp_linear_fc2_bias",
+      "target": "vision.blocks.14.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.14.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_norm1_weight",
+      "target": "vision.blocks.15.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_norm1_bias",
+      "target": "vision.blocks.15.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_norm2_weight",
+      "target": "vision.blocks.15.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_norm2_bias",
+      "target": "vision.blocks.15.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_attn_qkv_weight",
+      "target": "vision.blocks.15.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.15.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_attn_qkv_bias",
+      "target": "vision.blocks.15.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.15.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_attn_proj_weight",
+      "target": "vision.blocks.15.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.15.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_attn_proj_bias",
+      "target": "vision.blocks.15.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_mlp_linear_fc1_weight",
+      "target": "vision.blocks.15.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.15.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_mlp_linear_fc1_bias",
+      "target": "vision.blocks.15.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.15.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_mlp_linear_fc2_weight",
+      "target": "vision.blocks.15.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.15.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_15_mlp_linear_fc2_bias",
+      "target": "vision.blocks.15.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.15.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_norm1_weight",
+      "target": "vision.blocks.16.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_norm1_bias",
+      "target": "vision.blocks.16.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_norm2_weight",
+      "target": "vision.blocks.16.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_norm2_bias",
+      "target": "vision.blocks.16.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_attn_qkv_weight",
+      "target": "vision.blocks.16.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.16.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_attn_qkv_bias",
+      "target": "vision.blocks.16.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.16.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_attn_proj_weight",
+      "target": "vision.blocks.16.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.16.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_attn_proj_bias",
+      "target": "vision.blocks.16.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_mlp_linear_fc1_weight",
+      "target": "vision.blocks.16.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.16.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_mlp_linear_fc1_bias",
+      "target": "vision.blocks.16.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.16.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_mlp_linear_fc2_weight",
+      "target": "vision.blocks.16.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.16.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_16_mlp_linear_fc2_bias",
+      "target": "vision.blocks.16.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.16.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_norm1_weight",
+      "target": "vision.blocks.17.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_norm1_bias",
+      "target": "vision.blocks.17.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_norm2_weight",
+      "target": "vision.blocks.17.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_norm2_bias",
+      "target": "vision.blocks.17.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_attn_qkv_weight",
+      "target": "vision.blocks.17.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.17.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_attn_qkv_bias",
+      "target": "vision.blocks.17.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.17.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_attn_proj_weight",
+      "target": "vision.blocks.17.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.17.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_attn_proj_bias",
+      "target": "vision.blocks.17.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_mlp_linear_fc1_weight",
+      "target": "vision.blocks.17.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.17.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_mlp_linear_fc1_bias",
+      "target": "vision.blocks.17.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.17.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_mlp_linear_fc2_weight",
+      "target": "vision.blocks.17.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.17.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_17_mlp_linear_fc2_bias",
+      "target": "vision.blocks.17.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.17.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_norm1_weight",
+      "target": "vision.blocks.18.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_norm1_bias",
+      "target": "vision.blocks.18.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_norm2_weight",
+      "target": "vision.blocks.18.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_norm2_bias",
+      "target": "vision.blocks.18.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_attn_qkv_weight",
+      "target": "vision.blocks.18.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.18.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_attn_qkv_bias",
+      "target": "vision.blocks.18.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.18.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_attn_proj_weight",
+      "target": "vision.blocks.18.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.18.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_attn_proj_bias",
+      "target": "vision.blocks.18.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_mlp_linear_fc1_weight",
+      "target": "vision.blocks.18.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.18.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_mlp_linear_fc1_bias",
+      "target": "vision.blocks.18.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.18.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_mlp_linear_fc2_weight",
+      "target": "vision.blocks.18.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.18.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_18_mlp_linear_fc2_bias",
+      "target": "vision.blocks.18.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.18.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_norm1_weight",
+      "target": "vision.blocks.19.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_norm1_bias",
+      "target": "vision.blocks.19.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_norm2_weight",
+      "target": "vision.blocks.19.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_norm2_bias",
+      "target": "vision.blocks.19.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_attn_qkv_weight",
+      "target": "vision.blocks.19.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.19.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_attn_qkv_bias",
+      "target": "vision.blocks.19.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.19.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_attn_proj_weight",
+      "target": "vision.blocks.19.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.19.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_attn_proj_bias",
+      "target": "vision.blocks.19.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_mlp_linear_fc1_weight",
+      "target": "vision.blocks.19.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.19.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_mlp_linear_fc1_bias",
+      "target": "vision.blocks.19.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.19.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_mlp_linear_fc2_weight",
+      "target": "vision.blocks.19.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.19.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_19_mlp_linear_fc2_bias",
+      "target": "vision.blocks.19.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.19.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_norm1_weight",
+      "target": "vision.blocks.20.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_norm1_bias",
+      "target": "vision.blocks.20.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_norm2_weight",
+      "target": "vision.blocks.20.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_norm2_bias",
+      "target": "vision.blocks.20.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_attn_qkv_weight",
+      "target": "vision.blocks.20.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.20.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_attn_qkv_bias",
+      "target": "vision.blocks.20.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.20.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_attn_proj_weight",
+      "target": "vision.blocks.20.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.20.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_attn_proj_bias",
+      "target": "vision.blocks.20.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_mlp_linear_fc1_weight",
+      "target": "vision.blocks.20.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.20.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_mlp_linear_fc1_bias",
+      "target": "vision.blocks.20.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.20.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_mlp_linear_fc2_weight",
+      "target": "vision.blocks.20.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.20.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_20_mlp_linear_fc2_bias",
+      "target": "vision.blocks.20.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.20.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_norm1_weight",
+      "target": "vision.blocks.21.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_norm1_bias",
+      "target": "vision.blocks.21.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_norm2_weight",
+      "target": "vision.blocks.21.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_norm2_bias",
+      "target": "vision.blocks.21.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_attn_qkv_weight",
+      "target": "vision.blocks.21.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.21.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_attn_qkv_bias",
+      "target": "vision.blocks.21.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.21.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_attn_proj_weight",
+      "target": "vision.blocks.21.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.21.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_attn_proj_bias",
+      "target": "vision.blocks.21.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_mlp_linear_fc1_weight",
+      "target": "vision.blocks.21.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.21.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_mlp_linear_fc1_bias",
+      "target": "vision.blocks.21.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.21.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_mlp_linear_fc2_weight",
+      "target": "vision.blocks.21.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.21.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_21_mlp_linear_fc2_bias",
+      "target": "vision.blocks.21.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.21.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_norm1_weight",
+      "target": "vision.blocks.22.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_norm1_bias",
+      "target": "vision.blocks.22.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_norm2_weight",
+      "target": "vision.blocks.22.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_norm2_bias",
+      "target": "vision.blocks.22.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_attn_qkv_weight",
+      "target": "vision.blocks.22.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.22.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_attn_qkv_bias",
+      "target": "vision.blocks.22.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.22.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_attn_proj_weight",
+      "target": "vision.blocks.22.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.22.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_attn_proj_bias",
+      "target": "vision.blocks.22.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_mlp_linear_fc1_weight",
+      "target": "vision.blocks.22.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.22.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_mlp_linear_fc1_bias",
+      "target": "vision.blocks.22.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.22.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_mlp_linear_fc2_weight",
+      "target": "vision.blocks.22.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.22.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_22_mlp_linear_fc2_bias",
+      "target": "vision.blocks.22.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.22.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_norm1_weight",
+      "target": "vision.blocks.23.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_norm1_bias",
+      "target": "vision.blocks.23.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_norm2_weight",
+      "target": "vision.blocks.23.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_norm2_bias",
+      "target": "vision.blocks.23.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_attn_qkv_weight",
+      "target": "vision.blocks.23.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.23.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_attn_qkv_bias",
+      "target": "vision.blocks.23.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.23.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_attn_proj_weight",
+      "target": "vision.blocks.23.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.23.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_attn_proj_bias",
+      "target": "vision.blocks.23.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_mlp_linear_fc1_weight",
+      "target": "vision.blocks.23.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.23.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_mlp_linear_fc1_bias",
+      "target": "vision.blocks.23.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.23.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_mlp_linear_fc2_weight",
+      "target": "vision.blocks.23.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.23.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_23_mlp_linear_fc2_bias",
+      "target": "vision.blocks.23.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.23.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_norm1_weight",
+      "target": "vision.blocks.24.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_norm1_bias",
+      "target": "vision.blocks.24.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_norm2_weight",
+      "target": "vision.blocks.24.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_norm2_bias",
+      "target": "vision.blocks.24.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_attn_qkv_weight",
+      "target": "vision.blocks.24.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.24.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_attn_qkv_bias",
+      "target": "vision.blocks.24.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.24.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_attn_proj_weight",
+      "target": "vision.blocks.24.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.24.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_attn_proj_bias",
+      "target": "vision.blocks.24.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_mlp_linear_fc1_weight",
+      "target": "vision.blocks.24.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.24.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_mlp_linear_fc1_bias",
+      "target": "vision.blocks.24.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.24.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_mlp_linear_fc2_weight",
+      "target": "vision.blocks.24.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.24.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_24_mlp_linear_fc2_bias",
+      "target": "vision.blocks.24.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.24.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_norm1_weight",
+      "target": "vision.blocks.25.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_norm1_bias",
+      "target": "vision.blocks.25.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_norm2_weight",
+      "target": "vision.blocks.25.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_norm2_bias",
+      "target": "vision.blocks.25.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_attn_qkv_weight",
+      "target": "vision.blocks.25.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.25.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_attn_qkv_bias",
+      "target": "vision.blocks.25.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.25.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_attn_proj_weight",
+      "target": "vision.blocks.25.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.25.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_attn_proj_bias",
+      "target": "vision.blocks.25.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_mlp_linear_fc1_weight",
+      "target": "vision.blocks.25.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.25.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_mlp_linear_fc1_bias",
+      "target": "vision.blocks.25.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.25.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_mlp_linear_fc2_weight",
+      "target": "vision.blocks.25.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.25.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_25_mlp_linear_fc2_bias",
+      "target": "vision.blocks.25.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.25.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_norm1_weight",
+      "target": "vision.blocks.26.norm1.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.norm1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_norm1_bias",
+      "target": "vision.blocks.26.norm1.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.norm1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_norm2_weight",
+      "target": "vision.blocks.26.norm2.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.norm2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_norm2_bias",
+      "target": "vision.blocks.26.norm2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.norm2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_attn_qkv_weight",
+      "target": "vision.blocks.26.attn.qkv.weight",
+      "shape": [
+        4608,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 21233664,
+      "name": "model.visual.blocks.26.attn.qkv.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_attn_qkv_bias",
+      "target": "vision.blocks.26.attn.qkv.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.blocks.26.attn.qkv.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_attn_proj_weight",
+      "target": "vision.blocks.26.attn.proj.weight",
+      "shape": [
+        1152,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 5308416,
+      "name": "model.visual.blocks.26.attn.proj.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_attn_proj_bias",
+      "target": "vision.blocks.26.attn.proj.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.attn.proj.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_mlp_linear_fc1_weight",
+      "target": "vision.blocks.26.mlp.linear_fc1.weight",
+      "shape": [
+        4304,
+        1152
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.26.mlp.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_mlp_linear_fc1_bias",
+      "target": "vision.blocks.26.mlp.linear_fc1.bias",
+      "shape": [
+        4304
+      ],
+      "dtype": "float32",
+      "length": 17216,
+      "name": "model.visual.blocks.26.mlp.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_mlp_linear_fc2_weight",
+      "target": "vision.blocks.26.mlp.linear_fc2.weight",
+      "shape": [
+        1152,
+        4304
+      ],
+      "dtype": "float32",
+      "length": 19832832,
+      "name": "model.visual.blocks.26.mlp.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_blocks_26_mlp_linear_fc2_bias",
+      "target": "vision.blocks.26.mlp.linear_fc2.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.blocks.26.mlp.linear_fc2.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_norm_weight",
+      "target": "vision.merger.norm.weight",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.merger.norm.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_norm_bias",
+      "target": "vision.merger.norm.bias",
+      "shape": [
+        1152
+      ],
+      "dtype": "float32",
+      "length": 4608,
+      "name": "model.visual.merger.norm.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_linear_fc1_weight",
+      "target": "vision.merger.linear_fc1.weight",
+      "shape": [
+        4608,
+        4608
+      ],
+      "dtype": "float32",
+      "length": 84934656,
+      "name": "model.visual.merger.linear_fc1.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_linear_fc1_bias",
+      "target": "vision.merger.linear_fc1.bias",
+      "shape": [
+        4608
+      ],
+      "dtype": "float32",
+      "length": 18432,
+      "name": "model.visual.merger.linear_fc1.bias"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_linear_fc2_weight",
+      "target": "vision.merger.linear_fc2.weight",
+      "shape": [
+        2560,
+        4608
+      ],
+      "dtype": "float32",
+      "length": 47185920,
+      "name": "model.visual.merger.linear_fc2.weight"
+    },
+    {
+      "kind": "PARAMETER",
+      "parameterName": "p_vision_merger_linear_fc2_bias",
+      "target": "vision.merger.linear_fc2.bias",
+      "shape": [
+        2560
+      ],
+      "dtype": "float32",
+      "length": 10240,
+      "name": "model.visual.merger.linear_fc2.bias"
+    }
+  ]
+}

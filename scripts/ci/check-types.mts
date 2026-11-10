@@ -11,7 +11,13 @@ const fixture = join(root, 'tests/types');
 
 /** Type-check the packed package where a consumer has installed it. */
 export function checkConsumerTypes(consumer: string, typescriptCompiler = compiler): void {
-  for (const name of ['consumer.ts', 'tsconfig.base.json', 'tsconfig.bundler.json', 'tsconfig.nodenext.json']) {
+  for (const name of [
+    'consumer.ts',
+    'kanana-consumer.ts',
+    'tsconfig.base.json',
+    'tsconfig.bundler.json',
+    'tsconfig.nodenext.json'
+  ]) {
     copyFileSync(join(fixture, name), join(consumer, name));
   }
   for (const project of ['tsconfig.bundler.json', 'tsconfig.nodenext.json']) {

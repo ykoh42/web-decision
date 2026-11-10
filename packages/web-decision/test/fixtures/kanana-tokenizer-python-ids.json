@@ -1,6 +1,6 @@
 {
   "model": "kakaocorp/kanana-2-v-decide-3b-2611",
-  "revision": "1489062def4145ae3a0a9261fbac4f4d88a8c6d1",
+  "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
   "reference": {
     "api": "transformers.AutoTokenizer.encode(prompt)",
     "transformers": "5.21.0",

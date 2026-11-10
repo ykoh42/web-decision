@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdir, mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
@@ -43,19 +43,21 @@ async function readProductionInputs(): Promise<{
 
 async function validateTemporaryManifest(
   manifestBytes: Buffer,
-  options: {expectedSha256?: string; evidenceBytes?: Buffer} = {}
-): Promise<void> {
+  options: {expectedSha256?: string; evidenceBytes?: Buffer; allowPending?: boolean} = {}
+): Promise<{pendingModelIds: string[]}> {
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-model-provenance-')));
   try {
     const packageRoot = join(temporaryRoot, 'package');
     const evidenceRoot = join(packageRoot, MODEL_PROVENANCE_EVIDENCE_ROOT);
     await mkdir(evidenceRoot, {recursive: true});
-    const source = options.evidenceBytes
-      ? undefined
-      : await readFile(join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT, 'kev-0.6b-q4f16.json'));
-    await writeFile(join(evidenceRoot, 'kev-0.6b-q4f16.json'), options.evidenceBytes ?? source ?? Buffer.alloc(0));
+    const sourceEvidenceRoot = join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT);
+    for (const name of await readdir(sourceEvidenceRoot)) {
+      const source = await readFile(join(sourceEvidenceRoot, name));
+      const evidence = name === 'kev-0.6b-q4f16.json' ? (options.evidenceBytes ?? source) : source;
+      await writeFile(join(evidenceRoot, name), evidence);
+    }
     const inputs = await readProductionInputs();
-    await validateModelProvenance({
+    return await validateModelProvenance({
       packageRoot,
       workspaceRoot: WORKSPACE_ROOT,
       modelSpec: inputs.modelSpec,
@@ -65,7 +67,8 @@ async function validateTemporaryManifest(
       expectedManifestSha256: options.expectedSha256 ?? MODEL_PROVENANCE_MANIFEST_SHA256,
       expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
       allowTestFixture: false,
-      requireCommitted: false
+      requireCommitted: false,
+      ...(options.allowPending === undefined ? {} : {allowPending: options.allowPending})
     });
   } finally {
     await rm(temporaryRoot, {recursive: true, force: true});
@@ -73,12 +76,59 @@ async function validateTemporaryManifest(
 }
 
 test('the pinned public-model record remains pending with explicit unresolved lineage and rights', async () => {
-  const {manifestBytes} = await readProductionInputs();
+  const {manifestBytes, modelSpec, artifactLock} = await readProductionInputs();
+  const catalogIds = (modelSpec as {models: Array<{modelId: string}>}).models.map(({modelId}) => modelId).sort();
+  const lockIds = Object.keys((artifactLock as {byModelId: Record<string, unknown>}).byModelId).sort();
+  const manifestIds = (JSON.parse(manifestBytes.toString('utf8')) as {models: Array<{modelId: string}>}).models
+    .map(({modelId}) => modelId)
+    .sort();
+  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', 'kev-0.6b-q4f16']);
+  assert.deepEqual(manifestIds, catalogIds);
+  assert.deepEqual(lockIds, catalogIds);
   assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256);
   await assert.rejects(
     validateTemporaryManifest(manifestBytes),
     /Model kev-0\.6b-q4f16 provenance is pending: .*Exact Kev adapter source revision.*Exact Qwen3-0\.6B base revision.*Redistribution rights/u
   );
+});
+
+test('committed pending records pass integrity checks without becoming releasable', async () => {
+  const {manifestBytes} = await readProductionInputs();
+  const result = await validateTemporaryManifest(manifestBytes, {allowPending: true});
+
+  assert.deepEqual(result.pendingModelIds, ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']);
+});
+
+test('Kanana provenance pins the exact packaged license and records its unresolved deployment scope', async () => {
+  const evidenceBytes = await readFile(
+    join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT, 'kanana-2-v-decide-3b-2611.json')
+  );
+  const evidence = JSON.parse(evidenceBytes.toString('utf8')) as {
+    status: string;
+    knownReferences: Array<{url: string; bytes: number; sha256: string; scope: string}>;
+    conversion: {
+      artifactLockSha256: string;
+      recipe: {path: string; sha256: string};
+      config: {path: string; sha256: string};
+      toolchain: {path: string; sha256: string};
+    };
+    unresolved: string[];
+  };
+  const licenseBytes = await readFile(join(PACKAGE_ROOT, 'KANANA-OPEN-LICENSE.txt'));
+  const licenseReference = evidence.knownReferences.find(({url}) => url.endsWith('/LICENSE'));
+
+  assert.equal(evidence.status, 'pending');
+  assert.ok(licenseReference);
+  assert.equal(licenseReference.bytes, licenseBytes.byteLength);
+  assert.equal(licenseReference.sha256, sha256(licenseBytes));
+  assert.match(licenseReference.scope, /Section 4\.1\(iii\)/u);
+  assert.ok(evidence.unresolved.some((item) => item.includes('Section 4.1(iii)')));
+  assert.ok(evidence.unresolved.some((item) => item.includes('hash-locked dependencies')));
+  assert.equal(evidence.conversion.artifactLockSha256, sha256(await readFile(ARTIFACT_LOCK_PATH)));
+  for (const reference of [evidence.conversion.recipe, evidence.conversion.config, evidence.conversion.toolchain]) {
+    const bytes = await readFile(join(WORKSPACE_ROOT, reference.path));
+    assert.equal(sha256(bytes), reference.sha256);
+  }
 });
 
 test('changing only pending to approved cannot bypass the fixed provenance hash', async () => {
@@ -116,10 +166,22 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
     path: `docs/${name}`,
     sha256: sha256(requiredEvidence(evidenceFiles.get(name)))
   });
-  const {artifactLock, artifactLockBytes, modelSpec} = await readProductionInputs();
-  const approvedSpec = structuredClone(modelSpec) as {
-    models: Array<{description: {licenses: {modelTerms: string}}}>;
+  const inputs = await readProductionInputs();
+  const sourceSpec = inputs.modelSpec as {
+    schemaVersion: number;
+    models: Array<{modelId: string; description: {licenses: {modelTerms: string}}}>;
   };
+  const kevSpecModel = sourceSpec.models.find(({modelId}) => modelId === 'kev-0.6b-q4f16');
+  assert.ok(kevSpecModel);
+  const approvedSpec = {schemaVersion: sourceSpec.schemaVersion, models: [structuredClone(kevSpecModel)]};
+  const sourceLock = inputs.artifactLock as {schemaVersion: number; byModelId: Record<string, unknown>};
+  const kevLockEntry = sourceLock.byModelId['kev-0.6b-q4f16'];
+  assert.ok(kevLockEntry);
+  const artifactLock = {
+    schemaVersion: sourceLock.schemaVersion,
+    byModelId: {'kev-0.6b-q4f16': kevLockEntry}
+  };
+  const artifactLockBytes = Buffer.from(`${JSON.stringify(artifactLock, null, 2)}\n`);
   const specModel = approvedSpec.models[0];
   assert.ok(specModel);
   specModel.description.licenses.modelTerms = 'Apache-2.0';

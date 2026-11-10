@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('verify', 'test')]
+  [ValidateSet('verify', 'verify-kanana', 'test')]
   [string]$Mode,
 
   [string]$Archive,
@@ -29,6 +29,16 @@ try {
     $releaseDirectory = Join-Path $buildDirectory 'scripts/release'
     if ($Mode -eq 'test') {
       & node.exe --test (Join-Path $releaseDirectory 'verify-release-evidence.test.js') (Join-Path $releaseDirectory 'tvm-build-evidence.test.js')
+    } elseif ($Mode -eq 'verify-kanana') {
+      if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $BuildEvidence) {
+        throw 'Kanana verify mode requires Archive, InstalledPackage, PlaywrightReport, and BuildEvidence.'
+      }
+      & node.exe (Join-Path $releaseDirectory 'verify-release-evidence.js') `
+        --kanana `
+        --archive $Archive `
+        --installed-package $InstalledPackage `
+        --playwright-report $PlaywrightReport `
+        --build-evidence $BuildEvidence
     } else {
       if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $BuildEvidence) {
         throw 'Verify mode requires Archive, InstalledPackage, PlaywrightReport, and BuildEvidence.'

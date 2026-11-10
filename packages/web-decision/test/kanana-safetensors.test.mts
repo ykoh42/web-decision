@@ -4,15 +4,20 @@ import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
-import {convertBf16ToFp16, inspectBf16ToFp16, parseSafetensorsHeader} from '../src/kanana/safetensors.mjs';
+import {
+  convertBf16ToFp16,
+  convertFp16ToFp32,
+  inspectBf16ToFp16,
+  parseSafetensorsHeader
+} from '../src/kanana/safetensors.mjs';
 import {
   KANANA_SAFETENSORS_SPEC,
   openKananaWeightSource,
   openSafetensorsWeightSource
 } from '../src/kanana/weight-source.mjs';
-import {hashSafetensorsFile} from '../../../scripts/kanana/hash_safetensors_ranges.mjs';
+import {hashSafetensorsFile} from '../../../scripts/kanana/hash_safetensors_ranges.mts';
 
-function safetensorsFixture({header, data}) {
+function safetensorsFixture({header, data}: {header: Record<string, unknown>; data: Uint8Array}) {
   const json = new TextEncoder().encode(JSON.stringify(header));
   const paddedHeaderLength = Math.ceil(json.byteLength / 8) * 8;
   const headerBytes = new Uint8Array(paddedHeaderLength).fill(0x20);
@@ -154,6 +159,47 @@ test('rounds BF16 values to finite FP16 using IEEE nearest-even semantics', () =
   });
 });
 
+test('converts finite FP16 vision weights to FP32 across signed zero and exponent boundaries', () => {
+  const fp16 = Uint8Array.of(
+    0x00,
+    0x00,
+    0x00,
+    0x80,
+    0x01,
+    0x00,
+    0xff,
+    0x03,
+    0x00,
+    0x04,
+    0x00,
+    0x3c,
+    0x00,
+    0xc0,
+    0xff,
+    0x7b
+  );
+  const converted = convertFp16ToFp32(fp16);
+  const values = new Float32Array(converted.buffer, converted.byteOffset, converted.byteLength / 4);
+
+  assert.deepEqual(Array.from(values), [0, -0, 2 ** -24, 1023 * 2 ** -24, 2 ** -14, 1, -2, 65504]);
+  assert.throws(() => convertFp16ToFp32(Uint8Array.of(0x00)), {
+    code: 'INVALID_ASSET',
+    message: 'FP16 tensor byte length must be even.'
+  });
+  assert.throws(() => convertFp16ToFp32(Uint8Array.of(0x00, 0x7c)), {
+    code: 'INVALID_ASSET',
+    message: 'FP16 NaN and infinity are not valid TVM vision weights. At byte offset 0.'
+  });
+  assert.throws(() => convertFp16ToFp32(Uint8Array.of(0x00, 0xfc)), {
+    code: 'INVALID_ASSET',
+    message: 'FP16 NaN and infinity are not valid TVM vision weights. At byte offset 0.'
+  });
+  assert.throws(() => convertFp16ToFp32(Uint8Array.of(0x01, 0x00, 0x00, 0x7e)), {
+    code: 'INVALID_ASSET',
+    message: 'FP16 NaN and infinity are not valid TVM vision weights. At byte offset 2.'
+  });
+});
+
 test('reports the first BF16 overflow and absolute byte offset while hashing', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'kanana-safetensors-'));
   const fixture = safetensorsFixture({
@@ -193,7 +239,7 @@ test('reports the first BF16 overflow and absolute byte offset while hashing', a
         }
       ]
     });
-    assert.deepEqual(manifest.tensors[0].conversion, {
+    assert.deepEqual(manifest.tensors[0]!.conversion, {
       sourceDtype: 'BF16',
       targetDtype: 'float16',
       verified: true,
@@ -202,9 +248,9 @@ test('reports the first BF16 overflow and absolute byte offset while hashing', a
       invalidValueCount: 1,
       overflowValueCount: 1,
       nonFiniteValueCount: 0,
-      failure: manifest.conversionVerification.failures[0]
+      failure: manifest.conversionVerification!.failures[0]
     });
-    assert.equal(manifest.tensors[0].conversion.failure.fileOffset, fixture.dataOffset);
+    assert.equal(manifest.tensors[0]!.conversion!.failure!.fileOffset, fixture.dataOffset);
   } finally {
     await rm(directory, {recursive: true, force: true});
   }
@@ -221,9 +267,9 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     chunkBytes: 8,
     verifyBf16ToFp16: true
   });
-  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
   assert.equal(sourceManifest.headerSha256, digest(fixture.headerRange));
-  assert.deepEqual(sourceManifest.tensors[0].chunks, [
+  assert.deepEqual(sourceManifest.tensors[0]!.chunks, [
     {
       offset: fixture.dataOffset,
       length: 8,
@@ -231,7 +277,7 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     }
   ]);
   assert.equal(
-    sourceManifest.tensors[0].sha256,
+    sourceManifest.tensors[0]!.sha256,
     digest(fixture.file.subarray(fixture.dataOffset, fixture.dataOffset + 8))
   );
   assert.ok(sourceManifest.tensors.every(({chunks}) => chunks.every(({length}) => length <= 8 * 1024 * 1024)));
@@ -246,7 +292,7 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     nonFiniteValueCount: 0,
     failures: []
   });
-  assert.deepEqual(sourceManifest.tensors[0].conversion, {
+  assert.deepEqual(sourceManifest.tensors[0]!.conversion, {
     sourceDtype: 'BF16',
     targetDtype: 'float16',
     verified: true,
@@ -259,26 +305,33 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
 
   const requiredWeights = [
     {name: 'scale.f32', shape: [], dtype: 'float32', length: 4},
-    {name: 'weights.bf16', shape: [4], dtype: 'float16', length: 8}
+    {
+      name: 'weights.bf16',
+      parameterName: 'p_weight',
+      shape: [4],
+      dtype: 'float16',
+      length: 8
+    }
   ];
 
   const cacheEntries = new Map();
   const cache = {
-    async match(key) {
+    async match(key: string) {
       return cacheEntries.get(key)?.clone();
     },
-    async put(key, response) {
+    async put(key: string, response: Response) {
       cacheEntries.set(key, response.clone());
     }
   };
-  const requests = [];
+  const requests: Array<{url: string; range: string}> = [];
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
-    const range = init.headers.Range;
+    const range = new Headers(init?.headers).get('Range');
+    assert.ok(range);
     const match = /^bytes=(\d+)-(\d+)$/.exec(range);
     assert.ok(match, 'source should issue a byte Range request');
-    const start = Number(match[1]);
-    const end = Number(match[2]);
+    const start = Number(match[1]!);
+    const end = Number(match[2]!);
     requests.push({url: String(url), range});
     const bytes = fixture.file.subarray(start, end + 1);
     return new Response(bytes, {
@@ -291,7 +344,7 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
   };
 
   try {
-    const source = await openSafetensorsWeightSource({
+    const source: any = await openSafetensorsWeightSource({
       base: new URL('https://fixture.invalid/checkpoint/'),
       manifest: sourceManifest,
       requiredWeights,
@@ -300,9 +353,10 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     const converted = await source.readTensor('weights.bf16', {dtype: 'float16'});
     const float = await source.readTensor('scale.f32');
     assert.deepEqual(
-      source.records.map(({name}) => name),
+      source.records.map(({name}: {name: string}) => name),
       ['scale.f32', 'weights.bf16']
     );
+    assert.equal(source.records[1]!.parameterName, 'p_weight');
     assert.equal(source.tensors, undefined);
     assert.equal(converted.record.dtype, 'float16');
     assert.deepEqual([...converted.bytes], [0x00, 0x3c, 0x00, 0xc1, 0x00, 0x30, 0x01, 0x00]);
@@ -318,7 +372,7 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     assert.ok(markerPaths.includes('/checkpoint/kanana-offline-complete-v1.json'));
     assert.equal(markerPaths.includes('/checkpoint/strands-offline-complete-v1.json'), false);
     assert.equal(requests.length, 3);
-    assert.equal(requests[0].range, `bytes=0-${fixture.dataOffset - 1}`);
+    assert.equal(requests[0]!.range, `bytes=0-${fixture.dataOffset - 1}`);
 
     const requestCount = requests.length;
     const offline = await openSafetensorsWeightSource({
@@ -369,7 +423,11 @@ test('requires the pinned Kanana source manifest to verify finite FP16 nearest-e
   };
   await assert.rejects(
     openKananaWeightSource({manifest: pinnedManifest, requiredWeights: []}),
-    (error) => error.code === 'INVALID_ASSET' && /finite BF16 to FP16 nearest-even/.test(error.message)
+    (error) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'INVALID_ASSET' &&
+      /finite BF16 to FP16 nearest-even/.test(error.message)
   );
 
   pinnedManifest.conversionVerification.valid = true;
@@ -377,13 +435,17 @@ test('requires the pinned Kanana source manifest to verify finite FP16 nearest-e
   pinnedManifest.conversionVerification.overflowValueCount = 0;
   pinnedManifest.conversionVerification.nonFiniteValueCount = 0;
   pinnedManifest.conversionVerification.failures = [];
-  pinnedManifest.tensors[0].conversion.valid = true;
-  pinnedManifest.tensors[0].conversion.invalidValueCount = 0;
-  pinnedManifest.tensors[0].conversion.overflowValueCount = 0;
-  pinnedManifest.tensors[0].conversion.nonFiniteValueCount = 0;
+  pinnedManifest.tensors[0]!.conversion.valid = true;
+  pinnedManifest.tensors[0]!.conversion.invalidValueCount = 0;
+  pinnedManifest.tensors[0]!.conversion.overflowValueCount = 0;
+  pinnedManifest.tensors[0]!.conversion.nonFiniteValueCount = 0;
   await assert.rejects(
     openKananaWeightSource({manifest: pinnedManifest, requiredWeights: []}),
-    (error) => error.code === 'INVALID_ASSET' && /exactly 290 weights/.test(error.message)
+    (error) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'INVALID_ASSET' &&
+      /exactly 354 weights/.test(error.message)
   );
 });
 
@@ -411,12 +473,14 @@ test('verifies Content-Range and chunk integrity, and aborts source setup', asyn
     );
 
     const badChunkManifest = structuredClone(manifest);
-    badChunkManifest.tensors[0].chunks[0].sha256 = '0'.repeat(64);
+    badChunkManifest.tensors[0]!.chunks[0]!.sha256 = '0'.repeat(64);
     globalThis.fetch = async (url, init) => {
-      const match = /^bytes=(\d+)-(\d+)$/.exec(init.headers.Range);
+      const requestRange = new Headers(init?.headers).get('Range');
+      assert.ok(requestRange);
+      const match = /^bytes=(\d+)-(\d+)$/.exec(requestRange);
       assert.ok(match);
-      const start = Number(match[1]);
-      const end = Number(match[2]);
+      const start = Number(match[1]!);
+      const end = Number(match[2]!);
       const bytes = fixture.file.subarray(start, end + 1);
       return new Response(bytes, {
         status: 206,

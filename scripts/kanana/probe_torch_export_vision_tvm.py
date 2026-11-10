@@ -14,7 +14,11 @@ from __future__ import annotations
 import argparse
 import collections
 import copy
+import hashlib
 import importlib
+import importlib.abc
+import importlib.machinery
+import importlib.util
 import json
 import math
 import sys
@@ -22,8 +26,16 @@ import time
 import types
 from pathlib import Path
 
+try:
+    from pinned_model_files import PINNED_KANANA_MODEL_FILES, verify_pinned_model_files
+except ModuleNotFoundError:
+    from scripts.kanana.pinned_model_files import (
+        PINNED_KANANA_MODEL_FILES,
+        verify_pinned_model_files,
+    )
+
 MODEL_ID = "kakaocorp/kanana-2-v-decide-3b-2611"
-MODEL_REVISION = "1489062def4145ae3a0a9261fbac4f4d88a8c6d1"
+MODEL_REVISION = "12820d654ed9789a0f7f48daeee1703c3483c464"
 DEFAULT_MODEL_DIR = (
     Path.home()
     / ".cache/huggingface/hub/models--kakaocorp--kanana-2-v-decide-3b-2611"
@@ -32,15 +44,63 @@ DEFAULT_MODEL_DIR = (
 )
 DEFAULT_INPUTS = Path.home() / ".cache/web-decision/kanana-vision-probe/prepared-inputs.npz"
 PACKAGE = "kanana_cached_vision_probe"
+PINNED_PYTHON_MODULES = frozenset(
+    Path(name).stem for name in PINNED_KANANA_MODEL_FILES if name.endswith(".py")
+)
+
+
+class PinnedPythonSourceLoader(importlib.machinery.SourceFileLoader):
+    """Compile verified source bytes directly, bypassing timestamp or hash pyc files."""
+
+    def get_code(self, fullname):
+        source = self.get_data(self.path)
+        filename = Path(self.path).name
+        expected = PINNED_KANANA_MODEL_FILES[filename]
+        actual = hashlib.sha256(source).hexdigest()
+        if actual != expected:
+            raise ImportError(f"Kanana custom source changed before execution: {filename}")
+        return compile(source, self.path, "exec", dont_inherit=True)
+
+
+class PinnedPythonSourceFinder(importlib.abc.MetaPathFinder):
+    """Route every local Kanana module import through the pinned byte loader."""
+
+    def __init__(self, model_dir: Path):
+        self.model_dir = model_dir
+
+    def find_spec(self, fullname, path=None, target=None):
+        prefix = f"{PACKAGE}."
+        if not fullname.startswith(prefix):
+            return None
+        module_name = fullname[len(prefix) :]
+        if "." in module_name or module_name not in PINNED_PYTHON_MODULES:
+            raise ModuleNotFoundError(f"Unpinned Kanana custom module: {fullname}", name=fullname)
+        source_path = self.model_dir / f"{module_name}.py"
+        loader = PinnedPythonSourceLoader(fullname, str(source_path))
+        return importlib.util.spec_from_loader(fullname, loader, origin=str(source_path))
 
 
 def import_pinned_vision_classes(model_dir: Path):
+    verify_pinned_model_files(model_dir)
+    for name in tuple(sys.modules):
+        if name == PACKAGE or name.startswith(f"{PACKAGE}."):
+            del sys.modules[name]
     package = types.ModuleType(PACKAGE)
     package.__path__ = [str(model_dir)]
     package.__package__ = PACKAGE
     sys.modules[PACKAGE] = package
-    config_module = importlib.import_module(f"{PACKAGE}.configuration_kanana_v_decide")
-    model_module = importlib.import_module(f"{PACKAGE}.modeling_kanana_v_decide")
+    finder = PinnedPythonSourceFinder(model_dir)
+    sys.meta_path.insert(0, finder)
+    try:
+        config_module = importlib.import_module(f"{PACKAGE}.configuration_kanana_v_decide")
+        model_module = importlib.import_module(f"{PACKAGE}.modeling_kanana_v_decide")
+    except Exception:
+        for name in tuple(sys.modules):
+            if name == PACKAGE or name.startswith(f"{PACKAGE}."):
+                del sys.modules[name]
+        raise
+    finally:
+        sys.meta_path.remove(finder)
     return config_module.KananaVDecideVisionConfig, model_module.KananaVDecideVisionModel
 
 
@@ -252,7 +312,7 @@ def main():
         (args.output_dir / "vision_relax_main.r").write_text(mod["main"].script())
 
         started = time.perf_counter()
-        executable = tvm.relax.build(mod, target="llvm")
+        tvm.relax.build(mod, target="llvm")
         fixed_result["cpu_build_status"] = "passed"
         fixed_result["cpu_build_seconds"] = round(time.perf_counter() - started, 3)
         fixed_result["status"] = "passed"

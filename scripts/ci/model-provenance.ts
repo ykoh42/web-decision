@@ -5,7 +5,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'b4f4d204be336a37303cdbf58333b59d1e7eede67db970f8ea0975749c71c13f';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'e927926545f887980418e188ba549d0e98b990da5f6c22b12c0365009106d0a8';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';
@@ -38,6 +38,7 @@ interface ProvenanceValidationOptions {
   expectedEvidenceRoot: string;
   allowTestFixture: boolean;
   requireCommitted: boolean;
+  allowPending?: boolean;
 }
 
 export function sha256(bytes: Uint8Array): string {
@@ -281,10 +282,40 @@ async function validateCommittedEvidenceReference(
   if (requireCommitted) assertCommittedFile(workspaceRoot, path, bytes, description);
 }
 
+async function validatePendingProvenance(
+  evidence: unknown,
+  modelId: string,
+  artifactLockSha256: string,
+  workspaceRoot: string,
+  requireCommitted: boolean,
+  allowPending: boolean
+): Promise<void> {
+  failUnless(
+    isRecord(evidence) &&
+      evidence.status === 'pending' &&
+      evidence.modelId === modelId &&
+      Array.isArray(evidence.unresolved) &&
+      evidence.unresolved.length > 0 &&
+      evidence.unresolved.every((item) => typeof item === 'string' && item.length > 0),
+    `Pending provenance for ${modelId} must list unresolved evidence.`
+  );
+  if (isRecord(evidence.conversion)) {
+    await validateConversionEvidence(evidence.conversion, modelId, workspaceRoot, requireCommitted);
+    assert.equal(
+      evidence.conversion.artifactLockSha256,
+      artifactLockSha256,
+      `Pending conversion artifact-lock digest differs for ${modelId}.`
+    );
+  }
+  if (allowPending) return;
+  throw new Error(`Model ${modelId} provenance is pending: ${(evidence.unresolved as string[]).join('; ')}`);
+}
+
 export async function validateModelProvenance(options: ProvenanceValidationOptions): Promise<{
   manifestSha256: string;
   artifactLockSha256: string;
   modelIds: string[];
+  pendingModelIds: string[];
 }> {
   const manifestSha256 = sha256(options.manifestBytes);
   assert.equal(
@@ -310,6 +341,7 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     'Artifact lock model IDs must exactly match the model spec.'
   );
   const manifest = parseManifest(options.manifestBytes);
+  const pendingModelIds: string[] = [];
   const entryIds = manifest.models.map((entry) => entry?.modelId);
   failUnless(
     entryIds.every((id) => typeof id === 'string'),
@@ -387,17 +419,16 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     }
 
     if (entry.status === 'pending') {
-      failUnless(
-        isRecord(evidenceValue) &&
-          evidenceValue.status === 'pending' &&
-          evidenceValue.modelId === entry.modelId &&
-          Array.isArray(evidenceValue.unresolved) &&
-          evidenceValue.unresolved.length > 0 &&
-          evidenceValue.unresolved.every((item) => typeof item === 'string' && item.length > 0),
-        `Pending provenance for ${entry.modelId} must list unresolved evidence.`
+      await validatePendingProvenance(
+        evidenceValue,
+        entry.modelId,
+        artifactLockSha256,
+        options.workspaceRoot,
+        options.requireCommitted,
+        options.allowPending ?? false
       );
-      const unresolved = (evidenceValue.unresolved as string[]).join('; ');
-      throw new Error(`Model ${entry.modelId} provenance is pending: ${unresolved}`);
+      pendingModelIds.push(entry.modelId);
+      continue;
     }
 
     await validateReviewEvidence(
@@ -428,7 +459,7 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     );
   }
 
-  return {manifestSha256, artifactLockSha256, modelIds: ids};
+  return {manifestSha256, artifactLockSha256, modelIds: ids, pendingModelIds};
 }
 
 function assertCommittedFile(workspaceRoot: string, path: string, bytes: Uint8Array, description: string): void {
@@ -441,10 +472,14 @@ function assertCommittedFile(workspaceRoot: string, path: string, bytes: Uint8Ar
   assert.deepEqual(Buffer.from(bytes), committed, `${description} must match its committed bytes.`);
 }
 
-export async function assertCommittedPackageProvenance(workspaceRoot: string): Promise<{
+export async function assertCommittedPackageProvenance(
+  workspaceRoot: string,
+  options: {allowPending?: boolean} = {}
+): Promise<{
   manifestSha256: string;
   artifactLockSha256: string;
   modelIds: string[];
+  pendingModelIds: string[];
 }> {
   const root = resolve(workspaceRoot);
   const packageRoot = resolve(root, 'packages/web-decision');
@@ -471,7 +506,8 @@ export async function assertCommittedPackageProvenance(workspaceRoot: string): P
     expectedManifestSha256: MODEL_PROVENANCE_MANIFEST_SHA256,
     expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
     allowTestFixture: false,
-    requireCommitted: true
+    requireCommitted: true,
+    ...(options.allowPending === undefined ? {} : {allowPending: options.allowPending})
   });
   return result;
 }

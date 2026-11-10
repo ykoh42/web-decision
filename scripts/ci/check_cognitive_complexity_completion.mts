@@ -160,7 +160,7 @@ export function requireComplete(baseline: SonarBaseline, sourcePaths: ReadonlySe
   fail(`Managed JavaScript/TypeScript source remains above cognitive complexity ${THRESHOLD}:\n${details}`);
 }
 
-function workingTreeSources(root: string): Set<string> {
+export function workingTreeSources(root: string): Set<string> {
   const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
     cwd: root,
     encoding: 'buffer',
@@ -169,10 +169,26 @@ function workingTreeSources(root: string): Set<string> {
   if (result.error) fail(`Could not list JavaScript/TypeScript sources: ${result.error.message}`);
   if (result.status !== 0) fail(`Could not list JavaScript/TypeScript sources: ${result.stderr.toString('utf8')}`);
 
+  const deletedResult = spawnSync('git', ['ls-files', '--deleted', '-z'], {
+    cwd: root,
+    encoding: 'buffer',
+    maxBuffer: 128 * 1024 * 1024
+  });
+  if (deletedResult.error) fail(`Could not list deleted JavaScript/TypeScript sources: ${deletedResult.error.message}`);
+  if (deletedResult.status !== 0)
+    fail(`Could not list deleted JavaScript/TypeScript sources: ${deletedResult.stderr.toString('utf8')}`);
+  const deleted = new Set(
+    deletedResult.stdout
+      .toString('utf8')
+      .split('\0')
+      .filter((file) => file.length > 0)
+  );
+
   const sources = new Set<string>();
   for (const file of result.stdout.toString('utf8').split('\0')) {
     if (file === '' || !SOURCE_EXTENSIONS.has(path.posix.extname(file))) continue;
     const normalized = normalizedSourcePath(file, 'working tree source');
+    if (deleted.has(normalized)) continue;
     const absolute = path.join(root, ...normalized.split('/'));
     let stats: fs.Stats;
     try {

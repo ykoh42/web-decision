@@ -1,0 +1,46 @@
+{
+  "modelId": "kakaocorp/kanana-2-v-decide-3b-2611",
+  "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+  "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+  "source": {
+    "runtime": "Python/PyTorch system_one",
+    "parameterDtype": "bfloat16",
+    "mode": "checkpoint_full"
+  },
+  "request": {
+    "state": "Order A-1047 was due Friday, 10 April 2026. It arrived Sunday, 12 April 2026. The customer wrote: \"It arrived two days late.\"",
+    "questions": {
+      "delivery_status": {
+        "type": "choice",
+        "instructions": "How did the delivery compare with its promised date?",
+        "criteria": {
+          "early": "The parcel arrived before the promised date.",
+          "on_time": "The parcel arrived on the promised date.",
+          "late": "The parcel arrived after the promised date."
+        }
+      }
+    },
+    "state_format": "text",
+    "temperature": 0.7
+  },
+  "result": {
+    "model": "/Users/ykoh/.cache/huggingface/hub/models--kakaocorp--kanana-2-v-decide-3b-2611/snapshots/12820d654ed9789a0f7f48daeee1703c3483c464",
+    "answers": {
+      "delivery_status": {
+        "type": "choice",
+        "choice": "late",
+        "confidence": 0.9732644497066467,
+        "probabilities": {
+          "early": 0.0073939928078911735,
+          "on_time": 0.010429707387677695,
+          "late": 0.9821762998044311
+        }
+      }
+    },
+    "usage": {
+      "billing_units": 1,
+      "input_tokens": 235,
+      "output_tokens": 0
+    }
+  }
+}

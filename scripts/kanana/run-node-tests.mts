@@ -14,7 +14,8 @@ const allTests = (await readdir(testDirectory))
   .map((file) => join('test', file));
 const coreTests = [
   'test/kanana-decision-session.test.mts',
-  'test/kanana-tvm-session.test.mjs',
+  'test/kanana-device-limits.test.mts',
+  'test/kanana-tvm-session.test.mts',
   'test/kanana-source-tokenizer.test.mts',
   'test/kanana-protocol.test.mts',
   'test/kanana-scoring.test.mts',
@@ -25,6 +26,9 @@ const coreTests = [
   'test/kanana-image-ingress.test.mts',
   'test/kanana-encoded-image.test.mts',
   'test/kanana-image-processing.test.mts',
+  'test/kanana-mrope.test.mts',
+  'test/kanana-vision-inputs.test.mts',
+  'test/kanana-image-encoder.test.mts',
   'test/kanana-magick-image.test.mts',
   'test/kanana-pnm-image.test.mts',
   'test/kanana-tiff16-image.test.mts'

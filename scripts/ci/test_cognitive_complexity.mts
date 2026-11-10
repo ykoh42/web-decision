@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
@@ -13,6 +15,7 @@ import {
   runOxlint,
   selectTrackedSources,
   sourceNamesInWorkingTree,
+  workingTreeSources,
   validateFindings
 } from './check_cognitive_complexity.mjs';
 import type {ComplexityBaseline, ComplexityFinding, OxlintDiagnostic} from './check_cognitive_complexity.mjs';
@@ -65,6 +68,19 @@ function makeCacheFixture(prefix: string): string {
   return fs.mkdtempSync(path.join(cacheDirectory, prefix));
 }
 
+function makeGitSourceFixture(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'complexity-source-scan-'));
+  fs.mkdirSync(path.join(root, 'src'), {recursive: true});
+  fs.writeFileSync(path.join(root, 'src/legacy.mjs'), 'export const legacy = true;\n');
+  fs.writeFileSync(path.join(root, 'src/retained.ts'), 'export const retained = true;\n');
+  execFileSync('git', ['init', '--quiet'], {cwd: root});
+  execFileSync('git', ['add', '--', 'src/legacy.mjs', 'src/retained.ts'], {cwd: root});
+  fs.rmSync(path.join(root, 'src/legacy.mjs'));
+  fs.writeFileSync(path.join(root, 'src/new-module.mts'), 'export const moduleSource = true;\n');
+  fs.writeFileSync(path.join(root, 'src/new-browser.ts'), 'export const browserSource = true;\n');
+  return root;
+}
+
 test('fails closed when the tracked JavaScript/TypeScript list is empty', () => {
   assert.throws(() => selectTrackedSources([], []), /No tracked JavaScript or TypeScript sources/);
 });
@@ -79,6 +95,13 @@ test('includes ignored tracked source paths and exact release-source overlays', 
   assert.ok(selected.includes('.ignored/hidden.ts'));
   assert.ok(selected.includes('releases/web-decision-0.1.0/source/overlay/packages/web-decision/src/main.js'));
   for (const {path: name} of GENERATED_EXCLUSIONS) assert.ok(!selected.includes(name));
+});
+
+test('working-tree scan omits only git-confirmed deletions and includes new TS and MTS files', (context) => {
+  const root = makeGitSourceFixture();
+  context.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  const selected = workingTreeSources(root, []);
+  assert.deepEqual(selected, ['src/new-browser.ts', 'src/new-module.mts', 'src/retained.ts']);
 });
 
 test('maps diagnostics to stable function identity when lines move', () => {

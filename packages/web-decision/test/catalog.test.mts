@@ -26,26 +26,43 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog exposes one ID-only TVM descriptor with the kev06 adapter', () => {
-  assert.deepEqual(MODEL_IDS, ['kev-0.6b-q4f16']);
-  assert.equal(MODEL_CATALOG.length, 1);
+test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
+  assert.deepEqual(MODEL_IDS, ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']);
+  assert.equal(MODEL_CATALOG.length, 2);
 
-  const entry = MODEL_CATALOG_BY_ID[MODEL_IDS[0]!];
-  assert.equal(entry, MODEL_CATALOG[0]);
-  assert.equal(entry.modelId, MODEL_IDS[0]);
-  assert.equal(entry.description.adapter, 'kev06');
-  assert.equal(entry.description.backend.name, 'tvm-webgpu');
-  assert.deepEqual(entry.description.backend.requiredFeatures, ['shader-f16']);
-  assert.equal(entry.description.features.textChoice.status, 'implemented');
-  assert.equal(entry.description.verification.currentBundleGpu, 'not-revalidated');
-  assert.equal(Object.hasOwn(entry, 'model'), false);
-  assert.equal(Object.hasOwn(entry.description, 'model'), false);
-  assert.equal(Object.hasOwn(entry.description.assets, 'assetsUrl'), false);
-  assert.equal(Object.hasOwn(entry.description.assets, 'manifestSha256'), true);
+  const kev = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
+  assert.equal(kev, MODEL_CATALOG[0]);
+  assert.equal(kev.description.adapter, 'kev06');
+  assert.deepEqual(kev.description.backend.requiredFeatures, ['shader-f16']);
+
+  const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
+  assert.equal(kanana, MODEL_CATALOG[1]);
+  assert.equal(kanana.description.adapter, 'kanana');
+  assert.equal(kanana.description.backend.name, 'tvm-webgpu');
+  assert.equal(kanana.description.backend.requiredLimits.maxBufferSize, 656_670_720);
+  assert.equal(kanana.description.backend.requiredLimits.maxStorageBufferBindingSize, 656_670_720);
+  assert.equal(kanana.description.checkpoint.revision, '12820d654ed9789a0f7f48daeee1703c3483c464');
+  assert.equal(kanana.description.features.textChoice.status, 'implemented');
+  assert.equal(kanana.description.features.imageChoice?.status, 'implemented');
+  assert.deepEqual(kanana.description.features.imageChoice?.limits, [
+    {
+      resource: 'images',
+      scope: 'request',
+      max: 10,
+      description: 'Pinned model-card maximum across images in state messages and the images field.'
+    }
+  ]);
+  assert.equal(kanana.description.verification.currentBundleGpu, 'verified');
+  for (const entry of [kev, kanana]) {
+    assert.equal(Object.hasOwn(entry, 'model'), false);
+    assert.equal(Object.hasOwn(entry.description, 'model'), false);
+    assert.equal(Object.hasOwn(entry.description.assets, 'assetsUrl'), false);
+    assert.equal(Object.hasOwn(entry.description.assets, 'manifestSha256'), true);
+  }
 });
 
-test('catalog description retains the existing Kev contract and narrows bundle verification', () => {
-  const entry = MODEL_CATALOG[0]!;
+test('Kev catalog description retains its existing contract', () => {
+  const entry = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
   const {adapter, ...description} = entry.description;
   const legacy = getModelRegistration(entry.modelId).description;
   const {model, ...expected} = structuredClone(legacy);
@@ -99,42 +116,55 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
   );
 });
 
-test('artifact lock hashes the manifest, bundled files, and upstream map', async () => {
-  const entry = MODEL_CATALOG[0]!;
-  const lock = entry.artifacts;
+test('artifact locks hash packaged manifests, runtime files, and model ranges', async () => {
   const lockFile = JSON.parse(await readFile(packageFile('src/catalog/artifacts.lock.json'), 'utf8'));
-  const manifestBytes = await readFile(packageFile(lock.manifest.sourcePath));
-  const manifest = JSON.parse(manifestBytes.toString('utf8'));
-  const canonicalManifest = Buffer.from(JSON.stringify(canonical(manifest)) + '\n');
-
-  assert.equal(lock.manifest.rawSha256, sha256(manifestBytes));
-  assert.equal(lock.manifest.canonicalSha256, sha256(canonicalManifest));
-  assert.equal(entry.description.assets.manifestSha256, lock.manifest.canonicalSha256);
-  assert.deepEqual(entry.description.assets.requiredFiles, ['manifest.json', ...Object.keys(manifest.files)]);
-  assert.deepEqual(lock.manifest.files, manifest.files);
-  assert.equal(lock.manifest.experimental, true);
   assert.deepEqual(Object.keys(lockFile.byModelId), MODEL_IDS);
-  assert.deepEqual(lockFile.byModelId[entry.modelId], lock);
-  assert.equal(Object.hasOwn(lock, 'priorHardwareEvidence'), false);
+  for (const entry of MODEL_CATALOG) {
+    const lock = entry.artifacts;
+    const manifestBytes = await readFile(packageFile(lock.manifest.sourcePath));
+    const manifest = JSON.parse(manifestBytes.toString('utf8'));
+    const canonicalManifest = Buffer.from(JSON.stringify(canonical(manifest)) + '\n');
 
-  for (const artifact of lock.bundledRuntimeFiles) {
-    const bytes = await readFile(packageFile(artifact.sourcePath));
-    assert.equal(artifact.bytes, bytes.byteLength);
-    assert.equal(artifact.sha256, sha256(bytes));
-    assert.equal(artifact.sha256, lock.manifest.files[artifact.manifestName]!.sha256);
+    if (entry.modelId === 'kanana-2-v-decide-3b-2611') {
+      assert.equal(manifest.modifications.modifiedBy, 'web-decision');
+      assert.match(manifest.modifications.description, /generated TVM WebGPU modules/u);
+      assert.deepEqual(manifest.modifications.files, Object.keys(manifest.files));
+    }
+
+    assert.equal(lock.manifest.rawSha256, sha256(manifestBytes));
+    assert.equal(lock.manifest.canonicalSha256, sha256(canonicalManifest));
+    assert.equal(entry.description.assets.manifestSha256, lock.manifest.canonicalSha256);
+    assert.deepEqual(entry.description.assets.requiredFiles, ['manifest.json', ...Object.keys(manifest.files)]);
+    assert.deepEqual(lock.manifest.files, manifest.files);
+    assert.deepEqual(lockFile.byModelId[entry.modelId], lock);
+    assert.equal(Object.hasOwn(lock, 'priorHardwareEvidence'), false);
+
+    for (const artifact of lock.bundledRuntimeFiles) {
+      const bytes = await readFile(packageFile(artifact.sourcePath));
+      assert.equal(artifact.bytes, bytes.byteLength);
+      assert.equal(artifact.sha256, sha256(bytes));
+      assert.equal(artifact.sha256, lock.manifest.files[artifact.manifestName]!.sha256);
+    }
+
+    if (lock.upstream.shardMapPath) {
+      const mapBytes = await readFile(packageFile(lock.upstream.shardMapPath));
+      assert.equal(lock.upstream.shardMapSha256, sha256(mapBytes));
+    }
+    if (lock.upstream.rangeManifestPath) {
+      const rangeBytes = await readFile(packageFile(lock.upstream.rangeManifestPath));
+      assert.equal(lock.upstream.rangeManifestSha256, sha256(rangeBytes));
+    }
   }
-
-  const mapBytes = await readFile(packageFile(lock.upstream.shardMapPath));
-  assert.equal(lock.upstream.shardMapSha256, sha256(mapBytes));
-  assert.equal(entry.description.verification.currentBundleGpu, 'not-revalidated');
 });
 
 test('generated files are deterministic and the ModelId union follows the curated spec', async () => {
   const typeFile = await readFile(packageFile('src/catalog/types.generated.d.ts'), 'utf8');
-  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0]! + "';";
+  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0]! + "' | '" + MODEL_IDS[1]! + "';";
   assert.ok(typeFile.includes(expectedIdType));
-  assert.ok(typeFile.includes("export type ModelIdTuple = readonly ['" + MODEL_IDS[0]! + "'];"));
-  assert.ok(typeFile.includes("export type ModelAdapterId = 'kev06';"));
+  assert.ok(
+    typeFile.includes("export type ModelIdTuple = readonly ['" + MODEL_IDS[0]! + "', '" + MODEL_IDS[1]! + "'];")
+  );
+  assert.ok(typeFile.includes("export type ModelAdapterId = 'kev06' | 'kanana';"));
   assert.equal(typeFile.includes("from '../index.js'"), false);
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-model-catalog.mts', '--check'], {
     cwd: packageRoot,

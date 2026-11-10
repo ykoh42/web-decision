@@ -1,9 +1,12 @@
 export const KANANA_MODEL_ID = 'kanana-2-v-decide-3b-2611';
 export const KANANA_REPOSITORY = 'kakaocorp/kanana-2-v-decide-3b-2611';
-export const KANANA_REVISION = '1489062def4145ae3a0a9261fbac4f4d88a8c6d1';
+export const KANANA_REVISION = '12820d654ed9789a0f7f48daeee1703c3483c464';
 export const KANANA_ASSETS_URL = `https://huggingface.co/${KANANA_REPOSITORY}/resolve/${KANANA_REVISION}/`;
 export const KANANA_MODEL_MAX_LENGTH = 20_480;
 export const KANANA_VOCAB_SIZE = 128_256;
+export const KANANA_EMBEDDING_SIZE = 2_560;
+export const KANANA_IMAGE_TOKEN_ID = 128_020;
+export const KANANA_SPATIAL_MERGE_SIZE = 2;
 
 export const KANANA_FILES = Object.freeze({
   'config.json': Object.freeze({

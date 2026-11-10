@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {KANANA_MODEL_MAX_LENGTH} from '../src/kanana/contract.mjs';
-import {protocol, truncation} from './kanana-core-modules.mjs';
+import * as coreModules from './kanana-core-modules.mjs';
 
 const {
   answerKananaQuestion,
@@ -9,11 +9,11 @@ const {
   prepareKananaTextSystemOne,
   renderKananaQueryInput,
   renderKananaQueryMessages
-} = protocol;
-const {KANANA_MAX_LENGTH, truncateKananaQuery} = truncation;
+} = (coreModules as any).protocol;
+const {KANANA_MAX_LENGTH, truncateKananaQuery} = (coreModules as any).truncation;
 
 function choice(
-  criteria = new Map([
+  criteria: Map<string, string> = new Map([
     ['billing', 'Billing'],
     ['support', 'Support']
   ])
@@ -23,21 +23,21 @@ function choice(
 
 function codePointTokenizer() {
   return {
-    encode(value) {
-      return {ids: Array.from(value, (character) => character.codePointAt(0) + 1)};
+    encode(value: string) {
+      return {ids: Array.from(value, (character) => character.codePointAt(0)! + 1)};
     },
-    decode(ids) {
-      return Array.from(ids, (id) => String.fromCodePoint(id - 1)).join('');
+    decode(ids: number[]) {
+      return Array.from(ids, (id: number) => String.fromCodePoint(id - 1)).join('');
     }
   };
 }
 
-function queryInput(state) {
+function queryInput(state: string): any {
   const prepared = prepareKananaTextSystemOne({state, questions: {route: choice()}});
   return renderKananaQueryInput(prepared, 'route');
 }
 
-function truncateQuery(input, tokenizer, options = {}) {
+function truncateQuery(input: any, tokenizer: any, options: Record<string, unknown> = {}): any {
   return truncateKananaQuery(tokenizer, input.messages, [], {
     editableUserTextIndexes: input.editableUserTextIndexes,
     ...options
@@ -85,7 +85,7 @@ test('choice options and response entries preserve criteria order', () => {
   });
   const entry = prepared.questionEntries[0];
   const userText = renderKananaQueryMessages(prepared, 'route')[1]
-    .content.map(({text}) => text ?? '')
+    .content.map(({text}: {text?: string}) => text ?? '')
     .join('');
   const answer = answerKananaQuestion(entry.question, entry.candidateKeys, [0, 0, 1]);
 
@@ -93,7 +93,7 @@ test('choice options and response entries preserve criteria order', () => {
   assert.deepEqual(entry.candidateKeys, ['10', '2', '1']);
   assert.equal(answer.choice, '1');
   assert.deepEqual(
-    answer.probabilityEntries.map(([key]) => key),
+    answer.probabilityEntries.map(([key]: [string, unknown]) => key),
     ['10', '2', '1']
   );
 });
@@ -102,7 +102,7 @@ test('Noul reports P(true) without adding confidence or an abstention field', ()
   const answer = answerKananaQuestion({type: 'noul'}, ['false', 'true'], [Math.log(3), 0]);
 
   assert.equal(answer.type, 'noul');
-  assert.ok(Math.abs(answer.noul - 0.25) < 1e-12);
+  assert.ok(Math.abs((answer.noul as number) - 0.25) < 1e-12);
   assert.deepEqual(Object.keys(answer), ['type', 'noul']);
   assert.equal(Object.hasOwn(answer, 'abstain'), false);
 });
@@ -114,7 +114,7 @@ test('score answers keep ordered levels in their probabilities and legend', () =
   assert.equal(answer.score, 1);
   assert.deepEqual(answer.legend, {0: 'low', 1: 'middle', 2: 'high'});
   assert.deepEqual(
-    answer.probabilityEntries.map(([key]) => key),
+    answer.probabilityEntries.map(([key]: [string, unknown]) => key),
     ['0', '1', '2']
   );
 });

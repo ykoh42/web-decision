@@ -325,8 +325,29 @@ export function sourceNamesInWorkingTree(root = ROOT): string[] {
     .filter((name) => name.length > 0);
 }
 
-function workingTreeSources(): string[] {
-  return selectTrackedSources(sourceNamesInWorkingTree());
+function deletedTrackedSources(root = ROOT): Set<string> {
+  const result = spawnSync('git', ['ls-files', '--deleted', '-z'], {
+    cwd: root,
+    encoding: 'buffer',
+    maxBuffer: 128 * 1024 * 1024
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) fail(`git ls-files --deleted failed: ${result.stderr.toString('utf8')}`);
+  return new Set(
+    result.stdout
+      .toString('utf8')
+      .split('\0')
+      .filter((name) => name.length > 0)
+  );
+}
+
+export function workingTreeSources(
+  root = ROOT,
+  exclusions: readonly GeneratedExclusion[] = GENERATED_EXCLUSIONS
+): string[] {
+  const deleted = deletedTrackedSources(root);
+  const names = sourceNamesInWorkingTree(root).filter((file) => !deleted.has(file));
+  return selectTrackedSources(names, exclusions);
 }
 
 function verifySourceFile(relativePath: string): string {

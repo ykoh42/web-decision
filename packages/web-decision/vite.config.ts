@@ -4,18 +4,21 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
 // This preview uses the exact pinned original TVM WebGPU source.
-export function assertPreviewWebgpuHash(actual: string): void {
-  if (actual !== '77003ab2bc6c7ae103b38fb52c12a5a7a3d49597260b43f010deaacc5d65b7c1') {
-    throw new Error(
-      'This preview requires its verified TVM WebGPU source; use a clean pinned checkout for this build.'
-    );
+export function assertPinnedWebgpuHash(actual: string): void {
+  if (actual !== 'f9dcc047285dfe7d0b9d3eee0ce81df3c20cd5935cd34db581f6bce1ac887f23') {
+    throw new Error('The TVM WebGPU adapter-limits source differs from the verified patch.');
   }
 }
 
 export function tvmRuntimeImportWithoutTypeMarker(source: string): string | null {
   const marker = '?web-decision-runtime';
   const prefix = '../../../../.toolchains/apache-tvm-src/web/src/';
-  if (source !== `${prefix}runtime.ts${marker}` && source !== `${prefix}compact.ts${marker}`) return null;
+  if (
+    source !== `${prefix}runtime.ts${marker}` &&
+    source !== `${prefix}compact.ts${marker}` &&
+    source !== `${prefix}webgpu.ts${marker}`
+  )
+    return null;
   return source.slice(0, -marker.length);
 }
 
@@ -63,6 +66,7 @@ export function browserOnlyTvmWasiExport(): Plugin {
 }
 
 export default defineConfig({
+  base: './',
   // TVM's generated Emscripten glue probes Node globals. This package is
   // browser-only; leave those globals undefined before a consumer bundler can
   // replace `typeof __filename` with "string" and make the branch unconditional.
@@ -74,7 +78,7 @@ export default defineConfig({
       name: 'verify-preview-webgpu-source',
       buildStart() {
         const path = fileURLToPath(new URL('../../.toolchains/apache-tvm-src/web/src/webgpu.ts', import.meta.url));
-        assertPreviewWebgpuHash(createHash('sha256').update(readFileSync(path)).digest('hex'));
+        assertPinnedWebgpuHash(createHash('sha256').update(readFileSync(path)).digest('hex'));
       }
     },
     {
