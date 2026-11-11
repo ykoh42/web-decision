@@ -28,6 +28,7 @@ import {
 } from '../src/kev06/upstream-contract.js';
 
 type CuratedModel = Omit<ModelCatalogEntry, 'description' | 'artifacts'> & {
+  readonly artifactUpstreams?: readonly DirectKevUpstream[];
   readonly description: Omit<CatalogModelDescription, 'assets'> & {
     readonly adapter: ModelAdapterId;
     readonly assets: Omit<CatalogModelDescription['assets'], 'manifestSha256' | 'requiredFiles'>;
@@ -38,6 +39,23 @@ interface ManifestFile {
   readonly sha256: string;
   readonly bytes: number;
 }
+
+interface DirectKevUpstream {
+  readonly role: string;
+  readonly repository: string;
+  readonly revision: string;
+  readonly sourcePath: string;
+  readonly sourceBytes: number;
+  readonly sourceSha256: string;
+}
+
+type DirectModelArtifactLock = ModelArtifactLock & {
+  readonly upstreams: readonly DirectKevUpstream[];
+};
+
+type CatalogArtifactLock = ModelArtifactLock & {
+  readonly upstreams?: readonly DirectKevUpstream[];
+};
 
 interface KevManifest {
   readonly model: string;
@@ -62,7 +80,7 @@ interface DirectKevManifest {
 
 interface ArtifactLockFile {
   readonly schemaVersion: 1;
-  readonly byModelId: Readonly<Record<string, ModelArtifactLock>>;
+  readonly byModelId: Readonly<Record<string, CatalogArtifactLock>>;
 }
 
 interface JsonFile {
@@ -80,6 +98,7 @@ const catalogRoot = path.join(packageRoot, 'src/catalog');
 const specPath = path.join(catalogRoot, 'model-spec.json');
 const manifestPath = 'assets/kev06-stable/manifest.json';
 const directKevArtifactDirectory = path.join(packageRoot, 'assets/kev06-direct');
+const directKevManifestSha256 = '78988880bd42241c01729bed42c768b81a0cbc48d51e45de64845c64ea18b93a';
 const mapPath = 'assets/experimental-kev-upstream/source-shard-map.json';
 const bundledFiles: readonly (readonly [string, string])[] = [
   ['model.wasm', 'assets/kev06-stable/model.wasm'],
@@ -149,9 +168,99 @@ function safeManifestPath(value: string): boolean {
     value !== 'manifest.json' &&
     !value.startsWith('/') &&
     !value.includes(':') &&
-    !value.includes('\\') &&
+    !/[\\?#%\u0000-\u001f]/u.test(value) &&
     value.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
   );
+}
+
+function isDirectKevUpstream(value: unknown): value is DirectKevUpstream {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value).sort();
+  return (
+    JSON.stringify(keys) ===
+      JSON.stringify(['repository', 'revision', 'role', 'sourceBytes', 'sourcePath', 'sourceSha256']) &&
+    typeof value.role === 'string' &&
+    /^[a-z0-9][a-z0-9-]*$/u.test(value.role) &&
+    typeof value.repository === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(value.repository) &&
+    typeof value.revision === 'string' &&
+    /^[0-9a-f]{40}$/u.test(value.revision) &&
+    typeof value.sourcePath === 'string' &&
+    safeManifestPath(value.sourcePath) &&
+    Number.isSafeInteger(value.sourceBytes) &&
+    (value.sourceBytes as number) > 0 &&
+    typeof value.sourceSha256 === 'string' &&
+    /^[0-9a-f]{64}$/u.test(value.sourceSha256)
+  );
+}
+
+function validateDirectKevUpstreams(value: unknown): readonly DirectKevUpstream[] {
+  failUnless(Array.isArray(value) && value.length > 0, 'Direct Kev catalog must pin its conversion inputs.');
+  const roles = new Set<string>();
+  const sources = new Set<string>();
+  for (const candidate of value) {
+    failUnless(isDirectKevUpstream(candidate), 'Direct Kev conversion input pin is invalid.');
+    const source = [candidate.repository, candidate.revision, candidate.sourcePath].join('\0');
+    failUnless(!roles.has(candidate.role), 'Direct Kev conversion input roles must be unique.');
+    failUnless(!sources.has(source), 'Direct Kev conversion input sources must be unique.');
+    roles.add(candidate.role);
+    sources.add(source);
+  }
+  return value as readonly DirectKevUpstream[];
+}
+
+function validatePrivateArtifactUpstreams(model: Record<string, unknown>): void {
+  const description = model.description;
+  const checkpoint = isRecord(description) ? description.checkpoint : undefined;
+  failUnless(
+    model.modelId === 'kev-0.6b-q4f16' &&
+      isRecord(description) &&
+      description.adapter === 'kev06' &&
+      isRecord(checkpoint) &&
+      checkpoint.repository === DIRECT_KEV06_CHECKPOINT.repository &&
+      checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision,
+    'Artifact upstream pins are direct Kev-only.'
+  );
+  validateDirectKevUpstreams(model.artifactUpstreams);
+}
+
+function isDirectKevSpecModel(model: Record<string, unknown>): boolean {
+  const description = model.description;
+  const checkpoint = isRecord(description) ? description.checkpoint : undefined;
+  return (
+    isRecord(description) &&
+    isRecord(checkpoint) &&
+    (checkpoint.repository === DIRECT_KEV06_CHECKPOINT.repository ||
+      checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision)
+  );
+}
+
+function validateModelPrivateInputs(model: Record<string, unknown>): void {
+  if (isDirectKevSpecModel(model)) {
+    validatePrivateArtifactUpstreams(model);
+    return;
+  }
+  failUnless(!Object.hasOwn(model, 'artifactUpstreams'), 'Artifact upstream pins are direct Kev-only.');
+}
+
+function validateDirectKevManifestFiles(files: unknown): asserts files is Readonly<Record<string, ManifestFile>> {
+  failUnless(isRecord(files), 'Direct Kev manifest must contain a file inventory.');
+  const names = Object.keys(files).sort();
+  failUnless(names.length > 0, 'Direct Kev manifest must contain a file inventory.');
+  for (const name of names) {
+    failUnless(safeManifestPath(name), 'Direct Kev manifest contains an unsafe file path: ' + name + '.');
+    const metadata = files[name];
+    const metadataKeys = isRecord(metadata) ? Object.keys(metadata).sort() : [];
+    failUnless(
+      isRecord(metadata) &&
+        JSON.stringify(metadataKeys) === JSON.stringify(['bytes', 'sha256']) &&
+        typeof metadata.sha256 === 'string' &&
+        /^[0-9a-f]{64}$/u.test(metadata.sha256) &&
+        Number.isSafeInteger(metadata.bytes) &&
+        (metadata.bytes as number) > 0,
+      'Direct Kev manifest file metadata is invalid: ' + name + '.'
+    );
+  }
 }
 
 async function listLocalFiles(directory: string): Promise<string[]> {
@@ -170,7 +279,7 @@ async function listLocalFiles(directory: string): Promise<string[]> {
   return files.sort();
 }
 
-function validateDirectKevModel(model: CuratedModel): void {
+function validateDirectKevModel(model: CuratedModel): readonly DirectKevUpstream[] {
   failUnless(model.modelId === 'kev-0.6b-q4f16', 'Direct Kev package model ID differs from the curated model.');
   failUnless(model.description.adapter === 'kev06', 'Direct Kev package requires the Kev adapter.');
   failUnless(
@@ -178,13 +287,53 @@ function validateDirectKevModel(model: CuratedModel): void {
       model.description.checkpoint.revision === DIRECT_KEV06_CHECKPOINT.revision,
     'Direct Kev catalog checkpoint differs from the direct source pin.'
   );
+  return validateDirectKevUpstreams(model.artifactUpstreams);
+}
+
+function validateDirectKevManifestMetadata(model: CuratedModel, manifest: DirectKevManifest): void {
+  failUnless(typeof manifest.experimental === 'boolean', 'Direct Kev manifest must preserve its experimental flag.');
+  failUnless(manifest.model === model.modelId, 'Direct Kev manifest model differs from the curated model.');
+  failUnless(
+    manifest.backend === model.description.backend.name,
+    'Direct Kev manifest backend differs from the catalog.'
+  );
+  failUnless(
+    manifest.parameterCount === DIRECT_KEV06_PARAMETER_COUNT,
+    'Direct Kev parameter count differs from its pin.'
+  );
+  failUnless(
+    manifest.checkpoint.repository === model.description.checkpoint.repository &&
+      manifest.checkpoint.revision === model.description.checkpoint.revision,
+    'Direct Kev checkpoint differs from the catalog.'
+  );
+  failUnless(
+    manifest.base.repository === DIRECT_KEV06_BASE.repository && manifest.base.revision === DIRECT_KEV06_BASE.revision,
+    'Direct Kev base checkpoint differs from its pin.'
+  );
+  validateDirectKevManifestFiles(manifest.files);
+}
+
+async function validateAvailableDirectKevFiles(
+  directory: string,
+  manifest: DirectKevManifest
+): Promise<void> {
+  const actualNames = await listLocalFiles(directory);
+  const localAssets = actualNames.filter((name) => name !== 'manifest.json');
+  for (const name of localAssets) {
+    const metadata = manifest.files[name];
+    failUnless(metadata, 'Direct Kev package contains an undeclared file: ' + name + '.');
+    const bytes = await readFile(path.join(directory, ...name.split('/')));
+    failUnless(metadata.bytes === bytes.byteLength, 'Direct Kev file size differs from manifest: ' + name + '.');
+    failUnless(metadata.sha256 === sha256(bytes), 'Direct Kev file hash differs from manifest: ' + name + '.');
+  }
 }
 
 export async function createDirectKev06ArtifactLockFromDirectory(
   model: CuratedModel,
-  artifactDirectory: string
-): Promise<ModelArtifactLock> {
-  validateDirectKevModel(model);
+  artifactDirectory: string,
+  expectedManifestSha256: string = directKevManifestSha256
+): Promise<DirectModelArtifactLock> {
+  const upstreams = validateDirectKevModel(model);
   const absoluteDirectory = path.resolve(artifactDirectory);
   const relativeDirectory = path.relative(packageRoot, absoluteDirectory);
   failUnless(
@@ -205,47 +354,10 @@ export async function createDirectKev06ArtifactLockFromDirectory(
   const canonicalBytes = canonicalManifestBytes(manifestFile.value);
   const manifest = (await readDirectKev06ManifestResponse(
     new Response(manifestFile.bytes.toString('utf8')),
-    sha256(canonicalBytes)
+    expectedManifestSha256
   )) as DirectKevManifest;
-  failUnless(typeof manifest.experimental === 'boolean', 'Direct Kev manifest must preserve its experimental flag.');
-  failUnless(manifest.model === model.modelId, 'Direct Kev manifest model differs from the curated model.');
-  failUnless(
-    manifest.backend === model.description.backend.name,
-    'Direct Kev manifest backend differs from the catalog.'
-  );
-  failUnless(
-    manifest.parameterCount === DIRECT_KEV06_PARAMETER_COUNT,
-    'Direct Kev parameter count differs from its pin.'
-  );
-  failUnless(
-    manifest.checkpoint.repository === model.description.checkpoint.repository &&
-      manifest.checkpoint.revision === model.description.checkpoint.revision,
-    'Direct Kev checkpoint differs from the catalog.'
-  );
-  failUnless(
-    manifest.base.repository === DIRECT_KEV06_BASE.repository && manifest.base.revision === DIRECT_KEV06_BASE.revision,
-    'Direct Kev base checkpoint differs from its pin.'
-  );
-
-  const declaredNames = Object.keys(manifest.files);
-  for (const name of declaredNames) {
-    failUnless(safeManifestPath(name), 'Direct Kev manifest contains an unsafe file path: ' + name + '.');
-  }
-  const actualNames = await listLocalFiles(absoluteDirectory);
-  const expectedNames = ['manifest.json', ...declaredNames].sort();
-  failUnless(
-    JSON.stringify(actualNames) === JSON.stringify(expectedNames),
-    'Direct Kev package file inventory differs from its manifest.'
-  );
-  const files: Record<string, ManifestFile> = {};
-  for (const name of declaredNames) {
-    const metadata = manifest.files[name];
-    failUnless(metadata, 'Direct Kev manifest is missing file metadata: ' + name + '.');
-    const bytes = await readFile(path.join(absoluteDirectory, ...name.split('/')));
-    failUnless(metadata.bytes === bytes.byteLength, 'Direct Kev file size differs from manifest: ' + name + '.');
-    failUnless(metadata.sha256 === sha256(bytes), 'Direct Kev file hash differs from manifest: ' + name + '.');
-    files[name] = {bytes: bytes.byteLength, sha256: metadata.sha256};
-  }
+  validateDirectKevManifestMetadata(model, manifest);
+  await validateAvailableDirectKevFiles(absoluteDirectory, manifest);
   const sourcePath = path.posix.join(relativeDirectory.split(path.sep).join('/'), 'manifest.json');
   return {
     schemaVersion: 1,
@@ -255,9 +367,10 @@ export async function createDirectKev06ArtifactLockFromDirectory(
       canonicalSha256: sha256(canonicalBytes),
       canonicalBytes: canonicalBytes.byteLength,
       experimental: manifest.experimental,
-      files
+      files: manifest.files
     },
-    bundledRuntimeFiles: []
+    bundledRuntimeFiles: [],
+    upstreams
   };
 }
 
@@ -282,6 +395,7 @@ export function validateSpec(spec: unknown): CuratedModel[] {
     const description = model.description;
     failUnless(isRecord(description.backend), 'Catalog backends must be objects.');
     failUnless(isRecord(description.assets), 'Catalog assets must be objects.');
+    validateModelPrivateInputs(model);
     failUnless(!modelIds.has(model.modelId), 'Catalog modelIds must be unique.');
     modelIds.add(model.modelId);
     failUnless(description.backend.name === 'tvm-webgpu', 'Catalog models must use TVM WebGPU.');
@@ -376,7 +490,7 @@ function validateManifest(
 async function createKev06ArtifactLock(
   model: CuratedModel,
   localDirectArtifactDirectory: string = directKevArtifactDirectory
-): Promise<ModelArtifactLock> {
+): Promise<CatalogArtifactLock> {
   if (isDirectKevCheckpoint(model)) {
     return createDirectKev06ArtifactLockFromDirectory(model, localDirectArtifactDirectory);
   }
@@ -497,7 +611,7 @@ async function createKananaArtifactLock(model: CuratedModel): Promise<ModelArtif
 export async function createModelArtifactLock(
   model: CuratedModel,
   options: Readonly<{directKevArtifactDirectory?: string}> = {}
-): Promise<ModelArtifactLock> {
+): Promise<CatalogArtifactLock> {
   if (model.description.adapter === 'kev06')
     return createKev06ArtifactLock(model, options.directKevArtifactDirectory ?? directKevArtifactDirectory);
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
@@ -509,7 +623,7 @@ async function createArtifactLock(
   options: CatalogGenerationOptions
 ): Promise<ArtifactLockFile> {
   const records = await Promise.all(
-    models.map(async (model): Promise<readonly [ModelId, ModelArtifactLock]> => [
+    models.map(async (model): Promise<readonly [ModelId, CatalogArtifactLock]> => [
       model.modelId,
       await createModelArtifactLock(model, options)
     ])
@@ -660,6 +774,14 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       '    rangeManifestPath?: string;',
       '    rangeManifestSha256?: string;',
       '  }>;',
+      '  readonly upstreams?: readonly Readonly<{',
+      '    role: string;',
+      '    repository: string;',
+      '    revision: string;',
+      '    sourcePath: string;',
+      '    sourceBytes: number;',
+      '    sourceSha256: string;',
+      '  }>[];',
       '}',
       'export interface ModelCatalogEntry {',
       '  readonly modelId: ModelId;',
