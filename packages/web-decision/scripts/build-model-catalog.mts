@@ -313,10 +313,7 @@ function validateDirectKevManifestMetadata(model: CuratedModel, manifest: Direct
   validateDirectKevManifestFiles(manifest.files);
 }
 
-async function validateAvailableDirectKevFiles(
-  directory: string,
-  manifest: DirectKevManifest
-): Promise<void> {
+async function validateAvailableDirectKevFiles(directory: string, manifest: DirectKevManifest): Promise<void> {
   const actualNames = await listLocalFiles(directory);
   const localAssets = actualNames.filter((name) => name !== 'manifest.json');
   for (const name of localAssets) {
