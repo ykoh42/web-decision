@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-11-11T18:27:49Z",
+  "scope": "Synthetic single-attention-layer TIR kernel; not full Kev inference.",
+  "baseCommit": "cf03879",
+  "worktreeState": "Source files were uncommitted during the probes.",
+  "sourceSha256": {
+    "attentionGrid": "fe3ca615cc217057617201b35cd244aad989d2b5e87eceea4facbbf28934955b",
+    "attentionRelax": "8095ace1c486090d7f869baff52213ebafce605f7fb71ca363cc98c4839d80b8",
+    "relaxTests": "9f369680077c195cb0b6a29a64fbc34348469cc5dc36006cc10861898f8d3eca",
+    "generatedWgsl": "a372cce9178d723b06695dee773b74fd6728e627032165f93ecf9514d0a88d77"
+  },
+  "adapter": {
+    "vendor": "intel",
+    "architecture": "gen-12lp",
+    "browser": "Chrome 157"
+  },
+  "probeInputs": "Q=0, K=0, V=0.25, all keys valid, 16 heads, sequenceLength=8192.",
+  "probes": [
+    {
+      "queryChunkSize": 128,
+      "dispatchCount": 64,
+      "status": "passed",
+      "completedDispatchCount": 64,
+      "durationMs": 53760.99999999814,
+      "maximumDispatchMs": 1691.2999999998137,
+      "outputMaxError": 0,
+      "deviceLoss": null,
+      "harnessSha256": "995c07f1e01d2fd22e723263b40662b4b521c898bbb57facbf7e0fafd6506fe0"
+    },
+    {
+      "queryChunkSize": 256,
+      "dispatchCount": 32,
+      "status": "device-lost",
+      "completedDispatchCount": 20,
+      "durationBeforeDeviceLossMs": 21244.900000001304,
+      "maximumCompletedDispatchMs": 3176.9000000003725,
+      "outputComparison": "unavailable; readback failed after device loss",
+      "deviceLossCode": "DXGI_ERROR_DEVICE_HUNG",
+      "harnessSha256": "28c0228c749ed80d40646e52fc3fdb68ef849b2379d0d2b60adbdb9adb34c53a"
+    },
+    {
+      "queryChunkSize": 512,
+      "dispatchCount": 16,
+      "status": "device-lost",
+      "completedDispatchCount": 6,
+      "durationBeforeDeviceLossMs": 7842.0999999996275,
+      "maximumCompletedDispatchMs": 3141.2999999998137,
+      "outputComparison": "unavailable after device loss",
+      "deviceLossCode": "DXGI_ERROR_DEVICE_HUNG",
+      "harnessSha256": "3f765f3989e3faa7909b617b9e261c0f7bdc702c2927f0a32b4e9a0b2e0b2fe5"
+    }
+  ],
+  "productionGraph": {
+    "queryChunkSize": 512,
+    "queryChunkCount": 16,
+    "maxInputTokens": 8192,
+    "maximumLengthStatus": "pending; 512-query production configuration lost the device in this synthetic probe"
+  },
+  "limitations": [
+    "The 128-query probe confirms only one synthetic attention layer, not the full 28-layer model.",
+    "The successful inputs are degenerate and do not prove numerical parity for nonzero Q/K tensors.",
+    "The 128-query setting was a diagnostic harness override and is not wired into the production graph.",
+    "No exact-package, real-model, online/offline, or model quality conclusion follows from these probes."
+  ]
+}

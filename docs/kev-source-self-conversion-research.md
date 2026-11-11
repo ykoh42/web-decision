@@ -1,6 +1,6 @@
 # Kev 0.6B official-checkpoint self-conversion
 
-Updated 2026-11-10. This note records the reproducible source inputs, official assembly path, and compatibility target for converting Kev 0.6B from its publisher's checkpoint into the project's TVM format. It does not change the existing provenance decision.
+Updated 2026-11-12 KST. This note records the reproducible source inputs, official assembly path, and compatibility target for converting Kev 0.6B from its publisher's checkpoint into the project's TVM format. It does not change the existing provenance decision.
 
 ## Current direct-TVM status
 
@@ -63,6 +63,8 @@ The [Kev model card](https://huggingface.co/jaredpalmer/kev-0.6b/blob/93994937d1
 ## Viability and remaining unknowns
 
 The historical ONNX recipe is not the replacement plan. The direct PyTorch wrapper and single-case TVM CPU path now execute; Q4, dynamic-shape behavior, WebGPU, package integration, numerical coverage, and rights review remain unverified. Training encoder defaults are 384/1,024, while the official serving path sets both state and branch limits to 8,192. The serving limit, rather than the training default, is the package compatibility target.
+
+The current attention experiment compiles as a TVM WebGPU module and passes a 129-token synthetic dispatch with zero-work tails. On Chrome 157 / Intel Gen-12LP, an 8,192-token synthetic single-layer probe fails with the production 512-query setting after 6 of 16 dispatches. A diagnostic 128-query override completed 64 dispatches in 53.76 seconds, but the production graph is still configured for 512 queries and the probe used zero Q/K and constant V. Full-model maximum-length inference remains unverified; see the [chunk sweep report](../tools/kev-converter/reports/kev-attention-query-chunk-sweep-2026-11-12.json).
 
 Still unestablished: parity across representative and maximum inputs; dynamic-shape export and compilation; WebGPU compilation and browser execution; integration into the curated package; online integrity checks and offline cache reuse for the exact artifact; and the rights/notice review for the model and its training data.
 

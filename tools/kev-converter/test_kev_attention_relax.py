@@ -5,7 +5,11 @@ import unittest
 from pathlib import Path
 
 import tvm
-from kev_attention_relax import rewrite_kev_attention
+from kev_attention_relax import (
+    ATTENTION_QUERY_CHUNK_SIZE,
+    ATTENTION_QUERY_CHUNKS,
+    rewrite_kev_attention,
+)
 from tvm.script import ir as I
 from tvm.script import relax as R
 from tvm.script import tirx as T
@@ -101,7 +105,27 @@ class KevAttentionRelaxTests(unittest.TestCase):
             for line in script.splitlines()
             if "R.call_tir(cls.kev_attention_grid" in line
         ]
+        inplace_calls = [
+            line
+            for line in script.splitlines()
+            if "R.call_tir_inplace(cls.kev_attention_grid" in line
+        ]
         self.assertEqual(len(attention_calls), 28)
+        self.assertEqual(len(inplace_calls), 420)
+        self.assertEqual(ATTENTION_QUERY_CHUNK_SIZE, 512)
+        self.assertEqual(ATTENTION_QUERY_CHUNKS, 16)
+        self.assertIn(
+            f"T.max(0, T.min(sequence_length, {ATTENTION_QUERY_CHUNK_SIZE}))",
+            attention_calls[0],
+        )
+        self.assertIn(
+            f"T.max(0, T.min(sequence_length, {2 * ATTENTION_QUERY_CHUNK_SIZE}) - {ATTENTION_QUERY_CHUNK_SIZE})",
+            inplace_calls[0],
+        )
+        self.assertIn(
+            f"T.if_then_else(T.max(0, T.min(sequence_length, {2 * ATTENTION_QUERY_CHUNK_SIZE}) - {ATTENTION_QUERY_CHUNK_SIZE}) > 0, {ATTENTION_QUERY_CHUNK_SIZE}, 0)",
+            inplace_calls[0],
+        )
         self.assertTrue(
             all('T.Cast("int32", sequence_length)' in line for line in attention_calls)
         )

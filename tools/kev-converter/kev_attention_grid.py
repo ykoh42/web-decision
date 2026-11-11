@@ -190,6 +190,9 @@ def attention_grid(
     valid_handle: T.handle,
     sequence_length: T.int64,
     loop_length: T.int32,
+    skip_future_tiles: T.int32,
+    query_start: T.int32,
+    query_chunk_length: T.int32,
     output_handle: T.handle,
 ):
     """Fuse dense QK, finite masking, softmax, and PV on a 2D query/head grid."""
@@ -217,12 +220,13 @@ def attention_grid(
     )
     T.func_attr({"tirx.noalias": True})
 
-    for query_loop in T.thread_binding(sequence_length, thread="blockIdx.x"):
+    for query_loop in T.thread_binding(query_chunk_length, thread="blockIdx.x"):
         for head_loop in T.thread_binding(
             NUM_QUERY_HEADS,
             thread="blockIdx.y",
         ):
-            query_index = T.Cast("int32", query_loop)
+            query_local = T.Cast("int32", query_loop)
+            query_index = query_start + query_local
             head = T.Cast("int32", head_loop)
             query_segment = segments[0, T.Cast("int64", query_index)]
             partial = T.alloc_buffer((HEAD_DIM,), "float32", scope="shared")
@@ -231,7 +235,13 @@ def attention_grid(
             _initialize_state(state)
 
             tile_count = (loop_length + KEY_TILE - 1) // KEY_TILE
-            for tile_loop in T.serial(tile_count):
+            causal_tile_count = (query_index + KEY_TILE) // KEY_TILE
+            active_tile_count = T.if_then_else(
+                skip_future_tiles != 0,
+                T.min(tile_count, causal_tile_count),
+                tile_count,
+            )
+            for tile_loop in T.serial(active_tile_count):
                 key_base = tile_loop * KEY_TILE
                 _compute_dot_partials(
                     query,
@@ -257,7 +267,7 @@ def attention_grid(
                 )
                 _update_softmax_stats(state, scores)
 
-            for tile_loop in T.serial(tile_count):
+            for tile_loop in T.serial(active_tile_count):
                 key_base = tile_loop * KEY_TILE
                 _compute_dot_partials(
                     query,

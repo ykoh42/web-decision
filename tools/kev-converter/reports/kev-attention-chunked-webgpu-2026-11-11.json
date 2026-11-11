@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-11-11T17:50:18Z",
+  "scope": "Synthetic single attention TIR kernel; this is not full Kev inference.",
+  "sourceSha256": {
+    "attentionGrid": "fe3ca615cc217057617201b35cd244aad989d2b5e87eceea4facbbf28934955b",
+    "attentionRelax": "8095ace1c486090d7f869baff52213ebafce605f7fb71ca363cc98c4839d80b8",
+    "attentionRelaxTests": "9f369680077c195cb0b6a29a64fbc34348469cc5dc36006cc10861898f8d3eca",
+    "generatedWgsl": "a372cce9178d723b06695dee773b74fd6728e627032165f93ecf9514d0a88d77"
+  },
+  "adapter": {
+    "vendor": "intel",
+    "architecture": "gen-12lp",
+    "device": "",
+    "description": ""
+  },
+  "smallInputTailDispatch": {
+    "status": "passed",
+    "sequenceLength": 129,
+    "fixedQueryChunkSize": 512,
+    "dispatchCount": 16,
+    "activeDispatchCount": 1,
+    "durationMs": 69.90000000037253,
+    "chunkTimesMs": [
+      20.299999999813735,
+      1.099999999627471,
+      3.7999999998137355,
+      4,
+      4,
+      3.099999999627471,
+      3.1000000005587935,
+      3,
+      3.3999999994412065,
+      3.300000000745058,
+      3,
+      3.2999999998137355,
+      4.5,
+      3.2999999998137355,
+      3.300000000745058,
+      3.400000000372529
+    ],
+    "maxAbsoluteOutputError": 1.5348196029663086e-05,
+    "finiteOutput": true,
+    "uncapturedErrors": [],
+    "deviceLoss": null,
+    "harnessSha256": "ee9757e03584afbc9957a0cf47b30461d2750224f6e0bd4075d06aab806fddd5"
+  },
+  "maxSequenceInput": {
+    "status": "device-lost",
+    "sequenceLength": 8192,
+    "fixedQueryChunkSize": 256,
+    "expectedDispatchCount": 32,
+    "completedDispatchCount": 20,
+    "durationBeforeDeviceLossMs": 21244.900000001304,
+    "chunkTimesMs": [
+      58,
+      156.69999999925494,
+      236.5,
+      333.40000000037253,
+      421.29999999981374,
+      518,
+      606.7000000001863,
+      718.7000000001863,
+      809.3999999994412,
+      911,
+      1012.5999999996275,
+      1111.2000000001863,
+      1227.9000000003725,
+      1353.9000000003725,
+      1509.2000000001863,
+      1598.6000000005588,
+      1717.2000000001863,
+      1836.7999999998137,
+      1930.9000000003725,
+      3176.9000000003725
+    ],
+    "deviceLossCode": "DXGI_ERROR_DEVICE_HUNG",
+    "outputComparison": "unavailable; readback failed after device loss",
+    "harnessSha256": "28c0228c749ed80d40646e52fc3fdb68ef849b2379d0d2b60adbdb9adb34c53a"
+  },
+  "limitations": [
+    "The synthetic probe used zero Q/K tensors, constant V=0.25, and all-valid keys.",
+    "No full-model quality or exact-package online/offline result is established.",
+    "The 8192-token probe failed with device loss and must not be counted as passed."
+  ],
+  "baseCommit": "cf03879",
+  "worktreeState": "The hashed attention source files were uncommitted at record time; the baseCommit identifies the surrounding committed revision."
+}

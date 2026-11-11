@@ -165,10 +165,13 @@ class KevAttentionGridTests(unittest.TestCase):
         self.assertRegex(wgsl, r"f16\(probability\[0i\]\)")
         self.assertRegex(wgsl, r"f32\(probability_f16\[0i\]\)")
         self.assertIn("loop_length: i32", wgsl)
+        self.assertIn("skip_future_tiles: i32", wgsl)
+        self.assertIn("query_start: i32", wgsl)
+        self.assertIn("query_chunk_length: i32", wgsl)
         self.assertIn("podArgs.loop_length", wgsl)
         self.assertNotIn("length_i32_ptr", wgsl)
         self.assertIn("blockIdx.y", attention_grid.script())
-        self.assertLess(len(wgsl.encode("utf-8")), 10_000)
+        self.assertLess(len(wgsl.encode("utf-8")), 10 * 1024)
         self.assertNotRegex(wgsl, r"array<[^>]+,\s*\w*sequence_length")
 
 

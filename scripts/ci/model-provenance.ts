@@ -62,6 +62,15 @@ function isPathWithin(root: string, target: string): boolean {
   return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
+function sameCanonicalPath(actual: string, expected: string): boolean {
+  const normalizedActual = resolve(actual);
+  const normalizedExpected = resolve(expected);
+  // Windows realpath preserves filesystem casing, which may differ from the input path.
+  return process.platform === 'win32'
+    ? normalizedActual.toLowerCase() === normalizedExpected.toLowerCase()
+    : normalizedActual === normalizedExpected;
+}
+
 function safeRelativePath(value: unknown, description: string): string {
   failUnless(typeof value === 'string' && value.length > 0, `${description} must be a non-empty relative path.`);
   failUnless(!value.includes('\\') && !isAbsolute(value), `${description} has an unsafe path: ${value}`);
@@ -304,7 +313,7 @@ async function validateCommittedEvidenceReference(
   failUnless(isPathWithin(workspaceRoot, absolute), `${description} escapes the workspace.`);
   const info = await lstat(absolute);
   failUnless(info.isFile() && !info.isSymbolicLink(), `${description} must be a regular committed file.`);
-  assert.equal(await realpath(absolute), absolute, `${description} must use its canonical path.`);
+  failUnless(sameCanonicalPath(await realpath(absolute), absolute), `${description} must use its canonical path.`);
   const bytes = await readFile(absolute);
   assert.equal(sha256(bytes), value.sha256, `${description} SHA-256 mismatch.`);
   if (requireCommitted) assertCommittedFile(workspaceRoot, path, bytes, description);
