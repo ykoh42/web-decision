@@ -249,6 +249,30 @@ class UpstreamReferenceTests(unittest.TestCase):
         )
         self.assertEqual(git_run.call_count, 3)
 
+    def test_tvmjs_export_toolchain_reports_all_runtime_hash_mismatches(self):
+        converter_root = Path(__file__).resolve().parent
+        tvm_home = converter_root / "fake-pinned-tvm"
+        command_results = [
+            SimpleNamespace(stdout=f"{PINNED_TVM_WEB_REVISION}\n"),
+            SimpleNamespace(stdout=f"{PINNED_TVM_WEB_TAG}\n"),
+            SimpleNamespace(stdout=""),
+        ]
+        actual_hashes = ["0" * 64, "1" * 64, "2" * 64]
+
+        with (
+            patch("build_tvm.subprocess.run", side_effect=command_results),
+            patch("build_tvm.sha256_file", side_effect=actual_hashes),
+        ):
+            with self.assertRaises(ValueError) as error:
+                verify_tvmjs_toolchain(tvm_home)
+
+        for (path, _), actual_hash in zip(
+            PINNED_TVM_WEB_LIBRARIES.items(), actual_hashes, strict=True
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, str(error.exception))
+                self.assertIn(actual_hash, str(error.exception))
+
     def test_emcc_libatomic_dependency_is_version_and_hash_pinned(self):
         with tempfile.TemporaryDirectory() as temporary:
             library = Path(temporary) / "libatomic.so.1"
