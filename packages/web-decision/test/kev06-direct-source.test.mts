@@ -22,7 +22,7 @@ test('direct Kev assets reject roots and paths that can escape the pinned direct
     ['https://assets.example.test/kev/', 'weights\\shard.bin'],
     ['https://assets.example.test/kev/', 'weights/%2e%2e/shard.bin'],
     ['https://assets.example.test/kev/', 'manifest.json?alternate=1']
-  ]) {
+  ] as const) {
     await t.test(`${root} + ${name}`, () => {
       assert.throws(() => resolveDirectKevAssetUrl(root, name), {code: 'INVALID_ASSET'});
     });
