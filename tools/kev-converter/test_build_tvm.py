@@ -193,12 +193,16 @@ class UpstreamReferenceTests(unittest.TestCase):
         )
 
     def test_direct_webgpu_candidate_report_keeps_hardware_gate_pending(self):
-        report_path = (
-            Path(__file__).resolve().with_name("reports")
-            / "direct-tvm-q4-webgpu-build-r1.json"
-        )
+        reports = Path(__file__).resolve().with_name("reports")
+        report_path = reports / "direct-tvm-q4-webgpu-build-r1.json"
         report_bytes = report_path.read_bytes()
         report = json.loads(report_bytes)
+        manifest_path = reports / "direct-tvm-q4-webgpu-manifest-r1.json"
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes)
+        model_config_path = reports / "direct-tvm-q4-webgpu-model-config-r1.json"
+        model_config_bytes = model_config_path.read_bytes()
+        model_config = json.loads(model_config_bytes)
 
         self.assertEqual(
             hashlib.sha256(report_bytes).hexdigest(),
@@ -208,6 +212,41 @@ class UpstreamReferenceTests(unittest.TestCase):
         self.assertFalse(report["onnxIntermediateUsed"])
         self.assertEqual(report["candidateModelId"], "kev-0.6b-q4f16")
         self.assertEqual(report["parameterInputCount"], 511)
+        canonical_manifest = (
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        self.assertEqual(
+            hashlib.sha256(manifest_bytes).hexdigest(),
+            "d7ebc0e596e73c57d5ca7ff8fc80c632a8b4256b044f8a599012843bfefb9876",
+        )
+        self.assertEqual(
+            hashlib.sha256(canonical_manifest).hexdigest(),
+            report["browserPackage"]["manifestSha256"],
+        )
+        self.assertEqual(manifest["backend"], "tvm-webgpu")
+        self.assertEqual(manifest["parameterCount"], 511)
+        self.assertEqual(
+            manifest["checkpoint"]["revision"], report["kevCheckpointRevision"]
+        )
+        self.assertEqual(manifest["base"]["revision"], report["baseRevision"])
+        self.assertEqual(manifest["maxStateTokens"], 8192)
+        self.assertEqual(manifest["maxBranchTokens"], 8192)
+        self.assertEqual(manifest["maxOptions"], 255)
+        self.assertEqual(
+            hashlib.sha256(model_config_bytes).hexdigest(),
+            manifest["files"]["model_config.json"]["sha256"],
+        )
+        self.assertEqual(model_config["max_position_embeddings"], 32768)
+        self.assertEqual(model_config["kev"]["max_state_tokens"], 8192)
+        self.assertEqual(model_config["kev"]["max_branch_tokens"], 8192)
+        self.assertEqual(model_config["kev"]["max_options"], 255)
 
         cpu_gate = report["qualityGates"]["cpuBaseline"]
         self.assertEqual(cpu_gate["status"], "passed")
