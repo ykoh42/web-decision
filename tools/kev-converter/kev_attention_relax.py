@@ -229,6 +229,7 @@ def rewrite_kev_attention(
     decide_id,
     expected_attention_blocks=28,
     metadata_bindings=None,
+    target=None,
 ):
     """Fuse all Kev attention blocks and replace quadratic wrapper metadata.
 
@@ -248,7 +249,9 @@ def rewrite_kev_attention(
 
     setup_builder = relax.BlockBuilder(module)
     fused_gv = setup_builder.add_func(attention_grid, ATTENTION_FUNCTION_NAME)
-    preprocess_module = build_kev_preprocessor_module(question_id, decide_id)
+    preprocess_module = build_kev_preprocessor_module(
+        question_id, decide_id, target=target
+    )
     preprocess_gv = setup_builder.add_func(
         preprocess_module["kev_preprocess"], "kev_preprocess"
     )

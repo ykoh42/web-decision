@@ -1,7 +1,7 @@
 """Linear-memory Kev branch metadata preprocessing for TVM Relax."""
 
 import tvm
-from tvm import relax
+from tvm import relax, s_tir
 from tvm.script import tirx as T
 
 PREPROCESS_VALID = 0
@@ -30,87 +30,109 @@ def _kev_preprocess(
         output_handle, (PREPROCESS_FIELDS, batch_size, sequence_length + 1), "int32"
     )
     T.func_attr({"tirx.noalias": True})
-    with T.sblock("kev_preprocess_workgroup"):
-        T.reads()
-        T.writes()
-        for batch in T.serial(batch_size):
-            for index in T.serial(sequence_length + 1):
-                output[PREPROCESS_VALID, batch, index] = 0
-                output[PREPROCESS_SEGMENTS, batch, index] = 0
-                output[PREPROCESS_BRANCH_STARTS, batch, index] = 0
-                output[PREPROCESS_POSITION_IDS, batch, index] = 0
-                output[PREPROCESS_DECISION_SUMS, batch, index] = 0
-                output[PREPROCESS_NEXT_DECISION, batch, index] = 0
-
-            segment_count = T.int32(0)
-            first_question = sequence_length
-            for index in T.serial(sequence_length):
-                valid = T.Cast("int32", attention_mask[batch, index] != 0)
-                question = T.Cast(
-                    "int32", (input_ids[batch, index] == question_id) & (valid != 0)
-                )
-                decision = T.Cast(
-                    "int32", (input_ids[batch, index] == decide_id) & (valid != 0)
-                )
-                segment_count = segment_count + question
-                segment = T.if_then_else(valid != 0, segment_count, T.int32(-1))
-                output[PREPROCESS_VALID, batch, index] = valid
-                output[PREPROCESS_SEGMENTS, batch, index] = segment
-                first_question = T.min(
-                    first_question,
-                    T.if_then_else(question != 0, index, sequence_length),
-                )
-                bucket = T.max(segment, T.int32(0))
-                output[PREPROCESS_DECISION_SUMS, batch, bucket] = output[
-                    PREPROCESS_DECISION_SUMS, batch, bucket
-                ] + decision * T.Cast("int32", index)
-            first_question = T.if_then_else(
-                first_question == sequence_length,
-                T.int64(0),
-                first_question,
+    for _lane in T.serial(1):
+        with T.sblock("kev_preprocess_workgroup"):
+            T.reads(
+                input_ids[0:batch_size, 0:sequence_length],
+                attention_mask[0:batch_size, 0:sequence_length],
             )
+            T.writes(
+                output[0:PREPROCESS_FIELDS, 0:batch_size, 0:sequence_length + 1]
+            )
+            for batch in T.serial(batch_size):
+                for index in T.serial(sequence_length + 1):
+                    output[PREPROCESS_VALID, batch, index] = 0
+                    output[PREPROCESS_SEGMENTS, batch, index] = 0
+                    output[PREPROCESS_BRANCH_STARTS, batch, index] = 0
+                    output[PREPROCESS_POSITION_IDS, batch, index] = 0
+                    output[PREPROCESS_DECISION_SUMS, batch, index] = 0
+                    output[PREPROCESS_NEXT_DECISION, batch, index] = 0
 
-            last_question = T.int32(-1)
-            prefix_decisions = output[PREPROCESS_DECISION_SUMS, batch, 0]
-            for index in T.serial(sequence_length):
-                valid = output[PREPROCESS_VALID, batch, index]
-                segment = output[PREPROCESS_SEGMENTS, batch, index]
-                question = T.Cast(
-                    "int32", (input_ids[batch, index] == question_id) & (valid != 0)
-                )
-                last_question = T.max(
-                    last_question,
-                    T.if_then_else(
-                        question != 0,
-                        T.Cast("int32", index),
-                        T.int32(-1),
-                    ),
-                )
-                branch_start = T.if_then_else(segment > 0, last_question, T.int32(0))
-                position = T.if_then_else(
-                    valid == 0,
-                    T.int32(0),
-                    T.if_then_else(
-                        segment == 0,
-                        T.Cast("int32", index),
-                        T.Cast(
-                            "int32",
-                            first_question + index - T.Cast("int64", last_question),
+                segment_count = T.int32(0)
+                first_question = T.Cast("int32", sequence_length)
+                for index in T.serial(sequence_length):
+                    valid = T.Cast("int32", attention_mask[batch, index] != 0)
+                    question = T.Cast(
+                        "int32",
+                        (input_ids[batch, index] == question_id) & (valid != 0),
+                    )
+                    decision = T.Cast(
+                        "int32",
+                        (input_ids[batch, index] == decide_id) & (valid != 0),
+                    )
+                    segment_count = segment_count + question
+                    segment = T.if_then_else(
+                        valid != 0, segment_count, T.int32(-1)
+                    )
+                    output[PREPROCESS_VALID, batch, index] = valid
+                    output[PREPROCESS_SEGMENTS, batch, index] = segment
+                    first_question = T.min(
+                        first_question,
+                        T.if_then_else(
+                            question != 0,
+                            T.Cast("int32", index),
+                            T.Cast("int32", sequence_length),
                         ),
-                    ),
-                )
-                bucket = T.max(segment, T.int32(0))
-                branch_decisions = output[PREPROCESS_DECISION_SUMS, batch, bucket]
-                output[PREPROCESS_BRANCH_STARTS, batch, index] = branch_start
-                output[PREPROCESS_POSITION_IDS, batch, index] = position
-                output[PREPROCESS_NEXT_DECISION, batch, index] = T.if_then_else(
-                    segment > 0,
-                    branch_decisions + prefix_decisions,
-                    prefix_decisions,
+                    )
+                    bucket = T.max(segment, T.int32(0))
+                    output[PREPROCESS_DECISION_SUMS, batch, bucket] = output[
+                        PREPROCESS_DECISION_SUMS, batch, bucket
+                    ] + decision * T.Cast("int32", index)
+                first_question = T.if_then_else(
+                    first_question == T.Cast("int32", sequence_length),
+                    T.int32(0),
+                    first_question,
                 )
 
+                last_question = T.int32(-1)
+                prefix_decisions = output[PREPROCESS_DECISION_SUMS, batch, 0]
+                for index in T.serial(sequence_length):
+                    valid = output[PREPROCESS_VALID, batch, index]
+                    segment = output[PREPROCESS_SEGMENTS, batch, index]
+                    question = T.Cast(
+                        "int32",
+                        (input_ids[batch, index] == question_id) & (valid != 0),
+                    )
+                    last_question = T.max(
+                        last_question,
+                        T.if_then_else(
+                            question != 0,
+                            T.Cast("int32", index),
+                            T.int32(-1),
+                        ),
+                    )
+                    branch_start = T.if_then_else(
+                        segment > 0, last_question, T.int32(0)
+                    )
+                    position = T.if_then_else(
+                        valid == 0,
+                        T.int32(0),
+                        T.if_then_else(
+                            segment == 0,
+                            T.Cast("int32", index),
+                            first_question
+                            + T.Cast("int32", index)
+                            - last_question,
+                        ),
+                    )
+                    bucket = T.max(segment, T.int32(0))
+                    branch_decisions = output[
+                        PREPROCESS_DECISION_SUMS, batch, bucket
+                    ]
+                    output[PREPROCESS_BRANCH_STARTS, batch, index] = branch_start
+                    output[PREPROCESS_POSITION_IDS, batch, index] = position
+                    output[PREPROCESS_NEXT_DECISION, batch, index] = T.if_then_else(
+                        segment > 0,
+                        branch_decisions + prefix_decisions,
+                        prefix_decisions,
+                    )
 
-def build_kev_preprocessor_module(question_id: int, decide_id: int) -> tvm.IRModule:
+
+def build_kev_preprocessor_module(
+    question_id: int,
+    decide_id: int,
+    target: tvm.target.Target | str | None = None,
+) -> tvm.IRModule:
     """Build a symbolic-shape Relax module for Kev's O(S) metadata vectors.
 
     The output is `(6, B, S+1)` int32: valid, segment, branch start,
@@ -119,8 +141,19 @@ def build_kev_preprocessor_module(question_id: int, decide_id: int) -> tvm.IRMod
     with a question marker at every position. No aggregate sequence bound is
     attached to the symbolic sequence dimension.
     """
+    preprocess = _kev_preprocess
+    if target is not None and tvm.target.Target(target).kind.name == "webgpu":
+        schedule = s_tir.Schedule(preprocess)
+        loops = schedule.get_loops(
+            schedule.get_sblock("kev_preprocess_workgroup")
+        )
+        if len(loops) != 1:
+            raise ValueError("Kev preprocessing needs one WebGPU lane loop.")
+        schedule.bind(loops[0], "threadIdx.x")
+        preprocess = schedule.mod["main"]
+
     builder = relax.BlockBuilder()
-    preprocess = builder.add_func(_kev_preprocess, "kev_preprocess")
+    preprocess = builder.add_func(preprocess, "kev_preprocess")
     batch_size = tvm.tirx.Var("batch_size", "int64")
     sequence_length = tvm.tirx.Var("sequence_length", "int64")
     input_ids = relax.Var(
