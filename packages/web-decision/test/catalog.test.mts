@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {copyFile, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
 import {getModelRegistration} from '../src/model-registry.js';
-import {createModelArtifactLock, validateSpec} from '../scripts/build-model-catalog.mts';
+import {
+  createDirectKev06ArtifactLockFromDirectory,
+  createModelArtifactLock,
+  validateSpec
+} from '../scripts/build-model-catalog.mts';
 import {
   DIRECT_KEV06_BASE,
-  DIRECT_KEV06_CHECKPOINT,
-  DIRECT_KEV06_PARAMETER_COUNT
+  DIRECT_KEV06_CHECKPOINT
 } from '../src/kev06/direct-contract.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -138,84 +141,126 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
   );
 });
 
-test('direct Kev recipe derives manifest and file digests from a repository-local package directory', async () => {
+test('direct Kev recipe locks a manifest-only remote package and rejects malformed or tampered input', async () => {
   const spec = JSON.parse(await readFile(packageFile('src/catalog/model-spec.json'), 'utf8'));
   const [sourceModel] = spec.models;
+  const artifactUpstreams = [
+    {
+      role: 'base-config',
+      repository: DIRECT_KEV06_BASE.repository,
+      revision: DIRECT_KEV06_BASE.revision,
+      sourcePath: 'config.json',
+      sourceBytes: 727,
+      sourceSha256: '504a6b58c4271583724e66584b6b7698aea18450209df6b2f7582df0e89cee59'
+    }
+  ];
   const directModel = {
     ...sourceModel,
-    description: {...sourceModel.description, checkpoint: {...DIRECT_KEV06_CHECKPOINT}}
+    artifactUpstreams,
+    description: {
+      ...sourceModel.description,
+      checkpoint: {...DIRECT_KEV06_CHECKPOINT},
+      assets: {
+        ...sourceModel.description.assets,
+        directArtifactRoot: 'https://assets.example.test/kev-0.6b-q4f16/'
+      }
+    }
   };
-  const fixtureSource = packageFile('test/fixtures/direct-kev-package');
   const fixtureDirectory = await mkdtemp(packageFile('test/fixtures/.direct-kev-package-'));
-  const fileNames = [
-    'model.wasm',
-    'model_config.json',
-    'tokenizer.json',
-    'tokenizer_config.json',
-    'weights/params_shard_0000.bin',
-    'weights/tensor-cache.json'
-  ];
+  const manifestFixturePath = path.resolve(packageRoot, '../../tools/kev-converter/reports/direct-tvm-q4-webgpu-manifest-r4.json');
+  const manifestBytes = await readFile(manifestFixturePath);
+  const manifestFixture = JSON.parse(manifestBytes.toString('utf8'));
+  const canonicalBytes = Buffer.from(JSON.stringify(canonical(manifestFixture)) + '\n');
 
   try {
+    assert.deepEqual(validateSpec({...spec, models: [directModel]}), [directModel]);
+    const {artifactUpstreams: _artifactUpstreams, ...unpinnedModel} = directModel;
+    assert.throws(
+      () => validateSpec({...spec, models: [unpinnedModel]}),
+      /must pin its conversion inputs/u
+    );
     await assert.rejects(
-      createModelArtifactLock(directModel, {directKevArtifactDirectory: path.resolve(packageRoot, '..')}),
+      createDirectKev06ArtifactLockFromDirectory(directModel, path.resolve(packageRoot, '..')),
       /inside the web-decision package/u
     );
-    for (const name of fileNames) {
-      const destination = path.join(fixtureDirectory, ...name.split('/'));
-      await mkdir(path.dirname(destination), {recursive: true});
-      await copyFile(path.join(fixtureSource, ...name.split('/')), destination);
-    }
-    const files = Object.fromEntries(
-      await Promise.all(
-        fileNames.map(async (name) => {
-          const bytes = await readFile(path.join(fixtureDirectory, ...name.split('/')));
-          return [name, {bytes: bytes.byteLength, sha256: sha256(bytes)}] as const;
-        })
-      )
-    );
-    const manifestFixture = {
-      formatVersion: 1,
-      model: 'kev-0.6b-q4f16',
-      backend: 'tvm-webgpu',
-      experimental: true,
-      parameterCount: DIRECT_KEV06_PARAMETER_COUNT,
-      maxStateTokens: 8192,
-      maxBranchTokens: 8192,
-      checkpoint: {...DIRECT_KEV06_CHECKPOINT},
-      base: {...DIRECT_KEV06_BASE},
-      files
-    };
-    await writeFile(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify(manifestFixture, null, 2) + '\n');
-    const undeclaredPath = path.join(fixtureDirectory, 'undeclared.txt');
-    await writeFile(undeclaredPath, 'fixture-only file\n');
-    await assert.rejects(
-      createModelArtifactLock(directModel, {directKevArtifactDirectory: fixtureDirectory}),
-      /file inventory differs from its manifest/u
-    );
-    await rm(undeclaredPath);
-
-    const lock = await createModelArtifactLock(directModel, {directKevArtifactDirectory: fixtureDirectory});
-    const manifestBytes = await readFile(path.join(fixtureDirectory, 'manifest.json'));
-    const canonicalBytes = Buffer.from(JSON.stringify(canonical(manifestFixture)) + '\n');
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), manifestBytes);
+    const lock = await createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory);
 
     assert.match(lock.manifest.sourcePath, /^test\/fixtures\/.direct-kev-package-[^/]+\/manifest\.json$/u);
     assert.equal(lock.manifest.rawSha256, sha256(manifestBytes));
     assert.equal(lock.manifest.canonicalSha256, sha256(canonicalBytes));
     assert.equal(lock.manifest.canonicalBytes, canonicalBytes.byteLength);
     assert.equal(lock.manifest.experimental, true);
-    assert.deepEqual(lock.manifest.files, files);
+    assert.deepEqual(lock.manifest.files, manifestFixture.files);
     assert.deepEqual(lock.bundledRuntimeFiles, []);
     assert.equal(lock.upstream, undefined);
+    assert.deepEqual(lock.upstreams, artifactUpstreams);
+    assert.deepEqual(Object.keys(lock.manifest.files), Object.keys(manifestFixture.files));
 
-    for (const [name, metadata] of Object.entries(files) as [string, {bytes: number; sha256: string}][]) {
-      const bytes = await readFile(path.join(fixtureDirectory, ...name.split('/')));
-      assert.equal(metadata.bytes, bytes.byteLength);
-      assert.equal(metadata.sha256, sha256(bytes));
-    }
+    const tamperedManifest = {
+      ...manifestFixture,
+      files: {...manifestFixture.files, 'model.wasm': {...manifestFixture.files['model.wasm'], sha256: '0'.repeat(64)}}
+    };
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify(tamperedManifest));
+    await assert.rejects(
+      createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory),
+      /manifest does not match the verified experimental build/u
+    );
+
+    const unsafeManifest = {
+      ...manifestFixture,
+      files: {...manifestFixture.files, '../outside.bin': {bytes: 1, sha256: 'a'.repeat(64)}}
+    };
+    const unsafeCanonicalSha = sha256(Buffer.from(JSON.stringify(canonical(unsafeManifest)) + '\n'));
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify(unsafeManifest));
+    await assert.rejects(
+      createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory, unsafeCanonicalSha),
+      /unsafe file path/u
+    );
+
+    const malformedManifest = {
+      ...manifestFixture,
+      files: {...manifestFixture.files, 'model.wasm': {...manifestFixture.files['model.wasm'], bytes: '4041060'}}
+    };
+    const malformedCanonicalSha = sha256(Buffer.from(JSON.stringify(canonical(malformedManifest)) + '\n'));
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), JSON.stringify(malformedManifest));
+    await assert.rejects(
+      createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory, malformedCanonicalSha),
+      /Invalid direct Kev asset metadata/u
+    );
+
+    await writeFile(path.join(fixtureDirectory, 'manifest.json'), manifestBytes);
+    await writeFile(path.join(fixtureDirectory, 'undeclared.txt'), 'fixture-only file\n');
+    await assert.rejects(
+      createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory),
+      /undeclared file/u
+    );
   } finally {
     await rm(fixtureDirectory, {recursive: true, force: true});
   }
+});
+
+test('legacy Kev lock keeps the bundled runtime-file recipe', async () => {
+  const spec = JSON.parse(await readFile(packageFile('src/catalog/model-spec.json'), 'utf8'));
+  const [sourceModel] = spec.models;
+  const {artifactUpstreams: _artifactUpstreams, ...sourceModelWithoutPrivatePins} = sourceModel;
+  const bundledModel = {
+    ...sourceModelWithoutPrivatePins,
+    description: {
+      ...sourceModel.description,
+      checkpoint: {
+        repository: 'onnx-community/kev-0.6b-ONNX',
+        revision: '5a827091b3d58fe4fdfc02a5a5b2ce364047d678'
+      }
+    }
+  };
+
+  const lock = await createModelArtifactLock(bundledModel);
+
+  assert.equal(lock.manifest.canonicalSha256, MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'].artifacts.manifest.canonicalSha256);
+  assert.equal(lock.bundledRuntimeFiles.length, 5);
+  assert.equal(lock.upstream?.repository, 'onnx-community/kev-0.6b-ONNX');
+  assert.equal(Object.hasOwn(lock, 'upstreams'), false);
 });
 
 test('artifact locks hash packaged manifests, runtime files, and model ranges', async () => {

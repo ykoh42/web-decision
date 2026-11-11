@@ -69,6 +69,14 @@ export interface ModelArtifactLock {
     rangeManifestPath?: string;
     rangeManifestSha256?: string;
   }>;
+  readonly upstreams?: readonly Readonly<{
+    role: string;
+    repository: string;
+    revision: string;
+    sourcePath: string;
+    sourceBytes: number;
+    sourceSha256: string;
+  }>[];
 }
 export interface ModelCatalogEntry {
   readonly modelId: ModelId;

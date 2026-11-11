@@ -63,8 +63,11 @@ interface ModelRequirement {
   manifestPath: string;
   requiredFiles: RequiredFiles;
   manifestFiles: Record<string, AssetMetadata>;
+  runtimeAssets: RuntimeAssetMode;
   bundledRuntimeFiles: BundledRuntimeFile[];
 }
+
+type RuntimeAssetMode = {mode: 'bundled'} | {mode: 'remote-pinned'};
 
 interface AssetMetadata {
   bytes: number;
@@ -81,6 +84,7 @@ interface AssetManifest extends AnyRecord {
   modelId?: string;
   backend?: string;
   files?: Record<string, AssetMetadata>;
+  licenses?: Array<{file?: unknown}>;
 }
 
 interface ArchiveManifestEvidence {
@@ -89,6 +93,7 @@ interface ArchiveManifestEvidence {
   manifestSha256: string;
   filesSha256: string;
   files: Record<string, AssetMetadata>;
+  runtimeFiles: Record<string, AssetMetadata>;
 }
 
 export interface ArchiveInfo {
@@ -178,6 +183,7 @@ interface CatalogArtifactLock {
     files: Record<string, AssetMetadata>;
   };
   bundledRuntimeFiles: BundledRuntimeFile[];
+  runtimeAssets?: RuntimeAssetMode;
 }
 
 interface ModelSpecFile {
@@ -738,24 +744,13 @@ async function loadCommittedCatalog(
       if (path !== 'manifest.json')
         fail(Object.hasOwn(manifestFiles, path), `Required file ${path} is absent from the manifest for ${modelId}.`);
     }
-    const bundledRuntimeFiles = artifacts.bundledRuntimeFiles;
-    fail(
-      Array.isArray(bundledRuntimeFiles) && bundledRuntimeFiles.length > 0,
-      `Artifact lock has no bundled runtime files for ${modelId}.`
+    const runtime = validateRuntimeAssetConfiguration(
+      modelId,
+      artifacts.runtimeAssets,
+      artifacts.bundledRuntimeFiles,
+      manifestFiles,
+      assets.integrity
     );
-    const bundledNames = new Set<string>();
-    for (const file of bundledRuntimeFiles) {
-      const name = normalizedRelativePath(file.manifestName, `Bundled file name for ${modelId}`);
-      normalizedRelativePath(file.sourcePath, `Bundled source path for ${modelId}`);
-      fail(Object.hasOwn(manifestFiles, name), `Bundled file ${name} is absent from the manifest for ${modelId}.`);
-      assert.deepEqual(
-        file,
-        {manifestName: name, sourcePath: file.sourcePath, ...manifestFiles[name]},
-        `Bundled file lock differs from the manifest for ${modelId}/${name}.`
-      );
-      fail(!bundledNames.has(name), `Duplicate bundled file for ${modelId}/${name}.`);
-      bundledNames.add(name);
-    }
     const publicModel = normalizeCatalogDescriptor(modelId, {
       modelId,
       ...description,
@@ -765,10 +760,48 @@ async function loadCommittedCatalog(
       ...publicModel,
       manifestPath: manifest.sourcePath,
       manifestFiles,
-      bundledRuntimeFiles
+      runtimeAssets: runtime.mode,
+      bundledRuntimeFiles: runtime.bundledRuntimeFiles
     };
   });
   return {models: models.sort((left, right) => left.modelId.localeCompare(right.modelId)), provenanceSha256};
+}
+
+export function validateRuntimeAssetConfiguration(
+  modelId: string,
+  mode: unknown,
+  bundledFiles: unknown,
+  manifestFiles: Record<string, AssetMetadata>,
+  integrity: unknown
+): {mode: RuntimeAssetMode; bundledRuntimeFiles: BundledRuntimeFile[]} {
+  const selected = mode === undefined ? 'bundled' : (mode as AnyRecord)?.mode;
+  fail(selected === 'bundled' || selected === 'remote-pinned', `Invalid runtime asset mode for ${modelId}.`);
+  if (mode !== undefined)
+    assert.deepEqual(mode, {mode: selected}, `Runtime asset mode for ${modelId} has unsupported fields.`);
+  fail(Array.isArray(bundledFiles), `Artifact lock has no bundled runtime file list for ${modelId}.`);
+  const bundledRuntimeFiles = bundledFiles as BundledRuntimeFile[];
+  if (selected === 'remote-pinned') {
+    fail(integrity === 'pinned-manifest', `Remote runtime assets for ${modelId} require pinned-manifest integrity.`);
+    assert.deepEqual(bundledRuntimeFiles, [], `Remote-pinned assets for ${modelId} cannot also be bundled.`);
+    fail(Object.keys(manifestFiles).length > 0, `Remote-pinned manifest for ${modelId} has no required assets.`);
+    return {mode: {mode: 'remote-pinned'}, bundledRuntimeFiles: []};
+  }
+
+  fail(bundledRuntimeFiles.length > 0, `Artifact lock has no bundled runtime files for ${modelId}.`);
+  const bundledNames = new Set<string>();
+  for (const file of bundledRuntimeFiles) {
+    const name = normalizedRelativePath(file.manifestName, `Bundled file name for ${modelId}`);
+    normalizedRelativePath(file.sourcePath, `Bundled source path for ${modelId}`);
+    fail(Object.hasOwn(manifestFiles, name), `Bundled file ${name} is absent from the manifest for ${modelId}.`);
+    assert.deepEqual(
+      file,
+      {manifestName: name, sourcePath: file.sourcePath, ...manifestFiles[name]},
+      `Bundled file lock differs from the manifest for ${modelId}/${name}.`
+    );
+    fail(!bundledNames.has(name), `Duplicate bundled file for ${modelId}/${name}.`);
+    bundledNames.add(name);
+  }
+  return {mode: {mode: 'bundled'}, bundledRuntimeFiles};
 }
 
 function manifestModelId(manifest: AssetManifest): string | undefined {
@@ -802,6 +835,26 @@ function validateRequiredFiles(model: ModelRequirement, files: Record<string, As
   }
 }
 
+function manifestLicenseFiles(
+  manifest: AssetManifest,
+  files: Record<string, AssetMetadata>,
+  modelId: string
+): Set<string> {
+  if (manifest.licenses === undefined) return new Set();
+  fail(Array.isArray(manifest.licenses), `License file declarations for ${modelId} must be an array.`);
+  const paths = manifest.licenses.map((entry, index) => {
+    fail(
+      entry && typeof entry === 'object' && !Array.isArray(entry),
+      `License file ${index} for ${modelId} is invalid.`
+    );
+    return normalizedRelativePath(entry.file, `License file ${index} for ${modelId}`);
+  });
+  fail(new Set(paths).size === paths.length, `Manifest repeats a license file for ${modelId}.`);
+  for (const path of paths)
+    fail(Object.hasOwn(files, path), `License file ${path} is not listed in the manifest assets for ${modelId}.`);
+  return new Set(paths);
+}
+
 export function validateArtifactManifest(
   model: ModelRequirement,
   manifest: AssetManifest
@@ -809,6 +862,7 @@ export function validateArtifactManifest(
   manifestSha256: string;
   filesSha256: string;
   files: Record<string, AssetMetadata>;
+  runtimeFiles: Record<string, AssetMetadata>;
 } {
   assert.equal(manifestModelId(manifest), model.modelId, `Artifact manifest ID mismatch for ${model.modelId}.`);
   const digest = canonicalSha256(manifest);
@@ -824,7 +878,11 @@ export function validateArtifactManifest(
     `Manifest file map differs from the generated lock for ${model.modelId}.`
   );
   validateRequiredFiles(model, files);
-  return {manifestSha256: digest, filesSha256: canonicalSha256(files), files};
+  const licenseFiles = manifestLicenseFiles(manifest, files, model.modelId);
+  const runtimeFiles = Object.fromEntries(Object.entries(files).filter(([path]) => !licenseFiles.has(path)));
+  if (model.runtimeAssets.mode === 'remote-pinned')
+    fail(Object.keys(runtimeFiles).length > 0, `Remote-pinned manifest for ${model.modelId} has no runtime assets.`);
+  return {manifestSha256: digest, filesSha256: canonicalSha256(files), files, runtimeFiles};
 }
 
 export async function readArchiveModelManifests(
@@ -1030,7 +1088,11 @@ function requireText(value: unknown, description: string): void {
   fail(typeof value === 'string' && value.trim().length > 0, `${description} is required.`);
 }
 
-function validateObservedFiles(value: unknown, model: ModelRequirement): void {
+function validateObservedFiles(
+  value: unknown,
+  model: ModelRequirement,
+  expectedFiles: Record<string, AssetMetadata>
+): void {
   fail(Array.isArray(value) && value.length > 0, `Browser evidence has no verified files for ${model.modelId}.`);
   const observed: Record<string, AssetMetadata> = {};
   for (const item of value as unknown[]) {
@@ -1049,8 +1111,8 @@ function validateObservedFiles(value: unknown, model: ModelRequirement): void {
   }
   assert.deepEqual(
     canonical(observed),
-    canonical(model.manifestFiles),
-    `Browser cache verification differs from every pinned manifest file for ${model.modelId}.`
+    canonical(expectedFiles),
+    `Browser cache verification differs from the pinned runtime file set for ${model.modelId}.`
   );
 }
 
@@ -1194,7 +1256,7 @@ function validateTestEvidence(
     actualArtifact.filesSha256,
     `Reported artifact file digest mismatch for ${model.modelId}.`
   );
-  validateObservedFiles(artifact.verifiedFiles, model);
+  validateObservedFiles(artifact.verifiedFiles, model, archiveManifest.runtimeFiles);
   assert.deepEqual(
     canonical(artifact.manifest),
     canonical(archiveManifest.manifest),

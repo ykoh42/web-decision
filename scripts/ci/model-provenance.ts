@@ -141,34 +141,74 @@ function validateSourceLineage(sourceLineage: unknown, modelId: string): void {
     );
     safeRelativePath(item.path, `Source path ${index} for ${modelId}`);
     failUnless(
+      Number.isSafeInteger(item.bytes) && (item.bytes as number) >= 0,
+      `Source byte length ${index} for ${modelId} is invalid.`
+    );
+    failUnless(
       typeof item.sha256 === 'string' && SHA256_PATTERN.test(item.sha256),
       `Source SHA-256 ${index} for ${modelId} is invalid.`
     );
   }
 }
 
+interface LockedUpstream {
+  readonly role?: string;
+  readonly repository: string;
+  readonly revision: string;
+  readonly sourcePath: string;
+  readonly sourceBytes: number;
+  readonly sourceSha256: string;
+}
+
+function isLockedUpstream(value: unknown): value is LockedUpstream {
+  return (
+    isRecord(value) &&
+    (value.role === undefined || (typeof value.role === 'string' && value.role.length > 0)) &&
+    typeof value.repository === 'string' &&
+    typeof value.revision === 'string' &&
+    typeof value.sourcePath === 'string' &&
+    Number.isSafeInteger(value.sourceBytes) &&
+    (value.sourceBytes as number) >= 0 &&
+    typeof value.sourceSha256 === 'string' &&
+    SHA256_PATTERN.test(value.sourceSha256)
+  );
+}
+
+function matchesLockedUpstream(item: unknown, upstream: LockedUpstream, requireRole: boolean): boolean {
+  return (
+    isRecord(item) &&
+    item.repository === upstream.repository &&
+    item.revision === upstream.revision &&
+    item.path === upstream.sourcePath &&
+    item.sha256 === upstream.sourceSha256 &&
+    item.bytes === upstream.sourceBytes &&
+    (!requireRole || item.role === upstream.role)
+  );
+}
+
 export function validateLockedUpstream(sourceLineage: unknown, artifactEntry: unknown, modelId: string): void {
   failUnless(isRecord(artifactEntry), `Artifact lock entry for ${modelId} must be an object.`);
-  const upstream = artifactEntry.upstream;
-  failUnless(isRecord(upstream), `Locked upstream for ${modelId} must be an object.`);
+  const requiresExactSources = Object.hasOwn(artifactEntry, 'upstreams');
+  const upstreams = requiresExactSources ? artifactEntry.upstreams : [artifactEntry.upstream];
   failUnless(
-    typeof upstream.repository === 'string' &&
-      typeof upstream.revision === 'string' &&
-      typeof upstream.sourcePath === 'string' &&
-      typeof upstream.sourceSha256 === 'string' &&
-      Number.isSafeInteger(upstream.sourceBytes),
-    `Locked upstream for ${modelId} is incomplete.`
+    Array.isArray(upstreams) && upstreams.length > 0,
+    `Locked upstream for ${modelId} must contain source records.`
+  );
+  failUnless(upstreams.every(isLockedUpstream), `Locked upstream for ${modelId} is incomplete.`);
+  failUnless(
+    !requiresExactSources || upstreams.every((item) => typeof item.role === 'string'),
+    `Every locked source for ${modelId} needs a role.`
+  );
+  const roles = requiresExactSources ? upstreams.map((item) => item.role) : [];
+  failUnless(
+    !requiresExactSources || new Set(roles).size === roles.length,
+    `Locked source roles for ${modelId} must be unique.`
   );
   failUnless(
     Array.isArray(sourceLineage) &&
-      sourceLineage.some(
-        (item: unknown) =>
-          isRecord(item) &&
-          item.repository === upstream.repository &&
-          item.revision === upstream.revision &&
-          item.path === upstream.sourcePath &&
-          item.sha256 === upstream.sourceSha256 &&
-          item.bytes === upstream.sourceBytes
+      (!requiresExactSources || sourceLineage.length === upstreams.length) &&
+      upstreams.every((upstream) =>
+        sourceLineage.some((item: unknown) => matchesLockedUpstream(item, upstream, requiresExactSources))
       ),
     `Approved source lineage for ${modelId} does not match its locked upstream artifact.`
   );

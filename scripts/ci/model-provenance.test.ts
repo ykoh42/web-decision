@@ -370,6 +370,59 @@ test('a verified model cannot omit its locked upstream source', () => {
   assert.throws(() => validateLockedUpstream([], {}, 'fixture-model'), /Locked upstream.*must be an object/u);
 });
 
+test('a direct artifact lock binds every role-tagged conversion input', () => {
+  const upstreams = [
+    {
+      role: 'kev-adapter-weights',
+      repository: 'jaredpalmer/kev-0.6b',
+      revision: 'a'.repeat(40),
+      sourcePath: 'adapter_model.safetensors',
+      sourceBytes: 10,
+      sourceSha256: 'b'.repeat(64)
+    },
+    {
+      role: 'base-weights',
+      repository: 'Qwen/Qwen3-0.6B-Base',
+      revision: 'c'.repeat(40),
+      sourcePath: 'model.safetensors',
+      sourceBytes: 20,
+      sourceSha256: 'd'.repeat(64)
+    }
+  ];
+  const sourceLineage = upstreams.map((item) => ({
+    role: item.role,
+    repository: item.repository,
+    revision: item.revision,
+    path: item.sourcePath,
+    bytes: item.sourceBytes,
+    sha256: item.sourceSha256
+  }));
+  const artifactEntry = {upstreams};
+
+  assert.doesNotThrow(() => validateLockedUpstream(sourceLineage, artifactEntry, 'direct-model'));
+  assert.throws(
+    () => validateLockedUpstream(sourceLineage.slice(0, 1), artifactEntry, 'direct-model'),
+    /does not match its locked upstream artifact/u
+  );
+  assert.throws(
+    () => validateLockedUpstream([...sourceLineage, {...sourceLineage[0]!}], artifactEntry, 'direct-model'),
+    /does not match its locked upstream artifact/u
+  );
+  assert.throws(
+    () => validateLockedUpstream(sourceLineage, {upstreams: [{...upstreams[0], role: undefined}]}, 'direct-model'),
+    /needs a role/u
+  );
+  assert.throws(
+    () =>
+      validateLockedUpstream(
+        sourceLineage,
+        {upstreams: [upstreams[0], {...upstreams[1]!, role: upstreams[0]!.role}]},
+        'direct-model'
+      ),
+    /roles.*unique/u
+  );
+});
+
 test('tampered committed evidence cannot match the manifest evidence digest', async () => {
   const {manifestBytes} = await readProductionInputs();
   await assert.rejects(

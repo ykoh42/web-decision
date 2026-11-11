@@ -23,7 +23,8 @@ import {
   collectKananaReleaseEvidenceInputs,
   collectReleaseEvidenceInputsForTestFixture,
   verifyReleaseArtifactsForTestFixture,
-  verifyReleaseEvidence
+  verifyReleaseEvidence,
+  validateRuntimeAssetConfiguration
 } from './verify-release-evidence.ts';
 import {
   validateKananaEvidencePolicy,
@@ -101,6 +102,29 @@ function makeDescriptor(modelId: string, salt: string): AnyRecord {
     },
     manifest
   };
+}
+
+function makeRemotePinnedModel(): {
+  manifest: AnyRecord;
+  model: Parameters<typeof validateArtifactManifest>[0];
+  artifacts: AnyRecord;
+} {
+  const descriptor = makeDescriptor('remote-pinned-synthetic', 'b');
+  const artifacts = {
+    ...descriptor.artifacts,
+    bundledRuntimeFiles: [],
+    runtimeAssets: {mode: 'remote-pinned'}
+  };
+  const model = {
+    ...descriptor.publicDescriptor,
+    manifestSha256: descriptor.artifacts.manifest.canonicalSha256,
+    manifestPath: descriptor.artifacts.manifest.sourcePath,
+    requiredFiles: descriptor.publicDescriptor.assets.requiredFiles,
+    manifestFiles: descriptor.artifacts.manifest.files,
+    runtimeAssets: artifacts.runtimeAssets,
+    bundledRuntimeFiles: artifacts.bundledRuntimeFiles
+  } as Parameters<typeof validateArtifactManifest>[0];
+  return {manifest: descriptor.manifest, model, artifacts};
 }
 
 function apiSource(descriptors: AnyRecord[]): string {
@@ -805,6 +829,123 @@ test('accepts an exact installed archive with all curated model/browser GPU case
   assert.equal(result.packageVersion, '9.8.7');
   assert.deepEqual(result.models, ['kev-0.6b-q4f16']);
   assert.deepEqual(result.browserResults, {modelCount: 1, browserCount: 1, caseCount: 1});
+});
+
+test('accepts remote-pinned runtime assets from an exact static manifest file set', () => {
+  const {manifest, model, artifacts} = makeRemotePinnedModel();
+  assert.deepEqual(
+    validateRuntimeAssetConfiguration(
+      model.modelId,
+      artifacts.runtimeAssets,
+      artifacts.bundledRuntimeFiles,
+      model.manifestFiles,
+      'pinned-manifest'
+    ),
+    {mode: {mode: 'remote-pinned'}, bundledRuntimeFiles: []}
+  );
+  assert.deepEqual(validateArtifactManifest(model, manifest).files, model.manifestFiles);
+  assert.deepEqual(model.requiredFiles, ['manifest.json', ...Object.keys(model.manifestFiles)]);
+});
+
+test('pins license files without requiring them in runtime cache evidence', () => {
+  const {manifest, model} = makeRemotePinnedModel();
+  const manifestWithLicenses = {
+    ...manifest,
+    licenses: [{file: 'licenses/model.txt'}, {file: 'licenses/runtime.txt'}],
+    files: {
+      ...manifest.files,
+      'licenses/model.txt': {sha256: 'c'.repeat(64), bytes: 31},
+      'licenses/runtime.txt': {sha256: 'd'.repeat(64), bytes: 37}
+    }
+  };
+  const modelWithLicenses = {
+    ...model,
+    manifestSha256: canonicalSha256(manifestWithLicenses),
+    manifestFiles: manifestWithLicenses.files,
+    requiredFiles: ['manifest.json', ...Object.keys(manifestWithLicenses.files)].sort()
+  };
+  const result = validateArtifactManifest(modelWithLicenses, manifestWithLicenses);
+  assert.deepEqual(Object.keys(result.files).sort(), Object.keys(manifestWithLicenses.files).sort());
+  assert.deepEqual(Object.keys(result.runtimeFiles).sort(), Object.keys(manifest.files).sort());
+
+  const rejectLicenseManifest = (invalidManifest: AnyRecord, message: RegExp) => {
+    const invalidModel = {
+      ...modelWithLicenses,
+      manifestSha256: canonicalSha256(invalidManifest),
+      manifestFiles: invalidManifest.files,
+      requiredFiles: ['manifest.json', ...Object.keys(invalidManifest.files)].sort()
+    };
+    assert.throws(() => validateArtifactManifest(invalidModel, invalidManifest), message);
+  };
+  rejectLicenseManifest({...manifestWithLicenses, licenses: [{name: 'No file path'}]}, /License file 0/u);
+  rejectLicenseManifest(
+    {...manifestWithLicenses, licenses: [{file: 'licenses/model.txt'}, {file: 'licenses/model.txt'}]},
+    /repeats a license file/u
+  );
+  rejectLicenseManifest(
+    {...manifestWithLicenses, licenses: [{file: 'licenses/unlisted.txt'}]},
+    /is not listed in the manifest assets/u
+  );
+});
+
+test('rejects missing, extra, or unpinned remote manifest assets', () => {
+  const {manifest, model} = makeRemotePinnedModel();
+  const missingFiles = {...manifest.files};
+  delete missingFiles['weights/model.bin'];
+  const missingManifest = {...manifest, files: missingFiles};
+  assert.throws(
+    () => validateArtifactManifest({...model, manifestSha256: canonicalSha256(missingManifest)}, missingManifest),
+    /file map differs from the generated lock/u
+  );
+
+  const extraManifest = {
+    ...manifest,
+    files: {...manifest.files, 'extra.bin': {sha256: 'c'.repeat(64), bytes: 5}}
+  };
+  assert.throws(
+    () => validateArtifactManifest({...model, manifestSha256: canonicalSha256(extraManifest)}, extraManifest),
+    /file map differs from the generated lock/u
+  );
+
+  const unpinnedManifest = {
+    ...manifest,
+    files: {...manifest.files, 'weights/model.bin': {sha256: 'invalid', bytes: 23}}
+  };
+  assert.throws(
+    () => validateArtifactManifest({...model, manifestSha256: canonicalSha256(unpinnedManifest)}, unpinnedManifest),
+    /Invalid file SHA-256/u
+  );
+});
+
+test('rejects ambiguous or unpinned remote runtime mode declarations', () => {
+  const {model, artifacts} = makeRemotePinnedModel();
+  assert.throws(
+    () =>
+      validateRuntimeAssetConfiguration(
+        model.modelId,
+        artifacts.runtimeAssets,
+        [{manifestName: 'model.wasm'}],
+        model.manifestFiles,
+        'pinned-manifest'
+      ),
+    /cannot also be bundled/u
+  );
+  assert.throws(
+    () =>
+      validateRuntimeAssetConfiguration(
+        model.modelId,
+        {mode: 'remote-pinned', extra: true},
+        [],
+        model.manifestFiles,
+        'pinned-manifest'
+      ),
+    /unsupported fields/u
+  );
+  assert.throws(
+    () =>
+      validateRuntimeAssetConfiguration(model.modelId, artifacts.runtimeAssets, [], model.manifestFiles, 'unpinned'),
+    /require pinned-manifest integrity/u
+  );
 });
 
 test('requires an npm .tgz archive', async (t) => {

@@ -54,7 +54,7 @@ type KevLoaderDescription = {
   };
 };
 
-type KevCuratedDescription = ModelDescription & {
+type KevCuratedDescription = Omit<ModelDescription, 'assets'> & {
   readonly model: ModelId;
   readonly assets: ModelDescription['assets'] & {readonly directArtifactRoot?: string};
 };

@@ -11,13 +11,22 @@ const adapters = Object.freeze({
   kanana: () => import('./adapters/kanana.ts')
 });
 
-const descriptions = Object.freeze(
+const loaderDescriptions = Object.freeze(
   MODEL_CATALOG.map(({modelId, description}) => {
     const {adapter: _adapter, ...metadata} = description;
     return Object.freeze({modelId, ...metadata});
   })
 );
+const descriptions = Object.freeze(
+  loaderDescriptions.map(({assets, ...metadata}) => {
+    const {directArtifactRoot: _directArtifactRoot, ...publicAssets} = assets;
+    return Object.freeze({...metadata, assets: Object.freeze(publicAssets)});
+  })
+);
 const descriptionsById = Object.freeze(Object.fromEntries(descriptions.map((entry) => [entry.modelId, entry])));
+const loaderDescriptionsById = Object.freeze(
+  Object.fromEntries(loaderDescriptions.map((entry) => [entry.modelId, entry]))
+);
 
 function isModelId(value: unknown): value is ModelId {
   return typeof value === 'string' && Object.hasOwn(MODEL_CATALOG_BY_ID, value);
@@ -41,10 +50,11 @@ export async function loadDecisionModel(input: unknown) {
   const {modelId, options} = readLoadOptions(input, isModelId);
   (options as {signal?: AbortSignal}).signal?.throwIfAborted();
   const description = describeModel(modelId);
+  const loaderDescription = loaderDescriptionsById[modelId]!;
   const loadAdapter = adapters[MODEL_CATALOG_BY_ID[modelId].description.adapter];
   if (!loadAdapter) throw new WebDecisionError('INVALID_ASSET', 'The model adapter is unavailable.', undefined);
   const {loadModel} = await loadAdapter();
-  const model = await loadModel(options, description);
+  const model = await loadModel(options, loaderDescription);
   try {
     Object.defineProperty(model, 'description', {value: description});
     return model;
