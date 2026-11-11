@@ -94,13 +94,20 @@ def verify_tvmjs_toolchain(tvm_home: Path) -> dict[str, object]:
             "TVM Web runtime source must be the clean pinned v0.27.0.post1 checkout."
         )
     libraries = {}
+    mismatches = []
     for relative_path, expected_hash in PINNED_TVM_WEB_LIBRARIES.items():
         actual_hash = sha256_file(tvm_home / relative_path)
         if actual_hash != expected_hash:
-            raise ValueError(
-                f"Pinned TVM Web runtime library hash mismatch: {relative_path}."
+            mismatches.append(
+                f"{relative_path}: expected {expected_hash}, got {actual_hash}"
             )
         libraries[relative_path] = actual_hash
+    if mismatches:
+        raise ValueError(
+            "Pinned TVM Web runtime library hash mismatch: "
+            + "; ".join(mismatches)
+            + "."
+        )
     return {"sourceRevision": revision, "sourceTag": tag, "librarySha256": libraries}
 
 
