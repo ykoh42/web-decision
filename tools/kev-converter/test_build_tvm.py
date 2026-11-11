@@ -22,6 +22,7 @@ from build_tvm import (
     compare_upstream_output,
     expanded_gpu_gate_contract,
     export_dynamic_program,
+    extend_runtime_library_path,
     load_expanded_inference_fixture,
     load_upstream_reference,
     validate_upstream_inputs,
@@ -288,6 +289,14 @@ class UpstreamReferenceTests(unittest.TestCase):
                 "soname": "libatomic.so.1",
                 "librarySha256": PINNED_LIBATOMIC_SHA256,
             },
+        )
+
+    def test_libatomic_path_keeps_the_active_python_runtime_first(self):
+        self.assertEqual(
+            extend_runtime_library_path(
+                "/opt/python/lib:/opt/other-runtime/lib", Path("/usr/lib")
+            ),
+            "/opt/python/lib:/opt/other-runtime/lib:/usr/lib",
         )
 
 
