@@ -29,19 +29,29 @@ test('direct Kev assets reject roots and paths that can escape the pinned direct
   }
 });
 
-test('direct Kev source fetches the manifest and model files from the pinned root', async () => {
+test('direct Kev source fetches from its pinned root and reuses the cached manifest offline', async () => {
   const root = 'https://assets.example.test/kev/resolve/0123456789abcdef0123456789abcdef01234567/';
   const requestedUrls: string[] = [];
   const originalGlobals = {
     fetch: globalThis.fetch,
+    caches: Object.getOwnPropertyDescriptor(globalThis, 'caches'),
     location: Object.getOwnPropertyDescriptor(globalThis, 'location'),
     navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   };
+  const cacheEntries = new Map<string, Response>();
+  const cache = {
+    match: async (key: RequestInfo | URL) => cacheEntries.get(String(key))?.clone(),
+    put: async (key: RequestInfo | URL, response: Response) => cacheEntries.set(String(key), response.clone())
+  } as unknown as Cache;
 
   Object.defineProperty(globalThis, 'location', {configurable: true, value: {origin: 'https://app.example.test'}});
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: {gpu: {requestAdapter: async () => ({features: new Set(['shader-f16'])})}}
+  });
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: {open: async () => cache}
   });
   globalThis.fetch = async (input) => {
     requestedUrls.push(String(input));
@@ -50,11 +60,17 @@ test('direct Kev source fetches the manifest and model files from the pinned roo
 
   try {
     const source = createDirectKevPackageSource('a'.repeat(64), root);
-    const prepared = await source.prepare({cache: false});
+    assert.equal(source.assetLoadPhase, 'model-assets');
+    const prepared = await source.prepare({cache: true});
     const modelUrl = assetUrl(prepared.base, 'weights/params_shard_0000.bin');
     await source.fetch?.(modelUrl);
+    await cache.put(prepared.manifestUrl, prepared.response.clone());
+    const offline = await source.prepare({cache: true, offline: true});
+    assert.equal(await offline.response.text(), '{}');
   } finally {
     globalThis.fetch = originalGlobals.fetch;
+    if (originalGlobals.caches) Object.defineProperty(globalThis, 'caches', originalGlobals.caches);
+    else Reflect.deleteProperty(globalThis, 'caches');
     if (originalGlobals.location) Object.defineProperty(globalThis, 'location', originalGlobals.location);
     else Reflect.deleteProperty(globalThis, 'location');
     if (originalGlobals.navigator) Object.defineProperty(globalThis, 'navigator', originalGlobals.navigator);
