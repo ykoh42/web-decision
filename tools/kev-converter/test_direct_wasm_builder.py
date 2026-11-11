@@ -154,6 +154,7 @@ class DirectWasmBuilderTests(unittest.TestCase):
                 question_id=151660,
                 decide_id=151661,
                 expected_attention_blocks=28,
+                target=target,
             )
             tvm.relax.build.assert_called_once_with(rewritten_module, target=target)
             self.assertEqual(timeline.mock_calls[0][0], "rewrite")

@@ -462,6 +462,7 @@ def build_webgpu_package(
         question_id=KEV_DELIMITER_IDS["question"],
         decide_id=KEV_DELIMITER_IDS["decide"],
         expected_attention_blocks=28,
+        target=target,
     )
     package = build_and_package_direct_model(
         tvm, target, relax_module, parameters, output_dir, base_dir, kev_source_dir

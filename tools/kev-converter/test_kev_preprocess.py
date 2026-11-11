@@ -23,6 +23,13 @@ OPTION_START = 151648
 OPTION_END = 151649
 
 
+def imported_modules(module):
+    """Yield imported runtime modules recursively."""
+    for imported in module.imports:
+        yield imported
+        yield from imported_modules(imported)
+
+
 def dense_reference(input_ids, attention_mask):
     """Reproduce the existing S-by-S Kev wrapper for short rows."""
     batch_size, sequence_length = input_ids.shape
@@ -224,7 +231,18 @@ class KevPreprocessTests(unittest.TestCase):
             "webgpu",
             host={"kind": "llvm", "mtriple": "wasm32-unknown-unknown-wasm"},
         )
-        relax.build(self.module, target=target)
+        module = build_kev_preprocessor_module(QUESTION, DECIDE, target=target)
+        executable = relax.build(module, target=target)
+        webgpu_modules = [
+            module
+            for module in imported_modules(executable.mod)
+            if module.kind == "webgpu"
+        ]
+        self.assertTrue(webgpu_modules)
+        wgsl = webgpu_modules[0].inspect_source("wgsl")
+        self.assertIn("fn _kev_preprocess_kernel", wgsl)
+        self.assertIn("attention_mask_ptr", wgsl)
+        self.assertIn("@workgroup_size(1, 1, 1)", wgsl)
 
 
 if __name__ == "__main__":
