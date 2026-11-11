@@ -47,10 +47,13 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: direct-kev-build-report-${{ github.run_id }}
-          path: models/web-decision-assets/direct-kev-0.6b-q4f16/direct-tvm-report.json
+          name: direct-kev-candidate-${{ github.run_id }}
+          path: |
+            models/web-decision-assets/direct-kev-0.6b-q4f16/direct-tvm-report.json
+            models/web-decision-assets/direct-kev-0.6b-q4f16/browser-package/
           if-no-files-found: warn
-          retention-days: 7
+          compression-level: 0
+          retention-days: 3
 
   typescript:
     if: github.event_name != 'workflow_dispatch' || inputs.build_direct_kev != true
