@@ -284,7 +284,7 @@ class UpstreamReferenceTests(unittest.TestCase):
             actual_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
             self.assertEqual(actual_hash, expected_hash, name)
 
-    def test_direct_webgpu_candidate_r2_pins_current_sources_and_package_manifest(self):
+    def test_direct_webgpu_candidate_r2_pins_historical_package_snapshot(self):
         reports = Path(__file__).resolve().with_name("reports")
         report_bytes = (reports / "direct-tvm-q4-webgpu-build-r2.json").read_bytes()
         report = json.loads(report_bytes)
@@ -336,10 +336,90 @@ class UpstreamReferenceTests(unittest.TestCase):
         self.assertEqual(manifest["maxBranchTokens"], 8192)
         self.assertEqual(model_config["max_position_embeddings"], 32768)
 
+    def test_direct_webgpu_candidate_r3_pins_current_sources_and_package_manifest(self):
+        reports = Path(__file__).resolve().with_name("reports")
+        report_bytes = (reports / "direct-tvm-q4-webgpu-build-r3.json").read_bytes()
+        report = json.loads(report_bytes)
+        manifest_bytes = (
+            reports / "direct-tvm-q4-webgpu-manifest-r3.json"
+        ).read_bytes()
+        manifest = json.loads(manifest_bytes)
+        model_config_bytes = (
+            reports / "direct-tvm-q4-webgpu-model-config-r3.json"
+        ).read_bytes()
+        model_config = json.loads(model_config_bytes)
+
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            "403380567a3506de5fe93f63c36d53eee384a096d78c44a427863b4bcff97d38",
+        )
+        self.assertEqual(
+            hashlib.sha256(manifest_bytes).hexdigest(),
+            "417f24e4c63a683157a475f4be4603ea462ffc06839c69aaf07d44b1831b1fa0",
+        )
+        self.assertEqual(
+            hashlib.sha256(model_config_bytes).hexdigest(),
+            "7143a4974bc3ba3c2eea3bfb0b69d8b3284d7501ab7beea3312ba58e76b87251",
+        )
+        canonical_manifest = (
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        self.assertEqual(
+            hashlib.sha256(canonical_manifest).hexdigest(),
+            report["browserPackage"]["manifestSha256"],
+        )
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["candidateModelId"], "kev-0.6b-q4f16")
+        self.assertEqual(report["qualityGates"]["cpuBaseline"]["status"], "passed")
+        self.assertEqual(
+            report["qualityGates"]["webgpuExpandedMatrix"]["status"],
+            "pending-real-chrome-webgpu",
+        )
+        self.assertEqual(manifest["backend"], "tvm-webgpu")
+        self.assertEqual(manifest["parameterCount"], 511)
+        self.assertEqual(
+            manifest["files"]["model.wasm"]["sha256"],
+            "34d3afa576fec2043920f1b11f7c0e7981d8206293aefe9c01d4f4827e96fb4a",
+        )
+        self.assertEqual(manifest["maxStateTokens"], 8192)
+        self.assertEqual(manifest["maxBranchTokens"], 8192)
+        self.assertEqual(model_config["max_position_embeddings"], 32768)
+
         for name, expected_hash in report["converterHashes"].items():
             source_path = Path(__file__).resolve().with_name(name)
             actual_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
             self.assertEqual(actual_hash, expected_hash, name)
+
+    def test_direct_webgpu_candidate_r3_pins_real_chrome_failure(self):
+        reports = Path(__file__).resolve().with_name("reports")
+        report_bytes = (
+            reports / "direct-tvm-q4-webgpu-real-chrome-r3.json"
+        ).read_bytes()
+        report = json.loads(report_bytes)
+
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            "1fc7023640e2e1b4deeb4d5cb42714f16c96a41d5b643b31cd739478e6a7c335",
+        )
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(
+            report["modelWasmSha256"],
+            "34d3afa576fec2043920f1b11f7c0e7981d8206293aefe9c01d4f4827e96fb4a",
+        )
+        self.assertTrue(
+            all(
+                len(set(case["gpuOptionLogits"])) == 1
+                for case in report["onlineMatrix"]
+            )
+        )
+        self.assertEqual(report["offlineCheck"]["networkRequests"], 0)
 
     def test_converter_uses_the_locked_upstream_tvm_wheel_without_source_patches(self):
         converter_root = Path(__file__).resolve().parent
