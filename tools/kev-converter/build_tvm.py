@@ -386,15 +386,18 @@ def package_direct_model(
     executable, parameters, output_dir: Path, base_dir: Path, kev_source_dir: Path
 ):
     """Write the direct WebGPU executable and official base tokenizer assets."""
+    # Hugging Face cache snapshots expose pinned files through symlinks to
+    # content-addressed blobs. verify_inputs checks those files before export;
+    # pass their canonical regular-file paths to the package writer.
     return package_tvm_webgpu_artifacts(
         executable,
         parameters,
         output_dir / "browser-package",
-        base_dir / "tokenizer.json",
-        base_dir / "tokenizer_config.json",
-        base_dir / "config.json",
-        kev_source_dir / "LICENSE",
-        base_dir / "LICENSE",
+        (base_dir / "tokenizer.json").resolve(strict=True),
+        (base_dir / "tokenizer_config.json").resolve(strict=True),
+        (base_dir / "config.json").resolve(strict=True),
+        (kev_source_dir / "LICENSE").resolve(strict=True),
+        (base_dir / "LICENSE").resolve(strict=True),
     )
 
 
