@@ -168,9 +168,17 @@ function safeManifestPath(value: string): boolean {
     value !== 'manifest.json' &&
     !value.startsWith('/') &&
     !value.includes(':') &&
-    !/[\\?#%\u0000-\u001f]/u.test(value) &&
+    !/[\\?#%]/u.test(value) &&
+    !containsControlCharacter(value) &&
     value.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
   );
+}
+
+function containsControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 0x20 || codePoint === 0x7f;
+  });
 }
 
 function isDirectKevUpstream(value: unknown): value is DirectKevUpstream {
