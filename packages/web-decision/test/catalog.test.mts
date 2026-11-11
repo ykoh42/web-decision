@@ -6,6 +6,13 @@ import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
+import modelProvenance from '../src/catalog/model-provenance.json' with {type: 'json'};
+import {
+  APPROVED_MODEL_IDS,
+  MODEL_CATALOG as PUBLIC_MODEL_CATALOG,
+  MODEL_CATALOG_BY_ID as PUBLIC_MODEL_CATALOG_BY_ID
+} from '../src/catalog/public-catalog.generated.ts';
+import {APPROVED_ADAPTER_LOADERS} from '../src/catalog/public-adapters.generated.ts';
 import {getModelRegistration} from '../src/model-registry.js';
 import {
   createDirectKev06ArtifactLockFromDirectory,
@@ -31,17 +38,12 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
-  assert.deepEqual(MODEL_IDS, ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']);
-  assert.equal(MODEL_CATALOG.length, 2);
-
-  const kev = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
-  assert.equal(kev, MODEL_CATALOG[0]);
-  assert.equal(kev.description.adapter, 'kev06');
-  assert.deepEqual(kev.description.backend.requiredFeatures, ['shader-f16']);
+test('candidate catalog retains the verified Kanana TVM descriptor', () => {
+  assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611']);
+  assert.equal(MODEL_CATALOG.length, 1);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
-  assert.equal(kanana, MODEL_CATALOG[1]);
+  assert.equal(kanana, MODEL_CATALOG[0]);
   assert.equal(kanana.description.adapter, 'kanana');
   assert.equal(kanana.description.backend.name, 'tvm-webgpu');
   assert.equal(kanana.description.backend.requiredLimits.maxBufferSize, 656_670_720);
@@ -58,36 +60,28 @@ test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
     }
   ]);
   assert.equal(kanana.description.verification.currentBundleGpu, 'verified-m4-pro-chromium-157');
-  for (const entry of [kev, kanana]) {
-    assert.equal(Object.hasOwn(entry, 'model'), false);
-    assert.equal(Object.hasOwn(entry.description, 'model'), false);
-    assert.equal(Object.hasOwn(entry.description.assets, 'assetsUrl'), false);
-    assert.equal(Object.hasOwn(entry.description.assets, 'manifestSha256'), true);
-  }
-  assert.equal(Object.hasOwn(MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'].description.assets, 'directArtifactRoot'), false);
+  assert.equal(Object.hasOwn(kanana, 'model'), false);
+  assert.equal(Object.hasOwn(kanana.description, 'model'), false);
+  assert.equal(Object.hasOwn(kanana.description.assets, 'assetsUrl'), false);
+  assert.equal(Object.hasOwn(kanana.description.assets, 'manifestSha256'), true);
 });
 
-test('Kev catalog description retains its existing contract', () => {
-  const entry = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
-  const {adapter, ...description} = entry.description;
-  const legacy = getModelRegistration(entry.modelId).description;
-  const {model, ...expected} = structuredClone(legacy);
-  assert.equal(model, entry.modelId);
-  expected.verification.currentBundleGpu = 'not-revalidated';
-  expected.verification.priorEvidence = entry.description.verification.priorEvidence!;
-  expected.assets.requiredFiles = ['manifest.json', ...Object.keys(entry.artifacts.manifest.files)];
-
-  assert.equal(adapter, 'kev06');
-  assert.deepEqual(description, expected);
+test('public generated catalog and model ID type include verified models only', async () => {
+  const approvedIds = modelProvenance.models.filter(({status}) => status === 'verified').map(({modelId}) => modelId);
+  assert.deepEqual(APPROVED_MODEL_IDS, approvedIds);
   assert.deepEqual(
-    description.features.textChoice.limits.map(({resource, scope, min, max}) => ({resource, scope, min, max})),
-    [
-      {resource: 'tokens', scope: 'state', min: undefined, max: 8191},
-      {resource: 'tokens', scope: 'question', min: undefined, max: 8192},
-      {resource: 'options', scope: 'question', min: 1, max: 255},
-      {resource: 'questions', scope: 'request', min: 1, max: undefined}
-    ]
+    PUBLIC_MODEL_CATALOG.map(({modelId}) => modelId),
+    approvedIds
   );
+  assert.deepEqual(Object.keys(PUBLIC_MODEL_CATALOG_BY_ID), approvedIds);
+  assert.deepEqual(
+    Object.keys(APPROVED_ADAPTER_LOADERS).sort(),
+    [...new Set(PUBLIC_MODEL_CATALOG.map(({description}) => description.adapter))].sort()
+  );
+
+  const publicTypeFile = await readFile(packageFile('src/curated/public-model-id.generated.d.ts'), 'utf8');
+  const modelType = approvedIds.length ? approvedIds.map((modelId) => "'" + modelId + "'").join(' | ') : 'never';
+  assert.equal(publicTypeFile, 'export type PublicModelId = ' + modelType + ';\n');
 });
 
 test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entries', async () => {
@@ -140,7 +134,13 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
 
 test('direct Kev recipe locks a manifest-only remote package and rejects malformed or tampered input', async () => {
   const spec = JSON.parse(await readFile(packageFile('src/catalog/model-spec.json'), 'utf8'));
-  const [sourceModel] = spec.models;
+  const {model: _legacyModelId, ...kevDescription} = structuredClone(
+    getModelRegistration('kev-0.6b-q4f16').description
+  );
+  const sourceModel = {
+    modelId: 'kev-0.6b-q4f16',
+    description: {adapter: 'kev06', ...kevDescription}
+  };
   const artifactUpstreams = [
     {
       role: 'base-config',
@@ -234,29 +234,6 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
   }
 });
 
-test('legacy Kev lock keeps the bundled runtime-file recipe', async () => {
-  const spec = JSON.parse(await readFile(packageFile('src/catalog/model-spec.json'), 'utf8'));
-  const [sourceModel] = spec.models;
-  const {artifactUpstreams: _artifactUpstreams, ...sourceModelWithoutPrivatePins} = sourceModel;
-  const bundledModel = {
-    ...sourceModelWithoutPrivatePins,
-    description: {
-      ...sourceModel.description,
-      checkpoint: {
-        repository: 'onnx-community/kev-0.6b-ONNX',
-        revision: '5a827091b3d58fe4fdfc02a5a5b2ce364047d678'
-      }
-    }
-  };
-
-  const lock = await createModelArtifactLock(bundledModel);
-
-  assert.equal(lock.manifest.canonicalSha256, MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'].artifacts.manifest.canonicalSha256);
-  assert.equal(lock.bundledRuntimeFiles.length, 5);
-  assert.equal(lock.upstream?.repository, 'onnx-community/kev-0.6b-ONNX');
-  assert.equal(Object.hasOwn(lock, 'upstreams'), false);
-});
-
 test('artifact locks hash packaged manifests, runtime files, and model ranges', async () => {
   const lockFile = JSON.parse(await readFile(packageFile('src/catalog/artifacts.lock.json'), 'utf8'));
   assert.deepEqual(Object.keys(lockFile.byModelId), MODEL_IDS);
@@ -300,12 +277,13 @@ test('artifact locks hash packaged manifests, runtime files, and model ranges', 
 
 test('generated files are deterministic and the ModelId union follows the curated spec', async () => {
   const typeFile = await readFile(packageFile('src/catalog/types.generated.d.ts'), 'utf8');
-  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0]! + "' | '" + MODEL_IDS[1]! + "';";
+  const expectedIdType = 'export type ModelId = ' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(' | ') + ';';
   assert.ok(typeFile.includes(expectedIdType));
-  assert.ok(
-    typeFile.includes("export type ModelIdTuple = readonly ['" + MODEL_IDS[0]! + "', '" + MODEL_IDS[1]! + "'];")
-  );
-  assert.ok(typeFile.includes("export type ModelAdapterId = 'kev06' | 'kanana';"));
+  const expectedTuple =
+    'export type ModelIdTuple = readonly [' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(', ') + '];';
+  assert.ok(typeFile.includes(expectedTuple));
+  const adapterIds = [...new Set(MODEL_CATALOG.map(({description}) => description.adapter))].sort();
+  assert.ok(typeFile.includes('export type ModelAdapterId = ' + adapterIds.map((adapter) => "'" + adapter + "'").join(' | ') + ';'));
   assert.equal(typeFile.includes("from '../index.js'"), false);
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-model-catalog.mts', '--check'], {
     cwd: packageRoot,

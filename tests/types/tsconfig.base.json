@@ -14,5 +14,5 @@
     "skipLibCheck": false,
     "types": []
   },
-  "files": ["consumer.ts", "kanana-consumer.ts"]
+  "files": ["public-api-consumer.ts", "consumer.ts", "kanana-consumer.ts", "pending-model-ids.ts"]
 }

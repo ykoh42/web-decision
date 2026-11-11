@@ -1,5 +1,6 @@
-import {describeModel, loadDecisionModel} from 'web-decision';
+import {loadDecisionModel} from 'web-decision';
 import {assetUrl, CACHE_NAME, openAssetCache} from '../../packages/web-decision/src/assets.js';
+import {MODEL_CATALOG_BY_ID} from '../../packages/web-decision/src/catalog/index.generated.ts';
 import type {KevTokenizer} from '../../packages/web-decision/src/kev.js';
 import {loadCuratedKevModel} from '../../packages/web-decision/src/kev-loader.js';
 import type {RepresentativeDecisionCase} from './kev06-expanded-inference.js';
@@ -396,9 +397,10 @@ function createTestSource(manifestSha256: string) {
 }
 
 function createPackageDescription(manifestSha256: string): Parameters<typeof loadCuratedKevModel>[1] {
-  const described = describeModel(MODEL_ID);
+  const {adapter: _adapter, ...described} = MODEL_CATALOG_BY_ID[MODEL_ID]!.description;
   return {
     ...described,
+    modelId: MODEL_ID,
     model: MODEL_ID,
     checkpoint: {
       repository: 'jaredpalmer/kev-0.6b',

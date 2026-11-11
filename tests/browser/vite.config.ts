@@ -111,6 +111,14 @@ export default defineConfig({
   optimizeDeps: {noDiscovery: true, include: []},
   resolve: {
     alias: {
+      '@huggingface/tokenizers': realpathSync(
+        fileURLToPath(
+          new URL(
+            '../../packages/web-decision/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs',
+            import.meta.url
+          )
+        )
+      ),
       'web-decision': webDecisionBundle
     }
   },

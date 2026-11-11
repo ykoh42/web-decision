@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {lstat, readdir, readFile, writeFile} from 'node:fs/promises';
+import {lstat, readdir, readFile, realpath, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {
@@ -9,6 +9,11 @@ import type {
   ModelCatalogEntry,
   ModelId
 } from '../src/catalog/types.generated.js';
+import {
+  MODEL_PROVENANCE_EVIDENCE_ROOT,
+  MODEL_PROVENANCE_MANIFEST_SHA256,
+  validateModelProvenance
+} from '../../../scripts/ci/model-provenance.ts';
 import {KEV06_MANIFEST_SHA256} from '../src/kev06/contract.js';
 import {
   DIRECT_KEV06_BASE,
@@ -701,6 +706,80 @@ export const MODEL_CATALOG_BY_ID = Object.freeze(
 `;
 }
 
+function renderPublicCatalogModule(models: readonly CuratedModel[], artifactLock: ArtifactLockFile): string {
+  const catalog = models.map(({modelId, description}) => {
+    const artifacts = artifactLock.byModelId[modelId];
+    failUnless(artifacts, 'Artifact lock is missing approved model ' + modelId + '.');
+    return {
+      modelId,
+      description: {
+        ...description,
+        assets: {
+          ...description.assets,
+          requiredFiles: ['manifest.json', ...Object.keys(artifacts.manifest.files)],
+          manifestSha256: artifacts.manifest.canonicalSha256
+        }
+      }
+    };
+  });
+  return `import type {CatalogModelDescription, ModelId} from './types.generated.js';
+
+type PublicCatalogEntry = Readonly<{modelId: ModelId; description: CatalogModelDescription}>;
+
+function deepFreeze<T>(value: T): Readonly<T> {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+const catalog = ${JSON.stringify(catalog, null, 2)} as unknown as readonly PublicCatalogEntry[];
+export const APPROVED_MODEL_IDS = Object.freeze(catalog.map(({modelId}) => modelId));
+export const MODEL_CATALOG = deepFreeze(catalog);
+export const MODEL_CATALOG_BY_ID = Object.freeze(
+  Object.fromEntries(MODEL_CATALOG.map((entry) => [entry.modelId, entry])) as Record<ModelId, PublicCatalogEntry>
+);
+`;
+}
+
+function renderPublicModelIdType(models: readonly CuratedModel[]): string {
+  const ids = models.map((model) => "'" + model.modelId + "'");
+  return 'export type PublicModelId = ' + (ids.length ? ids.join(' | ') : 'never') + ';\n';
+}
+
+function renderPublicAdapterLoaders(models: readonly CuratedModel[]): string {
+  const adapters = [...new Set(models.map(({description}) => description.adapter))].sort();
+  const entries = adapters
+    .map((adapter) => `  ${adapter}: () => import('../curated/adapters/${adapter}.ts')`)
+    .join(',\n');
+  const loaderMap = entries
+    ? `{
+${entries}
+}`
+    : '{}';
+  return `import type {ModelDescription} from '../curated/types.js';
+
+type ModelAdapterModule = Readonly<{
+  loadModel(options: object, description: ModelDescription): Promise<Readonly<{dispose?: () => Promise<void>}>>;
+}>;
+
+export const APPROVED_ADAPTER_LOADERS: Readonly<Record<string, () => Promise<ModelAdapterModule>>> = Object.freeze(${loaderMap});
+`;
+}
+
+function renderPublicModelLoadOptions(models: readonly CuratedModel[]): string {
+  const commonOptions = ['modelId', 'cache', 'offline', 'signal', 'onProgress'];
+  const optionsByModelId = Object.fromEntries(
+    models.map(({modelId, description}) => {
+      if (description.adapter === 'kev06')
+        return [modelId, [...commonOptions, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']];
+      if (description.adapter === 'kanana') return [modelId, commonOptions];
+      throw new Error('No public load options are defined for adapter ' + description.adapter + '.');
+    })
+  );
+  return `export const APPROVED_MODEL_LOAD_OPTIONS: Readonly<Record<string, readonly string[]>> = Object.freeze(${JSON.stringify(optionsByModelId, null, 2)});
+`;
+}
+
 function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry: string} {
   const ids = models.map((model) => "'" + model.modelId + "'");
   const idTypes = ids.join(' | ');
@@ -829,12 +908,38 @@ async function main(): Promise<void> {
   const artifactLock = await createArtifactLock(models, {
     directKevArtifactDirectory: readDirectKevArtifactDirectory(process.argv.slice(2))
   });
+  const [provenanceFile, canonicalPackageRoot, canonicalWorkspaceRoot] = await Promise.all([
+    readJson(path.join(catalogRoot, 'model-provenance.json')),
+    realpath(packageRoot),
+    realpath(repositoryRoot)
+  ]);
+  const provenance = await validateModelProvenance({
+    packageRoot: canonicalPackageRoot,
+    workspaceRoot: canonicalWorkspaceRoot,
+    modelSpec: rawSpec,
+    artifactLock,
+    artifactLockBytes: Buffer.from(renderJson(artifactLock)),
+    manifestBytes: provenanceFile.bytes,
+    expectedManifestSha256: MODEL_PROVENANCE_MANIFEST_SHA256,
+    expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+    allowTestFixture: false,
+    requireCommitted: false,
+    allowPending: true
+  });
+  const pendingModelIds = new Set(provenance.pendingModelIds);
+  const approvedModelIds = new Set(provenance.modelIds.filter((modelId) => !pendingModelIds.has(modelId)));
+  const approvedModels = models.filter(({modelId}) => approvedModelIds.has(modelId));
+  failUnless(approvedModels.length === approvedModelIds.size, 'Approved provenance references an unknown model.');
   const types = renderTypeFiles(models);
   const outputs: readonly (readonly [string, string])[] = [
     [path.join(catalogRoot, 'artifacts.lock.json'), renderJson(artifactLock)],
     [path.join(catalogRoot, 'index.generated.ts'), renderCatalogModule()],
     [path.join(catalogRoot, 'types.generated.d.ts'), types.types],
-    [path.join(catalogRoot, 'index.generated.d.ts'), types.entry]
+    [path.join(catalogRoot, 'index.generated.d.ts'), types.entry],
+    [path.join(catalogRoot, 'public-catalog.generated.ts'), renderPublicCatalogModule(approvedModels, artifactLock)],
+    [path.join(catalogRoot, 'public-adapters.generated.ts'), renderPublicAdapterLoaders(approvedModels)],
+    [path.join(catalogRoot, 'public-load-options.generated.ts'), renderPublicModelLoadOptions(approvedModels)],
+    [path.join(packageRoot, 'src/curated/public-model-id.generated.d.ts'), renderPublicModelIdType(approvedModels)]
   ];
   await writeOutputs(outputs, process.argv.includes('--check'));
 }

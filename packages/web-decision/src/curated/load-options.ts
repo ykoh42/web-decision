@@ -1,13 +1,12 @@
 import type {ModelId} from '../catalog/types.generated.js';
+import {APPROVED_MODEL_LOAD_OPTIONS} from '../catalog/public-load-options.generated.ts';
 import {WebDecisionError} from './errors.ts';
 
 const COMMON_OPTIONS = ['modelId', 'cache', 'offline', 'signal', 'onProgress'] as const;
-const KANANA_OPTIONS = new Set(COMMON_OPTIONS);
-const KNOWN_OPTIONS = new Set<string>(KANANA_OPTIONS);
+const KNOWN_OPTIONS = new Set([...COMMON_OPTIONS, ...Object.values(APPROVED_MODEL_LOAD_OPTIONS).flat()]);
 
 function optionsForModel(modelId: ModelId): ReadonlySet<string> {
-  if (modelId === 'kanana-2-v-decide-3b-2611') return KANANA_OPTIONS;
-  return new Set();
+  return new Set(APPROVED_MODEL_LOAD_OPTIONS[modelId] ?? []);
 }
 
 /** Validate the closed public load interface without evaluating caller getters. */

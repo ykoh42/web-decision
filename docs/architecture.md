@@ -4,13 +4,13 @@ This document describes the curated TVM package and its release requirements.
 
 ## Public surface
 
-`web-decision` is a browser library. `listModels()` and `describeModel(id)` expose the models included in the installed package. `loadDecisionModel({modelId})` accepts only an included ID. An application cannot choose a model artifact URL, register a model, or replace the execution engine through the public interface.
+`web-decision` is a browser library. `listModels()` and `describeModel(id)` expose only provenance-approved models in the installed package. `loadDecisionModel({modelId})` accepts only an included ID. An application cannot choose a model artifact URL, register a model, or replace the execution engine through the public interface.
 
 The package includes only models selected by the project and admitted through the release verification process. A model's metadata describes what it can do and the environments actually checked; it does not guarantee output quality or universal hardware support. GPU support is model-specific. In particular, TVM does not imply that every model requires `shader-f16` or that a browser will offer the necessary GPU features.
 
 ## Responsibilities
 
-- The model catalog owns public IDs, capability metadata and pins to model artifacts. Its generated files must match the checked-in source definitions and artifact records.
+- The full candidate catalog owns model descriptions and artifact records. The generated public catalog and ID type include only approved candidates; generation validates the pinned provenance manifest and evidence first.
 - An artifact record identifies the model, source revision, transformation inputs, TVM execution contract and verified file hashes. Source claims, build-derived facts and release evidence have distinct owners; do not treat a previous build's test result as evidence for a new package.
 - The asset manager downloads from pinned sources, checks size and digest before use and manages cached copies. A verified cache hit is checked before use. Online success is not a guarantee that caching succeeded. An offline request must not fetch missing artifacts.
 - The TVM runtime manages device selection, execution, cancellation, device loss and cleanup. It must not silently switch execution engines.

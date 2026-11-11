@@ -5,21 +5,22 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/curated/index.d.ts",
+      "types": "./src/curated/public-index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "types": "./src/curated/index.d.ts",
+  "types": "./src/curated/public-index.d.ts",
   "files": [
     "dist",
-    "src/curated/index.d.ts",
-    "src/curated/types.d.ts",
-    "src/catalog/types.generated.d.ts",
-    "assets/kanana",
+    "src/curated/public-index.d.ts",
+    "src/curated/public-types.d.ts",
+    "src/curated/public-model-id.generated.d.ts",
     "README.md",
     "LICENSE",
     "KANANA-NOTICE",
     "KANANA-OPEN-LICENSE.txt",
+    "KEV06-NOTICE",
+    "KEV-NOTICE",
     "EMSCRIPTEN-LICENSE",
     "ROLLDOWN-LICENSE",
     "ROLLDOWN-THIRD-PARTY-LICENSE",

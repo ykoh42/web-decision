@@ -68,30 +68,45 @@ test(
       const entry = ${JSON.stringify(model)};
       export const MODEL_CATALOG = [entry];
       export const MODEL_CATALOG_BY_ID = {[entry.modelId]: entry};
+      export const APPROVED_MODEL_IDS = [entry.modelId];
     `;
-    const fakeKevLoaderSource = `
-      export async function loadCuratedKevModel(options, description) {
-        globalThis.__curatedPrivateMetadataCapture = {
-          model: options.model,
-          directArtifactRoot: description.assets.directArtifactRoot
-        };
-        return {};
-      }
+    const adapterSource = `
+      export const APPROVED_ADAPTER_LOADERS = {
+        kev06: async () => ({
+          loadModel: async (options, description) => {
+            globalThis.__curatedPrivateMetadataCapture = {
+              model: description.modelId,
+              directArtifactRoot: description.assets.directArtifactRoot
+            };
+            return {};
+          }
+        })
+      };
+    `;
+    const loadOptionsSource = `
+      export const APPROVED_MODEL_LOAD_OPTIONS = {
+        ${JSON.stringify(modelId)}: ['modelId', 'cache', 'offline', 'signal', 'onProgress']
+      };
     `;
     const dataUrl = (source: string) => `data:text/javascript,${encodeURIComponent(source)}`;
     const entryUrl = new URL('../src/curated/index.ts?private-metadata-test', import.meta.url);
     const indexUrl = new URL('../src/curated/index.ts', import.meta.url).href;
-    const adapterUrl = new URL('../src/curated/adapters/kev06.ts', import.meta.url).href;
+    const loadOptionsUrl = new URL('../src/curated/load-options.ts', import.meta.url).href;
     const testGlobal = globalThis as TestGlobal;
     const previousCapture = Object.getOwnPropertyDescriptor(testGlobal, '__curatedPrivateMetadataCapture');
     const hooks = registerHooks({
       resolve(specifier, context, nextResolve) {
-        if (context.parentURL === entryUrl.href && specifier === '../catalog/index.generated.ts')
+        if (context.parentURL === entryUrl.href && specifier === '../catalog/public-catalog.generated.ts')
           return {url: dataUrl(catalogSource), shortCircuit: true};
-        if (context.parentURL === adapterUrl && specifier === '../../kev-loader.js')
-          return {url: dataUrl(fakeKevLoaderSource), shortCircuit: true};
-        if (context.parentURL === indexUrl && specifier === '../catalog/index.generated.ts')
+        if (context.parentURL === indexUrl && specifier === '../catalog/public-catalog.generated.ts')
           return {url: dataUrl(catalogSource), shortCircuit: true};
+        if (
+          (context.parentURL === entryUrl.href || context.parentURL === indexUrl) &&
+          specifier === '../catalog/public-adapters.generated.ts'
+        )
+          return {url: dataUrl(adapterSource), shortCircuit: true};
+        if (context.parentURL === loadOptionsUrl && specifier === '../catalog/public-load-options.generated.ts')
+          return {url: dataUrl(loadOptionsSource), shortCircuit: true};
         return nextResolve(specifier, context);
       }
     });

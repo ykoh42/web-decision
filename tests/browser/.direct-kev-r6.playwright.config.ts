@@ -20,7 +20,7 @@ export default {
     }
   },
   webServer: {
-    command: 'node_modules/.bin/vite --config tests/browser/vite.config.ts',
+    command: 'node ../../node_modules/vite/bin/vite.js --config vite.config.ts --port 8767 --strictPort',
     url: baseURL,
     reuseExistingServer: true,
     timeout: 30_000

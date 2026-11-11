@@ -2,6 +2,7 @@ import {defineConfig, type Plugin} from 'vite';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {APPROVED_MODEL_IDS} from './src/catalog/public-catalog.generated.ts';
 
 // The package builds against the exact pinned upstream TVM WebGPU source.
 export function assertPinnedWebgpuHash(actual: string): void {
@@ -57,7 +58,8 @@ export default defineConfig({
           sawMarker = true;
           item.code = item.code.replace(/^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
         }
-        if (!sawMarker) throw new Error('Expected TVM source markers in bundle');
+        if (!sawMarker && APPROVED_MODEL_IDS.length > 0)
+          throw new Error('Expected TVM source markers in the approved model bundle');
         for (const item of Object.values(bundle)) {
           if (item.type !== 'chunk') continue;
           item.code = item.code.replace(/^\/\/ (?:\.\.\/)*.*?\/node_modules\//gm, '// [dependency]/');

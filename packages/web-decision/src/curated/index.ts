@@ -1,15 +1,12 @@
 import {CACHE_NAME} from '../assets.js';
-import {MODEL_CATALOG, MODEL_CATALOG_BY_ID} from '../catalog/index.generated.ts';
+import {APPROVED_ADAPTER_LOADERS} from '../catalog/public-adapters.generated.ts';
+import {MODEL_CATALOG, MODEL_CATALOG_BY_ID} from '../catalog/public-catalog.generated.ts';
 import type {ModelId} from '../catalog/types.generated.js';
 import {WebDecisionError} from './errors.ts';
 import {readLoadOptions} from './load-options.ts';
 
 export {WebDecisionError};
 export {KananaFloat, kananaFloat} from '../kanana/json-float.ts';
-
-const adapters = Object.freeze({
-  kanana: () => import('./adapters/kanana.ts')
-});
 
 const loaderDescriptions = Object.freeze(
   MODEL_CATALOG.map(({modelId, description}) => {
@@ -32,12 +29,12 @@ function isModelId(value: unknown): value is ModelId {
   return typeof value === 'string' && Object.hasOwn(MODEL_CATALOG_BY_ID, value);
 }
 
-/** List only the models registered in this package. */
+/** List only the models approved for public use in this package. */
 export function listModels() {
   return descriptions;
 }
 
-/** Describe a model from this package without accessing the network. */
+/** Describe an approved model from this package without accessing the network. */
 export function describeModel(modelId: ModelId) {
   if (!isModelId(modelId)) throw new WebDecisionError('INVALID_INPUT', 'Unsupported decision model ID.', undefined);
   const description = descriptionsById[modelId];
@@ -51,7 +48,7 @@ export async function loadDecisionModel(input: unknown) {
   (options as {signal?: AbortSignal}).signal?.throwIfAborted();
   const description = describeModel(modelId);
   const loaderDescription = loaderDescriptionsById[modelId]!;
-  const loadAdapter = adapters[MODEL_CATALOG_BY_ID[modelId].description.adapter];
+  const loadAdapter = APPROVED_ADAPTER_LOADERS[MODEL_CATALOG_BY_ID[modelId].description.adapter];
   if (!loadAdapter) throw new WebDecisionError('INVALID_ASSET', 'The model adapter is unavailable.', undefined);
   const {loadModel} = await loadAdapter();
   const model = await loadModel(options, loaderDescription);

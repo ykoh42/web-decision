@@ -509,7 +509,7 @@ export async function assertCommittedPackageProvenance(
   modelIds: string[];
   pendingModelIds: string[];
 }> {
-  const root = resolve(workspaceRoot);
+  const root = await realpath(resolve(workspaceRoot));
   const packageRoot = resolve(root, 'packages/web-decision');
   assert.equal(await realpath(packageRoot), packageRoot, 'Model package root must use its canonical path.');
   const manifestPath = resolve(packageRoot, MODEL_PROVENANCE_MANIFEST_PATH);
