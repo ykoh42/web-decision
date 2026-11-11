@@ -52,9 +52,9 @@ PINNED_TVM_VERSION = "0.27.0.post1"
 PINNED_TVM_WEB_REVISION = "7b5acb32bd271342a24130f4ef439ff6c2e52c6c"
 PINNED_TVM_WEB_TAG = "v0.27.0.post1"
 PINNED_TVM_WEB_LIBRARIES = {
-    "web/dist/wasm/wasm_runtime.bc": "a83fbebb797f1b4f3b911aace868fdf0f4b6e3a3fc067a8db7238db6b875519d",
-    "web/dist/wasm/tvmjs_support.bc": "0d62d38499e290eb4bb6990551e2407f6723f08c508d1a126dd0122958b9a4b0",
-    "web/dist/wasm/webgpu_runtime.bc": "aeb6aad70807f126c8be438e151b20a9a1155d6bc94e6a48c4f366c0dc194bb3",
+    "web/dist/wasm/wasm_runtime.bc": "1974cd7846e3735735fe48828856b7113257a426c24a49e44f45c79c412b972f",
+    "web/dist/wasm/tvmjs_support.bc": "24088d9f55002852d513af36b64770dacb1825e5dffebb95d23b43f104b19fc9",
+    "web/dist/wasm/webgpu_runtime.bc": "c4baf79ed300de425db4d81743ab89d36cee323e40e18904c4ef7f196f2fe0aa",
 }
 PINNED_LIBATOMIC_PACKAGE_VERSION = "14.2.0-4ubuntu2~24.04.1"
 PINNED_LIBATOMIC_SHA256 = (
