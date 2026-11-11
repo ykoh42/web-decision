@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "status": "failed",
+  "candidateModelId": "kev-0.6b-q4f16",
+  "buildReportSha256": "403380567a3506de5fe93f63c36d53eee384a096d78c44a427863b4bcff97d38",
+  "manifestSha256": "6a3625ef894614298390a1f185c32caa9f3491381efa480be517dde6aafe39d4",
+  "modelWasmSha256": "34d3afa576fec2043920f1b11f7c0e7981d8206293aefe9c01d4f4827e96fb4a",
+  "environment": {
+    "operatingSystem": "Windows",
+    "browser": "Chrome 157",
+    "adapter": "Intel UHD",
+    "architecture": "gen-12lp",
+    "fallbackAdapter": false
+  },
+  "onlineMatrix": [
+    {
+      "case": "baseline-double-charge",
+      "tokenCount": 22,
+      "gpuOptionLogits": [2.216796875, 2.216796875],
+      "maxAbsLogitDifference": 3.0791,
+      "maxProbabilityDifference": 0.49563
+    },
+    {
+      "case": "account-security",
+      "tokenCount": 64,
+      "gpuOptionLogits": [2.216796875, 2.216796875, 2.216796875],
+      "maxAbsLogitDifference": 3.9863
+    },
+    {
+      "case": "delayed-package",
+      "tokenCount": 57,
+      "gpuOptionLogits": [2.216796875, 2.216796875, 2.216796875],
+      "selectedOptionMatchesCpu": false,
+      "maxAbsLogitDifference": 3.4902
+    },
+    {
+      "case": "long-tracking-context",
+      "tokenCount": 243,
+      "gpuOptionLogits": [2.216796875, 2.216796875, 2.216796875],
+      "maxAbsLogitDifference": 4.9668
+    }
+  ],
+  "offlineCheck": {
+    "tokenCount": 22,
+    "modelLoadSucceeded": true,
+    "networkRequests": 0,
+    "matchesOnlineOutput": true
+  },
+  "result": "All tested GPU option logits collapse to the same constant; CPU/GPU quality gate fails. Offline cache retrieval works but reproduces the bad GPU output."
+}
