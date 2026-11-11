@@ -5,21 +5,23 @@ import {readLoadOptions} from '../src/curated/load-options.ts';
 
 const kananaId = 'kanana-2-v-decide-3b-2611';
 const isModelId = (value: unknown): value is ModelId => value === kananaId;
+const testLoadOptions = {[kananaId]: ['fixtureOption']} as const;
 
 test('accepts a curated model ID and copies supported options without changing the caller', () => {
-  const input = {modelId: kananaId, offline: true, cache: true};
-  const parsed = readLoadOptions(input, isModelId);
+  const input = {modelId: kananaId, offline: true, cache: true, fixtureOption: 4096};
+  const parsed = readLoadOptions(input, isModelId, testLoadOptions);
   assert.equal(parsed.modelId, kananaId);
   assert.equal(Object.hasOwn(parsed.options, 'model'), false);
   assert.equal(parsed.options.offline, true);
   assert.equal(parsed.options.cache, true);
+  assert.equal(parsed.options.fixtureOption, 4096);
   assert.equal(Object.getPrototypeOf(parsed.options), null);
-  assert.deepEqual(input, {modelId: kananaId, offline: true, cache: true});
+  assert.deepEqual(input, {modelId: kananaId, offline: true, cache: true, fixtureOption: 4096});
 });
 
 test('rejects unknown IDs, omitted IDs and legacy model routes', () => {
   for (const input of [undefined, {}, {modelId: 'unknown'}, {model: kananaId}, {modelId: kananaId, model: kananaId}]) {
-    assert.throws(() => readLoadOptions(input, isModelId), {code: 'INVALID_INPUT'});
+    assert.throws(() => readLoadOptions(input, isModelId, testLoadOptions), {code: 'INVALID_INPUT'});
   }
 });
 
@@ -30,15 +32,17 @@ test('rejects caller-specified sources and dependency injection', () => {
     {modelId: kananaId, runtime: {}},
     {modelId: kananaId, [Symbol('source')]: 'other'}
   ]) {
-    assert.throws(() => readLoadOptions(input, isModelId), {code: 'INVALID_INPUT'});
+    assert.throws(() => readLoadOptions(input, isModelId, testLoadOptions), {code: 'INVALID_INPUT'});
   }
 });
 
 test('rejects Kev-only load controls for Kanana without turning them into request caps', () => {
   for (const key of ['maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']) {
-    assert.throws(() => readLoadOptions({modelId: kananaId, [key]: 128}, isModelId), {code: 'INVALID_INPUT'});
+    assert.throws(() => readLoadOptions({modelId: kananaId, [key]: 128}, isModelId, testLoadOptions), {
+      code: 'INVALID_INPUT'
+    });
   }
-  const parsed = readLoadOptions({modelId: kananaId, cache: false}, isModelId);
+  const parsed = readLoadOptions({modelId: kananaId, cache: false}, isModelId, testLoadOptions);
   assert.equal(parsed.modelId, kananaId);
   assert.equal(parsed.options.cache, false);
 });
@@ -47,6 +51,6 @@ test('rejects accessors without invoking them', () => {
   let invoked = false;
   const input = {modelId: kananaId};
   Object.defineProperty(input, 'offline', {get: () => ((invoked = true), true)});
-  assert.throws(() => readLoadOptions(input, isModelId), {code: 'INVALID_INPUT'});
+  assert.throws(() => readLoadOptions(input, isModelId, testLoadOptions), {code: 'INVALID_INPUT'});
   assert.equal(invoked, false);
 });

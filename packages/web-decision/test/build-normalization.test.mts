@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import config, {assertPinnedWebgpuHash, tvmRuntimeImportWithoutTypeMarker} from '../vite.config.ts';
+import config, {
+  assertPinnedWebgpuHash,
+  createTvmSourceMarkerPlugin,
+  tvmRuntimeImportWithoutTypeMarker
+} from '../vite.config.ts';
 // These hooks are exercised with the minimal bundle and context the test needs.
 type Chunk = {type: 'chunk'; code: string};
 type NormalizeHook = {generateBundle: (options: object, bundle: Record<string, Chunk>) => void};
@@ -38,9 +42,14 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
   assert.match(build('../../'), /const text = "\.\.\/\.toolchains/);
 });
 
-test('build fails when the expected TVM marker format is missing', () => {
+test('an empty approved catalog does not require TVM source markers', () => {
+  assert.doesNotThrow(() => plugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}));
+});
+
+test('build fails when the approved model bundle has no TVM markers', () => {
+  const approvedPlugin = createTvmSourceMarkerPlugin(['kev-0.6b-q4f16']);
   assert.throws(
-    () => plugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}),
+    () => approvedPlugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}),
     /Expected TVM source markers/
   );
 });

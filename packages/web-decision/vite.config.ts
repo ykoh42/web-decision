@@ -34,6 +34,30 @@ export function resolveTvmTypeBoundary(): Plugin {
   };
 }
 
+export function createTvmSourceMarkerPlugin(approvedModelIds: readonly string[] = APPROVED_MODEL_IDS): Plugin {
+  return {
+    name: 'normalize-tvm-source-markers',
+    generateBundle(_options, bundle) {
+      let sawMarker = false;
+      for (const item of Object.values(bundle)) {
+        if (item.type !== 'chunk') continue;
+        // Rolldown emits source paths as comments. Their number of ../ segments
+        // depends on the checkout location, even when the code is identical.
+        const marker = /^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//m;
+        if (!marker.test(item.code)) continue;
+        sawMarker = true;
+        item.code = item.code.replace(/^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
+      }
+      if (!sawMarker && approvedModelIds.length > 0)
+        throw new Error('Expected TVM source markers in the approved model bundle');
+      for (const item of Object.values(bundle)) {
+        if (item.type !== 'chunk') continue;
+        item.code = item.code.replace(/^\/\/ (?:\.\.\/)*.*?\/node_modules\//gm, '// [dependency]/');
+      }
+    }
+  };
+}
+
 export default defineConfig({
   base: './',
   plugins: [
@@ -45,27 +69,7 @@ export default defineConfig({
         assertPinnedWebgpuHash(createHash('sha256').update(readFileSync(path)).digest('hex'));
       }
     },
-    {
-      name: 'normalize-tvm-source-markers',
-      generateBundle(_options, bundle) {
-        let sawMarker = false;
-        for (const item of Object.values(bundle)) {
-          if (item.type !== 'chunk') continue;
-          // Rolldown emits source paths as comments. Their number of ../ segments
-          // depends on the checkout location, even when the code is identical.
-          const marker = /^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//m;
-          if (!marker.test(item.code)) continue;
-          sawMarker = true;
-          item.code = item.code.replace(/^\/\/ (?:\.\.\/)*\.toolchains\/apache-tvm-src\/web\/src\//gm, '// [TVM]/');
-        }
-        if (!sawMarker && APPROVED_MODEL_IDS.length > 0)
-          throw new Error('Expected TVM source markers in the approved model bundle');
-        for (const item of Object.values(bundle)) {
-          if (item.type !== 'chunk') continue;
-          item.code = item.code.replace(/^\/\/ (?:\.\.\/)*.*?\/node_modules\//gm, '// [dependency]/');
-        }
-      }
-    }
+    createTvmSourceMarkerPlugin()
   ],
   resolve: {alias: [{find: 'ws', replacement: fileURLToPath(new URL('./src/browser-only-ws.ts', import.meta.url))}]},
   build: {
