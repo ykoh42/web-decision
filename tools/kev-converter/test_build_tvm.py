@@ -192,6 +192,48 @@ class UpstreamReferenceTests(unittest.TestCase):
             ],
         )
 
+    def test_direct_webgpu_candidate_report_keeps_hardware_gate_pending(self):
+        report_path = (
+            Path(__file__).resolve().with_name("reports")
+            / "direct-tvm-q4-webgpu-build-r1.json"
+        )
+        report_bytes = report_path.read_bytes()
+        report = json.loads(report_bytes)
+
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            "1913aeb513e9eff5b4fdc13b6c5bfb411673391c46fb794b8d9e1fc1c7c2755f",
+        )
+        self.assertEqual(report["status"], "passed")
+        self.assertFalse(report["onnxIntermediateUsed"])
+        self.assertEqual(report["candidateModelId"], "kev-0.6b-q4f16")
+        self.assertEqual(report["parameterInputCount"], 511)
+
+        cpu_gate = report["qualityGates"]["cpuBaseline"]
+        self.assertEqual(cpu_gate["status"], "passed")
+        self.assertEqual(cpu_gate["inputTokenCount"], 22)
+        self.assertTrue(cpu_gate["selectedOptionMatches"])
+        self.assertLessEqual(
+            cpu_gate["maxAbsLogitDelta"],
+            report["acceptanceThresholds"]["maxCpuLogitDeltaFromPinnedUpstreamQ4"],
+        )
+        self.assertLessEqual(
+            cpu_gate["maxAbsProbabilityDelta"],
+            report["acceptanceThresholds"][
+                "maxCpuProbabilityDeltaFromPinnedUpstreamQ4"
+            ],
+        )
+        self.assertEqual(
+            report["qualityGates"]["webgpuExpandedMatrix"]["status"],
+            "pending-real-chrome-webgpu",
+        )
+        self.assertEqual(report["browserPackage"]["parameterCount"], 511)
+
+        for name, expected_hash in report["converterHashes"].items():
+            source_path = Path(__file__).resolve().with_name(name)
+            actual_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+            self.assertEqual(actual_hash, expected_hash, name)
+
     def test_converter_uses_the_locked_upstream_tvm_wheel_without_source_patches(self):
         converter_root = Path(__file__).resolve().parent
         project = tomllib.loads(
