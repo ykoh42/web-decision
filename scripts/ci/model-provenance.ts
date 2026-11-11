@@ -189,6 +189,8 @@ function matchesLockedUpstream(item: unknown, upstream: LockedUpstream, requireR
 export function validateLockedUpstream(sourceLineage: unknown, artifactEntry: unknown, modelId: string): void {
   failUnless(isRecord(artifactEntry), `Artifact lock entry for ${modelId} must be an object.`);
   const requiresExactSources = Object.hasOwn(artifactEntry, 'upstreams');
+  if (!requiresExactSources)
+    failUnless(isRecord(artifactEntry.upstream), `Locked upstream for ${modelId} must be an object.`);
   const upstreams = requiresExactSources ? artifactEntry.upstreams : [artifactEntry.upstream];
   failUnless(
     Array.isArray(upstreams) && upstreams.length > 0,
