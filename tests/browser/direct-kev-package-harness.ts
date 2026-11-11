@@ -529,20 +529,13 @@ export async function runDirectKevPackageGate(
     online = await runDecisions(onlineModel, cases, 'online-matrix');
     qualityIssues = pinnedGpuMatrixIssues(online, cases, cpuBaseline);
     recordProgress('online-matrix-complete', {decisions: online, qualityIssues});
-    try {
-      boundaryProbe = await runTokenLimitProbe(onlineModel);
-    } catch (cause) {
-      boundaryProbeError = describeFailure(cause);
-    }
     cacheDiagnostics = await testSource.readCacheDiagnostics();
     recordProgress('online-cache-diagnostics-complete', cacheDiagnostics);
     recordProgress('online-phase-complete', {
       adapter,
       qualityIssues,
       online,
-      cacheDiagnostics,
-      boundaryProbe: boundaryProbe ?? null,
-      boundaryProbeError: boundaryProbeError ?? null
+      cacheDiagnostics
     });
   } finally {
     await onlineModel.dispose();
@@ -562,7 +555,18 @@ export async function runDirectKevPackageGate(
     const [baseline] = await runDecisions(offlineModel, cases.slice(0, 1), 'offline-baseline');
     if (!baseline) throw new Error('The offline direct Kev baseline was not returned.');
     offlineBaseline = baseline;
-    recordProgress('offline-phase-complete', {offlineBaseline, offlineFetchPaths: [...testSource.fetchPaths]});
+    recordProgress('offline-baseline-complete', {offlineBaseline, offlineFetchPaths: [...testSource.fetchPaths]});
+    try {
+      boundaryProbe = await runTokenLimitProbe(offlineModel);
+    } catch (cause) {
+      boundaryProbeError = describeFailure(cause);
+    }
+    recordProgress('offline-phase-complete', {
+      offlineBaseline,
+      offlineFetchPaths: [...testSource.fetchPaths],
+      boundaryProbe: boundaryProbe ?? null,
+      boundaryProbeError: boundaryProbeError ?? null
+    });
   } finally {
     await offlineModel.dispose();
   }
