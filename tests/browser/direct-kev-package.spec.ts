@@ -156,10 +156,7 @@ function maxDifference(left: readonly number[], right: readonly number[]): numbe
   return Math.max(...left.map((value, index) => Math.abs(value - right[index]!)));
 }
 
-async function withPackageFileServer<T>(
-  root: string,
-  run: (origin: string) => Promise<T>
-): Promise<T> {
+async function withPackageFileServer<T>(root: string, run: (origin: string) => Promise<T>): Promise<T> {
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
