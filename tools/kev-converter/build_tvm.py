@@ -123,6 +123,13 @@ def verify_libatomic(library_path: Path) -> dict[str, str]:
     }
 
 
+def extend_runtime_library_path(existing_path: str, runtime_directory: Path) -> str:
+    """Expose libatomic after the active Python runtime's shared libraries."""
+    return os.pathsep.join(
+        value for value in (existing_path, str(runtime_directory)) if value
+    )
+
+
 def probabilities(logits, np):
     shifted = logits - np.max(logits)
     values = np.exp(shifted)
@@ -496,8 +503,8 @@ def main() -> None:
     web_toolchain["emscriptenRuntimeDependency"] = verify_libatomic(libatomic_path)
     os.environ["TVM_HOME"] = str(tvm_home)
     existing_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-    os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(
-        value for value in (str(libatomic_path.parent), existing_library_path) if value
+    os.environ["LD_LIBRARY_PATH"] = extend_runtime_library_path(
+        existing_library_path, libatomic_path.parent
     )
     output_dir.mkdir(parents=True, exist_ok=False)
 
