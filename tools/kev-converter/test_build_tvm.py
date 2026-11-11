@@ -288,7 +288,9 @@ class UpstreamReferenceTests(unittest.TestCase):
         reports = Path(__file__).resolve().with_name("reports")
         report_bytes = (reports / "direct-tvm-q4-webgpu-build-r2.json").read_bytes()
         report = json.loads(report_bytes)
-        manifest_bytes = (reports / "direct-tvm-q4-webgpu-manifest-r2.json").read_bytes()
+        manifest_bytes = (
+            reports / "direct-tvm-q4-webgpu-manifest-r2.json"
+        ).read_bytes()
         manifest = json.loads(manifest_bytes)
         model_config_bytes = (
             reports / "direct-tvm-q4-webgpu-model-config-r2.json"
