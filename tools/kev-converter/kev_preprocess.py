@@ -36,9 +36,7 @@ def _kev_preprocess(
                 input_ids[0:batch_size, 0:sequence_length],
                 attention_mask[0:batch_size, 0:sequence_length],
             )
-            T.writes(
-                output[0:PREPROCESS_FIELDS, 0:batch_size, 0:sequence_length + 1]
-            )
+            T.writes(output[0:PREPROCESS_FIELDS, 0:batch_size, 0 : sequence_length + 1])
             for batch in T.serial(batch_size):
                 for index in T.serial(sequence_length + 1):
                     output[PREPROCESS_VALID, batch, index] = 0
@@ -61,9 +59,7 @@ def _kev_preprocess(
                         (input_ids[batch, index] == decide_id) & (valid != 0),
                     )
                     segment_count = segment_count + question
-                    segment = T.if_then_else(
-                        valid != 0, segment_count, T.int32(-1)
-                    )
+                    segment = T.if_then_else(valid != 0, segment_count, T.int32(-1))
                     output[PREPROCESS_VALID, batch, index] = valid
                     output[PREPROCESS_SEGMENTS, batch, index] = segment
                     first_question = T.min(
@@ -110,15 +106,11 @@ def _kev_preprocess(
                         T.if_then_else(
                             segment == 0,
                             T.Cast("int32", index),
-                            first_question
-                            + T.Cast("int32", index)
-                            - last_question,
+                            first_question + T.Cast("int32", index) - last_question,
                         ),
                     )
                     bucket = T.max(segment, T.int32(0))
-                    branch_decisions = output[
-                        PREPROCESS_DECISION_SUMS, batch, bucket
-                    ]
+                    branch_decisions = output[PREPROCESS_DECISION_SUMS, batch, bucket]
                     output[PREPROCESS_BRANCH_STARTS, batch, index] = branch_start
                     output[PREPROCESS_POSITION_IDS, batch, index] = position
                     output[PREPROCESS_NEXT_DECISION, batch, index] = T.if_then_else(
@@ -144,9 +136,7 @@ def build_kev_preprocessor_module(
     preprocess = _kev_preprocess
     if target is not None and tvm.target.Target(target).kind.name == "webgpu":
         schedule = s_tir.Schedule(preprocess)
-        loops = schedule.get_loops(
-            schedule.get_sblock("kev_preprocess_workgroup")
-        )
+        loops = schedule.get_loops(schedule.get_sblock("kev_preprocess_workgroup"))
         if len(loops) != 1:
             raise ValueError("Kev preprocessing needs one WebGPU lane loop.")
         schedule.bind(loops[0], "threadIdx.x")
