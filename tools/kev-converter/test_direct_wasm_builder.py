@@ -21,6 +21,19 @@ class DirectWasmBuilderTests(unittest.TestCase):
             output_dir = root / "run"
             base_dir = root / "official-base"
             kev_source_dir = root / "official-kev"
+            base_dir.mkdir()
+            kev_source_dir.mkdir()
+            for source in (
+                base_dir / "tokenizer_config.json",
+                base_dir / "config.json",
+                base_dir / "LICENSE",
+                kev_source_dir / "LICENSE",
+            ):
+                source.write_text("verified input", encoding="utf-8")
+            tokenizer_blob = root / "hf-cache" / "tokenizer.json"
+            tokenizer_blob.parent.mkdir()
+            tokenizer_blob.write_text("verified tokenizer", encoding="utf-8")
+            (base_dir / "tokenizer.json").symlink_to(tokenizer_blob)
             tvm = SimpleNamespace(
                 relax=SimpleNamespace(build=Mock(return_value=executable))
             )
@@ -45,11 +58,11 @@ class DirectWasmBuilderTests(unittest.TestCase):
                 executable,
                 parameters,
                 output_dir / "browser-package",
-                base_dir / "tokenizer.json",
-                base_dir / "tokenizer_config.json",
-                base_dir / "config.json",
-                kev_source_dir / "LICENSE",
-                base_dir / "LICENSE",
+                (base_dir / "tokenizer.json").resolve(),
+                (base_dir / "tokenizer_config.json").resolve(),
+                (base_dir / "config.json").resolve(),
+                (kev_source_dir / "LICENSE").resolve(),
+                (base_dir / "LICENSE").resolve(),
             )
 
     def test_webgpu_build_uses_scheduled_q4_and_packages_its_parameters(self):
@@ -59,6 +72,16 @@ class DirectWasmBuilderTests(unittest.TestCase):
             output_dir.mkdir()
             base_dir = root / "official-base"
             kev_source_dir = root / "official-kev"
+            base_dir.mkdir()
+            kev_source_dir.mkdir()
+            for source in (
+                base_dir / "tokenizer.json",
+                base_dir / "tokenizer_config.json",
+                base_dir / "config.json",
+                base_dir / "LICENSE",
+                kev_source_dir / "LICENSE",
+            ):
+                source.write_text("verified input", encoding="utf-8")
             target = object()
             cpu_device = object()
             fp16_module = object()
