@@ -283,22 +283,6 @@ async function runTokenLimitProbe(
     overLimitErrorCode?: string;
     overLimitMessage?: string;
   } = {requestedTokenCount: 8192};
-  recordProgress('boundary-8192-inference-started', {requestedTokenCount: 8192});
-  try {
-    const atLimit = await model.decide({state: '', questions: [{instructions: instruction, options: [option]}]});
-    const answer = atLimit.answers[0];
-    result.acceptedTokenCount = atLimit.tokenCount;
-    if (answer) {
-      result.outputFinite = answer.probabilities.every(
-        ({logit, probability}) => Number.isFinite(logit) && Number.isFinite(probability)
-      );
-      result.probabilityTotal = answer.probabilities.reduce((total, item) => total + item.probability, 0);
-    }
-  } catch (cause) {
-    result.atLimitError = describeFailure(cause);
-  }
-  recordProgress('boundary-8192-inference-complete', result);
-
   recordProgress('boundary-8193-rejection-started', {requestedTokenCount: 8193});
   const overLimitInstruction = exactTokenText(tokenizer, instructionTokens + 1);
   let overLimitError: {code?: unknown; message?: unknown} | undefined;
@@ -315,6 +299,22 @@ async function runTokenLimitProbe(
     if (typeof overLimitError.message === 'string') result.overLimitMessage = overLimitError.message;
   }
   recordProgress('boundary-8193-rejection-complete', result);
+
+  recordProgress('boundary-8192-inference-started', {requestedTokenCount: 8192});
+  try {
+    const atLimit = await model.decide({state: '', questions: [{instructions: instruction, options: [option]}]});
+    const answer = atLimit.answers[0];
+    result.acceptedTokenCount = atLimit.tokenCount;
+    if (answer) {
+      result.outputFinite = answer.probabilities.every(
+        ({logit, probability}) => Number.isFinite(logit) && Number.isFinite(probability)
+      );
+      result.probabilityTotal = answer.probabilities.reduce((total, item) => total + item.probability, 0);
+    }
+  } catch (cause) {
+    result.atLimitError = describeFailure(cause);
+  }
+  recordProgress('boundary-8192-inference-complete', result);
   return result;
 }
 
