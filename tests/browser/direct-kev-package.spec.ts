@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createReadStream, readFileSync} from 'node:fs';
 import {readFile, stat, writeFile} from 'node:fs/promises';
-import {createServer} from 'node:https';
+import {createServer} from 'node:http';
 import {extname, resolve, sep} from 'node:path';
 import {expect, test} from '@playwright/test';
 import type {RepresentativeDecisionCase} from './kev06-expanded-inference.js';
@@ -158,12 +158,9 @@ function maxDifference(left: readonly number[], right: readonly number[]): numbe
 
 async function withPackageFileServer<T>(
   root: string,
-  buildRoot: string,
   run: (origin: string) => Promise<T>
 ): Promise<T> {
-  const key = await readFile(resolve(buildRoot, 'direct-test-key.pem'));
-  const cert = await readFile(resolve(buildRoot, 'direct-test-cert.pem'));
-  const server = createServer({key, cert}, async (request, response) => {
+  const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
       const filePath = resolve(root, pathname);
@@ -195,7 +192,7 @@ async function withPackageFileServer<T>(
   if (!address || typeof address === 'string')
     throw new Error('The direct package file server did not bind a TCP port.');
   try {
-    return await run(`https://127.0.0.1:${address.port}`);
+    return await run(`http://127.0.0.1:${address.port}`);
   } finally {
     await new Promise<void>((resolveClose, rejectClose) => {
       server.close((error) => (error ? rejectClose(error) : resolveClose()));
@@ -334,9 +331,9 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
     sourceRevision: '7b5acb32bd271342a24130f4ef439ff6c2e52c6c',
     sourceTag: 'v0.27.0.post1',
     librarySha256: {
-      'web/dist/wasm/wasm_runtime.bc': 'a83fbebb797f1b4f3b911aace868fdf0f4b6e3a3fc067a8db7238db6b875519d',
-      'web/dist/wasm/tvmjs_support.bc': '0d62d38499e290eb4bb6990551e2407f6723f08c508d1a126dd0122958b9a4b0',
-      'web/dist/wasm/webgpu_runtime.bc': 'aeb6aad70807f126c8be438e151b20a9a1155d6bc94e6a48c4f366c0dc194bb3'
+      'web/dist/wasm/wasm_runtime.bc': '1974cd7846e3735735fe48828856b7113257a426c24a49e44f45c79c412b972f',
+      'web/dist/wasm/tvmjs_support.bc': '24088d9f55002852d513af36b64770dacb1825e5dffebb95d23b43f104b19fc9',
+      'web/dist/wasm/webgpu_runtime.bc': 'c4baf79ed300de425db4d81743ab89d36cee323e40e18904c4ef7f196f2fe0aa'
     },
     emscriptenRuntimeDependency: {
       package: 'libatomic1',
@@ -384,7 +381,7 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
   }
 
   const resolvedPackageRoot = resolve(packageRoot);
-  await withPackageFileServer(resolvedPackageRoot, buildRoot, async (packageOrigin) => {
+  await withPackageFileServer(resolvedPackageRoot, async (packageOrigin) => {
     await page.route(`${DIRECT_ARTIFACT_ROOT}**`, async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       await route.continue({url: `${packageOrigin}${pathname}`});
@@ -454,6 +451,7 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
           : null
       };
     });
+    expect(observed.adapter.isFallbackAdapter).toBe(false);
     activeDiagnosticDetails = {
       adapter: observed.adapter,
       nativeKevInputLimits,
