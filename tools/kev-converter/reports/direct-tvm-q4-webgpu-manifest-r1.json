@@ -1,0 +1,82 @@
+{
+  "backend": "tvm-webgpu",
+  "base": {
+    "repository": "Qwen/Qwen3-0.6B-Base",
+    "revision": "da87bfb608c14b7cf20ba1ce41287e8de496c0cd"
+  },
+  "checkpoint": {
+    "repository": "jaredpalmer/kev-0.6b",
+    "revision": "abe7110dedfd68a185839550079bcf7c26f561ac"
+  },
+  "experimental": true,
+  "files": {
+    "model.wasm": {
+      "bytes": 4032378,
+      "sha256": "e9229c26a926417d431bb15c1ff61d5d8f0b0d96ab64fc94047fbc93a0430d1a"
+    },
+    "model_config.json": {
+      "bytes": 987,
+      "sha256": "7143a4974bc3ba3c2eea3bfb0b69d8b3284d7501ab7beea3312ba58e76b87251"
+    },
+    "notices/kev-LICENSE": {
+      "bytes": 11343,
+      "sha256": "6b08bb37982c233aa12bcbdf19106da12f3f4fcf800773ea42e28ebeddd34fb8"
+    },
+    "notices/qwen3-0.6b-base-LICENSE": {
+      "bytes": 11343,
+      "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e"
+    },
+    "tokenizer.json": {
+      "bytes": 7031645,
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+    },
+    "tokenizer_config.json": {
+      "bytes": 9678,
+      "sha256": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5"
+    },
+    "weights/params_shard_0.bin": {
+      "bytes": 134134272,
+      "sha256": "a98fb65f04abf2785a075d9abcf2ab0daede798edededd8e163f3f710f7f3fff"
+    },
+    "weights/params_shard_1.bin": {
+      "bytes": 133959680,
+      "sha256": "ea4ab54910204e08039f06ab6390c1aba9b3ef0489ca57da6c0604070d6af7eb"
+    },
+    "weights/params_shard_2.bin": {
+      "bytes": 69377536,
+      "sha256": "a8137788c6c62204a8e2d2b477cf16f77beec65c83015a728237ee15c4488423"
+    },
+    "weights/tensor-cache.json": {
+      "bytes": 174585,
+      "sha256": "59f91a2590c1732da86ccbf4ab5aff91da003b366087dbd226b7f694ea9ad171"
+    }
+  },
+  "formatVersion": 1,
+  "license": "Apache-2.0",
+  "licenses": [
+    {
+      "file": "notices/kev-LICENSE",
+      "repository": "jaredpalmer/kev",
+      "revision": "37cb2f6155afec1054de2cc78dfd7c7dd24a956d",
+      "sourcePath": "LICENSE",
+      "spdxId": "Apache-2.0"
+    },
+    {
+      "file": "notices/qwen3-0.6b-base-LICENSE",
+      "repository": "Qwen/Qwen3-0.6B-Base",
+      "revision": "da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
+      "sourcePath": "LICENSE",
+      "spdxId": "Apache-2.0"
+    }
+  ],
+  "maxBranchTokens": 8192,
+  "maxOptions": 255,
+  "maxStateTokens": 8192,
+  "model": "kev-0.6b-q4f16",
+  "parameterCount": 511,
+  "sourceCode": {
+    "repository": "jaredpalmer/kev",
+    "revision": "37cb2f6155afec1054de2cc78dfd7c7dd24a956d"
+  },
+  "tvmVersion": "0.27.0.post1"
+}
