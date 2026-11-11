@@ -60,14 +60,14 @@ async function hashFile(path: string): Promise<string> {
   return digest.digest('hex');
 }
 
-async function containsFileIdentity(root: string, file: {dev: number; ino: number}): Promise<boolean> {
-  if (file.ino === 0) return false;
+async function containsFileIdentity(root: string, file: {dev: bigint; ino: bigint}): Promise<boolean> {
+  if (file.ino === 0n) return false;
   for (const entry of await readdir(root, {withFileTypes: true})) {
     const path = join(root, entry.name);
     if (entry.isDirectory() && (await containsFileIdentity(path, file))) return true;
     if (!entry.isFile()) continue;
-    const candidate = await stat(path);
-    if (candidate.ino !== 0 && candidate.ino === file.ino && candidate.dev === file.dev) return true;
+    const candidate = await stat(path, {bigint: true});
+    if (candidate.ino !== 0n && candidate.ino === file.ino && candidate.dev === file.dev) return true;
   }
   return false;
 }
@@ -165,13 +165,14 @@ async function assertReportMatchesArtifact(
 async function assertNotPackagedArtifact(
   sourcePath: string | undefined,
   blockedRoots: readonly string[],
-  file: Stats,
+  wasmPath: string,
   entry: BuildRecord
 ): Promise<void> {
+  const file = await stat(wasmPath, {bigint: true});
   if (sourcePath) {
-    const source = await stat(sourcePath);
+    const source = await stat(sourcePath, {bigint: true});
     requireCondition(
-      file.ino === 0 || source.ino === 0 || file.ino !== source.ino || file.dev !== source.dev,
+      file.ino === 0n || source.ino === 0n || file.ino !== source.ino || file.dev !== source.dev,
       `TVM build WASM is the packaged source file for ${entry.modelId}/${entry.artifact}.`
     );
   }
@@ -230,7 +231,7 @@ async function verifyBuildRecord(
   const {report, reportSha256} = await readBuildReport(paths.reportPath, entry);
   await assertReportMatchesArtifact(report, paths.buildRoot, paths.wasmPath, entry);
   const file = await stat(paths.wasmPath);
-  await assertNotPackagedArtifact(wanted.sourcePath, blockedRoots, file, entry);
+  await assertNotPackagedArtifact(wanted.sourcePath, blockedRoots, paths.wasmPath, entry);
   const actual = await verifyArtifactBytes(paths.wasmPath, wanted, entry, report, file);
   validateReportRequirements(report, wanted, entry);
   return {modelId: entry.modelId, artifact: entry.artifact, sha256: actual, evidenceSha256, reportSha256};

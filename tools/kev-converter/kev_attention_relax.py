@@ -11,7 +11,7 @@ from kev_preprocess import (
     PREPROCESS_VALID,
     build_kev_preprocessor_module,
 )
-from tvm import relax
+from tvm import relax, tirx
 
 ATTENTION_FUNCTION_NAME = "kev_attention_grid"
 DEFAULT_METADATA_BINDINGS = {
@@ -216,7 +216,15 @@ class KevAttentionGraphMutator(relax.PyExprMutator):
         segments = self.visit_expr(self.segment_var)
         result = relax.call_tir(
             self.fused_gv,
-            [query, key, value, segments, valid, self.sequence_length],
+            [
+                query,
+                key,
+                value,
+                segments,
+                valid,
+                self.sequence_length,
+                tirx.Cast("int32", self.sequence_length),
+            ],
             updated.ty,
         )
         self.attention_count += 1

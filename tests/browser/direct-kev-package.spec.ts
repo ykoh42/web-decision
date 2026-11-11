@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createReadStream, readFileSync} from 'node:fs';
 import {readFile, stat, writeFile} from 'node:fs/promises';
-import {createServer} from 'node:http';
+import {createServer} from 'node:https';
 import {extname, resolve, sep} from 'node:path';
 import {expect, test} from '@playwright/test';
 import type {RepresentativeDecisionCase} from './kev06-expanded-inference.js';
@@ -15,10 +15,15 @@ const PROBABILITY_TOLERANCE = 0.001;
 const PROGRESS_PREFIX = '__DIRECT_KEV_PROGRESS__';
 const DIAGNOSTIC_STORAGE_KEY = 'direct-kev-r6-webgpu-diagnostics';
 const fixtureBytes = readFileSync(new URL('../fixtures/kev06-expanded-inference.json', import.meta.url));
+// Test-only self-signed localhost certificate; never use it outside this fixture.
+const testTlsKey = readFileSync(new URL('../fixtures/direct-kev-test-key.pem.fixture', import.meta.url));
+const testTlsCert = readFileSync(new URL('../fixtures/direct-kev-test-cert.pem.fixture', import.meta.url));
 const fixtureSha256 = createHash('sha256').update(fixtureBytes).digest('hex');
 const fixture = JSON.parse(fixtureBytes.toString('utf8')) as {
   readonly decisionCases: readonly RepresentativeDecisionCase[];
 };
+
+test.use({ignoreHTTPSErrors: true});
 
 interface GateDecision {
   id: string;
@@ -157,7 +162,7 @@ function maxDifference(left: readonly number[], right: readonly number[]): numbe
 }
 
 async function withPackageFileServer<T>(root: string, run: (origin: string) => Promise<T>): Promise<T> {
-  const server = createServer(async (request, response) => {
+  const server = createServer({key: testTlsKey, cert: testTlsCert}, async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname).replace(/^\/+/, '');
       const filePath = resolve(root, pathname);
@@ -189,7 +194,7 @@ async function withPackageFileServer<T>(root: string, run: (origin: string) => P
   if (!address || typeof address === 'string')
     throw new Error('The direct package file server did not bind a TCP port.');
   try {
-    return await run(`http://127.0.0.1:${address.port}`);
+    return await run(`https://127.0.0.1:${address.port}`);
   } finally {
     await new Promise<void>((resolveClose, rejectClose) => {
       server.close((error) => (error ? rejectClose(error) : resolveClose()));
@@ -379,6 +384,17 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
 
   const resolvedPackageRoot = resolve(packageRoot);
   await withPackageFileServer(resolvedPackageRoot, async (packageOrigin) => {
+    page.on('console', (message) => {
+      if (message.type() === 'error') console.error(`Browser console error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => console.error(`Browser page error: ${error.stack ?? error.message}`));
+    page.on('crash', () => console.error('Browser page crashed.'));
+    page.on('request', (request) => {
+      if (request.url().startsWith(DIRECT_ARTIFACT_ROOT)) console.log(`Browser model request: ${request.url()}`);
+    });
+    page.on('requestfailed', (request) =>
+      console.error(`Browser request failed: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
+    );
     await page.route(`${DIRECT_ARTIFACT_ROOT}**`, async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       await route.continue({url: `${packageOrigin}${pathname}`});
