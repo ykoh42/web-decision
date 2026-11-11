@@ -96,7 +96,15 @@ class KevAttentionRelaxTests(unittest.TestCase):
             ("lv23", "lv3273", "lv5", "lv59"),
         )
         self.assertEqual(report.preprocess_calls, 1)
-        self.assertEqual(script.count("R.call_tir(cls.kev_attention_grid"), 28)
+        attention_calls = [
+            line
+            for line in script.splitlines()
+            if "R.call_tir(cls.kev_attention_grid" in line
+        ]
+        self.assertEqual(len(attention_calls), 28)
+        self.assertTrue(
+            all('T.Cast("int32", sequence_length)' in line for line in attention_calls)
+        )
         self.assertEqual(script.count("R.call_tir(cls.kev_preprocess"), 1)
         self.assertNotIn("R.nn.softmax", script)
         self.assertNotIn("R.matmul(", script)

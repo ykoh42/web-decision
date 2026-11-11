@@ -9,8 +9,8 @@
   },
   "scripts": {
     "lint": "oxlint . --max-warnings=2",
-    "format": "oxfmt '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
-    "format:check": "oxfmt --check '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'",
+    "format": "oxfmt \"**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}\"",
+    "format:check": "oxfmt --check \"**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}\"",
     "check:quality": "pnpm run format:check && pnpm run lint && pnpm run test:quality:complexity && pnpm run test:quality:package && pnpm run test:quality:coverage && pnpm run test:quality:release && pnpm run test:quality:provenance && node --import tsx scripts/ci/check_cognitive_complexity.mts && pnpm --filter web-decision check:catalog && pnpm --filter web-decision typecheck:curated && pnpm --filter web-decision typecheck:kev && tsc --project tests/browser/tsconfig.curated.json && tsc --project tsconfig.tools.json",
     "test:quality:complexity": "node --import tsx --test scripts/ci/test_cognitive_complexity.mts scripts/ci/test_cognitive_complexity_completion.mts",
     "test:quality:package": "node --import tsx --test scripts/ci/asset-key.test.ts",

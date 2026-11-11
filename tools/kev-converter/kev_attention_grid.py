@@ -189,6 +189,7 @@ def attention_grid(
     segment_handle: T.handle,
     valid_handle: T.handle,
     sequence_length: T.int64,
+    loop_length: T.int32,
     output_handle: T.handle,
 ):
     """Fuse dense QK, finite masking, softmax, and PV on a 2D query/head grid."""
@@ -214,7 +215,6 @@ def attention_grid(
         (NUM_QUERY_HEADS, sequence_length, HEAD_DIM),
         "float32",
     )
-    length_i32 = T.Cast("int32", sequence_length)
     T.func_attr({"tirx.noalias": True})
 
     for query_loop in T.thread_binding(sequence_length, thread="blockIdx.x"):
@@ -230,7 +230,7 @@ def attention_grid(
             state = T.alloc_buffer((HEAD_DIM, 3), "float32", scope="shared")
             _initialize_state(state)
 
-            tile_count = (length_i32 + KEY_TILE - 1) // KEY_TILE
+            tile_count = (loop_length + KEY_TILE - 1) // KEY_TILE
             for tile_loop in T.serial(tile_count):
                 key_base = tile_loop * KEY_TILE
                 _compute_dot_partials(
@@ -240,7 +240,7 @@ def attention_grid(
                     head,
                     query_index,
                     key_base,
-                    length_i32,
+                    loop_length,
                     sequence_length,
                 )
                 _write_masked_scores(
@@ -252,7 +252,7 @@ def attention_grid(
                     query_index,
                     key_base,
                     query_segment,
-                    length_i32,
+                    loop_length,
                     sequence_length,
                 )
                 _update_softmax_stats(state, scores)
@@ -266,7 +266,7 @@ def attention_grid(
                     head,
                     query_index,
                     key_base,
-                    length_i32,
+                    loop_length,
                     sequence_length,
                 )
                 _write_masked_scores(
@@ -278,7 +278,7 @@ def attention_grid(
                     query_index,
                     key_base,
                     query_segment,
-                    length_i32,
+                    loop_length,
                     sequence_length,
                 )
                 _accumulate_rounded_values(
@@ -287,7 +287,7 @@ def attention_grid(
                     value,
                     head,
                     key_base,
-                    length_i32,
+                    loop_length,
                     sequence_length,
                 )
 
