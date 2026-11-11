@@ -158,7 +158,7 @@ export function createDirectKevPackageSource(manifestSha256: string, directArtif
   return {
     prepare,
     fetch: fetchAsset,
-    bundledProgressPhase: 'bundled-assets' as const,
+    assetLoadPhase: 'model-assets' as const,
     assetProgressPhase: 'asset-verification' as const
   };
 }

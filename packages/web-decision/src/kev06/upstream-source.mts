@@ -117,7 +117,7 @@ type KevReconstructedSource = {
   readonly manifest: SourceManifestBase;
   prepare(options: KevSourceOptions): Promise<PreparedSource>;
   fetch(url: string | URL, init?: Pick<RequestInit, 'signal'>): Promise<Response>;
-  readonly bundledProgressPhase: ModelProgress['phase'];
+  readonly assetLoadPhase: ModelProgress['phase'];
   setProgress(callback: ((progress: ModelProgress) => void) | undefined, loadedBytes?: number): void;
   readonly assetProgressPhase: ModelProgress['phase'];
   dispose(): Promise<void>;
@@ -769,7 +769,7 @@ function createKevReconstructedSourceFor(
     manifest: profile.manifest,
     prepare,
     fetch: fetchAsset,
-    bundledProgressPhase: 'bundled-assets',
+    assetLoadPhase: 'bundled-assets',
     setProgress(callback, _loadedBytes) {
       onProgress = callback;
     },

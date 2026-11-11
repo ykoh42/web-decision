@@ -110,7 +110,7 @@ type ModelSourceProvider = {
   readonly prepare: (options: KevLoaderOptions, config: ModelSourcePreparation) => Promise<PreparedModelSource>;
   readonly fetch?: AssetFetch;
   readonly setProgress?: (callback: KevLoaderOptions['onProgress']) => void;
-  readonly bundledProgressPhase?: ModelProgress['phase'];
+  readonly assetLoadPhase?: ModelProgress['phase'];
   readonly assetProgressPhase?: ModelProgress['phase'];
   readonly dispose?: () => Promise<void> | void;
 };
@@ -395,7 +395,7 @@ async function loadKevModel(
     signal,
     options,
     fetchImpl: sourceProvider?.fetch,
-    progressPhase: sourceProvider?.bundledProgressPhase
+    progressPhase: sourceProvider?.assetLoadPhase
   });
   const {read} = assetReader;
   let runtime: Instance | undefined,
