@@ -12,10 +12,7 @@ import {
   createModelArtifactLock,
   validateSpec
 } from '../scripts/build-model-catalog.mts';
-import {
-  DIRECT_KEV06_BASE,
-  DIRECT_KEV06_CHECKPOINT
-} from '../src/kev06/direct-contract.js';
+import {DIRECT_KEV06_BASE, DIRECT_KEV06_CHECKPOINT} from '../src/kev06/direct-contract.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageFile = (relativePath: string): string => path.join(packageRoot, relativePath);
@@ -167,7 +164,10 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
     }
   };
   const fixtureDirectory = await mkdtemp(packageFile('test/fixtures/.direct-kev-package-'));
-  const manifestFixturePath = path.resolve(packageRoot, '../../tools/kev-converter/reports/direct-tvm-q4-webgpu-manifest-r4.json');
+  const manifestFixturePath = path.resolve(
+    packageRoot,
+    '../../tools/kev-converter/reports/direct-tvm-q4-webgpu-manifest-r4.json'
+  );
   const manifestBytes = await readFile(manifestFixturePath);
   const manifestFixture = JSON.parse(manifestBytes.toString('utf8'));
   const canonicalBytes = Buffer.from(JSON.stringify(canonical(manifestFixture)) + '\n');
@@ -175,10 +175,7 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
   try {
     assert.deepEqual(validateSpec({...spec, models: [directModel]}), [directModel]);
     const {artifactUpstreams: _artifactUpstreams, ...unpinnedModel} = directModel;
-    assert.throws(
-      () => validateSpec({...spec, models: [unpinnedModel]}),
-      /must pin its conversion inputs/u
-    );
+    assert.throws(() => validateSpec({...spec, models: [unpinnedModel]}), /must pin its conversion inputs/u);
     await assert.rejects(
       createDirectKev06ArtifactLockFromDirectory(directModel, path.resolve(packageRoot, '..')),
       /inside the web-decision package/u
@@ -231,10 +228,7 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
 
     await writeFile(path.join(fixtureDirectory, 'manifest.json'), manifestBytes);
     await writeFile(path.join(fixtureDirectory, 'undeclared.txt'), 'fixture-only file\n');
-    await assert.rejects(
-      createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory),
-      /undeclared file/u
-    );
+    await assert.rejects(createDirectKev06ArtifactLockFromDirectory(directModel, fixtureDirectory), /undeclared file/u);
   } finally {
     await rm(fixtureDirectory, {recursive: true, force: true});
   }
