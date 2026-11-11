@@ -220,6 +220,7 @@ test('approved provenance requires immutable lineage, pinned conversion, rights,
         repository: 'example/model',
         revision: 'a'.repeat(40),
         path: 'weights/model.bin',
+        bytes: 10,
         sha256: 'b'.repeat(64)
       }
     ],
