@@ -1,23 +1,8 @@
-/// <reference types="vite/client" />
-
 import {cancelBody, cancelResponse} from '../bounded-response.js';
 import {assetUrl, openAssetCache, waitForAbort} from '../assets.js';
 import {requestF16Adapter} from '../gpu-preflight.js';
 import {WebDecisionError} from '../kev.js';
 import {validatePrefetchBytes} from '../shard-prefetch.js';
-
-const PACKAGE_ASSET_PREFIX = '../../assets/kev06-stable/';
-const PACKAGE_ASSET_URLS = import.meta.glob(
-  [
-    '../../assets/kev06-stable/manifest.json',
-    '../../assets/kev06-stable/model.wasm',
-    '../../assets/kev06-stable/tokenizer.json',
-    '../../assets/kev06-stable/tokenizer_config.json',
-    '../../assets/kev06-stable/model_config.json',
-    '../../assets/kev06-stable/weights/tensor-cache.json'
-  ],
-  {eager: true, query: '?url&no-inline', import: 'default'}
-) as Readonly<Record<string, string>>;
 
 type DirectSourceOptions = {
   readonly cache?: boolean;
@@ -35,10 +20,33 @@ type DirectPreparedSource = {
   readonly maxPrefetchBytes: number;
 };
 
-function resolvePackageAsset(name: string): string {
-  const url = PACKAGE_ASSET_URLS[`${PACKAGE_ASSET_PREFIX}${name}`];
-  if (!url) throw new WebDecisionError('INVALID_ASSET', `The direct Kev package is missing ${name}.`);
-  return url;
+export function resolveDirectKevAssetUrl(root: string, name: string): string {
+  let directory: URL;
+  try {
+    directory = new URL(root);
+  } catch (cause) {
+    throw new WebDecisionError('INVALID_ASSET', 'The direct Kev artifact root is invalid.', {cause});
+  }
+  const segments = name.split('/');
+  if (
+    directory.protocol !== 'https:' ||
+    !directory.pathname.endsWith('/') ||
+    directory.search ||
+    directory.hash ||
+    directory.username ||
+    directory.password ||
+    !name ||
+    name.startsWith('/') ||
+    /[\\?#%]/u.test(name) ||
+    segments.some((segment) => !segment || segment === '.' || segment === '..')
+  )
+    throw new WebDecisionError('INVALID_ASSET', 'The direct Kev artifact path is invalid.');
+
+  const relativePath = segments.map(encodeURIComponent).join('/');
+  const url = new URL(relativePath, directory);
+  if (url.origin !== directory.origin || !url.pathname.startsWith(directory.pathname))
+    throw new WebDecisionError('INVALID_ASSET', 'The direct Kev artifact path leaves its pinned directory.');
+  return url.href;
 }
 
 function packageCacheBase(manifestSha256: string): URL {
@@ -96,10 +104,9 @@ async function readPackageManifest(
   return response;
 }
 
-/** Resolve package files through Vite's emitted asset URLs, independent of the consuming app's chunk URL. */
+/** Fetch direct Kev artifacts only from the curated model's pinned HTTPS directory. */
 export function createDirectKevPackageSource(manifestSha256: string, directArtifactRoot: string) {
   let cacheBase: URL | undefined;
-  const weightsRoot = new URL(directArtifactRoot);
   const prepare = async (options: DirectSourceOptions): Promise<DirectPreparedSource> => {
     if (options.offline !== undefined && typeof options.offline !== 'boolean')
       throw new WebDecisionError('INVALID_INPUT', 'offline must be a boolean.');
@@ -121,7 +128,7 @@ export function createDirectKevPackageSource(manifestSha256: string, directArtif
     cacheBase = packageCacheBase(manifestSha256);
     const manifestUrl = assetUrl(cacheBase, 'manifest.json');
     const response = await readPackageManifest(
-      resolvePackageAsset('manifest.json'),
+      resolveDirectKevAssetUrl(directArtifactRoot, 'manifest.json'),
       options.offline === true,
       cache,
       manifestUrl,
@@ -144,11 +151,8 @@ export function createDirectKevPackageSource(manifestSha256: string, directArtif
     if (requestUrl.origin !== cacheBase.origin || !requestUrl.pathname.startsWith(basePath))
       throw new WebDecisionError('INVALID_ASSET', 'The direct Kev asset URL leaves its package cache namespace.');
     const name = decodeURIComponent(requestUrl.pathname.slice(basePath.length));
-    const packageUrl =
-      name.startsWith('weights/') && name !== 'weights/tensor-cache.json'
-        ? new URL(name, weightsRoot).href
-        : resolvePackageAsset(name);
-    return fetch(packageUrl, init?.signal ? {signal: init.signal} : {});
+    const artifactUrl = resolveDirectKevAssetUrl(directArtifactRoot, name);
+    return fetch(artifactUrl, init?.signal ? {signal: init.signal} : {});
   };
 
   return {

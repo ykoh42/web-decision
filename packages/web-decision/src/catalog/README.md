@@ -20,9 +20,11 @@ together.
 When Kev is pinned to its direct source checkpoint, the generator reads the
 self-converted package from `assets/kev06-direct`. Use
 `--kev-direct-artifact-dir` to select another directory inside this package;
-the generator checks its manifest against every local file. Configure the
-catalog's `assets.directArtifactRoot` only when that package has a real hosted
-directory.
+the generator checks its manifest against every local file. At runtime the
+catalog's pinned `assets.directArtifactRoot` supplies the whole package,
+including its manifest, TVM module, tokenizer, configuration, and weight
+shards. The cache uses a local model-specific namespace, so verified files can
+be reused offline after an online load.
 
 Artifact integrity and runtime evidence are separate gates. The lock records
 pinned hashes; it does not establish current hardware verification or infer a
