@@ -7,7 +7,16 @@ import config, {
 } from '../vite.config.ts';
 // These hooks are exercised with the minimal bundle and context the test needs.
 type Chunk = {type: 'chunk'; code: string};
-type NormalizeHook = {generateBundle: (options: object, bundle: Record<string, Chunk>) => void};
+type Bundle = Record<string, Chunk>;
+type GenerateBundle =
+  | ((options: object, bundle: Bundle) => void)
+  | {handler: (options: object, bundle: Bundle) => void};
+type NormalizeHook = {generateBundle: GenerateBundle};
+function generateBundle(plugin: NormalizeHook, bundle: Bundle) {
+  const hook = plugin.generateBundle;
+  if (typeof hook === 'function') hook({}, bundle);
+  else hook.handler({}, bundle);
+}
 const plugins = config.plugins ?? [];
 const plugin = plugins.find(
   (candidate) =>
@@ -33,7 +42,7 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
         code: `// ${path}.toolchains/apache-tvm-src/web/src/runtime.ts\nconst text = "../.toolchains/apache-tvm-src/web/src/runtime.ts";\n`
       }
     };
-    plugin.generateBundle({}, bundle);
+    generateBundle(plugin, bundle);
     return bundle.entry.code;
   };
   assert.equal(build(''), build('../../'));
@@ -43,13 +52,16 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
 });
 
 test('an empty approved catalog does not require TVM source markers', () => {
-  assert.doesNotThrow(() => plugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}));
+  assert.doesNotThrow(() => generateBundle(plugin, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}));
 });
 
 test('build fails when the approved model bundle has no TVM markers', () => {
   const approvedPlugin = createTvmSourceMarkerPlugin(['kev-0.6b-q4f16']);
   assert.throws(
-    () => approvedPlugin.generateBundle({}, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}),
+    () =>
+      generateBundle(approvedPlugin as unknown as NormalizeHook, {
+        entry: {type: 'chunk' as const, code: 'const value = 1;'}
+      }),
     /Expected TVM source markers/
   );
 });
