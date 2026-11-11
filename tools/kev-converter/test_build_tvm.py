@@ -37,6 +37,12 @@ HISTORICAL_CONVERTER_SOURCE_HASHES = {
     "q4_relax.py": "17c079431d28c4540aafc9fd78ae5cdc0bd058ce596e7f6e66fbd9c606131e0d",
 }
 
+HISTORICAL_WEBGPU_R1_SOURCE_HASHES = {
+    "build_tvm.py": "0e48f555e7492dd3e12d237c1ea0e4866692275a5b1bab7b6d78de312a3a2ec5",
+    "kev_attention_relax.py": "e11fdb0df8b620198a2ecd2a6580035f68dcfe1b3469ae8e7034a0d93fd26472",
+    "kev_preprocess.py": "f25fbe7acffc7fe75aa9b382a855754a8050e50e4bace9f797a37bc4811decc0",
+}
+
 
 class UpstreamReferenceTests(unittest.TestCase):
     def setUp(self):
@@ -267,6 +273,66 @@ class UpstreamReferenceTests(unittest.TestCase):
             "pending-real-chrome-webgpu",
         )
         self.assertEqual(report["browserPackage"]["parameterCount"], 511)
+
+        for name, expected_hash in report["converterHashes"].items():
+            if name in HISTORICAL_WEBGPU_R1_SOURCE_HASHES:
+                self.assertEqual(
+                    expected_hash, HISTORICAL_WEBGPU_R1_SOURCE_HASHES[name], name
+                )
+                continue
+            source_path = Path(__file__).resolve().with_name(name)
+            actual_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+            self.assertEqual(actual_hash, expected_hash, name)
+
+    def test_direct_webgpu_candidate_r2_pins_current_sources_and_package_manifest(self):
+        reports = Path(__file__).resolve().with_name("reports")
+        report_bytes = (reports / "direct-tvm-q4-webgpu-build-r2.json").read_bytes()
+        report = json.loads(report_bytes)
+        manifest_bytes = (reports / "direct-tvm-q4-webgpu-manifest-r2.json").read_bytes()
+        manifest = json.loads(manifest_bytes)
+        model_config_bytes = (
+            reports / "direct-tvm-q4-webgpu-model-config-r2.json"
+        ).read_bytes()
+        model_config = json.loads(model_config_bytes)
+
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            "59009ed215dde8dfcffac87e38b8a2ad5c1c6396cc1b85b23e87394dc19fb67f",
+        )
+        self.assertEqual(
+            hashlib.sha256(manifest_bytes).hexdigest(),
+            "984bbf82059d8c6b261999b598c383bb98746595642c779e1540bd00923ca6e9",
+        )
+        self.assertEqual(
+            hashlib.sha256(model_config_bytes).hexdigest(),
+            "7143a4974bc3ba3c2eea3bfb0b69d8b3284d7501ab7beea3312ba58e76b87251",
+        )
+        canonical_manifest = (
+            json.dumps(
+                manifest,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+        self.assertEqual(
+            hashlib.sha256(canonical_manifest).hexdigest(),
+            report["browserPackage"]["manifestSha256"],
+        )
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual(report["candidateModelId"], "kev-0.6b-q4f16")
+        self.assertEqual(report["qualityGates"]["cpuBaseline"]["status"], "passed")
+        self.assertEqual(
+            report["qualityGates"]["webgpuExpandedMatrix"]["status"],
+            "pending-real-chrome-webgpu",
+        )
+        self.assertEqual(manifest["backend"], "tvm-webgpu")
+        self.assertEqual(manifest["parameterCount"], 511)
+        self.assertEqual(manifest["maxStateTokens"], 8192)
+        self.assertEqual(manifest["maxBranchTokens"], 8192)
+        self.assertEqual(model_config["max_position_embeddings"], 32768)
 
         for name, expected_hash in report["converterHashes"].items():
             source_path = Path(__file__).resolve().with_name(name)
