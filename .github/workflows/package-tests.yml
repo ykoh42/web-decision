@@ -6,12 +6,54 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_direct_kev:
+        description: Build the pinned direct-TVM Kev candidate on a hosted runner
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
+  direct-kev-candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_direct_kev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: '0.13.7'
+      - name: Install the pinned libatomic runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libatomic1=14.2.0-4ubuntu2~24.04.1
+          dpkg-query -W -f='${Version}\n' libatomic1
+          free -h
+          df -h "$GITHUB_WORKSPACE"
+      - name: Build direct TVM Kev candidate from pinned official inputs
+        env:
+          WEB_DECISION_LIBATOMIC_PATH: /usr/lib/x86_64-linux-gnu/libatomic.so.1
+        run: scripts/setup_preview.sh models/web-decision-assets/direct-kev-0.6b-q4f16
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: direct-kev-build-report-${{ github.run_id }}
+          path: models/web-decision-assets/direct-kev-0.6b-q4f16/direct-tvm-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
   typescript:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_direct_kev != true
     name: TypeScript migration gate (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -48,6 +90,7 @@ jobs:
           pnpm run test:quality:complexity
           pnpm run check:typescript:complete
   package-tests:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_direct_kev != true
     name: Package test suite (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -99,6 +142,7 @@ jobs:
       - name: Run the complete package test suite
         run: pnpm test
   package:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_direct_kev != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
