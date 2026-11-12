@@ -62,8 +62,8 @@ test('the pinned Kanana TVM kernels fit and compile on the local WebGPU device',
   );
   const shaders = graphs.flat();
   const maxStorageBuffers = Math.max(...shaders.map((source) => (source.match(/var<storage,/gu) ?? []).length));
-  expect(graphs.map((graph) => graph.length)).toEqual([82, 51]);
-  expect(maxStorageBuffers).toBe(5);
+  expect(graphs.map((graph) => graph.length)).toEqual([59, 51]);
+  expect(maxStorageBuffers).toBe(6);
 
   await page.goto('/');
   await page.addScriptTag({path: resolve('.toolchains/apache-tvm-src/web/lib/index.js')});
@@ -75,7 +75,24 @@ test('the pinned Kanana TVM kernels fit and compile on the local WebGPU device',
         };
       }
     ).tvmjs;
-    const {adapter, device} = await runtime.detectGPUDevice();
+    const requestDevice = GPUAdapter.prototype.requestDevice;
+    GPUAdapter.prototype.requestDevice = async function (...arguments_) {
+      const descriptor = arguments_[0] ?? {};
+      return requestDevice.call(this, {
+        ...descriptor,
+        requiredLimits: {
+          ...descriptor.requiredLimits,
+          maxStorageBuffersPerShaderStage: 6
+        }
+      });
+    };
+    let adapter: GPUAdapter;
+    let device: GPUDevice;
+    try {
+      ({adapter, device} = await runtime.detectGPUDevice());
+    } finally {
+      GPUAdapter.prototype.requestDevice = requestDevice;
+    }
     const failures: {index: number; entryPoint?: string; message: string}[] = [];
 
     for (const [index, source] of sources.entries()) {
@@ -111,7 +128,8 @@ test('the pinned Kanana TVM kernels fit and compile on the local WebGPU device',
   console.log(
     `KANANA_KERNEL_COMPATIBILITY ${JSON.stringify({browser: browser.version(), ...report, total: shaders.length})}`
   );
-  expect(report.limits.device).toBe(report.limits.adapter);
+  expect(report.limits.adapter).toBeGreaterThanOrEqual(6);
+  expect(report.limits.device).toBeGreaterThanOrEqual(6);
   expect(report.compiled).toBe(shaders.length);
   expect(report.failures).toEqual([]);
 });

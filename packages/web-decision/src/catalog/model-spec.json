@@ -28,7 +28,7 @@
             "maxBufferSize": 656670720,
             "maxStorageBufferBindingSize": 656670720,
             "maxComputeWorkgroupStorageSize": 32768,
-            "maxStorageBuffersPerShaderStage": 5
+            "maxStorageBuffersPerShaderStage": 6
           },
           "requiresNonFallbackAdapter": false
         },
