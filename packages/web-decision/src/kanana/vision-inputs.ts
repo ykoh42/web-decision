@@ -26,14 +26,32 @@ function validateGrid(value: unknown): VisionGrid {
   return [temporal, height, width];
 }
 
+function validatedGrid(value: unknown, spatialMergeSize: number): Readonly<{grid: VisionGrid; patchCount: number}> {
+  const grid = validateGrid(value);
+  const [, height, width] = grid;
+  if (
+    !Number.isSafeInteger(spatialMergeSize) ||
+    spatialMergeSize < 1 ||
+    height % spatialMergeSize !== 0 ||
+    width % spatialMergeSize !== 0
+  )
+    throw new RangeError('visionGridThw height and width must be divisible by spatialMergeSize.');
+
+  return {grid, patchCount: grid[0] * height * width};
+}
+
 function axisTaps(index: number, size: number, side: number): AxisTaps {
-  const source = (index * (side - 1)) / Math.max(size - 1, 1);
+  const numerator = Math.fround(Math.fround(index) * (side - 1));
+  const denominator = Math.fround(Math.max(size - 1, 1));
+  const source = Math.fround(numerator / denominator);
   const floor = Math.floor(source);
-  const first = source - floor;
-  const second = 1 - first;
+  const fraction = Math.fround(source - floor);
+  const upperDistance = Math.abs(Math.fround(fraction - 1));
+  const lowerWeight = Math.max(0, Math.fround(1 - Math.abs(fraction)));
+  const upperWeight = Math.max(0, Math.fround(1 - upperDistance));
   return [
     [Math.min(floor, side - 1), Math.min(floor + 1, side - 1)],
-    [second, first]
+    [lowerWeight, upperWeight]
   ];
 }
 
@@ -113,20 +131,15 @@ export function prepareKananaVisionGraphInputs(
     spatialMergeSize?: number;
   }
 ): KananaVisionGraphInputs {
-  const [temporal, height, width] = validateGrid(gridValue);
-  if (
-    !Number.isSafeInteger(spatialMergeSize) ||
-    spatialMergeSize < 1 ||
-    height % spatialMergeSize !== 0 ||
-    width % spatialMergeSize !== 0
-  )
-    throw new RangeError('visionGridThw height and width must be divisible by spatialMergeSize.');
+  const {
+    grid: [temporal, height, width],
+    patchCount
+  } = validatedGrid(gridValue, spatialMergeSize);
   if (!Number.isSafeInteger(numPositionEmbeddings) || numPositionEmbeddings < 1)
     throw new RangeError('numPositionEmbeddings must be a positive safe integer.');
 
   const side = Math.sqrt(numPositionEmbeddings);
   if (!Number.isSafeInteger(side)) throw new RangeError('numPositionEmbeddings must form a square table.');
-  const patchCount = temporal * height * width;
   const mergedTokenCount = patchCount / spatialMergeSize ** 2;
   if (!Number.isSafeInteger(mergedTokenCount))
     throw new RangeError('visionGridThw must produce a whole number of merged tokens.');
@@ -156,4 +169,9 @@ export function prepareKananaVisionGraphInputs(
     interpolationShape: Object.freeze([patchCount, 4]) as readonly [number, 4],
     mergedTokens: new Int32Array(mergedTokenCount)
   });
+}
+
+/** Validate a graph grid and return its patch count before allocating per-patch inputs. */
+export function kananaVisionPatchCount(gridValue: unknown, spatialMergeSize: number): number {
+  return validatedGrid(gridValue, spatialMergeSize).patchCount;
 }

@@ -105,6 +105,7 @@ test('WMI provenance stays separate from browser adapter information', () => {
       }
     }
   });
+  assert.ok(evidence.gpu);
   assert.equal(evidence.gpu.hardware.model, 'Intel(R) UHD Graphics');
   assert.equal(evidence.gpu.hardwareEvidence.source, 'windows-wmi/Win32_VideoController');
   assert.equal('adapterInfo' in evidence.gpu, false);
@@ -119,6 +120,7 @@ test('WMI provenance stays separate from browser adapter information', () => {
       architecture: 'x64'
     }
   );
+  assert.equal(hostWithHypervisor.device.evidence.host.source, 'windows-wmi/Win32_ComputerSystem');
   assert.equal(hostWithHypervisor.device.evidence.host.raw.HypervisorPresent, true);
 });
 

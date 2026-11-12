@@ -4,7 +4,8 @@ import {cancelResponse, readBoundedResponse, ResponseSizeError} from '../../boun
 import {detectGPUDevice} from '../../kanana/tvm-webgpu.js';
 import {instantiate, createPolyfillWASI} from '../../runtime/tvm.generated.mjs';
 import {WebDecisionError} from '../errors.ts';
-import type {KananaLoadOptions, ModelDescription, ModelProgress} from '../types.js';
+import type {ModelDescription, ModelProgress} from '../types.js';
+import type {KananaLoadOptions} from '../../kanana/types.js';
 import {KANANA_ARTIFACT_SOURCES} from '../../kanana/artifacts.js';
 import {decodeKananaImageSource} from '../../kanana/browser-image.js';
 import {createKananaDecisionSession} from '../../kanana/decision-session.js';

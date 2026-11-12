@@ -1,7 +1,16 @@
 {
   "schemaVersion": 1,
   "modelId": "kanana-2-v-decide-3b-2611",
-  "status": "pending",
+  "status": "verified",
+  "sourceLineage": [
+    {
+      "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+      "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+      "path": "model.safetensors",
+      "bytes": 7330945212,
+      "sha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b"
+    }
+  ],
   "knownSource": {
     "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
     "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
@@ -14,22 +23,84 @@
     "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
     "recipe": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-recipe.json",
-      "sha256": "6411b100c5418f6f3ea27e02419455df3749c86b90eeb2a111a32194484f267e"
+      "sha256": "8a0d1be431f2012f48eee0728c42c492ad6a5ee0f92669f55a2066aa797a036d"
     },
     "config": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-config.json",
-      "sha256": "6e49580c99d563c4565228eea7a61b71038574ab818896131fd941421dadeb1d"
+      "sha256": "1cdf67780fdf123307689378ba15ea7ce2cd7999f3561a4fc38bc027ad296687"
     },
     "toolchain": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json",
-      "sha256": "8fd7fe94dcb0ff3449e5bd1859c0740333416f6cfc9466ea5594087211339f0b"
+      "sha256": "8854d016a350abfdae4e43e9af131343262577cfa2956295d9a93a971552757c"
     },
-    "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a"
+    "artifactLockSha256": "536ca5587ad901f15108033c3512db88a9cffe51a9b78b2d2bf1caf58a9f012a"
   },
-  "unresolved": [
-    "No project-level determination is recorded on whether distributing web-decision's compiled TVM graph assets for browser and on-device use falls within Section 4.1(iii) or requires a separate Kakao commercial license.",
-    "An independent review of all third-party attribution obligations for the model source code and derived TVM graph assets is not recorded."
+  "rights": [
+    {
+      "subject": "Kanana checkpoint and converted model files",
+      "license": "KananaOpenLicense",
+      "redistribution": "conditional",
+      "conditions": [
+        "The agreement requires its copy, notices, and attribution to accompany redistributed derivatives.",
+        "Applications using Kanana must display Powered by Kanana and follow Kakao's Responsible AI Guidelines.",
+        "Commercial offerings embedding Kanana or derivatives in on-device domains require a separate Kakao commercial license."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/KANANA-OPEN-LICENSE.txt",
+        "sha256": "3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4"
+      }
+    }
   ],
+  "validation": {
+    "attention": {
+      "implementation": "tiled_online_softmax",
+      "queryTile": 16,
+      "keyTile": 16,
+      "causalKeyLimit": "query_tile_end",
+      "intermediateScoreMatrix": false,
+      "loweredAttentionOps": 32
+    },
+    "cpuParity": {
+      "sequenceLength1MaxAbsDelta": 7.903575897216797e-05,
+      "sequenceLength1Rmse": 1.8776381693896838e-05,
+      "sequenceLength8TextOnlyMaxAbsDelta": 0.00010013580322265625,
+      "sequenceLength8TextOnlyRmse": 1.8391005141890234e-05,
+      "sequenceLength8TwoImageTokensMaxAbsDelta": 0.00013655424118041992,
+      "sequenceLength8TwoImageTokensRmse": 2.3196473193820566e-05,
+      "withinTolerance": true
+    },
+    "exactPackageWebgpu": {
+      "browser": "Chromium 157.0.8103.52",
+      "device": "Apple M4 Pro",
+      "adapter": "Apple Metal 3",
+      "fallbackAdapter": false,
+      "textChoice": "passed",
+      "imageChoice": "passed",
+      "offlineCacheInference": "passed",
+      "offlineNetworkAttempts": 0,
+      "offlineMatchesOnline": true,
+      "maximumLength": {
+        "maxLength": 20480,
+        "passed": true,
+        "wholeTestSeconds": 312.192,
+        "peakLiveWebgpuBufferBytes": 11088504640,
+        "playwrightReportSha256": "10ee544aad39f2fa9da04b3cf16c1d5b6fe863cbaa901099db0f66b0b6129f5e"
+      },
+      "candidateArchive": {
+        "version": "0.4.0",
+        "archiveSha256": "13de93ff19d038ae4e53822ffb990d45427e8e55052ac29e4adbd28eca1299ff",
+        "packageTreeSha256": "6fcc5ca3a64246b353300b6fc87ca58b5c5784d51a51361941cfd386f231a476",
+        "bundleSha256": "d0b77f9964bf278d2126be7203b04d6048bb0684e7e00c8429dcfa71e3c86d80",
+        "playwrightReportSha256": "fe546c062b96a8dc2c03fc2bfa7b6258b0aec273805314151f70ac3b7fec3a86"
+      }
+    },
+    "upstreamTvm": {
+      "version": "0.27.0.post1",
+      "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+      "sourcePatches": [],
+      "onnxImportOrExportUsed": false
+    }
+  },
   "knownReferences": [
     {
       "url": "https://huggingface.co/kakaocorp/kanana-2-v-decide-3b-2611/blob/12820d654ed9789a0f7f48daeee1703c3483c464/LICENSE",

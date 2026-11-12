@@ -2,12 +2,10 @@ import type {ModelId} from '../catalog/types.generated.js';
 import {WebDecisionError} from './errors.ts';
 
 const COMMON_OPTIONS = ['modelId', 'cache', 'offline', 'signal', 'onProgress'] as const;
-const KEV_OPTIONS = new Set([...COMMON_OPTIONS, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']);
 const KANANA_OPTIONS = new Set(COMMON_OPTIONS);
-const KNOWN_OPTIONS = new Set([...KEV_OPTIONS, ...KANANA_OPTIONS]);
+const KNOWN_OPTIONS = new Set<string>(KANANA_OPTIONS);
 
 function optionsForModel(modelId: ModelId): ReadonlySet<string> {
-  if (modelId === 'kev-0.6b-q4f16') return KEV_OPTIONS;
   if (modelId === 'kanana-2-v-decide-3b-2611') return KANANA_OPTIONS;
   return new Set();
 }

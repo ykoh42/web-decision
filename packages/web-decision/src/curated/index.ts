@@ -8,7 +8,6 @@ export {WebDecisionError};
 export {KananaFloat, kananaFloat} from '../kanana/json-float.ts';
 
 const adapters = Object.freeze({
-  kev06: () => import('./adapters/kev06.ts'),
   kanana: () => import('./adapters/kanana.ts')
 });
 
@@ -40,6 +39,7 @@ export function describeModel(modelId: ModelId) {
 /** Load a curated model from the source and artifact pinned by this package. */
 export async function loadDecisionModel(input: unknown) {
   const {modelId, options} = readLoadOptions(input, isModelId);
+  (options as {signal?: AbortSignal}).signal?.throwIfAborted();
   const description = describeModel(modelId);
   const loadAdapter = adapters[MODEL_CATALOG_BY_ID[modelId].description.adapter];
   if (!loadAdapter) throw new WebDecisionError('INVALID_ASSET', 'The model adapter is unavailable.', undefined);

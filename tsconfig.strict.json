@@ -25,5 +25,13 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
-  "exclude": ["**/node_modules/**", "**/dist/**", ".toolchains/**", "releases/**", "tests/types/**"]
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    ".toolchains/**",
+    "releases/**",
+    "tests/types/**",
+    "tests/browser/kev-upstream-provider.ts",
+    "tests/browser/kev06-default-source-real-webgpu.spec.ts"
+  ]
 }

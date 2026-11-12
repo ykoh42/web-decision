@@ -12,7 +12,7 @@
   },
   "text": {
     "script": "scripts/kanana/prototype_text_tvm_relax.py",
-    "scriptSha256": "7d52ba9d4c53272f3b166666e588e8b18dde732a05d8c9136db8d79285f113d6",
+    "scriptSha256": "a74fbb97af0265aff8d90ea1aa091f8ab68517c16e85ab68ef63020288e67801",
     "reproductionCommandTemplate": [
       "python",
       "scripts/kanana/prototype_text_tvm_relax.py",
@@ -23,15 +23,15 @@
       "--checkpoint-full",
       "--runtime-dtype",
       "float16",
+      "--float32-compute",
       "--weight-source",
       "safetensors",
       "--dynamic-sequence",
+      "--online-attention",
       "--multimodal-inputs",
       "--sequence-lengths",
       "1",
       "8",
-      "9",
-      "--continue-after-cpu-parity-delta",
       "--target",
       "webgpu"
     ],
@@ -39,29 +39,29 @@
       "--checkpoint-full",
       "--runtime-dtype",
       "float16",
+      "--float32-compute",
       "--weight-source",
       "safetensors",
       "--dynamic-sequence",
+      "--online-attention",
       "--multimodal-inputs",
       "--sequence-lengths",
       "1",
       "8",
-      "9",
-      "--continue-after-cpu-parity-delta",
       "--target",
       "webgpu"
     ],
     "output": {
       "artifact": "kanana-text-model.wasm",
-      "bytes": 4477518,
-      "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+      "bytes": 4208785,
+      "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
     },
-    "reportSha256": "ca16b8d607357fa9d8cbdf72b1f4ef734184c811e13c9420f3d4ae6edf85bc62",
-    "sequenceParityReportSha256": "be53443e9ada55240a743eba66d722546a85ee13fe567b3b80347ec74b9844ec"
+    "reportSha256": "9a2be1e2569e1c902cbbfe94cb0e48e0c77ab77a7b6bbd1545193b2bea742cf5",
+    "sequenceParityReportSha256": "df59ad950721dd666c6b27a955c5af397ccc05e7d16cebe86487660ac0d68ea7"
   },
   "vision": {
     "script": "scripts/kanana/export_dynamic_vision_tvm.py",
-    "scriptSha256": "b07be3c34420f7bd1461285a26302932b680ba1a50e1442b0a8ed736a1efdefc",
+    "scriptSha256": "4e577c1210de8f32f5d4ef4c2d2a6128af0bdaa458187e6222c27ed5b6b70e86",
     "reproductionCommandTemplate": [
       "python",
       "scripts/kanana/export_dynamic_vision_tvm.py",
@@ -73,13 +73,13 @@
     "output": {
       "artifact": "kanana-vision-model.wasm",
       "bytes": 4414887,
-      "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+      "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
     },
-    "reportSha256": "58672bb84d2edcb92abee26c7a7a31ab3f8affd1d8f71edd45889735b8c750f4"
+    "reportSha256": "2999f0c0148b4f9c94f7f9643428d2fa3991b64d000fb7e0a3e7770df7bbfa5e"
   },
   "package": {
     "script": "scripts/kanana/package_tvm_artifacts.mts",
-    "scriptSha256": "c763eb616b8082c650e7fe8e92af294f4c82838cc280b34faff690b47669526e",
+    "scriptSha256": "50471a8d36b102e0fcfd56a9cbbd78bd2c384a1d8aec557b9646a40823ed112d",
     "arguments": [
       "node",
       "--import",
@@ -100,6 +100,12 @@
     "lockfile": "scripts/kanana/build-env/uv.lock",
     "lockfileSha256": "aa00ce4e3dd06a627a20fbd6582daa860d125b95fa38a893ff127694f8e6fdbf",
     "evidenceScript": "scripts/kanana/build_evidence.py",
-    "evidenceScriptSha256": "427c1972119e4718e0a1b8896e2deb30058f7d15b8b358e662fa712890b76052"
+    "evidenceScriptSha256": "b14a11cdfe775ec2fb6811188b9d8231a9c04efcab432fe1b3e3b399e653a39a"
+  },
+  "supportingScripts": {
+    "scripts/kanana/online_attention_tir.py": "db443dfe6bc570667b18a350b8bb6f474fa897bd909cf26a4e0142a24675378d",
+    "scripts/kanana/pinned_model_files.py": "3253e8b53c44faedb29c6634916e08feee1595a01644e31c2412a3fdcae8cec6",
+    "scripts/kanana/probe_torch_export_vision_tvm.py": "4cdccf7751998880212eb5a22607ad3fd831c882c00c2e167d62498c61100f40",
+    "scripts/kanana/hash_safetensors_ranges.mts": "60667dc765e320c1755e52ad384785f25f9ef7f51cd4663893b84e5c862035ee"
   }
 }

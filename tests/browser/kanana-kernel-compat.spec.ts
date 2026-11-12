@@ -13,33 +13,46 @@ function isWgslByte(value: number): boolean {
   return (value >= 32 && value <= 126) || value === 9 || value === 10 || value === 13;
 }
 
+function findShaderMarker(wasm: Buffer, offset: number): number | null {
+  const marker = wasm.indexOf(shaderMarker, offset);
+  return marker < 0 ? null : marker;
+}
+
+function findComputeMarker(wasm: Buffer, marker: number): number | null {
+  const compute = wasm.indexOf(Buffer.from('@compute '), marker);
+  return compute < 0 ? null : compute;
+}
+
+function findShaderStart(wasm: Buffer, marker: number): number {
+  let start = marker;
+  while (start > 0 && isWgslByte(wasm[start - 1]!)) start--;
+  return start;
+}
+
+function findShaderEnd(wasm: Buffer, compute: number): number {
+  let depth = 0;
+  for (let end = compute; end < wasm.length; end++) {
+    if (wasm[end] === 123) depth++;
+    if (wasm[end] !== 125) continue;
+    depth--;
+    if (depth === 0) return end + 1;
+  }
+  return wasm.length;
+}
+
 function extractComputeShaders(wasm: Buffer): string[] {
   const shaders: string[] = [];
   let offset = 0;
-  while (true) {
-    const marker = wasm.indexOf(shaderMarker, offset);
-    if (marker < 0) break;
-    const compute = wasm.indexOf(Buffer.from('@compute '), marker);
-    if (compute < 0) break;
-    let start = marker;
-    let depth = 0;
-    let end = compute;
-    while (start > 0 && isWgslByte(wasm[start - 1]!)) start--;
-    for (; end < wasm.length; end++) {
-      if (wasm[end] === 123) depth++;
-      if (wasm[end] === 125) {
-        depth--;
-        if (depth === 0) {
-          end++;
-          break;
-        }
-      }
-    }
-    const source = wasm.subarray(start, end).toString('utf8');
-    shaders.push(source);
+  for (;;) {
+    const marker = findShaderMarker(wasm, offset);
+    if (marker === null) return shaders;
+    const compute = findComputeMarker(wasm, marker);
+    if (compute === null) return shaders;
+    const start = findShaderStart(wasm, marker);
+    const end = findShaderEnd(wasm, compute);
+    shaders.push(wasm.subarray(start, end).toString('utf8'));
     offset = end + 1;
   }
-  return shaders;
 }
 
 test('the pinned Kanana TVM kernels fit and compile on the local WebGPU device', async ({page, browser}) => {

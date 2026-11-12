@@ -20,10 +20,9 @@ test('the catalog lists pinned TVM models and rejects unknown IDs', () => {
   assert.ok(Object.isFrozen(models));
   assert.deepEqual(
     models.map((entry) => entry.modelId),
-    ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']
+    ['kanana-2-v-decide-3b-2611']
   );
-  assert.equal(library.describeModel('kev-0.6b-q4f16'), models[0]);
-  assert.equal(library.describeModel('kanana-2-v-decide-3b-2611'), models[1]);
+  assert.equal(library.describeModel('kanana-2-v-decide-3b-2611'), models[0]);
   // @ts-expect-error Runtime validation must reject unavailable IDs too.
   assert.throws(() => library.describeModel('tamev-micro-minilm-int8'), {code: 'INVALID_INPUT'});
   // @ts-expect-error Prototype names are not model IDs.
@@ -40,7 +39,7 @@ test('invalid or caller-selected sources fail before making a network request', 
   try {
     for (const options of [
       {},
-      {model: 'kev-0.6b-q4f16'},
+      {model: 'kanana-2-v-decide-3b-2611'},
       {modelId: 'tamev-micro-minilm-int8'},
       {modelId: 'kev-0.6b-q4f16', assetsUrl: 'https://example.org/'}
     ]) {
@@ -80,10 +79,13 @@ test('a cancelled curated model load preserves its reason without requesting ass
     throw new Error('unexpected fetch');
   };
   try {
-    await assert.rejects(library.loadDecisionModel({modelId: 'kev-0.6b-q4f16', signal: controller.signal}), (error) => {
-      assert.equal(error, reason);
-      return true;
-    });
+    await assert.rejects(
+      library.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', signal: controller.signal}),
+      (error) => {
+        assert.equal(error, reason);
+        return true;
+      }
+    );
   } finally {
     globalThis.fetch = oldFetch;
   }

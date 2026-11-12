@@ -1,6 +1,6 @@
-export type ModelId = 'kev-0.6b-q4f16' | 'kanana-2-v-decide-3b-2611';
-export type ModelIdTuple = readonly ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611'];
-export type ModelAdapterId = 'kev06' | 'kanana';
+export type ModelId = 'kanana-2-v-decide-3b-2611';
+export type ModelIdTuple = readonly ['kanana-2-v-decide-3b-2611'];
+export type ModelAdapterId = 'kanana';
 export interface CatalogModelLimit {
   readonly resource: 'tokens' | 'options' | 'questions' | 'images';
   readonly scope: 'state' | 'question' | 'request';

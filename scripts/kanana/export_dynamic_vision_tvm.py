@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -15,8 +16,14 @@ import numpy as np
 import torch
 import tvm
 from safetensors import safe_open
-from transformers.models.qwen3_vl.modeling_qwen3_vl import ALL_ATTENTION_FUNCTIONS, eager_attention_forward
-from transformers.vision_utils import get_vision_interpolation_indices_and_weights, get_vision_position_ids
+from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+    ALL_ATTENTION_FUNCTIONS,
+    eager_attention_forward,
+)
+from transformers.vision_utils import (
+    get_vision_interpolation_indices_and_weights,
+    get_vision_position_ids,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL_ID = "kakaocorp/kanana-2-v-decide-3b-2611"
@@ -37,8 +44,12 @@ DEFAULT_MODEL_DIR = (
     / MODEL_REVISION
 )
 sys.path.insert(0, str(ROOT / "scripts/kanana"))
-from build_evidence import add_tvm_build_evidence
-from probe_torch_export_vision_tvm import import_pinned_vision_classes
+add_tvm_build_evidence = importlib.import_module(
+    "build_evidence"
+).add_tvm_build_evidence
+import_pinned_vision_classes = importlib.import_module(
+    "probe_torch_export_vision_tvm"
+).import_pinned_vision_classes
 
 
 def sha256_file(path):
@@ -53,10 +64,16 @@ def write_cases(output_dir, vision, config, torch, np):
     cases_dir = output_dir / "cases"
     cases_dir.mkdir(parents=True, exist_ok=True)
     cases = []
-    for name, height, width in (("minimum-256", 16, 16), ("middle-384", 16, 24), ("large-512", 16, 32)):
+    for name, height, width in (
+        ("minimum-256", 16, 16),
+        ("middle-384", 16, 24),
+        ("large-512", 16, 32),
+    ):
         patch_count = height * width
         grid = torch.tensor([[1, height, width]], dtype=torch.int64)
-        positions = get_vision_position_ids(grid, config.spatial_merge_size).to(dtype=torch.int32)
+        positions = get_vision_position_ids(grid, config.spatial_merge_size).to(
+            dtype=torch.int32
+        )
         indices, interpolation_weights = get_vision_interpolation_indices_and_weights(
             grid,
             num_grid_per_side=int(math.sqrt(config.num_position_embeddings)),
@@ -104,54 +121,97 @@ def write_cases(output_dir, vision, config, torch, np):
                 "files": files,
             }
         )
-        print(json.dumps({"stage": "reference-case", "case": name, "shape": list(expected.shape)}), flush=True)
+        print(
+            json.dumps(
+                {"stage": "reference-case", "case": name, "shape": list(expected.shape)}
+            ),
+            flush=True,
+        )
     (output_dir / "cases.json").write_text(json.dumps(cases, indent=2) + "\n")
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--output-dir", type=Path, required=True)
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def validate_pinned_inputs(args):
     if not tvm.__version__.startswith("0.27."):
         raise SystemExit(f"expected TVM 0.27, found {tvm.__version__}")
     model_dir = args.model_dir.expanduser().resolve(strict=True)
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     if model_dir.name != MODEL_REVISION:
-        raise SystemExit(f"expected pinned model revision {MODEL_REVISION}: {model_dir}")
+        raise SystemExit(
+            f"expected pinned model revision {MODEL_REVISION}: {model_dir}"
+        )
     checkpoint = model_dir / "model.safetensors"
     if not checkpoint.is_file() or checkpoint.stat().st_size != CHECKPOINT_BYTES:
-        raise SystemExit("the local checkpoint is missing or does not match the pinned byte length")
+        raise SystemExit(
+            "the local checkpoint is missing or does not match the pinned byte length"
+        )
     checkpoint_hash = sha256_file(checkpoint)
     if checkpoint_hash != CHECKPOINT_SHA256:
         raise SystemExit("the local checkpoint does not match the pinned SHA-256")
-    custom_hashes = {name: sha256_file(model_dir / name) for name in PINNED_CUSTOM_FILES}
+    custom_hashes = {
+        name: sha256_file(model_dir / name) for name in PINNED_CUSTOM_FILES
+    }
     if custom_hashes != PINNED_CUSTOM_FILES:
-        raise SystemExit("the local model config or custom model code differs from the pinned revision")
+        raise SystemExit(
+            "the local model config or custom model code differs from the pinned revision"
+        )
     max_patch_count = PROCESSOR_MAX_PIXELS // VISION_PATCH_AREA
+    return (
+        model_dir,
+        output_dir,
+        checkpoint,
+        checkpoint_hash,
+        custom_hashes,
+        max_patch_count,
+    )
 
+
+def load_vision_checkpoint(model_dir, checkpoint, torch):
     torch.set_num_threads(1)
     config_data = json.loads((model_dir / "config.json").read_text())["vision_config"]
-    config_data.pop('model_type', None)
+    config_data.pop("model_type", None)
     VisionConfig, VisionModel = import_pinned_vision_classes(model_dir)
     config = VisionConfig(**config_data)
-    config._attn_implementation = 'eager'
+    config._attn_implementation = "eager"
     vision = VisionModel(config).eval().to(dtype=torch.float32)
     expected_keys = set(vision.state_dict())
     loaded = {}
     with safe_open(str(checkpoint), framework="pt", device="cpu") as source:
         for name in source.keys():
             if name.startswith("model.visual."):
-                loaded[name.removeprefix("model.visual.")] = source.get_tensor(name).to(dtype=torch.float32)
+                loaded[name.removeprefix("model.visual.")] = source.get_tensor(name).to(
+                    dtype=torch.float32
+                )
     missing = expected_keys.difference(loaded)
     unexpected = set(loaded).difference(expected_keys)
     if missing or unexpected:
-        raise RuntimeError(f"vision weight names mismatch: missing={sorted(missing)[:10]}, unexpected={sorted(unexpected)[:10]}")
+        raise RuntimeError(
+            f"vision weight names mismatch: missing={sorted(missing)[:10]}, unexpected={sorted(unexpected)[:10]}"
+        )
     load_result = vision.load_state_dict(loaded, strict=True)
     del loaded
-    print(json.dumps({'stage':'checkpoint','weights':333,'missing':load_result.missing_keys,'unexpected':load_result.unexpected_keys}), flush=True)
+    print(
+        json.dumps(
+            {
+                "stage": "checkpoint",
+                "weights": 333,
+                "missing": load_result.missing_keys,
+                "unexpected": load_result.unexpected_keys,
+            }
+        ),
+        flush=True,
+    )
+    return config, vision
+
+
+def create_export_inputs(config, vision, max_patch_count, torch):
     torch.manual_seed(20261110)
     patch_count = 256
     grid = torch.tensor([[1, 16, 16]], dtype=torch.int64)
@@ -160,22 +220,29 @@ def main():
     interp_indices, interp_weights = get_vision_interpolation_indices_and_weights(
         grid,
         num_grid_per_side=int(math.sqrt(config.num_position_embeddings)),
-        mode='bilinear',
+        mode="bilinear",
         align_corners=True,
         spatial_merge_size=config.spatial_merge_size,
     )
-    previous_flash = ALL_ATTENTION_FUNCTIONS.get('flash_attention_2')
-    ALL_ATTENTION_FUNCTIONS.register('flash_attention_2', eager_attention_forward)
-    config._attn_implementation = 'flash_attention_2'
+    previous_flash = ALL_ATTENTION_FUNCTIONS.get("flash_attention_2")
+    ALL_ATTENTION_FUNCTIONS.register("flash_attention_2", eager_attention_forward)
+    config._attn_implementation = "flash_attention_2"
+
     class DynamicVision(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, vision_model, token_count):
             super().__init__()
-            self.vision = vision
-            self.register_buffer('cu_seqlens', torch.tensor([0, patch_count], dtype=torch.int32), persistent=False)
+            self.vision = vision_model
+            self.register_buffer(
+                "cu_seqlens",
+                torch.tensor([0, token_count], dtype=torch.int32),
+                persistent=False,
+            )
 
         def forward(self, pixels, positions, indices, weights, merged_tokens):
             hidden = self.vision.patch_embed(pixels)
-            position_embeddings = (self.vision.pos_embed(indices) * weights[:, :, None]).sum(1)
+            position_embeddings = (
+                self.vision.pos_embed(indices) * weights[:, :, None]
+            ).sum(1)
             hidden = hidden + position_embeddings.to(hidden.dtype)
             rotary = self.vision.rotary_pos_emb(hidden, positions)
             for block in self.vision.blocks:
@@ -186,63 +253,149 @@ def main():
                     position_embeddings=rotary,
                 )
             hidden = self.vision.merger.norm(hidden)
-            hidden = hidden.reshape(merged_tokens.shape[0], self.vision.merger.hidden_size)
-            hidden = self.vision.merger.linear_fc2(self.vision.merger.act_fn(self.vision.merger.linear_fc1(hidden)))
+            hidden = hidden.reshape(
+                merged_tokens.shape[0], self.vision.merger.hidden_size
+            )
+            hidden = self.vision.merger.linear_fc2(
+                self.vision.merger.act_fn(self.vision.merger.linear_fc1(hidden))
+            )
             return hidden
 
-    wrapped = DynamicVision().eval()
+    wrapped = DynamicVision(vision, patch_count).eval()
     merged_tokens = torch.zeros((patch_count // 4,), dtype=torch.int32)
-    export_inputs = (pixel_values, position_ids.to(dtype=torch.int32), interp_indices.to(dtype=torch.int32), interp_weights, merged_tokens)
+    export_inputs = (
+        pixel_values,
+        position_ids.to(dtype=torch.int32),
+        interp_indices.to(dtype=torch.int32),
+        interp_weights,
+        merged_tokens,
+    )
     with torch.inference_mode():
         started = time.perf_counter()
         expected = wrapped(*export_inputs)
-        print(json.dumps({'stage':'pytorch-reference','seconds':round(time.perf_counter()-started,3),'shape':list(expected.shape),'dtype':str(expected.dtype),'norm':float(expected.norm())}), flush=True)
-    merged = torch.export.Dim('merged_tokens', min=64, max=max_patch_count // 4)
+        print(
+            json.dumps(
+                {
+                    "stage": "pytorch-reference",
+                    "seconds": round(time.perf_counter() - started, 3),
+                    "shape": list(expected.shape),
+                    "dtype": str(expected.dtype),
+                    "norm": float(expected.norm()),
+                }
+            ),
+            flush=True,
+        )
+    return previous_flash, wrapped, grid, pixel_values, export_inputs, expected
+
+
+def export_torch_program(wrapped, export_inputs, max_patch_count, output_dir, torch):
+    merged = torch.export.Dim("merged_tokens", min=64, max=max_patch_count // 4)
     patches = 4 * merged
-    dynamic_shapes = ({0: patches}, {0: patches}, {0: patches}, {0: patches}, {0: merged})
+    dynamic_shapes = (
+        {0: patches},
+        {0: patches},
+        {0: patches},
+        {0: patches},
+        {0: merged},
+    )
     started = time.perf_counter()
-    exported = torch.export.export(wrapped, export_inputs, dynamic_shapes=dynamic_shapes, strict=False)
-    print(json.dumps({'stage':'torch-export','seconds':round(time.perf_counter()-started,3),'nodes':len(list(exported.graph_module.graph.nodes))}), flush=True)
-    (output_dir / 'exported-program.py').write_text(exported.graph_module.code)
-    from tvm import relax
-    from tvm.relax import expr_functor
-    from tvm.relax.frontend.torch import from_exported_program
-    started = time.perf_counter()
-    mod = from_exported_program(exported, keep_params_as_input=True, run_ep_decomposition=True, unwrap_unit_return_tuple=True)
-    print(json.dumps({'stage':'relax-import','seconds':round(time.perf_counter()-started,3),'type':str(mod['main'].ret_ty),'params':len(mod['main'].params)}), flush=True)
+    exported = torch.export.export(
+        wrapped, export_inputs, dynamic_shapes=dynamic_shapes, strict=False
+    )
+    print(
+        json.dumps(
+            {
+                "stage": "torch-export",
+                "seconds": round(time.perf_counter() - started, 3),
+                "nodes": len(list(exported.graph_module.graph.nodes)),
+            }
+        ),
+        flush=True,
+    )
+    (output_dir / "exported-program.py").write_text(exported.graph_module.code)
+    return exported
+
+
+def rewrite_take_indices(mod, relax, expr_functor):
     @expr_functor.mutator
     class NarrowTakeIndices(relax.PyExprMutator):
         def __init__(self, current_module):
             super().__init__(current_module)
             self.rewritten = 0
+
         def visit_call_(self, call):
             call = super().visit_call_(call)
-            if call.op.name != 'relax.take':
+            if call.op.name != "relax.take":
                 return call
             value, index = call.args
-            if isinstance(index, tvm.ir.expr.GenericConst) and str(index.value.dtype) == 'int64':
+            if (
+                isinstance(index, tvm.ir.expr.GenericConst)
+                and str(index.value.dtype) == "int64"
+            ):
                 self.rewritten += 1
-                return relax.Call(call.op, [value, relax.const(int(index.value.numpy()), 'int32')], call.attrs, call.ty_args, call.span)
+                return relax.Call(
+                    call.op,
+                    [value, relax.const(int(index.value.numpy()), "int32")],
+                    call.attrs,
+                    call.ty_args,
+                    call.span,
+                )
             return call
+
     rewriter = NarrowTakeIndices(mod)
     for global_var, function in mod.functions_items():
         if isinstance(function, relax.Function):
             rewriter.builder_.update_func(global_var, rewriter.visit_expr(function))
-    mod = rewriter.builder_.get()
-    print(json.dumps({'stage':'rewrite-take-indices','count':rewriter.rewritten}), flush=True)
-    (output_dir / 'relax-module.py').write_text(mod.script())
-    param_names = [param.name for param in mod['main'].params]
+    return rewriter.builder_.get(), rewriter.rewritten
+
+
+def import_relax_program(exported, output_dir):
+    from tvm import relax
+    from tvm.relax import expr_functor
+    from tvm.relax.frontend.torch import from_exported_program
+
+    started = time.perf_counter()
+    mod = from_exported_program(
+        exported,
+        keep_params_as_input=True,
+        run_ep_decomposition=True,
+        unwrap_unit_return_tuple=True,
+    )
+    print(
+        json.dumps(
+            {
+                "stage": "relax-import",
+                "seconds": round(time.perf_counter() - started, 3),
+                "type": str(mod["main"].ret_ty),
+                "params": len(mod["main"].params),
+            }
+        ),
+        flush=True,
+    )
+    mod, rewritten_count = rewrite_take_indices(mod, relax, expr_functor)
+    print(
+        json.dumps({"stage": "rewrite-take-indices", "count": rewritten_count}),
+        flush=True,
+    )
+    (output_dir / "relax-module.py").write_text(mod.script())
+    return mod
+
+
+def validate_parameter_inputs(exported, mod, torch):
+    param_names = [param.name for param in mod["main"].params]
     parameters = {
         spec.arg.name: exported.state_dict[spec.target]
         for spec in exported.graph_signature.input_specs
         if spec.kind is torch.export.graph_signature.InputKind.PARAMETER
     }
     if set(parameters).difference(param_names):
-        raise RuntimeError(f'missing TVM parameters: {sorted(set(parameters).difference(param_names))[:10]}')
-    started = time.perf_counter()
-    target = tvm.target.Target('webgpu', host={'kind':'llvm', 'mtriple':'wasm32-unknown-unknown-wasm'})
-    from tvm.relax.backend.gpu_generic import pipeline as gpu_pipeline
+        raise RuntimeError(
+            f"missing TVM parameters: {sorted(set(parameters).difference(param_names))[:10]}"
+        )
+    return parameters
 
+
+def build_dynamic_allocation_pipeline(target, gpu_pipeline, tvm):
     def dynamic_allocation_pipeline(module):
         passes = (
             gpu_pipeline.library_dispatch_passes(target)
@@ -259,63 +412,91 @@ def main():
         )
         return tvm.transform.Sequential(passes)(module)
 
-    exe = tvm.relax.build(mod, target=target, relax_pipeline=dynamic_allocation_pipeline)
+    return dynamic_allocation_pipeline
+
+
+def build_relax_module(mod, tvm):
+    target = tvm.target.Target(
+        "webgpu", host={"kind": "llvm", "mtriple": "wasm32-unknown-unknown-wasm"}
+    )
+    from tvm.relax.backend.gpu_generic import pipeline as gpu_pipeline
+
+    pipeline = build_dynamic_allocation_pipeline(target, gpu_pipeline, tvm)
+    return tvm.relax.build(mod, target=target, relax_pipeline=pipeline)
+
+
+def create_weight_manifest(exported, torch):
     manifest = []
     constants = {}
     for spec in exported.graph_signature.input_specs:
-        if spec.kind.name != 'PARAMETER':
+        if spec.kind.name != "PARAMETER":
             continue
         tensor = exported.state_dict[spec.target]
         item = {
-            'kind': spec.kind.name,
-            'parameterName': spec.arg.name,
-            'target': spec.target,
-            'shape': list(tensor.shape),
-            'dtype': str(tensor.dtype).removeprefix('torch.'),
-            'length': tensor.numel() * tensor.element_size(),
+            "kind": spec.kind.name,
+            "parameterName": spec.arg.name,
+            "target": spec.target,
+            "shape": list(tensor.shape),
+            "dtype": str(tensor.dtype).removeprefix("torch."),
+            "length": tensor.numel() * tensor.element_size(),
         }
-        if spec.kind.name == 'PARAMETER':
-            item['name'] = 'model.visual.' + spec.target.removeprefix('vision.')
+        if spec.kind.name == "PARAMETER":
+            item["name"] = "model.visual." + spec.target.removeprefix("vision.")
             manifest.append(item)
-    (output_dir / 'external-weight-manifest.json').write_text(json.dumps({'weights':manifest}, indent=2) + '\n')
-    (output_dir / 'graph-constants.json').write_text(json.dumps(constants, separators=(',', ':')) + '\n')
-    (output_dir / 'pytorch-reference.json').write_text(json.dumps({
-        'shape': list(expected.shape),
-        'values': expected.detach().cpu().float().reshape(-1).tolist(),
-        'pixelShape': list(pixel_values.shape),
-        'grid': grid.tolist(),
-    }) + '\n')
-    write_cases(output_dir, wrapped, config, torch, np)
-    wasm_path = output_dir / 'kanana-vision-model.wasm'
-    from tvm.contrib import tvmjs
-    previous_tvm_home = os.environ.get('TVM_HOME')
-    tvm_home = ROOT / '.toolchains/apache-tvm-src'
-    os.environ['TVM_HOME'] = str(tvm_home)
+    return manifest, constants
+
+
+def write_export_references(
+    output_dir, manifest, constants, expected, pixel_values, grid
+):
+    (output_dir / "external-weight-manifest.json").write_text(
+        json.dumps({"weights": manifest}, indent=2) + "\n"
+    )
+    (output_dir / "graph-constants.json").write_text(
+        json.dumps(constants, separators=(",", ":")) + "\n"
+    )
+    (output_dir / "pytorch-reference.json").write_text(
+        json.dumps(
+            {
+                "shape": list(expected.shape),
+                "values": expected.detach().cpu().float().reshape(-1).tolist(),
+                "pixelShape": list(pixel_values.shape),
+                "grid": grid.tolist(),
+            }
+        )
+        + "\n"
+    )
+
+
+def export_wasm(executable, output_dir, tvmjs):
+    wasm_path = output_dir / "kanana-vision-model.wasm"
+    previous_tvm_home = os.environ.get("TVM_HOME")
+    tvm_home = ROOT / ".toolchains/apache-tvm-src"
+    os.environ["TVM_HOME"] = str(tvm_home)
     try:
-        exe.export_library(
+        executable.export_library(
             str(wasm_path),
             fcompile=tvmjs.create_tvmjs_wasm,
-            options=[f'-ffile-prefix-map={ROOT}=/src'],
+            options=[f"-ffile-prefix-map={ROOT}=/src"],
         )
     finally:
         if previous_tvm_home is None:
-            os.environ.pop('TVM_HOME', None)
+            os.environ.pop("TVM_HOME", None)
         else:
-            os.environ['TVM_HOME'] = previous_tvm_home
-    print(json.dumps({'stage':'webgpu-wasm-export','bytes':wasm_path.stat().st_size,'parameters':len(manifest),'constants':list(constants)}), flush=True)
-    subprocess.run(
-        [
-            "node",
-            "--import",
-            "tsx",
-            str(ROOT / "scripts/kanana/hash_safetensors_ranges.mts"),
-            str(checkpoint),
-            str(output_dir / "range-manifest.json"),
-            "--verify-fp16-rn",
-        ],
-        cwd=ROOT,
-        check=True,
-    )
+            os.environ["TVM_HOME"] = previous_tvm_home
+    return wasm_path
+
+
+def write_build_report(
+    output_dir,
+    checkpoint_hash,
+    custom_hashes,
+    torch,
+    tvm,
+    manifest,
+    max_patch_count,
+    wasm_path,
+):
     report = {
         "modelId": MODEL_ID,
         "revision": MODEL_REVISION,
@@ -342,10 +523,74 @@ def main():
         tvm_version=tvm.__version__,
     )
     (output_dir / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
+
+
+def main():
+    args = parse_args()
+    (
+        model_dir,
+        output_dir,
+        checkpoint,
+        checkpoint_hash,
+        custom_hashes,
+        max_patch_count,
+    ) = validate_pinned_inputs(args)
+    config, vision = load_vision_checkpoint(model_dir, checkpoint, torch)
+    previous_flash, wrapped, grid, pixel_values, export_inputs, expected = (
+        create_export_inputs(config, vision, max_patch_count, torch)
+    )
+    exported = export_torch_program(
+        wrapped, export_inputs, max_patch_count, output_dir, torch
+    )
+    mod = import_relax_program(exported, output_dir)
+    validate_parameter_inputs(exported, mod, torch)
+    executable = build_relax_module(mod, tvm)
+    manifest, constants = create_weight_manifest(exported, torch)
+    write_export_references(
+        output_dir, manifest, constants, expected, pixel_values, grid
+    )
+    write_cases(output_dir, wrapped, config, torch, np)
+    from tvm.contrib import tvmjs
+
+    wasm_path = export_wasm(executable, output_dir, tvmjs)
+    print(
+        json.dumps(
+            {
+                "stage": "webgpu-wasm-export",
+                "bytes": wasm_path.stat().st_size,
+                "parameters": len(manifest),
+                "constants": list(constants),
+            }
+        ),
+        flush=True,
+    )
+    subprocess.run(
+        [
+            "node",
+            "--import",
+            "tsx",
+            str(ROOT / "scripts/kanana/hash_safetensors_ranges.mts"),
+            str(checkpoint),
+            str(output_dir / "range-manifest.json"),
+            "--verify-fp16-rn",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    write_build_report(
+        output_dir,
+        checkpoint_hash,
+        custom_hashes,
+        torch,
+        tvm,
+        manifest,
+        max_patch_count,
+        wasm_path,
+    )
     if previous_flash is None:
-        ALL_ATTENTION_FUNCTIONS.pop('flash_attention_2', None)
+        ALL_ATTENTION_FUNCTIONS.pop("flash_attention_2", None)
     else:
-        ALL_ATTENTION_FUNCTIONS.register('flash_attention_2', previous_flash)
+        ALL_ATTENTION_FUNCTIONS.register("flash_attention_2", previous_flash)
 
 
 if __name__ == "__main__":

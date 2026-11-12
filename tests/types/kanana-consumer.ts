@@ -9,8 +9,6 @@ import {
   type KananaFloat,
   type KananaImageSource,
   type KananaQuestion,
-  type DecisionModel,
-  type KevLoadOptions,
   type LoadedDecisionModel,
   type ModelId
 } from 'web-decision';
@@ -118,20 +116,11 @@ async function checkKananaConsumerTypes(): Promise<void> {
 
 void checkKananaConsumerTypes;
 
-const kevLoadOptions: KevLoadOptions = {modelId: 'kev-0.6b-q4f16', maxInputTokens: 512};
-void kevLoadOptions;
-
-function checkLoadedModelNarrowing(model: LoadedDecisionModel): void {
-  if (model.modelId === 'kanana-2-v-decide-3b-2611') {
-    const kanana: KananaDecisionModel = model;
-    void kanana.systemOne;
-    return;
-  }
-  const kev: DecisionModel = model;
-  const kevModelId: 'kev-0.6b-q4f16' = kev.modelId;
-  void kevModelId;
+function checkLoadedModelType(model: LoadedDecisionModel): void {
+  const kanana: KananaDecisionModel = model;
+  void kanana.systemOne;
 }
-void checkLoadedModelNarrowing;
+void checkLoadedModelType;
 
 // @ts-expect-error Kanana-specific systemOne accepts one request object, not the legacy Kev signature.
 void loadDecisionModel({modelId}).then((model) => model.systemOne('state', {urgent: {type: 'noul'}}));

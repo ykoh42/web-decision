@@ -47,42 +47,51 @@ interface NodeOsMetadata {
   architecture: string;
 }
 
+interface WindowsHostEvidence {
+  source: 'windows-wmi/Win32_ComputerSystem';
+  raw: {Manufacturer: string; Model: string; HypervisorPresent: boolean};
+}
+
+interface MacHostEvidence {
+  source: 'macos-system_profiler/SPHardwareDataType';
+  raw: {machine_name: string; machine_model: string; chip_type: string};
+}
+
+interface WindowsGpuEvidence {
+  hardware: {
+    manufacturer: string;
+    model: string;
+    driverVersion: string;
+    pnpDeviceId: string;
+  };
+  hardwareEvidence: {
+    source: 'windows-wmi/Win32_VideoController';
+    raw: {
+      AdapterCompatibility: string;
+      Name: string;
+      DriverVersion: string;
+      PNPDeviceID: string;
+    };
+  };
+}
+
 export interface HardwareEvidence {
   device: {
-    manufacturer: string;
+    manufacturer: string | null;
     model: string;
     os: string;
     osVersion: string;
     architecture: string;
     isVirtual: false;
     evidence: {
-      host: {
-        source: 'windows-wmi/Win32_ComputerSystem';
-        raw: {Manufacturer: string; Model: string; HypervisorPresent: boolean};
-      };
+      host: WindowsHostEvidence | MacHostEvidence;
       os: {
         source: 'node:os';
         raw: NodeOsMetadata;
       };
     };
   };
-  gpu: {
-    hardware: {
-      manufacturer: string;
-      model: string;
-      driverVersion: string;
-      pnpDeviceId: string;
-    };
-    hardwareEvidence: {
-      source: 'windows-wmi/Win32_VideoController';
-      raw: {
-        AdapterCompatibility: string;
-        Name: string;
-        DriverVersion: string;
-        PNPDeviceID: string;
-      };
-    };
-  };
+  gpu?: WindowsGpuEvidence;
 }
 
 export interface BaselineFixtureEvidence {
@@ -235,16 +244,67 @@ export function parseWmiHardwareEvidence(
   };
 }
 
-export function collectWindowsHardwareEvidence(): HardwareEvidence {
-  if (process.platform !== 'win32') {
-    throw new Error('Release hardware evidence requires Windows WMI measurements.');
+export function parseMacHardwareEvidence(
+  input: unknown,
+  osMetadata: NodeOsMetadata = {version: version(), release: release(), architecture: arch()}
+): HardwareEvidence {
+  const snapshot = asRecord(input, 'macOS system_profiler output');
+  const profile = asRecord(
+    onlyWmiRecord(snapshot.SPHardwareDataType, 'SPHardwareDataType'),
+    'SPHardwareDataType record'
+  );
+  const machineName = requiredText(profile.machine_name, 'SPHardwareDataType.machine_name');
+  const machineModel = requiredText(profile.machine_model, 'SPHardwareDataType.machine_model');
+  const chipType = requiredText(profile.chip_type, 'SPHardwareDataType.chip_type');
+  if (looksVirtual(`${machineName} ${machineModel} ${chipType}`)) {
+    throw new Error('macOS hardware identifiers indicate a virtual host.');
   }
+  const os = {
+    version: requiredText(osMetadata.version, 'node:os version'),
+    release: requiredText(osMetadata.release, 'node:os release'),
+    architecture: requiredText(osMetadata.architecture, 'node:os architecture')
+  };
+
+  return {
+    device: {
+      manufacturer: null,
+      model: machineModel,
+      os: os.version,
+      osVersion: os.release,
+      architecture: os.architecture,
+      isVirtual: false,
+      evidence: {
+        host: {
+          source: 'macos-system_profiler/SPHardwareDataType',
+          raw: {machine_name: machineName, machine_model: machineModel, chip_type: chipType}
+        },
+        os: {source: 'node:os', raw: os}
+      }
+    }
+  };
+}
+
+export function collectHardwareEvidence(): HardwareEvidence {
+  if (process.platform === 'win32') return collectWindowsHardwareEvidence();
+  if (process.platform === 'darwin') return collectMacHardwareEvidence();
+  throw new Error(`Release hardware evidence is not supported on ${process.platform}.`);
+}
+
+function collectWindowsHardwareEvidence(): HardwareEvidence {
   const output = execFileSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', WMI_QUERY], {
     encoding: 'utf8',
     maxBuffer: 1024 * 1024,
     windowsHide: true
   }).replace(/^\uFEFF/u, '');
   return parseWmiHardwareEvidence(JSON.parse(output) as unknown);
+}
+
+function collectMacHardwareEvidence(): HardwareEvidence {
+  const output = execFileSync('system_profiler', ['-json', 'SPHardwareDataType'], {
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024
+  }).replace(/^\uFEFF/u, '');
+  return parseMacHardwareEvidence(JSON.parse(output) as unknown);
 }
 
 function toInferenceOutput(inference: ObservedInference) {
@@ -303,7 +363,7 @@ function requiredText(value: unknown, description: string): string {
 }
 
 function looksVirtual(value: string): boolean {
-  return /virtual machine|vmware|virtualbox|qemu|\bkvm\b|\bxen\b|hyper-v|parallels|bhyve|microsoft basic render driver|microsoft remote display adapter|virtio/iu.test(
+  return /virtual machine|virtualmac|vmware|virtualbox|qemu|\bkvm\b|\bxen\b|hyper-v|parallels|apple virtualization|bhyve|microsoft basic render driver|microsoft remote display adapter|virtio/iu.test(
     value
   );
 }

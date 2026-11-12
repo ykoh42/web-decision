@@ -41,8 +41,13 @@ class TvmBuildEvidenceTests(unittest.TestCase):
             wasm_bytes = b"compiled wasm"
             wasm.write_bytes(wasm_bytes)
 
-            environment = {"python": {"version": "3.11.11"}, "host": {"build": "test-build"}}
-            with patch.object(build_evidence, "collect_build_environment", return_value=environment):
+            environment = {
+                "python": {"version": "3.11.11"},
+                "host": {"build": "test-build"},
+            }
+            with patch.object(
+                build_evidence, "collect_build_environment", return_value=environment
+            ):
                 report = add_tvm_build_evidence(
                     {"mode": "checkpoint_full"},
                     model_id="kanana-2-v-decide-3b-2611",

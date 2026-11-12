@@ -30,10 +30,23 @@ type BuildReport = JsonObject & {
   expectedCheckpointSha256?: unknown;
   mode?: unknown;
   checkpointLoaded?: unknown;
+  fullWidthDimensionsUnchanged?: unknown;
+  onlyLayerCountReduced?: unknown;
   weightSource?: unknown;
   onnxImportOrExportUsed?: unknown;
   versions?: unknown;
   parameterCount?: unknown;
+  sourceParameterDtype?: unknown;
+  runtimeParameterDtype?: unknown;
+  computeDtype?: unknown;
+  float32ComputeModules?: unknown;
+  effectiveTextConfig?: unknown;
+  onlineAttentionGraphRewrite?: unknown;
+  webgpuAttentionLowering?: unknown;
+  relaxCpuRun?: unknown;
+  relaxWebgpuBuild?: unknown;
+  relaxWebgpuWasmExport?: unknown;
+  sequenceCases?: unknown;
   maxPatchCount?: unknown;
 };
 type BuildManifest = JsonObject & {
@@ -92,6 +105,52 @@ function requireCondition(condition: unknown, message: string): asserts conditio
   if (!condition) throw new Error(message);
 }
 
+function isRecord(value: unknown): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function verifyCpuSequenceCases(report: BuildReport): void {
+  requireCondition(report.relaxCpuRun === 'passed', 'Kanana text graph CPU Relax run must pass.');
+  requireCondition(report.relaxWebgpuBuild === 'passed', 'Kanana text graph WebGPU Relax build must pass.');
+  requireCondition(report.relaxWebgpuWasmExport === 'passed', 'Kanana text graph WebGPU WASM export must pass.');
+
+  const sequenceCases = report.sequenceCases;
+  requireCondition(
+    Array.isArray(sequenceCases) && sequenceCases.length === 3,
+    'Kanana text report must contain the three required CPU sequence parity cases.'
+  );
+  const requiredCases = [
+    {name: 'no-images', sequenceLength: 1, imageTokens: 0},
+    {name: 'no-images', sequenceLength: 8, imageTokens: 0},
+    {name: 'two-image-tokens', sequenceLength: 8, imageTokens: 2}
+  ];
+  for (const expected of requiredCases) {
+    const matchingCases = (sequenceCases as unknown[]).filter(
+      (value): value is JsonObject =>
+        isRecord(value) &&
+        value.name === expected.name &&
+        value.sequenceLength === expected.sequenceLength &&
+        value.imageTokens === expected.imageTokens
+    );
+    requireCondition(
+      matchingCases.length === 1,
+      `Kanana CPU report must contain exactly one ${expected.name} sequence-length-${expected.sequenceLength} case.`
+    );
+    const parityCase = matchingCases[0];
+    if (!parityCase) throw new Error('Kanana CPU parity case disappeared after validation.');
+    const maxAbsDelta = parityCase.maxAbsDelta;
+    const rmse = parityCase.rmse;
+    requireCondition(
+      typeof maxAbsDelta === 'number' && Number.isFinite(maxAbsDelta) && maxAbsDelta < 0.03,
+      `Kanana ${expected.name} sequence-length-${expected.sequenceLength} max absolute error must be finite and below 0.03.`
+    );
+    requireCondition(
+      typeof rmse === 'number' && Number.isFinite(rmse) && rmse < 0.005,
+      `Kanana ${expected.name} sequence-length-${expected.sequenceLength} RMSE must be finite and below 0.005.`
+    );
+  }
+}
+
 function verifyBuildReports(
   textReport: BuildReport,
   visionReport: BuildReport,
@@ -118,8 +177,55 @@ function verifyBuildReports(
     'Kanana text graph must use the full pinned checkpoint.'
   );
   requireCondition(
+    textReport.fullWidthDimensionsUnchanged === true && textReport.onlyLayerCountReduced === false,
+    'Kanana text graph must preserve all pinned model dimensions and layers.'
+  );
+  requireCondition(
     textReport.weightSource === 'pinned-safetensors' && textReport.onnxImportOrExportUsed === false,
     'Kanana text graph must load pinned Safetensors weights through native TVM.'
+  );
+  requireCondition(
+    textReport.dynamicSequence === true && textReport.exportedSequenceLengthUpperBound === null,
+    'Kanana text graph must preserve runtime sequence length without exporting a max-length allocation bound.'
+  );
+  requireCondition(
+    textReport.sourceParameterDtype === 'bfloat16' && textReport.runtimeParameterDtype === 'float16',
+    'Kanana text graph must store the pinned BF16 parameters as float16.'
+  );
+  requireCondition(textReport.computeDtype === 'float32', 'Kanana text graph compute dtype must be float32.');
+  const effectiveTextConfig = textReport.effectiveTextConfig;
+  requireCondition(
+    isRecord(effectiveTextConfig) && effectiveTextConfig.attentionImplementation === 'web_decision_online',
+    'Kanana text graph must use the verified model-specific online attention path.'
+  );
+  const attentionRewrite = textReport.onlineAttentionGraphRewrite;
+  requireCondition(
+    isRecord(attentionRewrite) &&
+      attentionRewrite.attentionOps === 32 &&
+      attentionRewrite.defaultAttentionDecompositionRemoved === true,
+    'Kanana text graph must replace all 32 attention operators before TVM Relax import.'
+  );
+  const attentionLowering = textReport.webgpuAttentionLowering;
+  requireCondition(
+    isRecord(attentionLowering) &&
+      attentionLowering.function === 'kanana_online_attention' &&
+      attentionLowering.algorithm === 'tiled_online_softmax' &&
+      attentionLowering.sequenceDimension === 'dynamic' &&
+      attentionLowering.queryTile === 16 &&
+      attentionLowering.keyTile === 16 &&
+      attentionLowering.threadsPerBlock === 128 &&
+      attentionLowering.causalKeyLimit === 'query_tile_end' &&
+      attentionLowering.intermediateScoreMatrix === false &&
+      attentionLowering.loweredAttentionOps === 32,
+    'Kanana WebGPU graph must lower all 32 attention operators without a sequence-square score matrix.'
+  );
+  verifyCpuSequenceCases(textReport);
+  const float32ComputeModules = textReport.float32ComputeModules;
+  requireCondition(
+    isRecord(float32ComputeModules) &&
+      float32ComputeModules.linearLayers === 224 &&
+      float32ComputeModules.rmsNormLayers === 129,
+    'Kanana text graph must report float32 compute for all 224 Linear and 129 RMSNorm modules.'
   );
   requireCondition(textManifest.modelId === KANANA_REPOSITORY, 'Kanana text graph manifest has the wrong model.');
   requireCondition(
@@ -129,6 +235,12 @@ function verifyBuildReports(
   requireCondition(
     Array.isArray(textManifest.weights) && textManifest.weights.length === 354,
     'Kanana text graph must have all 354 graph weights.'
+  );
+  requireCondition(
+    (textManifest.weights as unknown[]).every(
+      (weight) => isRecord(weight) && weight.dtype === 'float16' && weight.sourceDtype === 'bfloat16'
+    ),
+    'Kanana text graph weights must be float16 values converted from pinned BF16 source weights.'
   );
   requireCondition(
     Array.isArray(visionManifest.weights) && visionManifest.weights.length === 333,
@@ -207,7 +319,24 @@ function packageManifest(files: ArtifactFile[], textReport: BuildReport, visionR
     },
     runtime: {
       tvm: tvmVersion,
-      textGraph: {mode: textReport.mode, weights: textReport.parameterCount, graphWeights: 354},
+      textGraph: {
+        mode: textReport.mode,
+        weights: textReport.parameterCount,
+        graphWeights: 354,
+        parameterDtype: textReport.runtimeParameterDtype,
+        computeDtype: 'float32',
+        attention: {
+          implementation: 'web_decision_online',
+          lowering: 'kanana_online_attention',
+          algorithm: 'tiled_online_softmax',
+          sequenceDimension: 'dynamic',
+          queryTile: 16,
+          keyTile: 16,
+          threadsPerBlock: 128,
+          causalKeyLimit: 'query_tile_end',
+          intermediateScoreMatrix: false
+        }
+      },
       visionGraph: {graphWeights: 333, maxPatchCount: visionReport.maxPatchCount}
     },
     files: Object.fromEntries(files.map(({name, bytes, sha256}) => [name, {bytes: bytes.byteLength, sha256}]))

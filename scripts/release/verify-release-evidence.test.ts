@@ -27,6 +27,7 @@ import {
 } from './verify-release-evidence.ts';
 import {
   validateKananaEvidencePolicy,
+  validateKananaMaximumContextPlaywrightReport,
   validateKananaManifestBytes,
   validateKananaPlaywrightReport,
   verifyKananaTvmBuildEvidence,
@@ -458,6 +459,8 @@ async function makeKananaVerificationContext(): Promise<KananaVerificationContex
   };
   const fixtureBytes = await readFile(join(WORKSPACE_ROOT, policy.referenceFixture.path));
   assert.equal(sha256(fixtureBytes), policy.referenceFixture.sha256);
+  const imageFixtureBytes = await readFile(join(WORKSPACE_ROOT, policy.imageReferenceFixture.path));
+  assert.equal(sha256(imageFixtureBytes), policy.imageReferenceFixture.sha256);
   const archive = {
     archivePath: join(tmpdir(), 'pinned-web-decision-0.4.0.tgz'),
     archiveSha256: policy.archive.sha256,
@@ -476,6 +479,7 @@ async function makeKananaVerificationContext(): Promise<KananaVerificationContex
     manifest,
     policy,
     referenceFixture: JSON.parse(fixtureBytes.toString('utf8')),
+    imageReferenceFixture: JSON.parse(imageFixtureBytes.toString('utf8')),
     workspaceRoot: WORKSPACE_ROOT
   };
 }
@@ -516,7 +520,13 @@ async function makeKananaBuildFixture() {
       graph: item.graph,
       buildBackend: 'native-tvm',
       weightSource: 'pinned-safetensors',
-      onnxImportOrExportUsed: false
+      onnxImportOrExportUsed: false,
+      buildEnvironment: {
+        nativeTvm: {
+          pythonPackage: {version: '0.27.0'},
+          source: {revision: '7b5acb32bd271342a24130f4ef439ff6c2e52c6c', patches: []}
+        }
+      }
     };
     await mkdir(dirname(packageArtifact), {recursive: true});
     await mkdir(artifactBuildRoot, {recursive: true});
@@ -556,6 +566,11 @@ async function makeKananaBuildFixture() {
         repository: 'kakaocorp/kanana-2-v-decide-3b-2611',
         revision: '12820d654ed9789a0f7f48daeee1703c3483c464',
         checkpointSha256: 'a'.repeat(64)
+      },
+      tvmSource: {
+        repository: 'https://github.com/apache/tvm.git',
+        revision: '7b5acb32bd271342a24130f4ef439ff6c2e52c6c',
+        patches: []
       }
     },
     manifest: {
@@ -594,13 +609,14 @@ function makeKananaEvidenceRecord(
   kind: keyof KananaVerificationContext['policy']['tests']
 ): AnyRecord {
   const {archive, manifest, policy} = context;
-  const imageProbabilities = {rectangle: 0.9, circle: 0.1};
+  const imageReference = context.imageReferenceFixture.result;
+  const imageProbabilities = structuredClone(imageReference.probabilities);
   const inference =
     kind === 'image'
       ? {
           ...kananaResult(context),
-          answer: 'rectangle',
-          confidence: imageProbabilities.rectangle - imageProbabilities.circle,
+          answer: imageReference.answer,
+          confidence: imageReference.confidence,
           probabilities: imageProbabilities,
           probabilityEntries: Object.entries(imageProbabilities)
         }
@@ -650,7 +666,10 @@ function makeKananaEvidenceRecord(
       ? {referenceFixtureSha256: policy.referenceFixture.sha256, probabilityTolerance: policy.textProbabilityTolerance}
       : {}),
     ...(kind === 'image'
-      ? {input: {kind: 'synthetic-canvas-v1', width: 256, height: 256, sha256: '5'.repeat(64)}}
+      ? {
+          referenceFixtureSha256: policy.imageReferenceFixture.sha256,
+          input: {kind: 'pinned-png-v1', ...context.imageReferenceFixture.input}
+        }
       : {}),
     ...(kind === 'offline'
       ? {
@@ -691,6 +710,62 @@ function makeKananaPlaywrightReport(context: KananaVerificationContext): AnyReco
     errors: [],
     stats: {expected: specs.length, skipped: 0, unexpected: 0, flaky: 0},
     suites: [{title: 'Kanana exact package release evidence', specs}]
+  };
+}
+
+function makeKananaMaximumContextPlaywrightReport(context: KananaVerificationContext): AnyRecord {
+  const {file, title, maxTokens} = context.policy.maximumContext;
+  const result = {
+    modelId: context.policy.model.modelId,
+    backend: 'tvm-webgpu',
+    modelMaxLength: maxTokens,
+    answer: 'first',
+    probabilities: {first: 0.6, second: 0.4},
+    usage: {input_tokens: maxTokens + 32},
+    inputTruncation: {truncated: true, maxLength: maxTokens, queryQuestionIds: ['max_context'], candidateDocuments: []},
+    isFallback: false,
+    bufferUsage: {peakLiveBufferBytes: 11_000_000_000},
+    deviceLimits: {maxBufferSize: 4_294_967_292, maxStorageBufferBindingSize: 4_294_967_292}
+  };
+  const stdout = [
+    `KANANA_MAX_CONTEXT_PACKAGE ${JSON.stringify({
+      archiveSha256: context.archive.archiveSha256,
+      packageTreeSha256: context.archive.packageTreeSha256,
+      bundleSha256: context.archive.bundleSha256
+    })}\n`,
+    `KANANA_BROWSER_LOG KANANA_MAX_CONTEXT_ADAPTER ${JSON.stringify({
+      isFallback: false,
+      ...context.policy.gpu.requiredLimits
+    })}\n`,
+    `KANANA_MAX_CONTEXT_REAL_GPU ${JSON.stringify({
+      browserName: context.policy.browser.name,
+      version: '157.0.8103.52',
+      result
+    })}\n`
+  ];
+  return {
+    config: {rootDir: context.workspaceRoot},
+    errors: [],
+    stats: {expected: 1, skipped: 0, unexpected: 0, flaky: 0},
+    suites: [
+      {
+        file,
+        specs: [
+          {
+            file,
+            title,
+            tests: [
+              {
+                expectedStatus: 'passed',
+                status: 'expected',
+                projectName: context.policy.browser.project,
+                results: [{status: 'passed', errors: [], stdout}]
+              }
+            ]
+          }
+        ]
+      }
+    ]
   };
 }
 
@@ -755,18 +830,18 @@ test('rejects policy edits that drop browser requirements or leave the matrix em
 
 test('pins the exact Kanana npm archive, static manifest, and TVM artifact set', async (t) => {
   const policy = validateKananaEvidencePolicy(POLICY.kanana);
-  assert.equal(policy.archive.sha256, 'bdabd252712d4e600b1222cad6886716ab68266822c7125fb673d2d2f85a06c8');
+  assert.equal(policy.archive.sha256, 'bd4333dd930b414f9753aafd7396f94d0d0b4a2581d6cd58cdfae40940874227');
   assert.equal(policy.archive.packageVersion, '0.4.0');
   const context = await makeKananaVerificationContext();
   assert.equal(context.manifest.manifestSha256, policy.model.manifestSha256);
   assert.deepEqual(context.manifest.files, policy.model.artifactFiles);
   assert.equal(
     context.manifest.files['kanana-text-model.wasm']?.sha256,
-    'f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09'
+    '2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799'
   );
   assert.equal(
     context.manifest.files['kanana-vision-model.wasm']?.sha256,
-    '6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6'
+    '2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d'
   );
 
   const invalidManifest = Buffer.concat([
@@ -815,6 +890,40 @@ test('requires independent native TVM rebuild reports for both Kanana WASM artif
   await assert.rejects(
     verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
     /onnxImportOrExportUsed differs/u
+  );
+  await writeFile(visionReportPath, JSON.stringify(visionReport));
+
+  await writeFile(
+    visionReportPath,
+    JSON.stringify({
+      ...visionReport,
+      buildEnvironment: {
+        nativeTvm: {
+          pythonPackage: {version: '0.27.0'},
+          source: {revision: '0'.repeat(40), patches: []}
+        }
+      }
+    })
+  );
+  await assert.rejects(
+    verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
+    /source revision differs/u
+  );
+  await writeFile(
+    visionReportPath,
+    JSON.stringify({
+      ...visionReport,
+      buildEnvironment: {
+        nativeTvm: {
+          pythonPackage: {version: '0.27.0'},
+          source: {revision: '7b5acb32bd271342a24130f4ef439ff6c2e52c6c', patches: ['local-patch.diff']}
+        }
+      }
+    })
+  );
+  await assert.rejects(
+    verifyKananaTvmBuildEvidence(fixture.evidencePath, fixture.inputs, fixture.sourceRoot),
+    /local source patches/u
   );
   await writeFile(visionReportPath, JSON.stringify(visionReport));
 
@@ -908,6 +1017,32 @@ test('requires text, image, and cached-offline Kanana WebGPU evidence bound to t
     record.inference.offline.probabilities.late = 0.5;
   });
   assert.throws(() => validateKananaPlaywrightReport(offlineOutputMismatch, context));
+});
+
+test('requires the exact-package maximum-context boundary report', async () => {
+  const context = await makeKananaVerificationContext();
+  const valid = makeKananaMaximumContextPlaywrightReport(context);
+  assert.deepEqual(validateKananaMaximumContextPlaywrightReport(valid, context), {
+    caseCount: 1,
+    maxTokens: 20_480,
+    browser: 'chromium',
+    modelId: context.policy.model.modelId
+  });
+
+  const wrongArchive = structuredClone(valid);
+  wrongArchive.suites[0].specs[0].tests[0].results[0].stdout[0] = `KANANA_MAX_CONTEXT_PACKAGE ${JSON.stringify({archiveSha256: '0'.repeat(64)})}\n`;
+  assert.throws(() => validateKananaMaximumContextPlaywrightReport(wrongArchive, context));
+
+  const noTruncation = structuredClone(valid);
+  const stdout = noTruncation.suites[0].specs[0].tests[0].results[0].stdout[2];
+  const record = JSON.parse(stdout.slice('KANANA_MAX_CONTEXT_REAL_GPU '.length));
+  record.result.inputTruncation.truncated = false;
+  noTruncation.suites[0].specs[0].tests[0].results[0].stdout[2] = `KANANA_MAX_CONTEXT_REAL_GPU ${JSON.stringify(record)}\n`;
+  assert.throws(() => validateKananaMaximumContextPlaywrightReport(noTruncation, context));
+
+  const browserError = structuredClone(valid);
+  browserError.suites[0].specs[0].tests[0].results[0].stdout.push('KANANA_BROWSER_ERROR unexpected WebGPU error\n');
+  assert.throws(() => validateKananaMaximumContextPlaywrightReport(browserError, context), /logged a browser error/u);
 });
 
 test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () => {

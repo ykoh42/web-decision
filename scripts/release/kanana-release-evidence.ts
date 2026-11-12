@@ -21,7 +21,9 @@ export interface KananaEvidencePolicy {
     manifestSha256: string;
     artifactFiles: Record<string, AssetMetadata>;
   };
+  tvmSource: {repository: string; revision: string; patches: string[]};
   referenceFixture: {path: string; sha256: string};
+  imageReferenceFixture: {path: string; sha256: string};
   textProbabilityTolerance: number;
   browser: {name: string; project: string};
   gpu: {api: 'webgpu'; requiredLimits: Record<string, number>};
@@ -29,11 +31,14 @@ export interface KananaEvidencePolicy {
     'text' | 'image' | 'offline',
     {
       file: string;
+      sourceSha256: string;
       title: string;
       kind: 'text-choice' | 'synthetic-image-choice' | 'cached-offline-text-choice';
       runtimeArtifacts: string[];
     }
   >;
+  testSupportSources: Record<string, string>;
+  maximumContext: {file: string; sourceSha256: string; title: string; maxTokens: number};
 }
 
 export interface KananaManifestEvidence {
@@ -58,11 +63,20 @@ interface KananaReferenceFixture extends AnyRecord {
   result: {answers: Record<string, {choice: string; confidence: number; probabilities: Record<string, number>}>};
 }
 
+interface KananaImageReferenceFixture extends AnyRecord {
+  modelId: string;
+  revision: string;
+  checkpointSha256: string;
+  input: {path: string; bytes: number; sha256: string; width: number; height: number};
+  result: {answer: string; probabilities: Record<string, number>; confidence: number};
+}
+
 export interface KananaVerificationContext {
   archive: ArchiveInfo;
   manifest: KananaManifestEvidence;
   policy: KananaEvidencePolicy;
   referenceFixture: KananaReferenceFixture;
+  imageReferenceFixture: KananaImageReferenceFixture;
   workspaceRoot: string;
 }
 
@@ -104,6 +118,7 @@ export async function verifyKananaTvmBuildEvidence(
     modelId: inputs.policy.model.modelId,
     manifestFiles: inputs.manifest.files,
     tvmVersion,
+    tvmSourceRevision: inputs.policy.tvmSource.revision,
     sourceArtifacts,
     reportRequirements
   };
@@ -162,6 +177,33 @@ function artifactFiles(input: unknown): Record<string, AssetMetadata> {
   return files;
 }
 
+function testSourcePins(input: unknown): Record<string, string> {
+  fail(
+    input !== null && typeof input === 'object' && !Array.isArray(input),
+    'Kanana test support source pins are required.'
+  );
+  const result: Record<string, string> = {};
+  for (const [path, digest] of Object.entries(input)) {
+    const safePath = normalizedPath(path, 'Kanana test support source');
+    fail(safePath.startsWith('tests/browser/'), 'Kanana test support source must be under tests/browser/.');
+    fail(SHA256_PATTERN.test(String(digest)), `Invalid Kanana test support source SHA-256: ${path}.`);
+    result[safePath] = String(digest);
+  }
+  fail(Object.keys(result).length > 0, 'Kanana test support source pins must not be empty.');
+  return result;
+}
+
+function validateTvmSourcePolicy(input: unknown): KananaEvidencePolicy['tvmSource'] {
+  const tvmSource = input as AnyRecord;
+  fail(tvmSource?.repository === 'https://github.com/apache/tvm.git', 'Kanana upstream TVM repository pin is invalid.');
+  fail(
+    typeof tvmSource.revision === 'string' && /^[a-f0-9]{40}$/u.test(tvmSource.revision),
+    'Kanana upstream TVM revision pin is invalid.'
+  );
+  fail(Array.isArray(tvmSource.patches) && tvmSource.patches.length === 0, 'Kanana TVM source must remain unpatched.');
+  return {repository: tvmSource.repository, revision: tvmSource.revision, patches: tvmSource.patches};
+}
+
 export function validateKananaEvidencePolicy(input: unknown): KananaEvidencePolicy {
   fail(input !== null && typeof input === 'object' && !Array.isArray(input), 'Kanana evidence policy is required.');
   const policy = input as AnyRecord;
@@ -191,6 +233,15 @@ export function validateKananaEvidencePolicy(input: unknown): KananaEvidencePoli
     sha256: fixture?.sha256
   };
   fail(SHA256_PATTERN.test(referenceFixture.sha256), 'Kanana reference fixture SHA-256 pin is invalid.');
+
+  const imageFixture = policy.imageReferenceFixture as AnyRecord;
+  const imageReferenceFixture = {
+    path: normalizedPath(imageFixture?.path, 'Kanana image reference fixture path'),
+    sha256: imageFixture?.sha256
+  };
+  fail(SHA256_PATTERN.test(imageReferenceFixture.sha256), 'Kanana image reference fixture SHA-256 pin is invalid.');
+
+  const tvmSource = validateTvmSourcePolicy(policy.tvmSource);
   fail(
     typeof policy.textProbabilityTolerance === 'number' &&
       Number.isFinite(policy.textProbabilityTolerance) &&
@@ -222,6 +273,7 @@ export function validateKananaEvidencePolicy(input: unknown): KananaEvidencePoli
     const item = (policy.tests as AnyRecord)?.[key] as AnyRecord;
     const file = normalizedPath(item?.file, `Kanana ${key} test file`);
     fail(file.startsWith('tests/browser/'), `Kanana ${key} test must be under tests/browser/.`);
+    fail(SHA256_PATTERN.test(item?.sourceSha256), `Kanana ${key} test source SHA-256 pin is invalid.`);
     fail(typeof item?.title === 'string' && item.title.length > 0, `Kanana ${key} test title is required.`);
     assert.equal(item.kind, definitions[key].kind, `Kanana ${key} evidence kind is invalid.`);
     const runtimeArtifacts = item.runtimeArtifacts;
@@ -236,8 +288,30 @@ export function validateKananaEvidencePolicy(input: unknown): KananaEvidencePoli
       paths.every((path) => Object.hasOwn(pinnedFiles, path)),
       `Kanana ${key} test refers to an unpinned artifact.`
     );
-    tests[key] = {file, title: item.title, kind: definitions[key].kind, runtimeArtifacts: paths};
+    tests[key] = {
+      file,
+      sourceSha256: item.sourceSha256,
+      title: item.title,
+      kind: definitions[key].kind,
+      runtimeArtifacts: paths
+    };
   }
+
+  const contextTest = policy.maximumContext as AnyRecord;
+  const maximumContext = {
+    file: normalizedPath(contextTest?.file, 'Kanana maximum-context test file'),
+    sourceSha256: contextTest?.sourceSha256,
+    title: contextTest?.title,
+    maxTokens: contextTest?.maxTokens
+  };
+  fail(maximumContext.file.startsWith('tests/browser/'), 'Kanana maximum-context test must be under tests/browser/.');
+  fail(SHA256_PATTERN.test(maximumContext.sourceSha256), 'Kanana maximum-context test source SHA-256 pin is invalid.');
+  fail(
+    typeof maximumContext.title === 'string' && maximumContext.title.length > 0,
+    'Kanana maximum-context test title is required.'
+  );
+  fail(maximumContext.maxTokens === 20_480, 'Kanana maximum-context token boundary must match the model pin.');
+  const supportingTests = testSourcePins(policy.testSupportSources);
 
   return {
     schemaVersion: 1,
@@ -253,11 +327,15 @@ export function validateKananaEvidencePolicy(input: unknown): KananaEvidencePoli
       manifestSha256: model.manifestSha256,
       artifactFiles: pinnedFiles
     },
+    tvmSource: {repository: tvmSource.repository, revision: tvmSource.revision, patches: tvmSource.patches},
     referenceFixture,
+    imageReferenceFixture,
     textProbabilityTolerance: policy.textProbabilityTolerance,
     browser: {name: browser.name, project: browser.project},
     gpu: {api: 'webgpu', requiredLimits},
-    tests
+    tests,
+    testSupportSources: supportingTests,
+    maximumContext
   };
 }
 
@@ -457,14 +535,27 @@ function validateKananaTextResult(output: AnyRecord, context: KananaVerification
 
 function validateKananaImageResult(output: AnyRecord, context: KananaVerificationContext): void {
   validateKananaResultIdentity(output, context, 'Image');
-  assert.equal(output.answer, 'rectangle', 'Kanana synthetic-image choice differs from the expected result.');
+  const expected = context.imageReferenceFixture.result;
+  assert.equal(output.answer, expected.answer, 'Kanana synthetic-image choice differs from the pinned reference.');
   const probabilities = output.probabilities as Record<string, number>;
-  assert.deepEqual(Object.keys(probabilities ?? {}), ['rectangle', 'circle'], 'Kanana image option order mismatch.');
-  const rectangle = probabilities.rectangle;
-  const circle = probabilities.circle;
-  fail(typeof rectangle === 'number' && Number.isFinite(rectangle), 'Kanana rectangle probability is invalid.');
-  fail(typeof circle === 'number' && Number.isFinite(circle), 'Kanana circle probability is invalid.');
-  fail(Math.abs(rectangle + circle - 1) <= 1e-6, 'Kanana image probabilities are not normalized.');
+  const expectedProbabilities = expected.probabilities;
+  assert.deepEqual(
+    Object.keys(probabilities ?? {}),
+    Object.keys(expectedProbabilities),
+    'Kanana image option order mismatch.'
+  );
+  for (const [key, expectedProbability] of Object.entries(expectedProbabilities)) {
+    const actual = probabilities[key];
+    fail(typeof actual === 'number' && Number.isFinite(actual), `Kanana image probability ${key} is invalid.`);
+    fail(
+      Math.abs(actual - expectedProbability) <= context.policy.textProbabilityTolerance,
+      `Kanana image probability ${key} differs from the pinned reference.`
+    );
+  }
+  const selected = probabilities[output.answer];
+  fail(typeof selected === 'number' && Number.isFinite(selected), 'Kanana selected probability is invalid.');
+  const probabilitySum = Object.values(probabilities).reduce((sum, probability) => sum + probability, 0);
+  fail(Math.abs(probabilitySum - 1) <= 1e-6, 'Kanana image probabilities are not normalized.');
   fail(Array.isArray(output.probabilityEntries), 'Kanana image probabilities have no ordered entries.');
   assert.deepEqual(
     output.probabilityEntries.map((entry: unknown[]) => entry[0]),
@@ -472,8 +563,6 @@ function validateKananaImageResult(output: AnyRecord, context: KananaVerificatio
     'Kanana image probability order differs from its option order.'
   );
   fail(Number.isFinite(output.confidence), 'Kanana image confidence is invalid.');
-  const selected = probabilities[output.answer];
-  fail(typeof selected === 'number' && Number.isFinite(selected), 'Kanana selected probability is invalid.');
   const others: number[] = Object.entries(probabilities)
     .filter(([key]) => key !== output.answer)
     .map(([, probability]) => probability);
@@ -483,6 +572,10 @@ function validateKananaImageResult(output: AnyRecord, context: KananaVerificatio
   fail(
     Math.abs(output.confidence - expectedConfidence) <= 1e-6,
     'Kanana image confidence differs from the selected-option margin.'
+  );
+  fail(
+    Math.abs(output.confidence - expected.confidence) <= context.policy.textProbabilityTolerance,
+    'Kanana image confidence differs from the pinned reference.'
   );
 }
 
@@ -507,10 +600,17 @@ function validateKananaRecord(
     return;
   }
   if (kind === 'image') {
-    assert.equal(record.input?.kind, 'synthetic-canvas-v1', 'Kanana image evidence must use the synthetic fixture.');
-    assert.equal(record.input?.width, 256, 'Kanana synthetic image width mismatch.');
-    assert.equal(record.input?.height, 256, 'Kanana synthetic image height mismatch.');
-    fail(SHA256_PATTERN.test(record.input?.sha256), 'Kanana synthetic image digest is missing.');
+    const expectedInput = context.imageReferenceFixture.input;
+    assert.equal(record.referenceFixtureSha256, context.policy.imageReferenceFixture.sha256);
+    assert.equal(record.input?.kind, 'pinned-png-v1', 'Kanana image evidence must use the pinned PNG fixture.');
+    assert.equal(record.input?.bytes, expectedInput.bytes, 'Kanana synthetic image byte length mismatch.');
+    assert.equal(record.input?.width, expectedInput.width, 'Kanana synthetic image width mismatch.');
+    assert.equal(record.input?.height, expectedInput.height, 'Kanana synthetic image height mismatch.');
+    assert.equal(
+      record.input?.sha256,
+      expectedInput.sha256,
+      'Kanana synthetic image digest differs from its reference.'
+    );
     validateKananaImageResult(record.inference, context);
     return;
   }
@@ -585,4 +685,113 @@ export function validateKananaPlaywrightReport(
     assert.ok(observed.has(kind), `Missing Kanana ${kind} release evidence.`);
   }
   return {caseCount: observed.size, browser: context.policy.browser.name, modelId: context.policy.model.modelId};
+}
+
+function prefixedJson(output: string, prefix: string): AnyRecord {
+  const records = output.split(/\r?\n/u).filter((line) => line.startsWith(prefix));
+  assert.equal(records.length, 1, `Kanana maximum-context report must emit one ${prefix.trim()} record.`);
+  const record = JSON.parse(records[0]!.slice(prefix.length)) as unknown;
+  fail(record !== null && typeof record === 'object' && !Array.isArray(record), 'Invalid maximum-context record.');
+  return record as AnyRecord;
+}
+
+function playwrightOutput(result: AnyRecord): string {
+  return (result.stdout ?? [])
+    .map((item: unknown) => (typeof item === 'string' ? item : ((item as AnyRecord)?.text ?? '')))
+    .join('');
+}
+
+function validateMaximumContextResult(result: AnyRecord, context: KananaVerificationContext): void {
+  const {maxTokens} = context.policy.maximumContext;
+  assert.equal(result.modelId, context.policy.model.modelId);
+  assert.equal(result.backend, 'tvm-webgpu');
+  assert.equal(result.modelMaxLength, maxTokens);
+  assert.equal(result.isFallback, false);
+  assert.equal(result.inputTruncation?.truncated, true);
+  assert.equal(result.inputTruncation?.maxLength, maxTokens);
+  assert.deepEqual(result.inputTruncation?.queryQuestionIds, ['max_context']);
+  assert.deepEqual(result.inputTruncation?.candidateDocuments, []);
+  fail(
+    Number.isSafeInteger(result.usage?.input_tokens) && result.usage.input_tokens > maxTokens,
+    'Boundary test did not exceed maxTokens.'
+  );
+  const probabilities = result.probabilities as Record<string, number>;
+  assert.deepEqual(Object.keys(probabilities ?? {}), ['first', 'second']);
+  fail(
+    Object.values(probabilities).every((value) => Number.isFinite(value) && value >= 0 && value <= 1),
+    'Maximum-context probabilities are invalid.'
+  );
+  const sum = Object.values(probabilities).reduce((total, value) => total + value, 0);
+  fail(Math.abs(sum - 1) <= 1e-6, 'Maximum-context probabilities are not normalized.');
+  const deviceLimits = result.deviceLimits as AnyRecord;
+  for (const name of ['maxBufferSize', 'maxStorageBufferBindingSize']) {
+    const minimum = context.policy.gpu.requiredLimits[name];
+    fail(
+      typeof minimum === 'number' && Number.isFinite(deviceLimits?.[name]) && deviceLimits[name] >= minimum,
+      `Maximum-context GPU does not meet ${name}.`
+    );
+  }
+  fail(
+    Number.isSafeInteger(result.bufferUsage?.peakLiveBufferBytes) && result.bufferUsage.peakLiveBufferBytes > 0,
+    'Maximum-context GPU buffer usage is missing.'
+  );
+}
+
+export function validateKananaMaximumContextPlaywrightReport(
+  report: AnyRecord,
+  context: KananaVerificationContext
+): {caseCount: 1; maxTokens: number; browser: string; modelId: string} {
+  const tests = collectPlaywrightTests(report.suites);
+  const reportRoot = report.config?.rootDir;
+  const requirement = context.policy.maximumContext;
+  fail(
+    typeof reportRoot === 'string' && isAbsolute(reportRoot),
+    'Kanana maximum-context report has no absolute test root.'
+  );
+  assert.equal(report.stats?.expected, 1, 'Kanana maximum-context report must include one test.');
+  assert.equal(report.stats?.skipped, 0, 'Skipped Kanana maximum-context test blocks release evidence.');
+  assert.equal(report.stats?.unexpected, 0, 'Failed Kanana maximum-context test blocks release evidence.');
+  assert.equal(report.stats?.flaky, 0, 'Flaky Kanana maximum-context test blocks release evidence.');
+  assert.deepEqual(report.errors ?? [], [], 'Kanana maximum-context report contains global errors.');
+  assert.equal(tests.length, 1, 'Kanana maximum-context report must contain one test.');
+
+  const [item] = tests;
+  fail(item !== undefined, 'Kanana maximum-context report has no test.');
+  assert.equal(resolve(reportRoot, item.file ?? ''), resolve(context.workspaceRoot, requirement.file));
+  assert.equal(item.title, requirement.title);
+  assert.equal(item.test.projectName, context.policy.browser.project);
+  const [execution] = item.test.results ?? [];
+  fail((item.test.results ?? []).length === 1 && execution !== undefined, 'Maximum-context test must run once.');
+  assert.equal(item.test.expectedStatus, 'passed');
+  assert.equal(item.test.status, 'expected');
+  assert.equal(execution.status, 'passed');
+  assert.deepEqual(execution.errors ?? [], [], 'Kanana maximum-context test contains errors.');
+
+  const output = playwrightOutput(execution);
+  assert.deepEqual(
+    output.split('\n').filter((line) => line.startsWith('KANANA_BROWSER_ERROR ')),
+    [],
+    'Kanana maximum-context test logged a browser error.'
+  );
+  const packaged = prefixedJson(output, 'KANANA_MAX_CONTEXT_PACKAGE ');
+  assert.equal(packaged.archiveSha256, context.archive.archiveSha256);
+  assert.equal(packaged.packageTreeSha256, context.archive.packageTreeSha256);
+  assert.equal(packaged.bundleSha256, context.archive.bundleSha256);
+  const inference = prefixedJson(output, 'KANANA_MAX_CONTEXT_REAL_GPU ');
+  assert.equal(inference.browserName, context.policy.browser.name);
+  fail(
+    typeof inference.version === 'string' && inference.version.length > 0,
+    'Maximum-context browser version is missing.'
+  );
+  validateMaximumContextResult(inference.result, context);
+  const adapter = prefixedJson(output, 'KANANA_BROWSER_LOG KANANA_MAX_CONTEXT_ADAPTER ');
+  assert.equal(adapter.isFallback, false, 'Maximum-context test did not use a hardware WebGPU adapter.');
+  validateLimits(adapter, context.policy.gpu.requiredLimits);
+
+  return {
+    caseCount: 1,
+    maxTokens: requirement.maxTokens,
+    browser: context.policy.browser.name,
+    modelId: context.policy.model.modelId
+  };
 }

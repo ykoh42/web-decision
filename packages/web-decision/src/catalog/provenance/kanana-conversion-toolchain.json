@@ -150,21 +150,23 @@
         "clangSha256": "538e37cd01bf3acf8239b62e57ac05823c95d6e15e6f3963c4de6df1a4f4ce5f",
         "wasmLdSha256": "78c27077265dca11635d5e3b53ed43f0b7640b9f7465ae629d3eb34aac78219d"
       }
-    }
+    },
+    "evidenceScriptSha256": "b14a11cdfe775ec2fb6811188b9d8231a9c04efcab432fe1b3e3b399e653a39a"
   },
   "observedBuilds": {
     "text": {
-      "reportSha256": "ca16b8d607357fa9d8cbdf72b1f4ef734184c811e13c9420f3d4ae6edf85bc62",
-      "wasmBytes": 4477518,
-      "wasmSha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+      "reportSha256": "9a2be1e2569e1c902cbbfe94cb0e48e0c77ab77a7b6bbd1545193b2bea742cf5",
+      "wasmBytes": 4208785,
+      "wasmSha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
     },
     "vision": {
-      "reportSha256": "58672bb84d2edcb92abee26c7a7a31ab3f8affd1d8f71edd45889735b8c750f4",
+      "reportSha256": "2999f0c0148b4f9c94f7f9643428d2fa3991b64d000fb7e0a3e7770df7bbfa5e",
       "wasmBytes": 4414887,
-      "wasmSha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+      "wasmSha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
     }
   },
   "rebuildVariance": {
+    "scope": "prior exports; hashes below do not describe the current package artifacts",
     "relaxModuleSha256": "8075a43be07cae054830bcd919787f59c612d4cf07fa0d15103f77c8cd83ed50",
     "observedWasmSha256": [
       {
@@ -184,9 +186,9 @@
         "sha256": "254a63b7bf00dbf6ddbe598ce8dd2840bf033c6af7c4b0fe1dcb53f6604908e5"
       }
     ],
-    "note": "Repeated exports produced different WASM bytes while the Relax module bytes matched. The selected 6ddac artifact is pinned by the package manifest and passed the real WebGPU cases recorded below."
+    "note": "Prior repeated exports produced different WASM bytes while the Relax module bytes matched. The final package WASM files match the independent direct-TVM build reports recorded above. Byte-for-byte rebuild reproducibility remains unestablished."
   },
-  "realWebGpuValidation": {
+  "previousVisionGraphWebGpuValidation": {
     "source": "tests/browser/kanana-vision-dynamic-real-webgpu.spec.ts",
     "browser": "158.0.8127.18",
     "model": "kakaocorp/kanana-2-v-decide-3b-2611",
@@ -227,7 +229,7 @@
       }
     ],
     "webgpuErrors": [],
-    "originalPackageArtifactSha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6",
-    "originalPackageAndSelectedBuildResultsEqual": true
+    "artifactSha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6",
+    "note": "Historical raw vision-graph validation for a previous artifact; it does not validate the current 2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d vision WASM."
   }
 }

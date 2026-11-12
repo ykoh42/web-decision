@@ -47,7 +47,6 @@ const openWeights = openSafetensorsWeightSource as unknown as ValidationWeightOp
 
 declare global {
   interface Window {
-    tvmjs?: TvmJs;
     __kananaVisionProgress?(event: Record<string, unknown>): void;
   }
 }
@@ -94,7 +93,7 @@ function compare(actual: Float32Array, expected: Float32Array) {
 }
 
 export async function runKananaDynamicVisionRealWebGpu(assetsBase: string) {
-  const tvmjs = window.tvmjs;
+  const tvmjs = (window as Window & {tvmjs?: TvmJs}).tvmjs;
   if (!tvmjs) throw new Error('Apache TVM JS runtime bundle is not loaded.');
   const base = new URL(assetsBase);
   if (!base.pathname.endsWith('/')) base.pathname += '/';

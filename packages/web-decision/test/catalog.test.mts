@@ -6,7 +6,6 @@ import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
-import {getModelRegistration} from '../src/model-registry.js';
 import {createModelArtifactLock, validateSpec} from '../scripts/build-model-catalog.mts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,17 +25,12 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
-  assert.deepEqual(MODEL_IDS, ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611']);
-  assert.equal(MODEL_CATALOG.length, 2);
-
-  const kev = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
-  assert.equal(kev, MODEL_CATALOG[0]);
-  assert.equal(kev.description.adapter, 'kev06');
-  assert.deepEqual(kev.description.backend.requiredFeatures, ['shader-f16']);
+test('catalog exposes Kanana through an ID-only TVM descriptor', () => {
+  assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611']);
+  assert.equal(MODEL_CATALOG.length, 1);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
-  assert.equal(kanana, MODEL_CATALOG[1]);
+  assert.equal(kanana, MODEL_CATALOG[0]);
   assert.equal(kanana.description.adapter, 'kanana');
   assert.equal(kanana.description.backend.name, 'tvm-webgpu');
   assert.equal(kanana.description.backend.requiredLimits.maxBufferSize, 656_670_720);
@@ -52,36 +46,11 @@ test('catalog exposes Kev and Kanana through ID-only TVM descriptors', () => {
       description: 'Pinned model-card maximum across images in state messages and the images field.'
     }
   ]);
-  assert.equal(kanana.description.verification.currentBundleGpu, 'verified');
-  for (const entry of [kev, kanana]) {
-    assert.equal(Object.hasOwn(entry, 'model'), false);
-    assert.equal(Object.hasOwn(entry.description, 'model'), false);
-    assert.equal(Object.hasOwn(entry.description.assets, 'assetsUrl'), false);
-    assert.equal(Object.hasOwn(entry.description.assets, 'manifestSha256'), true);
-  }
-});
-
-test('Kev catalog description retains its existing contract', () => {
-  const entry = MODEL_CATALOG_BY_ID['kev-0.6b-q4f16'];
-  const {adapter, ...description} = entry.description;
-  const legacy = getModelRegistration(entry.modelId).description;
-  const {model, ...expected} = structuredClone(legacy);
-  assert.equal(model, entry.modelId);
-  expected.verification.currentBundleGpu = 'not-revalidated';
-  expected.verification.priorEvidence = entry.description.verification.priorEvidence!;
-  expected.assets.requiredFiles = ['manifest.json', ...Object.keys(entry.artifacts.manifest.files)];
-
-  assert.equal(adapter, 'kev06');
-  assert.deepEqual(description, expected);
-  assert.deepEqual(
-    description.features.textChoice.limits.map(({resource, scope, min, max}) => ({resource, scope, min, max})),
-    [
-      {resource: 'tokens', scope: 'state', min: undefined, max: 8191},
-      {resource: 'tokens', scope: 'question', min: undefined, max: 8192},
-      {resource: 'options', scope: 'question', min: 1, max: 255},
-      {resource: 'questions', scope: 'request', min: 1, max: undefined}
-    ]
-  );
+  assert.equal(kanana.description.verification.currentBundleGpu, 'verified-m4-pro-chromium-157');
+  assert.equal(Object.hasOwn(kanana, 'model'), false);
+  assert.equal(Object.hasOwn(kanana.description, 'model'), false);
+  assert.equal(Object.hasOwn(kanana.description.assets, 'assetsUrl'), false);
+  assert.equal(Object.hasOwn(kanana.description.assets, 'manifestSha256'), true);
 });
 
 test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entries', async () => {
@@ -159,12 +128,14 @@ test('artifact locks hash packaged manifests, runtime files, and model ranges', 
 
 test('generated files are deterministic and the ModelId union follows the curated spec', async () => {
   const typeFile = await readFile(packageFile('src/catalog/types.generated.d.ts'), 'utf8');
-  const expectedIdType = "export type ModelId = '" + MODEL_IDS[0]! + "' | '" + MODEL_IDS[1]! + "';";
-  assert.ok(typeFile.includes(expectedIdType));
-  assert.ok(
-    typeFile.includes("export type ModelIdTuple = readonly ['" + MODEL_IDS[0]! + "', '" + MODEL_IDS[1]! + "'];")
-  );
-  assert.ok(typeFile.includes("export type ModelAdapterId = 'kev06' | 'kanana';"));
+  const expectedIds = MODEL_IDS.map((modelId) => "'" + modelId + "'").join(' | ');
+  const expectedTuple = MODEL_IDS.map((modelId) => "'" + modelId + "'").join(', ');
+  const expectedAdapters = [...new Set(MODEL_CATALOG.map(({description}) => description.adapter))]
+    .map((adapter) => "'" + adapter + "'")
+    .join(' | ');
+  assert.ok(typeFile.includes('export type ModelId = ' + expectedIds + ';'));
+  assert.ok(typeFile.includes('export type ModelIdTuple = readonly [' + expectedTuple + '];'));
+  assert.ok(typeFile.includes('export type ModelAdapterId = ' + expectedAdapters + ';'));
   assert.equal(typeFile.includes("from '../index.js'"), false);
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-model-catalog.mts', '--check'], {
     cwd: packageRoot,

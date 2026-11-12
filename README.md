@@ -23,24 +23,27 @@ Upstream model-card scores appear highest first within the same benchmark. They 
 
 The published package includes library code and notices. Its model files must be hosted at an application-controlled URL. See the [0.3.0 setup guide](releases/web-decision-0.3.0/package/README.md) for installation, asset links, and protocol details.
 
-## Interface preview on main
+## Kanana candidate on main
 
-This interface is not in npm `0.3.0` yet. It is the clean model-ID interface currently implemented on `main`.
+Kanana is implemented and verified on `main`; it is not included in npm `0.3.0` yet.
 
 ```ts
 import {loadDecisionModel} from 'web-decision';
 
-const model = await loadDecisionModel({modelId: 'kev-0.6b-q4f16'});
+const model = await loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611'});
 
 try {
-  const result = await model.decide({
+  const result = await model.systemOne({
     state: 'A customer reports a duplicate card charge.',
-    questions: [{
-      instructions: 'Which team should review this?',
-      options: ['Billing', 'Fraud']
-    }]
+    questions: {
+      team: {
+        type: 'choice',
+        instructions: 'Which team should review this?',
+        criteria: {billing: 'Billing', fraud: 'Fraud'}
+      }
+    }
   });
-  console.log(result.answers[0]?.selected);
+  console.log(result.answers.team?.choice);
 } finally {
   await model.dispose();
 }
@@ -48,7 +51,7 @@ try {
 
 The workspace preview exposes only curated TVM models. `listModels()` and `describeModel(id)` show model capabilities and runtime requirements; `loadDecisionModel({modelId})` loads only a listed ID. Caller-supplied model URLs and unregistered models are not accepted.
 
-The Kev route fetches its pinned upstream data and reconstructs its TVM shards locally. The library checks the expected hashes and does not silently switch models or runtimes. Inclusion in a published release requires the exact package and model artifacts to pass the release verification gates.
+The Kanana candidate uses native TVM text and vision graphs, pinned assets, and only the checkpoint ranges those graphs require. Its exact npm archive passed text, image, offline-cache, and 20,480-token-boundary WebGPU checks on an Apple M4 Pro with Chromium 157. The archive is bound to the reports in the release verification gate before publication.
 
 ## Verification
 

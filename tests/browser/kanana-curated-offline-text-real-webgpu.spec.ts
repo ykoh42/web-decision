@@ -3,7 +3,9 @@ import {readFileSync} from 'node:fs';
 import {mkdtemp, open, readFile, rm, stat} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
-import {expect, test, type BrowserContext} from '@playwright/test';
+import {chromium, expect, test, type BrowserContext} from '@playwright/test';
+import {createKananaReleaseEvidence, KANANA_RELEASE_EVIDENCE_PREFIX} from './kanana-candidate-evidence.ts';
+import type {KananaDecisionModel} from '../../packages/web-decision/src/curated/types.d.ts';
 import {
   kananaCheckpointSha256,
   kananaModelId,
@@ -12,15 +14,11 @@ import {
   kananaUpstreamBase,
   verifyPinnedKananaSnapshot
 } from './kanana-snapshot.ts';
-import {
-  collectInstalledKananaReleaseInputs,
-  createKananaReleaseEvidenceEnvelope,
-  KANANA_RELEASE_EVIDENCE_PREFIX,
-  localKananaCandidateMode
-} from './kanana-release-evidence.ts';
-
 const localBuildMode = process.env.WEB_DECISION_KANANA_LOCAL_BUILD_GPU === '1';
-const enabled = process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' || localKananaCandidateMode || localBuildMode;
+const enabled =
+  process.env.WEB_DECISION_KANANA_CURATED_REAL_GPU === '1' ||
+  process.env.WEB_DECISION_KANANA_LOCAL_GPU === '1' ||
+  localBuildMode;
 const upstreamPath = new URL(kananaUpstreamBase).pathname;
 const probabilityTolerance = 0.001;
 const fixtureBytes = readFileSync(new URL('../fixtures/kanana-decision-python-reference.json', import.meta.url));
@@ -51,18 +49,15 @@ async function readRange(file: Awaited<ReturnType<typeof open>>, start: number, 
   return bytes;
 }
 
-test('the public Kanana package loader reuses cached text weights with network requests blocked', async ({
+test('the Kanana candidate reuses cached text weights with network requests blocked', async ({
   browserName,
   browser
-}) => {
-  test.skip(!enabled, 'Set WEB_DECISION_KANANA_CURATED_REAL_GPU=1 to run the full package consumer GPU check.');
+}, testInfo) => {
+  test.skip(!enabled, 'Set WEB_DECISION_KANANA_CURATED_REAL_GPU=1 to run the Kanana candidate GPU check.');
   test.setTimeout(45 * 60 * 1000);
 
-  const releaseInputs = localBuildMode ? null : await collectInstalledKananaReleaseInputs();
-  expect(fixtureSha256).toBe(
-    releaseInputs?.policy.referenceFixture.sha256 ?? '822156454d468153cef23fde6fad8c88b59821d9da1b86897733fa906abfd420'
-  );
-  expect(reference.modelId).toBe(releaseInputs?.policy.model.repository ?? `kakaocorp/${kananaModelId}`);
+  expect(fixtureSha256).toBe('822156454d468153cef23fde6fad8c88b59821d9da1b86897733fa906abfd420');
+  expect(reference.modelId).toBe(`kakaocorp/${kananaModelId}`);
   expect(reference.revision).toBe(kananaRevision);
   expect(reference.checkpointSha256).toBe(kananaCheckpointSha256);
   await verifyPinnedKananaSnapshot();
@@ -82,14 +77,15 @@ test('the public Kanana package loader reuses cached text weights with network r
     expect(browserName).toBe('chromium');
     profileDirectory = await mkdtemp(join(tmpdir(), 'web-decision-kanana-offline-'));
     const gpuMarker = process.env.WEB_DECISION_GPU_BROWSER_MARKER;
-    persistentContext = await browser.browserType().launchPersistentContext(profileDirectory, {
+    const context = await chromium.launchPersistentContext(profileDirectory, {
       baseURL: `http://127.0.0.1:${Number(process.env.WEB_DECISION_BROWSER_PORT || 41773)}`,
       headless: false,
       channel: process.env.WEB_DECISION_BROWSER_CHANNEL || 'chromium',
       args: ['--enable-unsafe-webgpu', ...(gpuMarker ? [gpuMarker] : [])],
       ignoreDefaultArgs: ['--enable-unsafe-swiftshader']
     });
-    const page = persistentContext.pages()[0] ?? (await persistentContext.newPage());
+    persistentContext = context;
+    const page = context.pages()[0] ?? (await context.newPage());
     page.on('request', (request) => {
       if (new URL(request.url()).pathname.includes('kanana-vision-model')) visionWasmRequests.push(request.url());
     });
@@ -147,6 +143,7 @@ test('the public Kanana package loader reuses cached text weights with network r
     const browserErrors: string[] = [];
     page.on('pageerror', (error) => browserErrors.push(error.message));
     await page.goto('/');
+    const browserVersion = browser.version();
     localOrigin = new URL(page.url()).origin;
     await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
     await page.evaluate(async () => {
@@ -165,7 +162,10 @@ test('the public Kanana package loader reuses cached text weights with network r
       const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
       const isFallback = adapterWithFallback.isFallbackAdapter ?? adapter.info?.isFallbackAdapter ?? null;
       if (isFallback !== false) throw new Error(`Expected a hardware WebGPU adapter; got ${String(isFallback)}.`);
-      const model = await window.webDecision.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', cache: true});
+      const model = (await window.webDecision.loadDecisionModel({
+        modelId: 'kanana-2-v-decide-3b-2611',
+        cache: true
+      })) as unknown as KananaDecisionModel;
       try {
         const output = await model.systemOne(input);
         const answer = output.answers.delivery_status;
@@ -173,14 +173,13 @@ test('the public Kanana package loader reuses cached text weights with network r
         const checkpointSha256 = model.description.checkpoint.weightSha256;
         if (!checkpointSha256) throw new Error('Kanana descriptor omitted the checkpoint digest.');
         return {
-          gpu: {
+          userAgent: navigator.userAgent,
+          adapter: {
             isFallbackAdapter: isFallback,
-            adapterInfo: {
-              vendor: adapter.info?.vendor ?? '',
-              architecture: adapter.info?.architecture ?? '',
-              isFallbackAdapter: isFallback
-            },
-            features: [...adapter.features],
+            vendor: adapter.info?.vendor ?? '',
+            architecture: adapter.info?.architecture ?? '',
+            device: adapter.info?.device ?? '',
+            features: Array.from(adapter.features),
             limits: {
               maxBufferSize: adapter.limits.maxBufferSize,
               maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
@@ -188,7 +187,6 @@ test('the public Kanana package loader reuses cached text weights with network r
               maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage
             }
           },
-          userAgent: navigator.userAgent,
           result: {
             modelId: model.modelId,
             descriptionModelId: model.description.modelId,
@@ -235,7 +233,10 @@ test('the public Kanana package loader reuses cached text weights with network r
 
     blockNetwork = true;
     const offline = await page.evaluate(async (input) => {
-      const model = await window.webDecision.loadDecisionModel({modelId: 'kanana-2-v-decide-3b-2611', offline: true});
+      const model = (await window.webDecision.loadDecisionModel({
+        modelId: 'kanana-2-v-decide-3b-2611',
+        offline: true
+      })) as unknown as KananaDecisionModel;
       try {
         const output = await model.systemOne(input);
         const answer = output.answers.delivery_status;
@@ -272,41 +273,36 @@ test('the public Kanana package loader reuses cached text weights with network r
     expect(browserErrors).toEqual([]);
 
     console.log(
-      `KANANA_CURATED_OFFLINE_TEXT_REAL_GPU ${JSON.stringify({browserName, version: browser.version(), online: onlineRun.result, offline, fetchedRanges: fetchedRanges.length, fetchedBytes: fetchedRanges.reduce((sum, item) => sum + item.bytes, 0), networkAttempts})}`
+      `KANANA_CURATED_OFFLINE_TEXT_REAL_GPU ${JSON.stringify({browserName, version: browserVersion, online: onlineRun.result, offline, fetchedRanges: fetchedRanges.length, fetchedBytes: fetchedRanges.reduce((sum, item) => sum + item.bytes, 0), networkAttempts})}`
     );
-    if (releaseInputs === null) return;
-    if (localKananaCandidateMode && process.env.WEB_DECISION_KANANA_EMIT_EVIDENCE !== '1') return;
-    const evidence = createKananaReleaseEvidenceEnvelope({
-      inputs: releaseInputs,
-      kind: 'cached-offline-text-choice',
-      runtimeArtifactNames: releaseInputs.policy.tests.offline.runtimeArtifacts,
+    const evidence = await createKananaReleaseEvidence({
+      kind: 'offline',
+      testInfo,
       browserName,
-      browserVersion: browser.version(),
+      browserVersion,
       userAgent: onlineRun.userAgent,
       model: {
-        loadedId: offline.modelId,
-        describedId: offline.descriptionModelId,
+        requestedId: kananaModelId,
+        modelId: offline.modelId,
+        descriptionModelId: offline.descriptionModelId,
         checkpointRevision: offline.checkpointRevision,
-        checkpointSha256: offline.checkpointSha256
+        checkpointSha256: offline.checkpointSha256,
+        assetManifestSha256: offline.assetManifestSha256,
+        backend: offline.backend
       },
-      gpu: onlineRun.gpu
-    });
-    console.log(
-      `${KANANA_RELEASE_EVIDENCE_PREFIX}${JSON.stringify({
-        ...evidence,
+      adapter: onlineRun.adapter,
+      observation: {
+        online: onlineRun.result,
+        offline,
         referenceFixtureSha256: fixtureSha256,
-        probabilityTolerance,
-        cache: {
-          primedOnline: true,
-          requestedOffline: true,
-          blockedNetwork: true,
-          fetchedRanges: fetchedRanges.length,
-          fetchedBytes: fetchedRanges.reduce((sum, item) => sum + item.bytes, 0)
-        },
-        networkAttempts,
-        inference: {online: onlineRun.result, offline}
-      })}`
-    );
+        completionMarkerFound: hasCompletionMarker,
+        visionWasmRequests: visionWasmRequests.length,
+        fetchedRanges: fetchedRanges.length,
+        fetchedBytes: fetchedRanges.reduce((sum, item) => sum + item.bytes, 0),
+        networkAttempts
+      }
+    });
+    if (evidence) console.log(`${KANANA_RELEASE_EVIDENCE_PREFIX}${JSON.stringify(evidence)}`);
   } finally {
     await persistentContext?.close();
     if (profileDirectory) await rm(profileDirectory, {recursive: true, force: true});

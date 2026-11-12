@@ -1,19 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import config, {
-  assertPinnedWebgpuHash,
-  browserOnlyTvmWasiExport,
-  stripNodeOnlyWasiExport,
-  tvmRuntimeImportWithoutTypeMarker
-} from '../vite.config.ts';
+import config, {assertPinnedWebgpuHash, tvmRuntimeImportWithoutTypeMarker} from '../vite.config.ts';
 // These hooks are exercised with the minimal bundle and context the test needs.
 type Chunk = {type: 'chunk'; code: string};
 type NormalizeHook = {generateBundle: (options: object, bundle: Record<string, Chunk>) => void};
-type WasiHooks = {
-  buildStart: () => void;
-  transform: (source: string, id: string) => {code: string; map: null} | null;
-  generateBundle: () => void;
-};
 const plugins = config.plugins ?? [];
 const plugin = plugins.find(
   (candidate) =>
@@ -65,27 +55,4 @@ test('the package build rejects a changed TVM WebGPU source', () => {
     () => assertPinnedWebgpuHash('92ba506841dc0eddedc8b1ea1ea64e37ff7dfce2d2f3fae297df6f9ec282bc5c'),
     /differs from the pinned upstream revision/
   );
-});
-
-test('browser-only WASI transform removes only the exact Node export', () => {
-  const nodeExport = 'if(typeof module!="undefined"){module["exports"]=Module}';
-  const source = `before();${nodeExport};after();`;
-  assert.equal(stripNodeOnlyWasiExport(source), 'before();;after();');
-  assert.throws(() => stripNodeOnlyWasiExport('before();after();'), /exactly one/);
-  assert.throws(() => stripNodeOnlyWasiExport(source + nodeExport), /exactly one/);
-});
-
-test('browser-only WASI transform targets the TVM glue and fails if missing', () => {
-  const plugin = browserOnlyTvmWasiExport() as unknown as WasiHooks;
-  plugin.buildStart();
-  assert.equal(plugin.transform('no edit', '/other/wasi.js'), null);
-  assert.throws(() => plugin.generateBundle(), /Expected TVM WASI glue/);
-  const source = 'if(typeof module!="undefined"){module["exports"]=Module}';
-  assert.deepEqual(
-    plugin.transform(source, 'C:\\work\\.toolchains\\apache-tvm-src\\web\\src\\tvmjs_runtime_wasi.js?test'),
-    {code: '', map: null}
-  );
-  assert.doesNotThrow(() => plugin.generateBundle());
-  plugin.buildStart();
-  assert.throws(() => plugin.generateBundle(), /Expected TVM WASI glue/);
 });

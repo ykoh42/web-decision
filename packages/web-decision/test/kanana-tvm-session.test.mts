@@ -31,6 +31,7 @@ type FakeSetupOptions = {
   arity?: number;
   outputValues?: number[];
   inferenceError?: unknown;
+  syncError?: unknown;
   inferenceDelay?: number;
 };
 
@@ -39,6 +40,7 @@ function fakeSetup(options: FakeSetupOptions = {}) {
   const arity = options.arity ?? parameterNames.length;
   const outputValues = options.outputValues ?? [0.25, -2, 4.5];
   const inferenceError = options.inferenceError;
+  const syncError = options.syncError;
   const inferenceDelay = options.inferenceDelay ?? 0;
   const calls: {
     functions: string[];
@@ -70,6 +72,7 @@ function fakeSetup(options: FakeSetupOptions = {}) {
   const device = {
     async sync() {
       calls.sync++;
+      if (syncError) throw syncError;
     }
   };
   const outputBytes = new Uint8Array(new Float32Array(outputValues).buffer).slice();
@@ -294,6 +297,22 @@ test('rejects multimodal inputs that do not match the image tokens or embedding 
     }),
     {code: 'invalid_input'}
   );
+  await assert.rejects(
+    session.infer([1, KANANA_IMAGE_TOKEN_ID], [1, 1], {
+      ...valid,
+      imageEmbeddings: {
+        shape: [1, KANANA_EMBEDDING_SIZE],
+        values: new Float64Array(KANANA_EMBEDDING_SIZE).fill(3.5e38)
+      }
+    }),
+    {code: 'invalid_input'}
+  );
+  const outOfRangePositions = new Float64Array(valid.positionIds);
+  outOfRangePositions[0] = 0x80000000;
+  await assert.rejects(
+    session.infer([1, KANANA_IMAGE_TOKEN_ID], [1, 1], {...valid, positionIds: outOfRangePositions}),
+    {code: 'invalid_input'}
+  );
   assert.equal(calls.mainArgs.length, 0);
   await session.dispose();
 });
@@ -344,7 +363,9 @@ test('rejects vision inputs beyond the compiled graph range or with the wrong pi
   });
 
   await assert.rejects(session.infer(new Float32Array(3), [1, 2, 2]), {code: 'invalid_input'});
+  await assert.rejects(session.infer(new Float64Array(12).fill(Number.MAX_VALUE), [1, 2, 2]), {code: 'invalid_input'});
   await assert.rejects(session.infer(new Float32Array(5 * 3), [1, 2, 10]), {code: 'input_too_large'});
+  await assert.rejects(session.infer(new Float32Array(3), [1, 1_073_741_824, 2]), {code: 'input_too_large'});
   assert.equal(calls.mainArgs.length, 0);
   await session.dispose();
 });
@@ -380,6 +401,17 @@ test('rejects empty or over-limit input without truncating or invoking the model
   const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
 
   await assert.rejects(session.infer([], []), {code: 'invalid_input'});
+  let oversizedInputReads = 0;
+  const oversizedIds = new Proxy([], {
+    get(target, property, receiver) {
+      if (property === 'length') return 1_000_000_000;
+      if (property === '0') oversizedInputReads++;
+      return Reflect.get(target, property, receiver);
+    }
+  });
+  await assert.rejects(session.infer(oversizedIds, [1]), {code: 'input_too_long'});
+  assert.equal(oversizedInputReads, 0);
+
   const longIds = new Int32Array(20_481).fill(1);
   const longMask = new Int32Array(longIds.length).fill(1);
   await assert.rejects(session.infer(longIds, longMask), {code: 'input_too_long'});
@@ -401,7 +433,7 @@ test('ends each temporary scope after multiple sequential inferences', async () 
 });
 
 test('propagates inference failures and keeps the owning scope disposable', async () => {
-  const inferenceError = new Error('TVM inference failed');
+  const inferenceError = Object.assign(new Error('TVM inference failed'), {code: 'runtime_failure'});
   const {calls, setup} = fakeSetup({
     parameterNames: ['input_ids', 'attention_mask'],
     arity: 2,
@@ -409,13 +441,39 @@ test('propagates inference failures and keeps the owning scope disposable', asyn
   });
   const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
 
-  await assert.rejects(session.infer([1], [1]), inferenceError);
+  await assert.rejects(session.infer([1], [1]), (error) => {
+    assert.equal((error as Error).message, 'Kanana TVM graph execution failed: Error: TVM inference failed');
+    assert.equal((error as Error).cause, inferenceError);
+    assert.equal((error as Error & {code?: string}).code, 'runtime_failure');
+    return true;
+  });
   assert.equal(calls.disposed, 0);
   assert.equal(calls.scopeBegins, 1);
   assert.equal(calls.scopeEnds, 1);
   assert.equal(calls.scopeDepth, 0);
   await session.dispose();
   assert.equal(calls.disposed, 1);
+});
+
+test('reports the WebGPU synchronization stage and preserves its cause', async () => {
+  const syncError = new Error('GPU synchronization failed');
+  const {calls, setup} = fakeSetup({
+    parameterNames: ['input_ids', 'attention_mask'],
+    arity: 2,
+    syncError
+  });
+  const session = await createKananaTvmInferenceSession({setup, weightSource: {weights: []}});
+
+  await assert.rejects(session.infer([1], [1]), (error) => {
+    assert.equal(
+      (error as Error).message,
+      'Kanana TVM WebGPU execution synchronization failed: Error: GPU synchronization failed'
+    );
+    assert.equal((error as Error).cause, syncError);
+    return true;
+  });
+  assert.equal(calls.scopeDepth, 0);
+  await session.dispose();
 });
 
 test('serializes overlapping inferences and waits for accepted calls before disposal', async () => {

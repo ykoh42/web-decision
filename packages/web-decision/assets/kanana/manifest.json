@@ -20,7 +20,20 @@
     "textGraph": {
       "mode": "checkpoint_full",
       "weights": 3180636672,
-      "graphWeights": 354
+      "graphWeights": 354,
+      "parameterDtype": "float16",
+      "computeDtype": "float32",
+      "attention": {
+        "implementation": "web_decision_online",
+        "lowering": "kanana_online_attention",
+        "algorithm": "tiled_online_softmax",
+        "sequenceDimension": "dynamic",
+        "queryTile": 16,
+        "keyTile": 16,
+        "threadsPerBlock": 128,
+        "causalKeyLimit": "query_tile_end",
+        "intermediateScoreMatrix": false
+      }
     },
     "visionGraph": {
       "graphWeights": 333,
@@ -29,8 +42,8 @@
   },
   "files": {
     "kanana-text-model.wasm": {
-      "bytes": 4477518,
-      "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+      "bytes": 4208785,
+      "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
     },
     "text-weight-manifest.json": {
       "bytes": 102978,
@@ -38,7 +51,7 @@
     },
     "kanana-vision-model.wasm": {
       "bytes": 4414887,
-      "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+      "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
     },
     "vision-weight-manifest.json": {
       "bytes": 100018,

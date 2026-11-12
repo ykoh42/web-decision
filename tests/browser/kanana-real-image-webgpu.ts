@@ -49,12 +49,6 @@ type WeightOpener = (options: {
 const openTextWeights = openPinnedKananaWeightSource as unknown as WeightOpener;
 const openVisionWeights = openSafetensorsSource as unknown as WeightOpener;
 
-declare global {
-  interface Window {
-    tvmjs?: TvmJs;
-  }
-}
-
 async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Could not read ${url}: HTTP ${response.status}.`);
@@ -127,7 +121,7 @@ function finiteProbabilityOutput(value: Record<string, unknown>) {
 
 /** Execute the pinned image and text graphs on one local image through the package decision session. */
 export async function runKananaRealImageDecisionWebGpu(textAssetsBase: string) {
-  const tvmjs = window.tvmjs;
+  const tvmjs = (window as Window & {tvmjs?: TvmJs}).tvmjs;
   if (!tvmjs) throw new Error('Apache TVM JS runtime bundle is not loaded.');
   const textBase = new URL(textAssetsBase);
   if (!textBase.pathname.endsWith('/')) textBase.pathname += '/';

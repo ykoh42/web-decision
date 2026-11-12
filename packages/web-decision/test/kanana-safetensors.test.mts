@@ -361,6 +361,15 @@ test('hashes file ranges incrementally and opens verified, cached source tensors
     assert.equal(source.tensors, undefined);
     assert.equal(converted.record.dtype, 'float16');
     assert.deepEqual([...converted.bytes], [0x00, 0x3c, 0x00, 0xc1, 0x00, 0x30, 0x01, 0x00]);
+    const nativeSource: any = await openSafetensorsWeightSource({
+      base: new URL('https://fixture.invalid/checkpoint/'),
+      manifest: sourceManifest,
+      requiredWeights: [{name: 'weights.bf16', shape: [4], dtype: 'bfloat16', length: 8}],
+      cache
+    });
+    const native = await nativeSource.readTensor('weights.bf16');
+    assert.equal(native.record.dtype, 'bfloat16');
+    assert.deepEqual([...native.bytes], [0x80, 0x3f, 0x20, 0xc0, 0x00, 0x3e, 0x01, 0x33]);
     assert.equal(float.record.dtype, 'float32');
     assert.deepEqual([...float.bytes], [0x00, 0x00, 0x80, 0x3f]);
     await assert.rejects(source.readTensor('model.visual.patch_embed.proj.weight'), {code: 'INVALID_ASSET'});

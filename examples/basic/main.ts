@@ -46,27 +46,17 @@ async function runDecision(model: LoadedDecisionModel) {
   const options = element('#options', HTMLTextAreaElement).value.split('\n');
   if (options.some((option) => !option.trim())) throw new Error('Each option line must contain text.');
 
-  if (model.modelId === 'kanana-2-v-decide-3b-2611') {
-    const criteria = Object.fromEntries(options.map((option, index) => [`option-${index}`, option]));
-    const answer = await model.decide({
-      state,
-      questions: {decision: {type: 'choice', instructions, criteria}}
-    });
-    const selected = answer.answers.decision;
-    if (!selected || selected.type !== 'choice') throw new Error('The model returned no choice answer.');
-    const selectedIndex = Number(selected.choice.slice('option-'.length));
-    const selectedOption = options[selectedIndex];
-    if (selectedOption === undefined) throw new Error('The model returned an unknown option.');
-    return {selected: selectedOption, answer};
-  }
-
+  const criteria = Object.fromEntries(options.map((option, index) => [`option-${index}`, option]));
   const answer = await model.decide({
     state,
-    questions: [{instructions, options}]
+    questions: {decision: {type: 'choice', instructions, criteria}}
   });
-  const selected = answer.answers[0];
-  if (!selected) throw new Error('The model returned no answer.');
-  return {selected: selected.selected, answer};
+  const selected = answer.answers.decision;
+  if (!selected || selected.type !== 'choice') throw new Error('The model returned no choice answer.');
+  const selectedIndex = Number(selected.choice.slice('option-'.length));
+  const selectedOption = options[selectedIndex];
+  if (selectedOption === undefined) throw new Error('The model returned an unknown option.');
+  return {selected: selectedOption, answer};
 }
 
 load.addEventListener('click', async () => {

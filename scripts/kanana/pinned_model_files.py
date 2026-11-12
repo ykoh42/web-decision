@@ -36,7 +36,10 @@ def verify_pinned_model_files(model_dir: Path) -> dict[str, str]:
                 continue
             actual = sha256_file(path)
         except OSError as error:
-            mismatches[name] = {"expected": expected, "actual": f"unreadable: {error.strerror}"}
+            mismatches[name] = {
+                "expected": expected,
+                "actual": f"unreadable: {error.strerror}",
+            }
             continue
 
         verified[name] = actual
@@ -44,5 +47,7 @@ def verify_pinned_model_files(model_dir: Path) -> dict[str, str]:
             mismatches[name] = {"expected": expected, "actual": actual}
 
     if mismatches:
-        raise SystemExit(f"Kanana model files differ from the pinned revision: {mismatches}")
+        raise SystemExit(
+            f"Kanana model files differ from the pinned revision: {mismatches}"
+        )
     return verified

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import json
 import marshal
 import struct
 import tempfile
@@ -24,6 +25,38 @@ except ModuleNotFoundError:
     from scripts.kanana import probe_torch_export_vision_tvm as vision_probe
 
 
+def _function_calls(function):
+    calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
+    return sorted(calls, key=lambda node: (node.lineno, node.col_offset))
+
+
+def _named_call_lines(function, name):
+    return [
+        call.lineno
+        for call in _function_calls(function)
+        if getattr(call.func, "id", getattr(call.func, "attr", None)) == name
+    ]
+
+
+def _trusted_load_lines(function):
+    return [
+        call.lineno
+        for call in _function_calls(function)
+        if any(
+            keyword.arg == "trust_remote_code"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+            for keyword in call.keywords
+        )
+    ]
+
+
+def _script_functions(name):
+    path = Path(__file__).resolve().parent / name
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+
+
 class PinnedModelFilesTests(unittest.TestCase):
     def _model_directory(self, root: Path, content: bytes) -> dict[str, str]:
         expected = {}
@@ -36,8 +69,12 @@ class PinnedModelFilesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             model_dir = Path(temporary_directory)
             expected = self._model_directory(model_dir, b"verified source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                self.assertEqual(pinned_model_files.verify_pinned_model_files(model_dir), expected)
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                self.assertEqual(
+                    pinned_model_files.verify_pinned_model_files(model_dir), expected
+                )
 
     def test_rejects_a_tampered_custom_model_file(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -45,7 +82,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             tampered_name = "modeling_kanana_v_decide.py"
             (model_dir / tampered_name).write_bytes(b"tampered source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with self.assertRaisesRegex(SystemExit, tampered_name):
                     pinned_model_files.verify_pinned_model_files(model_dir)
 
@@ -55,7 +94,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             missing_name = "configuration_kanana_v_decide.py"
             (model_dir / missing_name).unlink()
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with self.assertRaisesRegex(SystemExit, missing_name):
                     pinned_model_files.verify_pinned_model_files(model_dir)
 
@@ -64,8 +105,12 @@ class PinnedModelFilesTests(unittest.TestCase):
             model_dir = Path(temporary_directory)
             expected = self._model_directory(model_dir, b"verified source")
             (model_dir / "modeling_kanana_v_decide.py").write_bytes(b"tampered source")
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                with patch.object(vision_probe.importlib, "import_module") as import_module:
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                with patch.object(
+                    vision_probe.importlib, "import_module"
+                ) as import_module:
                     with self.assertRaises(SystemExit):
                         vision_probe.import_pinned_vision_classes(model_dir)
                     import_module.assert_not_called()
@@ -100,8 +145,12 @@ class PinnedModelFilesTests(unittest.TestCase):
             )
             pyc_path.write_bytes(header + marshal.dumps(malicious_code))
 
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
-                config_class, model_class = vision_probe.import_pinned_vision_classes(model_dir)
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
+                config_class, model_class = vision_probe.import_pinned_vision_classes(
+                    model_dir
+                )
 
             self.assertEqual(config_class.__name__, "KananaVDecideVisionConfig")
             self.assertEqual(model_class.__name__, "KananaVDecideVisionModel")
@@ -112,7 +161,9 @@ class PinnedModelFilesTests(unittest.TestCase):
             expected = self._model_directory(model_dir, b"verified source")
             config_module = SimpleNamespace(KananaVDecideVisionConfig=object)
             model_module = SimpleNamespace(KananaVDecideVisionModel=object)
-            with patch.dict(pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True):
+            with patch.dict(
+                pinned_model_files.PINNED_KANANA_MODEL_FILES, expected, clear=True
+            ):
                 with patch.object(
                     vision_probe.importlib,
                     "import_module",
@@ -123,37 +174,45 @@ class PinnedModelFilesTests(unittest.TestCase):
                         (object, object),
                     )
 
-    def test_trusted_transformers_loads_follow_pinned_file_verification(self):
-        script_directory = Path(__file__).resolve().parent
-        for name in ("generate_decision_probe.py", "prototype_text_tvm_relax.py"):
-            with self.subTest(script=name):
-                tree = ast.parse((script_directory / name).read_text(encoding="utf-8"))
-                main = next(
-                    node
-                    for node in tree.body
-                    if isinstance(node, ast.FunctionDef) and node.name == "main"
-                )
-                verifier_lines = [
-                    node.lineno
-                    for node in ast.walk(main)
-                    if isinstance(node, ast.Call)
-                    and getattr(node.func, "id", getattr(node.func, "attr", None))
-                    == "verify_pinned_model_files"
-                ]
-                trusted_load_lines = [
-                    node.lineno
-                    for node in ast.walk(main)
-                    if isinstance(node, ast.Call)
-                    and any(
-                        keyword.arg == "trust_remote_code"
-                        and isinstance(keyword.value, ast.Constant)
-                        and keyword.value.value is True
-                        for keyword in node.keywords
-                    )
-                ]
-                self.assertTrue(verifier_lines)
-                self.assertTrue(trusted_load_lines)
-                self.assertLess(min(verifier_lines), min(trusted_load_lines))
+    def test_decision_probe_verifies_custom_code_before_trusted_load(self):
+        loader = _script_functions("generate_decision_probe.py")["load_pinned_model"]
+        verifier_lines = _named_call_lines(loader, "verify_pinned_model_files")
+        trusted_load_lines = _trusted_load_lines(loader)
+        self.assertLess(min(verifier_lines), min(trusted_load_lines))
+
+    def test_text_export_verifies_custom_code_before_trusted_load(self):
+        functions = _script_functions("prototype_text_tvm_relax.py")
+        prepare = functions["_prepare_run"]
+        verifier_lines = _named_call_lines(prepare, "verify_pinned_model_files")
+        config_load_lines = _named_call_lines(prepare, "_load_config")
+        main_prepare_lines = _named_call_lines(functions["main"], "_prepare_run")
+        main_pipeline_lines = _named_call_lines(functions["main"], "_run_pipeline")
+        self.assertLess(min(verifier_lines), min(config_load_lines))
+        self.assertTrue(_trusted_load_lines(functions["_load_config"]))
+        self.assertTrue(_trusted_load_lines(functions["_load_model_stage"]))
+        self.assertLess(min(main_prepare_lines), min(main_pipeline_lines))
+
+    def test_conversion_recipe_pins_all_local_build_scripts(self):
+        repository_root = Path(__file__).resolve().parents[2]
+        recipe_path = (
+            repository_root
+            / "packages/web-decision/src/catalog/provenance/kanana-conversion-recipe.json"
+        )
+        recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+        sources = {
+            recipe[section]["script"]: recipe[section]["scriptSha256"]
+            for section in ("text", "vision", "package")
+        }
+        sources.update(recipe["supportingScripts"])
+        sources[recipe["buildEnvironment"]["evidenceScript"]] = recipe[
+            "buildEnvironment"
+        ]["evidenceScriptSha256"]
+        for name, expected in sources.items():
+            with self.subTest(source=name):
+                actual = hashlib.sha256(
+                    (repository_root / name).read_bytes()
+                ).hexdigest()
+                self.assertEqual(actual, expected)
 
 
 if __name__ == "__main__":

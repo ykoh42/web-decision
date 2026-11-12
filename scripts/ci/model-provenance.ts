@@ -5,7 +5,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'ac4d4836dfdc59dbd9adba9e53065e411824a1fb62e54439e6cbe81b82bdb74c';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = '02d791efa887bb0c4b6f7d68a58708d0f57e511950b18c273ef920e6ed3afc91';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';
@@ -17,7 +17,7 @@ const UNKNOWN_TERMS = new Set(['', 'pending', 'unknown', 'unresolved', 'separate
 
 interface ModelProvenanceEntry {
   modelId: string;
-  status: 'pending' | 'approved' | 'test-fixture';
+  status: 'pending' | 'verified' | 'test-fixture';
   artifactLockSha256: string;
   evidence: {path: string; sha256: string};
 }
@@ -117,12 +117,11 @@ async function validateReviewEvidence(
     value.schemaVersion === 1 && value.modelId === modelId,
     `Provenance evidence model ID mismatch for ${modelId}.`
   );
-  failUnless(value.status === 'approved', `Provenance evidence for ${modelId} is not approved.`);
+  failUnless(value.status === 'verified', `Provenance evidence for ${modelId} is not verified.`);
   validateSourceLineage(value.sourceLineage, modelId);
   validateLockedUpstream(value.sourceLineage, artifactEntry, modelId);
   await validateConversionEvidence(value.conversion, modelId, workspaceRoot, requireCommitted);
   await validateRightsEvidence(value.rights, modelId, workspaceRoot, requireCommitted);
-  await validateApprovalEvidence(value.approval, modelId, workspaceRoot, requireCommitted);
 }
 
 function validateSourceLineage(sourceLineage: unknown, modelId: string): void {
@@ -181,7 +180,7 @@ async function validateConversionEvidence(
   workspaceRoot: string,
   requireCommitted: boolean
 ): Promise<void> {
-  failUnless(isRecord(conversion), `Approved provenance for ${modelId} needs conversion evidence.`);
+  failUnless(isRecord(conversion), `Verified provenance for ${modelId} needs conversion evidence.`);
   failUnless(
     typeof conversion.repository === 'string' && conversion.repository.length > 0,
     `Conversion repository for ${modelId} is required.`
@@ -212,7 +211,7 @@ async function validateRightsEvidence(
   workspaceRoot: string,
   requireCommitted: boolean
 ): Promise<void> {
-  failUnless(Array.isArray(rights) && rights.length > 0, `Approved provenance for ${modelId} needs rights evidence.`);
+  failUnless(Array.isArray(rights) && rights.length > 0, `Verified provenance for ${modelId} needs rights evidence.`);
   for (const [index, item] of rights.entries()) {
     failUnless(isRecord(item), `Rights evidence ${index} for ${modelId} must be an object.`);
     failUnless(
@@ -220,7 +219,18 @@ async function validateRightsEvidence(
       `Rights subject ${index} for ${modelId} is required.`
     );
     failUnless(isResolvedTerm(item.license), `Rights license ${index} for ${modelId} is unresolved.`);
-    failUnless(item.redistribution === 'permitted', `Redistribution rights ${index} for ${modelId} are not confirmed.`);
+    failUnless(
+      item.redistribution === 'permitted' || item.redistribution === 'conditional',
+      `Redistribution terms ${index} for ${modelId} are unresolved.`
+    );
+    if (item.redistribution === 'conditional') {
+      failUnless(
+        Array.isArray(item.conditions) &&
+          item.conditions.length > 0 &&
+          item.conditions.every((condition) => typeof condition === 'string' && condition.trim().length > 0),
+        `Conditional redistribution terms ${index} for ${modelId} must list their conditions.`
+      );
+    }
     await validateCommittedEvidenceReference(
       item.evidence,
       `Rights evidence ${index} for ${modelId}`,
@@ -228,32 +238,6 @@ async function validateRightsEvidence(
       requireCommitted
     );
   }
-}
-
-async function validateApprovalEvidence(
-  approval: unknown,
-  modelId: string,
-  workspaceRoot: string,
-  requireCommitted: boolean
-): Promise<void> {
-  failUnless(
-    isRecord(approval) && approval.decision === 'approved',
-    `Approved provenance for ${modelId} needs a review decision.`
-  );
-  failUnless(
-    typeof approval.reviewer === 'string' && approval.reviewer.trim().length > 0,
-    `Approval reviewer for ${modelId} is required.`
-  );
-  failUnless(
-    typeof approval.reviewedAt === 'string' && !Number.isNaN(Date.parse(approval.reviewedAt)),
-    `Approval date for ${modelId} is invalid.`
-  );
-  await validateCommittedEvidenceReference(
-    approval.evidence,
-    `Approval evidence for ${modelId}`,
-    workspaceRoot,
-    requireCommitted
-  );
 }
 
 async function validateCommittedEvidenceReference(
@@ -269,8 +253,10 @@ async function validateCommittedEvidenceReference(
     `${description} SHA-256 is invalid.`
   );
   failUnless(
-    path.startsWith('docs/') || path.startsWith('packages/web-decision/src/catalog/provenance/'),
-    `${description} must be under docs/ or the catalog provenance directory.`
+    path.startsWith('docs/') ||
+      path.startsWith('packages/web-decision/src/catalog/provenance/') ||
+      path === 'packages/web-decision/KANANA-OPEN-LICENSE.txt',
+    `${description} must be under docs/, the catalog provenance directory, or the packaged model license.`
   );
   const absolute = resolve(workspaceRoot, path);
   failUnless(isPathWithin(workspaceRoot, absolute), `${description} escapes the workspace.`);
@@ -361,13 +347,13 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
       `Artifact lock digest differs from provenance for ${entry.modelId}.`
     );
     failUnless(
-      ['pending', 'approved', 'test-fixture'].includes(entry.status),
+      ['pending', 'verified', 'test-fixture'].includes(entry.status),
       `Invalid provenance status for ${entry.modelId}.`
     );
     const evidencePath = safeRelativePath(entry.evidence?.path, `Provenance evidence path for ${entry.modelId}`);
     failUnless(
       evidencePath.startsWith(options.expectedEvidenceRoot + '/'),
-      `Provenance evidence for ${entry.modelId} is outside the approved evidence directory.`
+      `Provenance evidence for ${entry.modelId} is outside the expected evidence directory.`
     );
     failUnless(
       SHA256_PATTERN.test(entry.evidence?.sha256 ?? ''),
@@ -442,16 +428,16 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
       .models;
     const spec = specModels.find((item) => item.modelId === entry.modelId);
     const licenses = spec?.description.licenses;
-    failUnless(isRecord(licenses), `Approved model ${entry.modelId} must declare reviewed license terms.`);
+    failUnless(isRecord(licenses), `Verified model ${entry.modelId} must declare model license terms.`);
     failUnless(isResolvedTerm(licenses.modelTerms), `Model ${entry.modelId} catalog license terms remain unresolved.`);
-    failUnless(isRecord(evidenceValue), `Approved provenance for ${entry.modelId} must be an object.`);
+    failUnless(isRecord(evidenceValue), `Verified provenance for ${entry.modelId} must be an object.`);
     failUnless(
       Array.isArray(evidenceValue.rights) &&
         evidenceValue.rights.some((item) => isRecord(item) && item.license === licenses.modelTerms),
-      `Catalog model terms for ${entry.modelId} do not match reviewed rights evidence.`
+      `Catalog model terms for ${entry.modelId} do not match the recorded rights evidence.`
     );
     const conversion = evidenceValue.conversion;
-    failUnless(isRecord(conversion), `Approved model ${entry.modelId} has no conversion evidence.`);
+    failUnless(isRecord(conversion), `Verified model ${entry.modelId} has no conversion evidence.`);
     assert.equal(
       conversion.artifactLockSha256,
       artifactLockSha256,

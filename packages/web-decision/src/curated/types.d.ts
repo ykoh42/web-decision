@@ -43,7 +43,7 @@ export interface KananaLoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
   readonly modelId: 'kanana-2-v-decide-3b-2611';
 }
 
-export type LoadOptions = KevLoadOptions | KananaLoadOptions;
+export type LoadOptions = KananaLoadOptions;
 
 export interface DecisionQuestion {
   readonly instructions: string;
@@ -270,11 +270,10 @@ export interface KananaDecisionModel {
   dispose(): Promise<void>;
 }
 
-export type LoadedDecisionModel = DecisionModel | KananaDecisionModel;
+export type LoadedDecisionModel = KananaDecisionModel;
 
 export function listModels(): readonly ModelDescription[];
 export function describeModel(modelId: ModelId): ModelDescription;
-export function loadDecisionModel(options: KevLoadOptions): Promise<DecisionModel>;
 export function loadDecisionModel(options: KananaLoadOptions): Promise<KananaDecisionModel>;
 export function loadDecisionModel(options: LoadOptions): Promise<LoadedDecisionModel>;
 export function loadDecisionModel(options: CommonLoadOptions): Promise<LoadedDecisionModel>;

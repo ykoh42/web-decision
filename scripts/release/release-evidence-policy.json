@@ -5,12 +5,30 @@
   "expandedInference": {
     "fixturePath": "tests/fixtures/kev06-expanded-inference.json",
     "fixtureSha256": "05e7f81d2ec5e8a306c0a8034253e3daa3983c088b8ccd9c29b5130b2eecbd41",
-    "decisionCaseIds": ["baseline-double-charge", "account-security", "delayed-package", "long-tracking-context"],
+    "decisionCaseIds": [
+      "baseline-double-charge",
+      "account-security",
+      "delayed-package",
+      "long-tracking-context"
+    ],
     "typedSystemOneId": "typed-system-one-probe",
-    "typedQuestionNames": ["team", "refund", "sentiment"],
-    "typedQuestionTypes": ["choice", "noul", "score"]
+    "typedQuestionNames": [
+      "team",
+      "refund",
+      "sentiment"
+    ],
+    "typedQuestionTypes": [
+      "choice",
+      "noul",
+      "score"
+    ]
   },
-  "browsers": [{"name": "chromium", "project": "chromium"}],
+  "browsers": [
+    {
+      "name": "chromium",
+      "project": "chromium"
+    }
+  ],
   "requireNonFallbackAdapter": true,
   "requirePhysicalDevice": true,
   "requiredApi": "webgpu",
@@ -18,7 +36,7 @@
     "schemaVersion": 1,
     "evidencePrefix": "WEB_DECISION_KANANA_RELEASE_EVIDENCE_V1:",
     "archive": {
-      "sha256": "bdabd252712d4e600b1222cad6886716ab68266822c7125fb673d2d2f85a06c8",
+      "sha256": "bd4333dd930b414f9753aafd7396f94d0d0b4a2581d6cd58cdfae40940874227",
       "packageName": "web-decision",
       "packageVersion": "0.4.0"
     },
@@ -28,12 +46,12 @@
       "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
       "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
       "manifestPath": "assets/kanana/manifest.json",
-      "manifestRawSha256": "0a97f2f3febed6b48be667c34c928891904efc2443dc4b95e0e78767b08eb858",
-      "manifestSha256": "0e2b8ea3cd733e3fef807d574f68960b06cbfd4e0f919af408f4ca76a18bc801",
+      "manifestRawSha256": "6ad86479bd30e9913ea5d4a1d5d17342d2bdd39d1b091af2156aaf4d87a35839",
+      "manifestSha256": "d4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5",
       "artifactFiles": {
         "kanana-text-model.wasm": {
-          "bytes": 4477518,
-          "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+          "bytes": 4208785,
+          "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
         },
         "text-weight-manifest.json": {
           "bytes": 102978,
@@ -41,7 +59,7 @@
         },
         "kanana-vision-model.wasm": {
           "bytes": 4414887,
-          "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+          "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
         },
         "vision-weight-manifest.json": {
           "bytes": 100018,
@@ -53,12 +71,24 @@
         }
       }
     },
+    "tvmSource": {
+      "repository": "https://github.com/apache/tvm.git",
+      "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+      "patches": []
+    },
     "referenceFixture": {
       "path": "tests/fixtures/kanana-decision-python-reference.json",
       "sha256": "822156454d468153cef23fde6fad8c88b59821d9da1b86897733fa906abfd420"
     },
+    "imageReferenceFixture": {
+      "path": "tests/fixtures/kanana-synthetic-image-python-reference.json",
+      "sha256": "038b67ad338eef65434f9724c7b924d2d85dc21b8436a3831a1ad7d9d788b10b"
+    },
     "textProbabilityTolerance": 0.001,
-    "browser": {"name": "chromium", "project": "chromium"},
+    "browser": {
+      "name": "chromium",
+      "project": "chromium"
+    },
     "gpu": {
       "api": "webgpu",
       "requiredLimits": {
@@ -71,22 +101,44 @@
     "tests": {
       "text": {
         "file": "tests/browser/kanana-curated-text-real-webgpu.spec.ts",
-        "title": "the public Kanana package loader matches the pinned text-only PyTorch choice reference on WebGPU",
+        "sourceSha256": "89a19d4aa446c2c7d8020e20fc078c202d12f5db60c29d9de0ba4023ed0cef81",
+        "title": "the Kanana candidate matches the pinned text-only PyTorch choice reference on WebGPU",
         "kind": "text-choice",
-        "runtimeArtifacts": ["kanana-text-model.wasm"]
+        "runtimeArtifacts": [
+          "kanana-text-model.wasm"
+        ]
       },
       "image": {
         "file": "tests/browser/kanana-curated-real-webgpu.spec.ts",
-        "title": "the public Kanana package loader runs the pinned image decision on WebGPU",
+        "sourceSha256": "025755ab7fdef1fdcd2a6866715ffaa491caf9834750b02d1f17618a0849894f",
+        "title": "the Kanana candidate runs the pinned image decision on WebGPU",
         "kind": "synthetic-image-choice",
-        "runtimeArtifacts": ["kanana-text-model.wasm", "kanana-vision-model.wasm"]
+        "runtimeArtifacts": [
+          "kanana-text-model.wasm",
+          "kanana-vision-model.wasm"
+        ]
       },
       "offline": {
         "file": "tests/browser/kanana-curated-offline-text-real-webgpu.spec.ts",
-        "title": "the public Kanana package loader reuses cached text weights with network requests blocked",
+        "sourceSha256": "fa47e44526a2698b05585c0e3bd3c259487b1941bee1008488633e0afcaec47d",
+        "title": "the Kanana candidate reuses cached text weights with network requests blocked",
         "kind": "cached-offline-text-choice",
-        "runtimeArtifacts": ["kanana-text-model.wasm"]
+        "runtimeArtifacts": [
+          "kanana-text-model.wasm"
+        ]
       }
+    },
+    "testSupportSources": {
+      "tests/browser/kanana-candidate-evidence.ts": "35fc53593dec0932cfcbe166ebcfc0a739fb1b78f01480998d4c5afe7727bfb0",
+      "tests/browser/kanana-release-evidence.ts": "7d3bd5378a8ff7b32082b8b0e614c72467b573db2ce3635ca69cf0941d4d2764",
+      "tests/browser/kanana-snapshot.ts": "0c976034d7f93aa4ec0fbd4986a39182759aad754a9a07cc03a957738a72d0c4",
+      "tests/browser/kev06-release-evidence.ts": "75f2ddef3f3f805c3ef338b9bc11de08ed8c8310e537077f6dd8a4a62aab8c59"
+    },
+    "maximumContext": {
+      "file": "tests/browser/kanana-max-context-real-webgpu.spec.ts",
+      "sourceSha256": "b7132977a989bcad50bf59656932ec4d9052f540c5c5f4be873f2591733687b3",
+      "title": "Kanana runs a truncated request at the requested token boundary",
+      "maxTokens": 20480
     }
   }
 }

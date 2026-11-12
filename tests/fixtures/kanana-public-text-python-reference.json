@@ -1,0 +1,57 @@
+{
+  "modelId": "kakaocorp/kanana-2-v-decide-3b-2611",
+  "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+  "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+  "source": {
+    "runtime": "Python/PyTorch system_one",
+    "parameterDtype": "bfloat16",
+    "mode": "checkpoint_full"
+  },
+  "request": {
+    "state": "Order A-1047 was due Friday, 10 April 2026. It arrived Sunday, 12 April 2026. The customer wrote: \"It arrived two days late.\"",
+    "state_format": "text",
+    "temperature": 0.7,
+    "questions": {
+      "needs_immediate_page": {
+        "type": "noul",
+        "instructions": "Did the parcel arrive late?",
+        "criteria": {
+          "false": "The parcel arrived on or before the promised date.",
+          "true": "The parcel arrived after the promised date."
+        }
+      },
+      "delay_severity": {
+        "type": "score",
+        "instructions": "How severe was the delivery delay?",
+        "criteria": [
+          "No delay",
+          "Small delay",
+          "Significant delay"
+        ]
+      }
+    }
+  },
+  "result": {
+    "answers": {
+      "needs_immediate_page": {
+        "type": "noul",
+        "noul": 0.9625095117948107
+      },
+      "delay_severity": {
+        "type": "score",
+        "score": 1.363000651216247,
+        "confidence": 0.37772823361727936,
+        "legend": {
+          "0": "No delay",
+          "1": "Small delay",
+          "2": "Significant delay"
+        },
+        "probabilities": {
+          "0": 0.02592359651945013,
+          "1": 0.5851521557448529,
+          "2": 0.388924247735697
+        }
+      }
+    }
+  }
+}

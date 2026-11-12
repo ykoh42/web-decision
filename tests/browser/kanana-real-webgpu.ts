@@ -11,6 +11,7 @@ import {
   type KananaTvmInferenceSessionOptions
 } from '../../packages/web-decision/src/kanana/tvm-session.js';
 import {setupKananaTvmRuntime} from '../../packages/web-decision/src/kanana/tvm-runtime.js';
+import {detectGPUDevice} from '../../packages/web-decision/src/kanana/tvm-webgpu.js';
 
 type TvmJs = {
   instantiate(
@@ -19,7 +20,6 @@ type TvmJs = {
     logger: (message: string) => void
   ): Promise<unknown>;
   createPolyfillWASI(): Record<string, unknown>;
-  detectGPUDevice(): Promise<{adapter: GPUAdapter; device: GPUDevice} | undefined>;
 };
 
 type ValidationWeightRecord = {
@@ -49,7 +49,6 @@ const openSafetensorsWeights = openSafetensorsSource as unknown as ValidationWei
 
 declare global {
   interface Window {
-    tvmjs?: TvmJs;
     __kananaProgress?(event: Record<string, unknown>): Promise<void>;
   }
 }
@@ -87,7 +86,10 @@ async function inferRealHiddenState(
     );
     return {kind: 'success' as const, hiddenState};
   } catch (error) {
-    const lost = await device.lost;
+    const lost = await Promise.race([
+      device.lost.then((info) => ({reason: info.reason, message: info.message})),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 250))
+    ]);
     return {
       kind: 'execution-failure' as const,
       result: {
@@ -95,7 +97,7 @@ async function inferRealHiddenState(
         model: 'kakaocorp/kanana-2-v-decide-3b-2611',
         revision: KANANA_REVISION,
         error: describeError(error),
-        deviceLost: {reason: lost.reason, message: lost.message},
+        deviceLost: lost,
         gpu: {
           vendor: adapter.info?.vendor ?? '',
           architecture: adapter.info?.architecture ?? '',
@@ -188,7 +190,7 @@ export async function runKananaRealWebGpu(
   pytorchReferenceUrl: string,
   decisionReferenceUrl: string
 ) {
-  const tvmjs = window.tvmjs;
+  const tvmjs = (window as Window & {tvmjs?: TvmJs}).tvmjs;
   if (!tvmjs) throw new Error('Apache TVM JS runtime bundle is not loaded.');
 
   const stages: {name: string; milliseconds: number}[] = [];
@@ -240,7 +242,7 @@ export async function runKananaRealWebGpu(
           cache: false
         });
 
-  const gpuSetup = await tvmjs.detectGPUDevice();
+  const gpuSetup = await detectGPUDevice();
   if (!gpuSetup) throw new Error('This browser does not expose WebGPU.');
   const {adapter, device} = gpuSetup;
   const webgpuErrors: string[] = [];

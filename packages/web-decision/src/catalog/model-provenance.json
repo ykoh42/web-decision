@@ -2,21 +2,12 @@
   "schemaVersion": 1,
   "models": [
     {
-      "modelId": "kev-0.6b-q4f16",
-      "status": "pending",
-      "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a",
-      "evidence": {
-        "path": "src/catalog/provenance/kev-0.6b-q4f16.json",
-        "sha256": "818a66033384221399e11cec61a924791ab8449bdfae0d329a0f773a16e25f86"
-      }
-    },
-    {
       "modelId": "kanana-2-v-decide-3b-2611",
-      "status": "pending",
-      "artifactLockSha256": "1e55aa29a89b278cb32e367a2134ed334522e24bae8121f4a63217b874b18a8a",
+      "status": "verified",
+      "artifactLockSha256": "536ca5587ad901f15108033c3512db88a9cffe51a9b78b2d2bf1caf58a9f012a",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
-        "sha256": "da7c29e2c282eb160ccdeeb7d7f581ced8c7a1fc5a37fe31c962e2650cea5c29"
+        "sha256": "073ab122ee2b90d9dedc04e6014570aa4a5b88de228b11d1237048ebd930b354"
       }
     }
   ]

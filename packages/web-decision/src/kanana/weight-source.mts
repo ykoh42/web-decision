@@ -295,9 +295,10 @@ function selectRequiredWeights(
 
     const sourceRecord = sourceByName.get(required.name);
     if (!sourceRecord) throw invalid(`Graph-required weight is missing from Safetensors: ${required.name}.`);
-    const expectedDtype = sourceRecord.dtype === 'BF16' ? 'float16' : TVM_DTYPE[sourceRecord.dtype];
+    const expectedDtype = TVM_DTYPE[sourceRecord.dtype];
+    const acceptsConvertedBf16 = sourceRecord.dtype === 'BF16' && required.dtype === 'float16';
     if (
-      required.dtype !== expectedDtype ||
+      (required.dtype !== expectedDtype && !acceptsConvertedBf16) ||
       required.length !== sourceRecord.length ||
       required.shape.length !== sourceRecord.shape.length ||
       required.shape.some(

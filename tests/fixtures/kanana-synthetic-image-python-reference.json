@@ -1,0 +1,40 @@
+{
+  "modelId": "kakaocorp/kanana-2-v-decide-3b-2611",
+  "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+  "checkpointSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+  "source": {
+    "runtime": "Python/PyTorch system_one",
+    "parameterDtype": "bfloat16",
+    "mode": "checkpoint_full"
+  },
+  "input": {
+    "path": "tests/fixtures/kanana-synthetic-image.png",
+    "bytes": 4735,
+    "sha256": "9a83fa578ba9d50c10d620fc49551648c581cff2c8fa7613fd7451798ad720cc",
+    "width": 256,
+    "height": 256
+  },
+  "request": {
+    "state": "Inspect this synthetic illustration and decide which description fits best.",
+    "state_format": "text",
+    "temperature": 1.0,
+    "questions": {
+      "action": {
+        "type": "choice",
+        "instructions": "Which object is most prominent?",
+        "criteria": {
+          "rectangle": "A gold rectangle on the left is prominent.",
+          "circle": "A teal circle on the right is prominent."
+        }
+      }
+    }
+  },
+  "result": {
+    "answer": "rectangle",
+    "probabilities": {
+      "rectangle": 0.5994297244441411,
+      "circle": 0.40057027555585895
+    },
+    "confidence": 0.19885944888828216
+  }
+}

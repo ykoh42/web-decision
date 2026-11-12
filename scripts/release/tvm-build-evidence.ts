@@ -12,6 +12,7 @@ export interface TvmBuildModel {
   readonly modelId: string;
   readonly manifestFiles: Readonly<Record<string, AssetMetadata>>;
   readonly tvmVersion: string;
+  readonly tvmSourceRevision?: string;
   readonly sourceArtifacts?: Readonly<Record<string, string>>;
   readonly reportRequirements?: Readonly<Record<string, Readonly<Record<string, string | number | boolean>>>>;
 }
@@ -80,6 +81,7 @@ function inside(root: string, path: string): boolean {
 
 interface ExpectedArtifact extends AssetMetadata {
   readonly tvmVersion: string;
+  readonly tvmSourceRevision: string | undefined;
   readonly sourcePath: string | undefined;
   readonly reportRequirements: Readonly<Record<string, string | number | boolean>>;
 }
@@ -100,6 +102,7 @@ function expectedArtifacts(models: readonly TvmBuildModel[]): Map<string, Expect
       expected.set(`${model.modelId}\0${name}`, {
         ...metadata,
         tvmVersion: model.tvmVersion,
+        tvmSourceRevision: model.tvmSourceRevision,
         sourcePath: model.sourceArtifacts?.[name],
         reportRequirements: model.reportRequirements?.[name] ?? {}
       });
@@ -215,6 +218,24 @@ function validateReportRequirements(
     requireCondition(
       report[field] === value,
       `TVM build report ${field} differs for ${entry.modelId}/${entry.artifact}.`
+    );
+  }
+  if (wanted.tvmSourceRevision) {
+    const environment = report.buildEnvironment;
+    const nativeTvm = isRecord(environment) ? environment.nativeTvm : undefined;
+    const source = isRecord(nativeTvm) ? nativeTvm.source : undefined;
+    requireCondition(
+      isRecord(source) && source.revision === wanted.tvmSourceRevision,
+      `TVM build report source revision differs for ${entry.modelId}/${entry.artifact}.`
+    );
+    requireCondition(
+      Array.isArray(source.patches) && source.patches.length === 0,
+      `TVM build report uses local source patches for ${entry.modelId}/${entry.artifact}.`
+    );
+    const pythonPackage = isRecord(nativeTvm) ? nativeTvm.pythonPackage : undefined;
+    requireCondition(
+      isRecord(pythonPackage) && pythonPackage.version === wanted.tvmVersion,
+      `TVM build report Python package version differs for ${entry.modelId}/${entry.artifact}.`
     );
   }
 }

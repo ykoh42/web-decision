@@ -1,14 +1,13 @@
 """Focused regression for the pinned Kanana text M-RoPE recomposition."""
 
 import importlib.util
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch
 import tvm
 from tvm.relax.frontend.torch import from_exported_program
-
 
 SCRIPT_PATH = Path(__file__).with_name("prototype_text_tvm_relax.py")
 SPEC = importlib.util.spec_from_file_location("kanana_text_tvm_relax", SCRIPT_PATH)
@@ -86,7 +85,9 @@ class StaticMropeRecompositionTest(unittest.TestCase):
         np.testing.assert_array_equal(output, expected.numpy())
 
         webgpu_executable = tvm.relax.build(normalized, target="webgpu")
-        wgsl = "\n".join(source for source in _wgsl_sources(webgpu_executable.mod) if source)
+        wgsl = "\n".join(
+            source for source in _wgsl_sources(webgpu_executable.mod) if source
+        )
         self.assertNotIn("array<i8>", wgsl)
 
 

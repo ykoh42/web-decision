@@ -10,33 +10,39 @@ The provenance gate checks committed evidence hashes and binds any declared upst
 
 ## Kanana exact-package GPU evidence
 
-The Kanana gate is separate from the Kev matrix and accepts only the npm-packed `web-decision@0.4.0` archive pinned in [release-evidence-policy.json](./release-evidence-policy.json). The policy binds the archive SHA-256, Kanana static manifest, checkpoint revision and digest, all five manifest file hashes, and the text reference fixture. The text test checks its recorded TVM WebGPU output against the pinned Python/PyTorch fixture. The image test records the actual synthetic PNG digest and requires the selected `rectangle` option with normalized probabilities. Every record carries the installed archive and entrypoint digests, exact text and vision Wasm hashes, the `navigator.gpu.requestAdapter().info` observation, adapter features and limits, and the model output. The gate requires the three policy-pinned Chromium cases to pass once, with no skip, failure, retry, or omission.
+The Kanana gate is separate from the Kev matrix and accepts only the npm-packed `web-decision@0.4.0` archive pinned in [release-evidence-policy.json](./release-evidence-policy.json). The policy binds the archive SHA-256, Kanana static manifest, checkpoint revision and digest, all five manifest file hashes, and the text and image reference fixtures. The text test checks its recorded TVM WebGPU output against the pinned Python/PyTorch fixture. The image test checks the selected option and probabilities against its pinned Python/PyTorch fixture. Every record carries the installed archive and entrypoint digests, exact text and vision Wasm hashes, the `navigator.gpu.requestAdapter().info` observation, adapter features and limits, and the model output. The policy pins the source hashes of all four GPU test files and their evidence helpers; release verification requires those files to match committed `HEAD` bytes.
 
-The offline case loads the text model with `cache: true`, completes a reference inference, then loads with `offline: true` while Playwright routes abort requests. The record must show positive priming bytes, no attempted requests, and matching online/offline outputs. All three GPU tests remain opt-in.
+The offline case loads the text model with `cache: true`, completes a reference inference, then loads with `offline: true` while Playwright routes abort requests. The record must show positive priming bytes, no attempted requests, and matching online/offline outputs. A fourth pinned test exercises the 20,480-token boundary and validates the exact archive, truncation result, probability distribution, and WebGPU limits. All four GPU tests remain opt-in.
 
 The Kanana gate also requires independent rebuild evidence for both packaged TVM modules: `kanana-text-model.wasm` and `kanana-vision-model.wasm`. Each evidence entry points to a successful `web-decision-tvm-build-v1` report and a rebuilt WASM inside a build directory outside both `packages/web-decision` and the installed archive. The verifier checks each artifact's byte count and SHA-256 against the archive-pinned manifest, checks the report's TVM version and output hash, and requires its repository, revision, checkpoint digest, graph name, `buildBackend: native-tvm`, `weightSource: pinned-safetensors`, and `onnxImportOrExportUsed: false` fields to match the Kanana pins. One record per artifact is required. Direct package paths and package hardlinks are rejected. Separate byte-for-byte copies cannot be distinguished from independent deterministic build outputs by hashes alone; retain the underlying build logs and review them with the report.
 
-For a local exact-archive inference run before the policy is committed, set `WEB_DECISION_KANANA_LOCAL_GPU=1`. This mode still checks the current policy bytes against the verifier pin, verifies the exact archive against its installed package, and runs the snapshot, GPU, and inference assertions. By default it skips structured evidence emission. Set `WEB_DECISION_KANANA_EMIT_EVIDENCE=1` to emit structured candidate records that can be checked against the current policy; these records still cannot pass production release verification until the policy and provenance inputs match committed bytes. For strict release evidence, leave both local variables unset and set `WEB_DECISION_KANANA_CURATED_REAL_GPU=1`.
+For a local exact-archive inference run before the policy is committed, set `WEB_DECISION_KANANA_LOCAL_GPU=1`. This mode still checks the current policy bytes against the verifier pin, verifies the exact archive against its installed package, and runs the snapshot, GPU, and inference assertions. Set `WEB_DECISION_KANANA_RELEASE_EVIDENCE=1` to emit structured records that the verifier can check. For strict release evidence, leave `WEB_DECISION_KANANA_LOCAL_GPU` unset and set both `WEB_DECISION_KANANA_RELEASE_EVIDENCE=1` and `WEB_DECISION_KANANA_CURATED_REAL_GPU=1`.
 
 ```sh
 export WEB_DECISION_RELEASE_ARCHIVE=/release/web-decision-0.4.0.tgz
 export WEB_DECISION_RELEASE_PACKAGE_DIR=/release/consumer/node_modules/web-decision
 export WEB_DECISION_INSTALLED_BUNDLE=/release/consumer/node_modules/web-decision/dist/index.js
 export WEB_DECISION_REAL_GPU=1
+export WEB_DECISION_KANANA_RELEASE_EVIDENCE=1
 export WEB_DECISION_KANANA_CURATED_REAL_GPU=1
 export WEB_DECISION_BROWSER_NAME=chromium
 export WEB_DECISION_BROWSER_CHANNEL=chrome
 export PLAYWRIGHT_JSON_OUTPUT_NAME=/release/kanana-playwright-report.json
+export WEB_DECISION_KANANA_MAX_CONTEXT_REPORT=/release/kanana-max-context-playwright-report.json
 export WEB_DECISION_TVM_BUILD_EVIDENCE=/release/kanana-tvm-build-evidence.json
 pnpm exec playwright test \
   tests/browser/kanana-curated-text-real-webgpu.spec.ts \
   tests/browser/kanana-curated-real-webgpu.spec.ts \
   tests/browser/kanana-curated-offline-text-real-webgpu.spec.ts \
   --reporter=json
+WEB_DECISION_REAL_GPU=1 WEB_DECISION_KANANA_MAX_CONTEXT_GPU=1 \
+  pnpm exec playwright test tests/browser/kanana-max-context-real-webgpu.spec.ts \
+  --reporter=json > "$WEB_DECISION_KANANA_MAX_CONTEXT_REPORT"
 node --import tsx scripts/release/verify-release-evidence.ts --kanana \
   --archive "$WEB_DECISION_RELEASE_ARCHIVE" \
   --installed-package "$WEB_DECISION_RELEASE_PACKAGE_DIR" \
   --playwright-report "$PLAYWRIGHT_JSON_OUTPUT_NAME" \
+  --max-context-report "$WEB_DECISION_KANANA_MAX_CONTEXT_REPORT" \
   --build-evidence "$WEB_DECISION_TVM_BUILD_EVIDENCE"
 ```
 
@@ -104,6 +110,7 @@ For Kanana, invoke the separate mode with the same exact archive, installed pack
   -Archive $env:WEB_DECISION_RELEASE_ARCHIVE `
   -InstalledPackage $env:WEB_DECISION_RELEASE_PACKAGE_DIR `
   -PlaywrightReport $env:PLAYWRIGHT_JSON_OUTPUT_NAME `
+  -MaxContextReport $env:WEB_DECISION_KANANA_MAX_CONTEXT_REPORT `
   -BuildEvidence $env:WEB_DECISION_TVM_BUILD_EVIDENCE
 ```
 

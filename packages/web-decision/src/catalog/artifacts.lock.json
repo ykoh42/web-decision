@@ -1,127 +1,18 @@
 {
   "schemaVersion": 1,
   "byModelId": {
-    "kev-0.6b-q4f16": {
-      "schemaVersion": 1,
-      "manifest": {
-        "sourcePath": "assets/kev06-stable/manifest.json",
-        "rawSha256": "21834ab1aa5cd6d674054bae371543bf0eaf0a2d97ca81c8752a0002b1fe3bf2",
-        "canonicalSha256": "57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2",
-        "canonicalBytes": 2068,
-        "experimental": true,
-        "files": {
-          "model.wasm": {
-            "sha256": "ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0",
-            "bytes": 6807324
-          },
-          "tokenizer.json": {
-            "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
-            "bytes": 7031645
-          },
-          "tokenizer_config.json": {
-            "sha256": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
-            "bytes": 9678
-          },
-          "model_config.json": {
-            "sha256": "40ce1c875acf016ab7742ecdc45d3bad0fe8c51d3ead0ca2263ec5eb4e96f42d",
-            "bytes": 2267
-          },
-          "weights/tensor-cache.json": {
-            "sha256": "d81bd1a6151d47d99292b59bb7fb3f974f779e2c9c26269238c85d954c665691",
-            "bytes": 138762
-          },
-          "weights/params_shard_0.bin": {
-            "sha256": "389b31f41b7941517e3d3ca068b3d057eec8642370c7bc637943fe12201b27a5",
-            "bytes": 77791232
-          },
-          "weights/params_shard_1.bin": {
-            "sha256": "ee5ffc708c5059886585f69b9e0be67597f1893365fa4c93d2e860beb24e7455",
-            "bytes": 33030144
-          },
-          "weights/params_shard_2.bin": {
-            "sha256": "a15723feb9034bd9abc071c35db1c9cf7ca85f507fd99afe66d4d1fc4eacc223",
-            "bytes": 33030144
-          },
-          "weights/params_shard_3.bin": {
-            "sha256": "ede08c41d34db032e1bd5e9416c29291f50ddf7925af230f8aab2b8bfa32fd64",
-            "bytes": 33030144
-          },
-          "weights/params_shard_4.bin": {
-            "sha256": "17920657d0a1bd3fe7a0129914ab53e16342967c3c023d7e6b593ce3e8561706",
-            "bytes": 33030144
-          },
-          "weights/params_shard_5.bin": {
-            "sha256": "f9fa6e62d60233b793660a79d461f02d3a115f94d7d551a821767cd63d1acbba",
-            "bytes": 33030144
-          },
-          "weights/params_shard_6.bin": {
-            "sha256": "9e8c7f110b6bad3659d2db93568b7508f5bdfb2df965b37791e840f7012dd94f",
-            "bytes": 33030144
-          },
-          "weights/params_shard_7.bin": {
-            "sha256": "54eba46256fd39aed80104759b7552a2f22ba67e9f2ec3afc64f9c6f0c1b6101",
-            "bytes": 33513472
-          },
-          "weights/params_shard_8.bin": {
-            "sha256": "98ef5f5b3e1b63ea5efb43441c7eca62a96e00735dad29b2c8d0f406128640ec",
-            "bytes": 25755648
-          }
-        }
-      },
-      "bundledRuntimeFiles": [
-        {
-          "manifestName": "model.wasm",
-          "sourcePath": "assets/kev06-stable/model.wasm",
-          "bytes": 6807324,
-          "sha256": "ecc2bdce793221f4f370890d2ac4ddcb6082b85da05a645f3554903768b03cb0"
-        },
-        {
-          "manifestName": "tokenizer.json",
-          "sourcePath": "assets/experimental-kev-upstream/tokenizer.json",
-          "bytes": 7031645,
-          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
-        },
-        {
-          "manifestName": "tokenizer_config.json",
-          "sourcePath": "assets/experimental-kev-upstream/tokenizer_config.json",
-          "bytes": 9678,
-          "sha256": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5"
-        },
-        {
-          "manifestName": "model_config.json",
-          "sourcePath": "assets/experimental-kev-upstream/model_config.json",
-          "bytes": 2267,
-          "sha256": "40ce1c875acf016ab7742ecdc45d3bad0fe8c51d3ead0ca2263ec5eb4e96f42d"
-        },
-        {
-          "manifestName": "weights/tensor-cache.json",
-          "sourcePath": "assets/experimental-kev-upstream/weights/tensor-cache.json",
-          "bytes": 138762,
-          "sha256": "d81bd1a6151d47d99292b59bb7fb3f974f779e2c9c26269238c85d954c665691"
-        }
-      ],
-      "upstream": {
-        "repository": "onnx-community/kev-0.6b-ONNX",
-        "revision": "5a827091b3d58fe4fdfc02a5a5b2ce364047d678",
-        "sourcePath": "onnx/model_q4f16.onnx_data",
-        "sourceBytes": 335357952,
-        "sourceSha256": "777335dbc052e2e02ec7591f6eefcfb29e2c28caf52075e492d226fc27e0824b",
-        "shardMapPath": "assets/experimental-kev-upstream/source-shard-map.json",
-        "shardMapSha256": "bbe4279b99d995770bd3ba681d17cec07e4f083aeaaddffb0a3ce26d07e81065"
-      }
-    },
     "kanana-2-v-decide-3b-2611": {
       "schemaVersion": 1,
       "manifest": {
         "sourcePath": "assets/kanana/manifest.json",
-        "rawSha256": "0a97f2f3febed6b48be667c34c928891904efc2443dc4b95e0e78767b08eb858",
-        "canonicalSha256": "0e2b8ea3cd733e3fef807d574f68960b06cbfd4e0f919af408f4ca76a18bc801",
-        "canonicalBytes": 1383,
+        "rawSha256": "6ad86479bd30e9913ea5d4a1d5d17342d2bdd39d1b091af2156aaf4d87a35839",
+        "canonicalSha256": "d4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5",
+        "canonicalBytes": 1706,
         "experimental": false,
         "files": {
           "kanana-text-model.wasm": {
-            "bytes": 4477518,
-            "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+            "bytes": 4208785,
+            "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
           },
           "text-weight-manifest.json": {
             "bytes": 102978,
@@ -129,7 +20,7 @@
           },
           "kanana-vision-model.wasm": {
             "bytes": 4414887,
-            "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+            "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
           },
           "vision-weight-manifest.json": {
             "bytes": 100018,
@@ -145,8 +36,8 @@
         {
           "manifestName": "kanana-text-model.wasm",
           "sourcePath": "assets/kanana/kanana-text-model.wasm",
-          "bytes": 4477518,
-          "sha256": "f0e22c3d113e037675f0cad6dfeefef2ed21045a957b96f15ff270a59add9a09"
+          "bytes": 4208785,
+          "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
         },
         {
           "manifestName": "text-weight-manifest.json",
@@ -158,7 +49,7 @@
           "manifestName": "kanana-vision-model.wasm",
           "sourcePath": "assets/kanana/kanana-vision-model.wasm",
           "bytes": 4414887,
-          "sha256": "6ddac1315c3bd3ed25cf1ad831f4334da206420dcd3a786ca82dc10f4ec935d6"
+          "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
         },
         {
           "manifestName": "vision-weight-manifest.json",

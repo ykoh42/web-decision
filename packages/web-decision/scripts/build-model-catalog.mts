@@ -305,7 +305,7 @@ async function createKananaArtifactLock(model: CuratedModel): Promise<ModelArtif
 }
 
 export async function createModelArtifactLock(model: CuratedModel): Promise<ModelArtifactLock> {
-  if (model.description.adapter === 'kev06') return createKev06ArtifactLock(model);
+  if (String(model.description.adapter) === 'kev06') return createKev06ArtifactLock(model);
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }

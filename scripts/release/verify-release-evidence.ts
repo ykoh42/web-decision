@@ -23,6 +23,7 @@ import {
 } from '../../tests/browser/kev06-expanded-inference.ts';
 import {
   validateKananaEvidencePolicy,
+  validateKananaMaximumContextPlaywrightReport,
   validateKananaManifestBytes,
   validateKananaPlaywrightReport,
   verifyKananaTvmBuildEvidence,
@@ -193,7 +194,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(process.env.WEB_DECISION_WORKSPACE_ROOT ?? resolve(SCRIPT_DIRECTORY, '../..'));
 const RELEASE_SCRIPT_DIRECTORY = join(WORKSPACE_ROOT, 'scripts/release');
 const POLICY_PATH = join(RELEASE_SCRIPT_DIRECTORY, 'release-evidence-policy.json');
-export const RELEASE_EVIDENCE_POLICY_SHA256 = 'b40f73d94e8e951123c3f16a5a8db125a07e55c9b4ace87eaba5ffb34bd974e2';
+export const RELEASE_EVIDENCE_POLICY_SHA256 = '79057394dec404860c945eabd46a95da72ac1abc04a08b47920da04b89dd7130';
 export const BASELINE_REFERENCE = Object.freeze({
   packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
   fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',
@@ -371,6 +372,21 @@ function assertCommittedCatalogSources(workspaceRoot: string): void {
     encoding: 'utf8'
   });
   assert.equal(untracked, '', 'Model catalog and asset inputs must be committed.');
+}
+
+async function assertCommittedKananaTestSources(workspaceRoot: string, policy: KananaEvidencePolicy): Promise<void> {
+  const supportSources = Object.entries(policy.testSupportSources).map(([file, sourceSha256]) => ({
+    file,
+    sourceSha256
+  }));
+  const tests = [...Object.values(policy.tests), policy.maximumContext, ...supportSources];
+  for (const test of tests) {
+    const bytes = await readFile(resolve(workspaceRoot, test.file));
+    assert.equal(sha256(bytes), test.sourceSha256, `Kanana test source differs from its policy pin: ${test.file}`);
+    execFileSync('git', ['ls-files', '--error-unmatch', test.file], {cwd: workspaceRoot, stdio: 'ignore'});
+    const committed = execFileSync('git', ['show', `HEAD:${test.file}`], {cwd: workspaceRoot});
+    assert.deepEqual(bytes, committed, `Kanana GPU test differs from the committed source: ${test.file}`);
+  }
 }
 
 async function readCommittedFixture(workspaceRoot: string, path: string, digest: string): Promise<AnyRecord> {
@@ -1437,13 +1453,54 @@ interface KananaReleaseEvidenceOptions {
   archivePath: string;
   installedPackagePath: string;
   playwrightReportPath: string;
+  maxContextReportPath: string;
   buildEvidencePath: string;
   workspaceRoot?: string;
+}
+
+async function assertKananaExactPackageProvenance(
+  workspaceRoot: string,
+  inputs: KananaReleaseEvidenceInputs,
+  playwrightReportBytes: Buffer,
+  maxContextReportBytes: Buffer
+): Promise<void> {
+  const evidencePath = join(
+    workspaceRoot,
+    'packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json'
+  );
+  const evidence = JSON.parse(await readFile(evidencePath, 'utf8')) as AnyRecord;
+  const exactPackage = evidence.validation?.exactPackageWebgpu as AnyRecord;
+  const candidate = exactPackage?.candidateArchive as AnyRecord;
+  assert.equal(candidate?.version, inputs.archive.packageVersion);
+  assert.equal(candidate?.archiveSha256, inputs.archive.archiveSha256);
+  assert.equal(candidate?.packageTreeSha256, inputs.archive.packageTreeSha256);
+  assert.equal(candidate?.bundleSha256, inputs.archive.bundleSha256);
+  assert.equal(candidate?.playwrightReportSha256, sha256(playwrightReportBytes));
+  assert.equal(exactPackage?.maximumLength?.maxLength, inputs.policy.maximumContext.maxTokens);
+  assert.equal(exactPackage?.maximumLength?.passed, true);
+  assert.equal(exactPackage?.maximumLength?.playwrightReportSha256, sha256(maxContextReportBytes));
+
+  const configPath = join(workspaceRoot, 'packages/web-decision/src/catalog/provenance/kanana-conversion-config.json');
+  const config = JSON.parse(await readFile(configPath, 'utf8')) as AnyRecord;
+  const publicApi = config.validation?.curatedPublicApiReleaseTestsEvidence as AnyRecord;
+  assert.equal(publicApi?.archiveSha256, inputs.archive.archiveSha256);
+  assert.equal(publicApi?.packageTreeSha256, inputs.archive.packageTreeSha256);
+  assert.equal(publicApi?.bundleSha256, inputs.archive.bundleSha256);
+  assert.equal(publicApi?.reportSha256, sha256(playwrightReportBytes));
+  const maximumLength = config.validation?.maxContextBoundaryEvidence as AnyRecord;
+  assert.equal(maximumLength?.archiveSha256, inputs.archive.archiveSha256);
+  assert.equal(maximumLength?.packageTreeSha256, inputs.archive.packageTreeSha256);
+  assert.equal(maximumLength?.bundleSha256, inputs.archive.bundleSha256);
+  assert.equal(maximumLength?.reportSha256, sha256(maxContextReportBytes));
 }
 
 export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidenceOptions): Promise<AnyRecord> {
   const workspaceRoot = resolve(options.workspaceRoot ?? WORKSPACE_ROOT);
   const policy = await loadTrustedKananaPolicy(workspaceRoot);
+  assertCommittedCatalogSources(workspaceRoot);
+  const provenance = await assertCommittedPackageProvenance(workspaceRoot);
+  assert.deepEqual(provenance.modelIds, [policy.model.modelId], 'Kanana release provenance must contain only Kanana.');
+  await assertCommittedKananaTestSources(workspaceRoot, policy);
   const fixture = await readCommittedFixture(
     workspaceRoot,
     policy.referenceFixture.path,
@@ -1455,6 +1512,22 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
     fixture.checkpointSha256,
     policy.model.checkpointSha256,
     'Kanana text fixture checkpoint pin differs from policy.'
+  );
+  const imageFixture = await readCommittedFixture(
+    workspaceRoot,
+    policy.imageReferenceFixture.path,
+    policy.imageReferenceFixture.sha256
+  );
+  assert.equal(
+    imageFixture.modelId,
+    `${policy.model.repository}`,
+    'Kanana image fixture model ID differs from policy.'
+  );
+  assert.equal(imageFixture.revision, policy.model.revision, 'Kanana image fixture revision differs from policy.');
+  assert.equal(
+    imageFixture.checkpointSha256,
+    policy.model.checkpointSha256,
+    'Kanana image fixture checkpoint pin differs from policy.'
   );
 
   const inputs = await collectKananaReleaseEvidenceInputs({
@@ -1468,14 +1541,21 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
     inputs,
     join(workspaceRoot, 'packages/web-decision')
   );
-  const report = JSON.parse(await readFile(options.playwrightReportPath, 'utf8')) as PlaywrightReport;
-  const browserResults = validateKananaPlaywrightReport(report, {
+  const playwrightReportBytes = await readFile(options.playwrightReportPath);
+  const report = JSON.parse(playwrightReportBytes.toString('utf8')) as PlaywrightReport;
+  const maxContextReportBytes = await readFile(options.maxContextReportPath);
+  const maxContextReport = JSON.parse(maxContextReportBytes.toString('utf8')) as PlaywrightReport;
+  const verificationContext = {
     archive: inputs.archive,
     manifest: inputs.manifest,
     policy,
     referenceFixture: fixture as KananaVerificationContext['referenceFixture'],
+    imageReferenceFixture: imageFixture as KananaVerificationContext['imageReferenceFixture'],
     workspaceRoot
-  });
+  };
+  const browserResults = validateKananaPlaywrightReport(report, verificationContext);
+  const maximumContextResults = validateKananaMaximumContextPlaywrightReport(maxContextReport, verificationContext);
+  await assertKananaExactPackageProvenance(workspaceRoot, inputs, playwrightReportBytes, maxContextReportBytes);
   const finalArchive = await verifyArchiveInstall(options.archivePath, options.installedPackagePath);
   assert.equal(finalArchive.archiveSha256, inputs.archive.archiveSha256, 'Kanana archive changed during verification.');
   assert.equal(
@@ -1503,7 +1583,8 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
     manifestSha256: inputs.manifest.manifestSha256,
     artifacts: inputs.manifest.files,
     builds,
-    browserResults
+    browserResults,
+    maximumContextResults
   };
 }
 
@@ -1653,7 +1734,9 @@ function parseKananaArguments(args: string[]): KananaReleaseEvidenceOptions {
     const value = args[index + 1];
     fail(typeof key === 'string', 'Missing option name.');
     fail(
-      ['--archive', '--installed-package', '--playwright-report', '--build-evidence'].includes(key),
+      ['--archive', '--installed-package', '--playwright-report', '--max-context-report', '--build-evidence'].includes(
+        key
+      ),
       `Unknown Kanana verification option: ${key}`
     );
     fail(typeof value === 'string' && !value.startsWith('--'), `Missing value for ${key}.`);
@@ -1669,6 +1752,7 @@ function parseKananaArguments(args: string[]): KananaReleaseEvidenceOptions {
     archivePath: requiredValue('--archive'),
     installedPackagePath: requiredValue('--installed-package'),
     playwrightReportPath: requiredValue('--playwright-report'),
+    maxContextReportPath: requiredValue('--max-context-report'),
     buildEvidencePath: requiredValue('--build-evidence')
   };
 }

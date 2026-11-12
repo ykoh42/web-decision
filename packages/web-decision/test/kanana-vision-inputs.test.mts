@@ -23,6 +23,18 @@ test('matches the pinned Qwen3-VL patch order and bilinear lookup for a merged i
   assert.deepEqual(inputs.mergedTokens, new Int32Array(6));
 });
 
+test('matches pinned float32 interpolation rounding for a nonuniform grid', () => {
+  const inputs = prepareKananaVisionGraphInputs([1, 16, 24], {numPositionEmbeddings: 256});
+
+  assert.deepEqual(
+    inputs.interpolationWeights.slice(0, 24),
+    new Float32Array([
+      1, 0, 0, 0, 0.3478260636329651, 0.6521739363670349, 0, 0, 1, 0, 0, 0, 0.3478260636329651, 0.6521739363670349, 0,
+      0, 0.6956521272659302, 0.3043478727340698, 0, 0, 0.04347825050354004, 0.95652174949646, 0, 0
+    ])
+  );
+});
+
 test('handles singleton grids and rejects invalid patch geometry', () => {
   const singleton = prepareKananaVisionGraphInputs([1, 2, 2], {numPositionEmbeddings: 1});
   assert.deepEqual(singleton.positionIds, new Int32Array([0, 0, 0, 1, 1, 0, 1, 1]));

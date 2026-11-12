@@ -1,5 +1,5 @@
 import {KANANA_EMBEDDING_SIZE, KANANA_IMAGE_TOKEN_ID, KANANA_MODEL_MAX_LENGTH, KANANA_VOCAB_SIZE} from './contract.mjs';
-import {prepareKananaVisionGraphInputs} from './vision-inputs.js';
+import {kananaVisionPatchCount, prepareKananaVisionGraphInputs} from './vision-inputs.js';
 import type {KananaTvmSetup, TvmRuntimeLike} from './tvm-runtime.js';
 
 type ByteInput = ArrayBuffer | ArrayBufferView;
@@ -257,13 +257,26 @@ function inspectMain(setup: KananaTvmInferenceSessionOptions['setup'], weightCou
   return {main, parameterNames: parameterNames as string[]};
 }
 
-function indexedValues(value: unknown, label: string): number[] {
+function indexedValues(
+  value: unknown,
+  label: string,
+  options: {expectedLength?: number; maximumLength?: number; maximumLengthCode?: string} = {}
+): number[] {
   if (!Array.isArray(value) && !(ArrayBuffer.isView(value) && !(value instanceof DataView)))
     fail('invalid_input', `${label} must be an array of numbers.`);
   const source = value as ArrayLike<unknown>;
+  const length = source.length;
+  if (!Number.isSafeInteger(length) || length < 0) fail('invalid_input', `${label} must have a valid length.`);
+  if (options.expectedLength !== undefined && length !== options.expectedLength)
+    fail('invalid_input', `${label} must contain ${options.expectedLength} values.`);
+  if (options.maximumLength !== undefined && length > options.maximumLength)
+    fail(
+      options.maximumLengthCode ?? 'invalid_input',
+      `${label} contains ${length} values, exceeding the limit of ${options.maximumLength}.`
+    );
   const values: number[] = [];
-  values.length = source.length;
-  for (let index = 0; index < source.length; index++) {
+  values.length = length;
+  for (let index = 0; index < length; index++) {
     if (Array.isArray(value) && !Object.hasOwn(value, index))
       fail('invalid_input', `${label} must not contain empty entries.`);
     const item = source[index];
@@ -299,8 +312,8 @@ function linearPositionIds(sequenceLength: number): Int32Array {
 }
 
 function validateMultimodalPositions(positionValues: readonly number[], sequenceLength: number): void {
-  if (positionValues.length !== 4 * sequenceLength || positionValues.some((value) => value < 0))
-    fail('invalid_input', 'position_ids must contain four nonnegative axis rows matching the input sequence.');
+  if (positionValues.length !== 4 * sequenceLength || positionValues.some((value) => value < 0 || value > 0x7fffffff))
+    fail('invalid_input', 'position_ids must contain four nonnegative int32 axis rows matching the input sequence.');
 }
 
 function validateImageEmbeddingShape(
@@ -334,13 +347,14 @@ function validateImageTokenPositions(
     fail('invalid_input', 'image_positions must match image-token positions in prompt order.');
 }
 
-function copyImageEmbeddingValues(values: ArrayLike<number>): Float32Array {
+function copyFloat32Values(values: ArrayLike<number>, label: string): Float32Array {
   const copy = new Float32Array(values.length);
   for (let index = 0; index < values.length; index++) {
     const value = values[index];
-    if (typeof value !== 'number' || !Number.isFinite(value))
-      fail('invalid_input', 'image_embeddings must contain finite float32 values.');
-    copy[index] = value;
+    const float32Value = typeof value === 'number' ? Math.fround(value) : Number.NaN;
+    if (!Number.isFinite(value) || !Number.isFinite(float32Value))
+      fail('invalid_input', `${label} must contain finite float32 values.`);
+    copy[index] = float32Value;
   }
   return copy;
 }
@@ -354,7 +368,9 @@ function multimodalInputData(
 ): Pick<KananaTvmInputData, 'imageEmbeddings' | 'imagePositions' | 'positionIds'> {
   const sequenceLength = ids.length;
   validateMultimodalPositions(positionValues, sequenceLength);
-  const imagePositions = indexedValues(multimodal.imagePositions, 'image_positions');
+  const imagePositions = indexedValues(multimodal.imagePositions, 'image_positions', {
+    maximumLength: sequenceLength
+  });
   const imageEmbeddingShape = multimodal.imageEmbeddings?.shape;
   const imageEmbeddingValues = multimodal.imageEmbeddings?.values;
   validateImageEmbeddingShape(imageEmbeddingShape, imageEmbeddingValues, embeddingSize);
@@ -362,7 +378,7 @@ function multimodalInputData(
     fail('invalid_input', 'image_embeddings and image_positions must contain the same number of image tokens.');
   validateImageTokenPositions(ids, imagePositions, imageTokenId);
   return {
-    imageEmbeddings: copyImageEmbeddingValues(imageEmbeddingValues),
+    imageEmbeddings: copyFloat32Values(imageEmbeddingValues, 'image_embeddings'),
     imagePositions: Int32Array.from(imagePositions),
     positionIds: Int32Array.from(positionValues)
   };
@@ -376,10 +392,13 @@ function inputTensorData(
   embeddingSize: number,
   imageTokenId: number
 ): KananaTvmInputData {
-  const ids = indexedValues(inputIds, 'input_ids');
+  const ids = indexedValues(inputIds, 'input_ids', {
+    maximumLength: KANANA_MODEL_MAX_LENGTH,
+    maximumLengthCode: 'input_too_long'
+  });
   validateTokenIds(ids);
 
-  const mask = indexedValues(attentionMask, 'attention_mask');
+  const mask = indexedValues(attentionMask, 'attention_mask', {expectedLength: ids.length});
   validateAttentionMask(mask, ids.length);
   const result: KananaTvmInputData = {ids: Int32Array.from(ids), mask: Int32Array.from(mask)};
   if (!expectsMultimodalInputs) {
@@ -388,7 +407,9 @@ function inputTensorData(
   }
 
   const sequenceLength = ids.length;
-  const positionValues = multimodal ? indexedValues(multimodal.positionIds, 'position_ids') : [];
+  const positionValues = multimodal
+    ? indexedValues(multimodal.positionIds, 'position_ids', {expectedLength: 4 * sequenceLength})
+    : [];
   if (!multimodal) {
     result.imageEmbeddings = new Float32Array(0);
     result.imagePositions = new Int32Array(0);
@@ -417,23 +438,17 @@ function visionInputData(
     fail('vision_config', 'Kanana TVM vision patch dimensions must be positive safe integers.');
   if (!pixelValues || !Number.isSafeInteger(pixelValues.length) || pixelValues.length < 1)
     fail('invalid_input', 'pixel_values must be a nonempty indexed sequence.');
+  const patchCount = kananaVisionPatchCount(gridValue, options.spatialMergeSize);
+  if (patchCount > options.maxPatchCount)
+    fail('input_too_large', `Kanana vision graph supports at most ${options.maxPatchCount} patches.`);
   const inputs = prepareKananaVisionGraphInputs(gridValue, {
     numPositionEmbeddings: options.numPositionEmbeddings,
     spatialMergeSize: options.spatialMergeSize
   });
-  const patchCount = inputs.positionShape[0];
-  if (patchCount > options.maxPatchCount)
-    fail('input_too_large', `Kanana vision graph supports at most ${options.maxPatchCount} patches.`);
   if (pixelValues.length !== patchCount * options.patchValues)
     fail('invalid_input', `pixel_values must contain ${patchCount * options.patchValues} values for this vision grid.`);
 
-  const pixels = new Float32Array(pixelValues.length);
-  for (let index = 0; index < pixelValues.length; index++) {
-    const value = pixelValues[index];
-    if (typeof value !== 'number' || !Number.isFinite(value))
-      fail('invalid_input', 'pixel_values must contain finite float32 values.');
-    pixels[index] = value;
-  }
+  const pixels = copyFloat32Values(pixelValues, 'pixel_values');
   return {pixels, ...inputs};
 }
 
@@ -485,6 +500,59 @@ function releaseSetupAfterFailure(setup: KananaTvmInferenceSessionOptions['setup
   throw error;
 }
 
+function validateInferenceOptions(
+  weightSource: KananaTvmWeightSource,
+  embeddingSize: number,
+  imageTokenId: number
+): void {
+  if (!weightSource || typeof weightSource !== 'object')
+    fail('weight_manifest', 'A verified Kanana TVM weight source is required.');
+  if (!Number.isSafeInteger(embeddingSize) || embeddingSize < 1)
+    fail('invalid_config', 'Kanana TVM embeddingSize must be a positive safe integer.');
+  if (!Number.isSafeInteger(imageTokenId) || imageTokenId < 0 || imageTokenId >= KANANA_VOCAB_SIZE)
+    fail('invalid_config', 'Kanana TVM imageTokenId must be within the pinned vocabulary.');
+}
+
+async function loadOrderedWeights(
+  source: KananaTvmWeightSource,
+  ordered: readonly IndexedWeightRecord[],
+  runtime: KananaTvmRuntimeLike,
+  device: TvmDeviceLike & object
+): Promise<TvmTensorLike[]> {
+  const weights: TvmTensorLike[] = [];
+  for (const entry of ordered) {
+    const bytes = await readWeightBytes(source, entry.record, entry.sourceIndex);
+    const tensor = runtime.empty([...entry.record.shape], entry.record.dtype, device).copyFromRawBytes(bytes);
+    weights.push(tensor);
+    if (weights.length % 4 === 0 || weights.length === ordered.length) await device.sync();
+  }
+  return weights;
+}
+
+function wrapInferenceError(stage: string, error: unknown): Error {
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const failure = new Error(`Kanana TVM ${stage} failed: ${detail}`, {cause: error});
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+  if (code !== undefined) Object.assign(failure, {code});
+  return failure;
+}
+
+function throwInferenceErrors(
+  inferenceFailed: boolean,
+  inferenceError: unknown,
+  scopeCleanupFailed: boolean,
+  scopeCleanupError: unknown
+): void {
+  if (inferenceFailed && scopeCleanupFailed)
+    throw new AggregateError(
+      [inferenceError, scopeCleanupError],
+      'Kanana TVM inference and scope cleanup both failed.',
+      {cause: inferenceError}
+    );
+  if (inferenceFailed) throw inferenceError;
+  if (scopeCleanupFailed) throw scopeCleanupError;
+}
+
 /**
  * Load caller-verified weights into an already scoped TVM setup and create a text-graph inference session.
  * The weight reader must return verified bytes; transport, caching, and asset verification stay with the caller.
@@ -496,26 +564,14 @@ export async function createKananaTvmInferenceSession({
   imageTokenId = KANANA_IMAGE_TOKEN_ID
 }: KananaTvmInferenceSessionOptions): Promise<KananaTvmInferenceSession> {
   try {
-    if (!weightSource || typeof weightSource !== 'object')
-      fail('weight_manifest', 'A verified Kanana TVM weight source is required.');
-    if (!Number.isSafeInteger(embeddingSize) || embeddingSize < 1)
-      fail('invalid_config', 'Kanana TVM embeddingSize must be a positive safe integer.');
-    if (!Number.isSafeInteger(imageTokenId) || imageTokenId < 0 || imageTokenId >= KANANA_VOCAB_SIZE)
-      fail('invalid_config', 'Kanana TVM imageTokenId must be within the pinned vocabulary.');
+    validateInferenceOptions(weightSource, embeddingSize, imageTokenId);
     const records = weightRecords(weightSource);
     const {main, parameterNames} = inspectMain(setup, records.length);
     const inputParameterCount = inputCount(parameterNames, records);
     const ordered = orderedWeightRecords(parameterNames, records, inputParameterCount);
     const runtime = setup.runtime as KananaTvmRuntimeLike;
     const device = runtime.webgpu();
-    const weights: TvmTensorLike[] = [];
-
-    for (const entry of ordered) {
-      const bytes = await readWeightBytes(weightSource, entry.record, entry.sourceIndex);
-      const tensor = runtime.empty([...entry.record.shape], entry.record.dtype, device).copyFromRawBytes(bytes);
-      weights.push(tensor);
-      if (weights.length % 4 === 0 || weights.length === ordered.length) await device.sync();
-    }
+    const weights = await loadOrderedWeights(weightSource, ordered, runtime, device);
 
     let disposed = false;
     let pendingInference = Promise.resolve();
@@ -529,6 +585,7 @@ export async function createKananaTvmInferenceSession({
       let scopeCleanupFailed = false;
       let scopeCleanupError: unknown;
       let result: KananaTvmInferenceResult | undefined;
+      let stage = 'input tensor preparation';
       try {
         const idsTensor = runtime.empty([1, ids.length], 'int32', device).copyFrom(ids);
         const maskTensor = runtime.empty([1, mask.length], 'int32', device).copyFrom(mask);
@@ -544,19 +601,25 @@ export async function createKananaTvmInferenceSession({
             runtime.empty([4, 1, ids.length], 'int32', device).copyFrom(positionIds)
           );
         }
+        stage = 'graph execution';
         const output = (await main(...modelInputs, ...weights)) as TvmTensorLike;
+        stage = 'WebGPU execution synchronization';
         await device.sync();
 
+        stage = 'output validation';
         if (!output || output.dtype !== 'float32' || typeof output.toRawBytes !== 'function')
           fail('output_dtype', 'Kanana TVM main must return float32 hidden-state values.');
         const shape = outputShape(output.shape);
+        stage = 'output copy to CPU';
         const host = runtime.empty(shape, 'float32', runtime.cpu()).copyFrom(output);
+        stage = 'CPU output synchronization';
         await device.sync();
+        stage = 'CPU output readback';
         const values = float32Values(host.toRawBytes(), shape);
         result = Object.freeze({shape: Object.freeze(shape), dtype: 'float32' as const, values});
       } catch (error) {
         inferenceFailed = true;
-        inferenceError = error;
+        inferenceError = wrapInferenceError(stage, error);
       }
       try {
         runtime.endScope();
@@ -564,14 +627,7 @@ export async function createKananaTvmInferenceSession({
         scopeCleanupFailed = true;
         scopeCleanupError = error;
       }
-      if (inferenceFailed && scopeCleanupFailed)
-        throw new AggregateError(
-          [inferenceError, scopeCleanupError],
-          'Kanana TVM inference and scope cleanup both failed.',
-          {cause: inferenceError}
-        );
-      if (inferenceFailed) throw inferenceError;
-      if (scopeCleanupFailed) throw scopeCleanupError;
+      throwInferenceErrors(inferenceFailed, inferenceError, scopeCleanupFailed, scopeCleanupError);
       if (!result) fail('inference_result', 'Kanana TVM inference did not produce hidden-state values.');
       return result;
     }

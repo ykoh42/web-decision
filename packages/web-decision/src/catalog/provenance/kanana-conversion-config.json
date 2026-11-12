@@ -12,8 +12,24 @@
     "layers": 32,
     "sourceParameterDtype": "bfloat16",
     "runtimeParameterDtype": "float16",
+    "computeDtype": "float32",
+    "attentionImplementation": "web_decision_online",
+    "attentionLowering": {
+      "algorithm": "tiled_online_softmax",
+      "function": "kanana_online_attention",
+      "upstreamSchedule": "tvm.relax.frontend.nn.llm._kernel_common",
+      "queryTile": 16,
+      "keyTile": 16,
+      "threadsPerBlock": 128,
+      "causalKeyLimit": "query_tile_end",
+      "intermediateScoreMatrix": false
+    },
+    "weightSource": "pinned-safetensors",
     "dynamicSequence": true,
-    "sequenceLengthBounds": [1, 20480],
+    "sequenceLengthBounds": [
+      1,
+      20480
+    ],
     "multimodalInputs": true,
     "onnxImportOrExportUsed": false,
     "parameters": 3180636672,
@@ -26,16 +42,75 @@
     "onnxImportOrExportUsed": false
   },
   "validation": {
-    "textCpuParityTolerance": {"maxAbsDelta": 0.03, "rmse": 0.005},
+    "textCpuParityTolerance": {
+      "maxAbsDelta": 0.03,
+      "rmse": 0.005
+    },
     "textCpuParityObserved": {
       "sequenceLength1WithinTolerance": true,
-      "sequenceLength8WithImageTokensMaxAbsDelta": 0.087890625,
-      "sequenceLength8WithImageTokensRmse": 0.015408012084662914,
-      "sequenceLength8TextOnlyMaxAbsDelta": 0.0546875,
-      "sequenceLength8TextOnlyRmse": 0.009534475393593311,
-      "sequenceLength9TextOnlyMaxAbsDelta": 0.0546875,
-      "sequenceLength9TextOnlyRmse": 0.009914416819810867,
-      "note": "Some CPU parity cases exceeded tolerance; the export continued with --continue-after-cpu-parity-delta. The separately recorded public-package WebGPU reference tests passed."
-    }
+      "sequenceLength1MaxAbsDelta": 7.903575897216797e-05,
+      "sequenceLength1Rmse": 1.8776381693896838e-05,
+      "sequenceLength8TextOnlyMaxAbsDelta": 0.00010013580322265625,
+      "sequenceLength8TextOnlyRmse": 1.8391005141890234e-05,
+      "sequenceLength8WithTwoImageTokensMaxAbsDelta": 0.00013655424118041992,
+      "sequenceLength8WithTwoImageTokensRmse": 2.3196473193820566e-05
+    },
+    "textWebgpuWasmExport": "passed",
+    "textGraphSmoke": "passed",
+    "curatedPublicApiReleaseTests": "passed",
+    "curatedPublicApiReleaseTestsEvidence": {
+      "reportPath": "candidate-kanana-rebuild-final/kanana-real-webgpu-report.json",
+      "reportSha256": "fe546c062b96a8dc2c03fc2bfa7b6258b0aec273805314151f70ac3b7fec3a86",
+      "archiveSha256": "13de93ff19d038ae4e53822ffb990d45427e8e55052ac29e4adbd28eca1299ff",
+      "packageTreeSha256": "6fcc5ca3a64246b353300b6fc87ca58b5c5784d51a51361941cfd386f231a476",
+      "bundleSha256": "d0b77f9964bf278d2126be7203b04d6048bb0684e7e00c8429dcfa71e3c86d80",
+      "browser": "Chromium 157.0.8103.52",
+      "gpu": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "host": "Apple M4 Pro",
+        "isFallbackAdapter": false
+      },
+      "passedCases": [
+        "text",
+        "image",
+        "offline"
+      ],
+      "artifactFiles": {
+        "kanana-text-model.wasm": {
+          "bytes": 4208785,
+          "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
+        },
+        "kanana-vision-model.wasm": {
+          "bytes": 4414887,
+          "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
+        }
+      }
+    },
+    "maxContextBoundaryEvidence": {
+      "status": "passed",
+      "testedLength": 20480,
+      "reportPath": "candidate-kanana-rebuild-final/kanana-max-context-report.json",
+      "reportSha256": "10ee544aad39f2fa9da04b3cf16c1d5b6fe863cbaa901099db0f66b0b6129f5e",
+      "archiveSha256": "13de93ff19d038ae4e53822ffb990d45427e8e55052ac29e4adbd28eca1299ff",
+      "packageTreeSha256": "6fcc5ca3a64246b353300b6fc87ca58b5c5784d51a51361941cfd386f231a476",
+      "bundleSha256": "d0b77f9964bf278d2126be7203b04d6048bb0684e7e00c8429dcfa71e3c86d80",
+      "browser": "Chromium 157.0.8103.52",
+      "gpu": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "isFallbackAdapter": false
+      },
+      "observed": {
+        "answer": "first",
+        "inputTokens": 20534,
+        "truncated": true,
+        "maxLength": 20480,
+        "peakLiveBufferBytes": 11088504640,
+        "bufferCount": 1513,
+        "wholeTestSeconds": 312.192
+      }
+    },
+    "note": "Full 32-layer direct-TVM text graph CPU parity passed at sequence lengths 1 and 8, with and without two image tokens. Independent direct-TVM text and vision WebGPU WASM builds match the package pins. Exact-package text, image, offline, and 20,480-token boundary tests passed on Chromium 157.0.8103.52 / Apple M4 Pro Metal 3 WebGPU; offline inference made zero network attempts."
   }
 }

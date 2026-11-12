@@ -9,6 +9,8 @@ param(
 
   [string]$PlaywrightReport,
 
+  [string]$MaxContextReport,
+
   [string]$BuildEvidence
 )
 
@@ -30,14 +32,15 @@ try {
     if ($Mode -eq 'test') {
       & node.exe --test (Join-Path $releaseDirectory 'verify-release-evidence.test.js') (Join-Path $releaseDirectory 'tvm-build-evidence.test.js')
     } elseif ($Mode -eq 'verify-kanana') {
-      if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $BuildEvidence) {
-        throw 'Kanana verify mode requires Archive, InstalledPackage, PlaywrightReport, and BuildEvidence.'
+      if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $MaxContextReport -or -not $BuildEvidence) {
+        throw 'Kanana verify mode requires Archive, InstalledPackage, PlaywrightReport, MaxContextReport, and BuildEvidence.'
       }
       & node.exe (Join-Path $releaseDirectory 'verify-release-evidence.js') `
         --kanana `
         --archive $Archive `
         --installed-package $InstalledPackage `
         --playwright-report $PlaywrightReport `
+        --max-context-report $MaxContextReport `
         --build-evidence $BuildEvidence
     } else {
       if (-not $Archive -or -not $InstalledPackage -or -not $PlaywrightReport -or -not $BuildEvidence) {
