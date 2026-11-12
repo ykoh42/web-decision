@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "modelId": "kev-0.6b-q4f16",
+  "purpose": "Compare the original and shared-probability TVM attention kernels at the native 8,192-token input boundary.",
+  "input": {
+    "test": "tests/browser/direct-kev-package-harness.ts#runTokenLimitProbe",
+    "testHarnessSha256": "3cd64c8b2e9315fe9ecab62c2a48f3ee7edb59b84a277291f890b035913ba8c8",
+    "state": "",
+    "instructionGenerator": "exactTokenText(tokenizer, 8186)",
+    "options": ["x"],
+    "acceptedTokenCount": 8192,
+    "rejectedTokenCount": 8193,
+    "expandedFixtureSha256": "05e7f81d2ec5e8a306c0a8034253e3daa3983c088b8ccd9c29b5130b2eecbd41"
+  },
+  "hardware": {
+    "browser": "Chrome",
+    "browserVersion": "157.0.8103.52",
+    "adapterVendor": "intel",
+    "adapterArchitecture": "gen-12lp",
+    "fallbackAdapter": false,
+    "maxBufferSize": 2147483648,
+    "maxStorageBufferBindingSize": 2147483644
+  },
+  "identicalPackageFiles": [
+    "model_config.json",
+    "notices/kev-LICENSE",
+    "notices/qwen3-0.6b-base-LICENSE",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "weights/params_shard_0.bin",
+    "weights/params_shard_1.bin",
+    "weights/params_shard_2.bin",
+    "weights/tensor-cache.json"
+  ],
+  "runs": {
+    "r9": {
+      "kernelSourceSha256": "fe3ca615cc217057617201b35cd244aad989d2b5e87eceea4facbbf28934955b",
+      "manifestSha256": "70f00b584e9c08c5b1bc06f7946f1709bc67cf39d82337ae4620243170df0847",
+      "wasmSha256": "d188b0eb10748d23323b86d8225e51564cf26b8bf81eaa4b09f9678fe4c42f54",
+      "validationReportSha256": "c2e986c99c4efa93198ba37e5ef601ed721c981d21da41043df6f15a56670626",
+      "inferenceElapsedMilliseconds": 2230744,
+      "output": {
+        "selected": "x",
+        "logits": [5.74609375],
+        "probabilities": [1],
+        "finite": true
+      }
+    },
+    "r11": {
+      "kernelSourceSha256": "ee619c42eada9386cc06786317e62ab8551661206ef38259c4c9dc52063ea078",
+      "manifestSha256": "a6d8e80adcc416d7ef9bd5456ed4cdbfa87404632b1e82ceb95f68aaa83e30a6",
+      "wasmSha256": "ea53d122497d79472f37b3e2287c4640349ff64deace0cee2c6474878cb672aa",
+      "validationReportSha256": "1ea26ad4f73a4d6eef6448b935ff6688119ba8bce1ca9ce42d6aedff7d361514",
+      "inferenceElapsedMilliseconds": 2067937,
+      "output": {
+        "selected": "x",
+        "logits": [5.74609375],
+        "probabilities": [1],
+        "finite": true
+      }
+    }
+  },
+  "comparison": {
+    "acceptedAtNativeLimit": true,
+    "overLimitReturnsInvalidInputWithoutTruncation": true,
+    "maxAbsoluteLogitDelta": 0,
+    "maxAbsoluteProbabilityDelta": 0,
+    "selectionMatches": true,
+    "inferenceTimeReductionRatio": 0.0729774956267993,
+    "result": "passed"
+  },
+  "scope": [
+    "Both exact packages passed the four-case online matrix, offline cache reuse, and the 8,192/8,193 boundary test.",
+    "Only model.wasm and its manifest digest differ; tokenizer, configuration, notices, tensor cache, and all three weight shards are byte-identical.",
+    "The parity result covers one generated maximum-length instruction with one option on this Intel Gen-12LP adapter. It does not establish independent ground-truth quality or multi-option ranking across the full input domain.",
+    "The measured elapsed-time change applies to this adapter and probe only; it is not a performance guarantee for other GPUs."
+  ]
+}

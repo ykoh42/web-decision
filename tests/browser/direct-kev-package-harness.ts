@@ -348,6 +348,8 @@ async function runTokenLimitProbe(
     acceptedTokenCount?: number;
     outputFinite?: boolean;
     probabilityTotal?: number;
+    selected?: string;
+    probabilities?: readonly Readonly<{option: string; logit: number; probability: number}>[];
     atLimitError?: string;
     overLimitErrorCode?: string;
     overLimitMessage?: string;
@@ -375,6 +377,8 @@ async function runTokenLimitProbe(
     const answer = atLimit.answers[0];
     result.acceptedTokenCount = atLimit.tokenCount;
     if (answer) {
+      result.selected = answer.selected;
+      result.probabilities = answer.probabilities;
       result.outputFinite = answer.probabilities.every(
         ({logit, probability}) => Number.isFinite(logit) && Number.isFinite(probability)
       );

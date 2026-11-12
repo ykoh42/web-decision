@@ -67,6 +67,8 @@ interface GateOutput {
     acceptedTokenCount?: number;
     outputFinite?: boolean;
     probabilityTotal?: number;
+    selected?: string;
+    probabilities?: readonly Readonly<{option: string; logit: number; probability: number}>[];
     atLimitError?: string;
     overLimitErrorCode?: string;
     overLimitMessage?: string;
@@ -526,6 +528,13 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
     expect(observed.boundaryProbe?.acceptedTokenCount).toBe(8192);
     expect(observed.boundaryProbe?.outputFinite).toBe(true);
     expect(observed.boundaryProbe?.probabilityTotal).toBeCloseTo(1, 6);
+    expect(observed.boundaryProbe?.selected).toBe('x');
+    expect(observed.boundaryProbe?.probabilities).toHaveLength(1);
+    expect(observed.boundaryProbe?.probabilities?.[0]).toMatchObject({
+      option: 'x',
+      logit: expect.any(Number),
+      probability: 1
+    });
     expect(observed.boundaryProbe?.overLimitErrorCode).toBe('INVALID_INPUT');
     expect(observed.boundaryProbe?.overLimitMessage).toContain('8192 tokens');
     expect(observed.boundaryProbe?.overLimitMessage).toContain('no truncation was applied');
