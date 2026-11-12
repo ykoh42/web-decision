@@ -10,6 +10,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+if __package__:
+    from .git_environment import git_environment
+else:
+    from git_environment import git_environment
+
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE_NAME = "complexipy-snapshot.json"
 THRESHOLD = 15
@@ -164,6 +169,7 @@ def working_tree_python_sources(root: Path) -> set[str]:
                 "*.py",
             ],
             cwd=root,
+            env=git_environment(root),
             capture_output=True,
             check=False,
         )

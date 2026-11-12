@@ -19,6 +19,7 @@ from check_python_quality import (
 )
 
 PREPARE = Path(__file__).with_name("prepare_python_quality_baseline.py")
+GIT_ENVIRONMENT = Path(__file__).with_name("git_environment.py")
 
 
 def fingerprint(code="F401", row=4, column=1, message="unused import"):
@@ -227,6 +228,7 @@ def baseline_project(project, *, with_snapshot):
     script = project / "scripts/ci/prepare_python_quality_baseline.py"
     script.parent.mkdir(parents=True)
     shutil.copyfile(PREPARE, script)
+    shutil.copyfile(GIT_ENVIRONMENT, script.with_name(GIT_ENVIRONMENT.name))
     assert run("git", "init", "--quiet", cwd=project).returncode == 0
     assert run("git", "add", "scripts", cwd=project).returncode == 0
     if with_snapshot:

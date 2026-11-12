@@ -9,6 +9,7 @@ import pytest
 
 CHECKER = Path(__file__).with_name("check_python_complexity.py")
 PREPARE = Path(__file__).with_name("prepare_python_complexity_baseline.py")
+GIT_ENVIRONMENT = Path(__file__).with_name("git_environment.py")
 
 
 def make_function(branches, *, ignore=False):
@@ -29,6 +30,7 @@ def project(tmp_path):
     checker = tmp_path / "scripts/ci/check_python_complexity.py"
     checker.parent.mkdir(parents=True)
     shutil.copyfile(CHECKER, checker)
+    shutil.copyfile(GIT_ENVIRONMENT, checker.with_name(GIT_ENVIRONMENT.name))
     (tmp_path / "existing.py").write_text(make_function(16))
     assert run("git", "init", "--quiet", cwd=tmp_path).returncode == 0
     snapshot = run(
@@ -180,6 +182,7 @@ def baseline_project(tmp_path):
     script = tmp_path / "scripts/ci/prepare_python_complexity_baseline.py"
     script.parent.mkdir(parents=True)
     shutil.copyfile(PREPARE, script)
+    shutil.copyfile(GIT_ENVIRONMENT, script.with_name(GIT_ENVIRONMENT.name))
     assert run("git", "init", "--quiet", cwd=tmp_path).returncode == 0
     assert run("git", "add", "scripts", cwd=tmp_path).returncode == 0
     return tmp_path, commit(tmp_path, "base")

@@ -8,6 +8,11 @@ import subprocess
 import tempfile
 from pathlib import Path, PurePosixPath
 
+if __package__:
+    from .git_environment import git_environment
+else:
+    from git_environment import git_environment
+
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "complexipy-snapshot.json"
 
@@ -25,6 +30,7 @@ def python_files():
             "*.py",
         ],
         cwd=ROOT,
+        env=git_environment(ROOT),
     )
     return [Path(name.decode()) for name in result.split(b"\0") if name]
 
@@ -78,7 +84,12 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="web-decision-complexity-") as temporary:
         root = Path(temporary)
-        shutil.copyfile(BASELINE, root / BASELINE.name)
+        snapshot = json.loads(BASELINE.read_text(encoding="utf-8"))
+        for entry in snapshot:
+            entry["path"] = os.fspath(Path(entry["path"]))
+        (root / BASELINE.name).write_text(
+            json.dumps(snapshot, indent=2) + "\n", encoding="utf-8"
+        )
         for name in files:
             source = ROOT / name
             if (

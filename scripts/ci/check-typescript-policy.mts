@@ -5,6 +5,7 @@ import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {defaultTreeAdapter, parse, type DefaultTreeAdapterTypes} from 'parse5';
 import {generateTvmBoundary, verifyTvmBoundary} from './generate-tvm-boundary.mts';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 
 const policyPath = 'scripts/ci/typescript-migration-policy.json';
 const initialInventoryCommit = 'baa3c144d23e1882ba29084c9f95897b8c56accb';
@@ -312,7 +313,12 @@ function changedPathProblems(
 }
 
 function runGit(root: string, args: string[]): string {
-  return execFileSync('git', args, {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+  return execFileSync('git', args, {
+    cwd: root,
+    env: gitEnvironmentFor(root),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
 }
 
 function tryRunGit(root: string, args: string[]): string | null {

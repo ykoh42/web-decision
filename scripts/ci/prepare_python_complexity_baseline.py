@@ -7,12 +7,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+if __package__:
+    from .git_environment import git_environment
+else:
+    from git_environment import git_environment
+
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = "complexipy-snapshot.json"
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, check=False)
+    return subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        env=git_environment(ROOT),
+        capture_output=True,
+        check=False,
+    )
 
 
 def main():

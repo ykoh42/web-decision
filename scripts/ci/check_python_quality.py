@@ -10,6 +10,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
+if __package__:
+    from .git_environment import git_environment
+else:
+    from git_environment import git_environment
+
 ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = ROOT / "ruff-snapshot.json"
 SNAPSHOT_ENV = "WEB_DECISION_RUFF_BASELINE"
@@ -45,6 +50,7 @@ def tracked_python_files():
             "*.py",
         ],
         cwd=ROOT,
+        env=git_environment(ROOT),
         capture_output=True,
         check=False,
     )
