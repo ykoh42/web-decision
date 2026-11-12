@@ -161,8 +161,9 @@ class KevAttentionGridTests(unittest.TestCase):
         self.assertIn("var<workgroup> state : array<f32, 384>", wgsl)
         self.assertIn("var<workgroup> partial : array<f32, 128>", wgsl)
         self.assertIn("var<workgroup> scores : array<f32, 64>", wgsl)
+        self.assertIn("var<workgroup> probabilities : array<f32, 64>", wgsl)
         self.assertIn("var<storage, read> value_ptr : array<f32>", wgsl)
-        self.assertRegex(wgsl, r"f16\(probability\[0i\]\)")
+        self.assertRegex(wgsl, r"probability_f16\[0i\] = f16\(")
         self.assertRegex(wgsl, r"f32\(probability_f16\[0i\]\)")
         self.assertIn("loop_length: i32", wgsl)
         self.assertIn("skip_future_tiles: i32", wgsl)
@@ -171,6 +172,9 @@ class KevAttentionGridTests(unittest.TestCase):
         self.assertIn("podArgs.loop_length", wgsl)
         self.assertNotIn("length_i32_ptr", wgsl)
         self.assertIn("blockIdx.y", attention_grid.script())
+        self.assertIn(
+            'T.thread_binding(1, thread="threadIdx.x")', attention_grid.script()
+        )
         self.assertLess(len(wgsl.encode("utf-8")), 10 * 1024)
         self.assertNotRegex(wgsl, r"array<[^>]+,\s*\w*sequence_length")
 

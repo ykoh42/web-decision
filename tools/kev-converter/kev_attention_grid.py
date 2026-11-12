@@ -125,10 +125,12 @@ def _write_masked_scores(
 
 @T.macro
 def _update_softmax_stats(state, scores):
-    """Update the row maximum and denominator for one key tile."""
-    for lane_loop in T.thread_binding(HEAD_DIM, thread="threadIdx.x"):
+    """Update shared row statistics once for one key tile."""
+    for lane_loop in T.thread_binding(1, thread="threadIdx.x"):
         with T.sblock("update_attention_stats"):
-            lane = T.axis.spatial(HEAD_DIM, lane_loop)
+            lane = T.axis.spatial(1, lane_loop)
+            T.reads(scores[0:KEY_TILE], state[lane, 0:2])
+            T.writes(state[lane, 0:2])
             tile_maximum = T.float32(NEGATIVE_INFINITY)
             for slot in T.serial(KEY_TILE):
                 tile_maximum = T.max(tile_maximum, scores[slot])
@@ -138,39 +140,49 @@ def _update_softmax_stats(state, scores):
             for slot in T.serial(KEY_TILE):
                 tile_denominator = tile_denominator + T.exp(scores[slot] - next_maximum)
             previous_scale = T.exp(previous_maximum - next_maximum)
-            T.reads(scores[0:KEY_TILE], state[lane, 0:2])
-            T.writes(state[lane, 0:2])
             state[lane, 0] = next_maximum
             state[lane, 1] = state[lane, 1] * previous_scale + tile_denominator
     T.tvm_storage_sync("shared")
 
 
 @T.macro
+def _cache_rounded_probabilities(state, scores, probabilities):
+    """Compute each FP16-rounded softmax probability once per key."""
+    for probability_loop in T.thread_binding(KEY_TILE, thread="threadIdx.x"):
+        with T.sblock("cache_rounded_probabilities"):
+            slot = T.axis.spatial(KEY_TILE, probability_loop)
+            maximum = state[0, 0]
+            denominator = state[0, 1]
+            probability = T.exp(scores[slot] - maximum) / denominator
+            probability_f16 = T.Cast("float16", probability)
+            probability_f32 = T.Cast("float32", probability_f16)
+            T.reads(scores[slot], state[0, 0:2])
+            T.writes(probabilities[slot])
+            probabilities[slot] = probability_f32
+    T.tvm_storage_sync("shared")
+
+
+@T.macro
 def _accumulate_rounded_values(
-    state, scores, value, head, key_base, length_i32, sequence_length
+    state, probabilities, value, head, key_base, length_i32, sequence_length
 ):
-    """Recompute probabilities, round P through FP16, and accumulate FP32 V."""
+    """Accumulate cached FP16-rounded probabilities against FP32 V."""
     for lane_loop in T.thread_binding(HEAD_DIM, thread="threadIdx.x"):
         with T.sblock("accumulate_attention_values"):
             lane = T.axis.spatial(HEAD_DIM, lane_loop)
             accumulator = state[lane, 2]
-            maximum = state[lane, 0]
-            denominator = state[lane, 1]
             T.reads(
-                scores[0:KEY_TILE],
-                state[lane, 0:3],
+                probabilities[0:KEY_TILE],
+                state[lane, 2],
                 value[head, 0:sequence_length, lane],
             )
             T.writes(state[lane, 2])
             for slot in T.serial(KEY_TILE):
                 raw_key_index = key_base + slot
                 if raw_key_index < length_i32:
-                    probability = T.exp(scores[slot] - maximum) / denominator
-                    probability_f16 = T.Cast("float16", probability)
-                    probability_f32 = T.Cast("float32", probability_f16)
                     accumulator = (
                         accumulator
-                        + probability_f32
+                        + probabilities[slot]
                         * value[
                             head,
                             T.Cast("int64", raw_key_index),
@@ -231,6 +243,7 @@ def attention_grid(
             query_segment = segments[0, T.Cast("int64", query_index)]
             partial = T.alloc_buffer((HEAD_DIM,), "float32", scope="shared")
             scores = T.alloc_buffer((KEY_TILE,), "float32", scope="shared")
+            probabilities = T.alloc_buffer((KEY_TILE,), "float32", scope="shared")
             state = T.alloc_buffer((HEAD_DIM, 3), "float32", scope="shared")
             _initialize_state(state)
 
@@ -291,9 +304,10 @@ def attention_grid(
                     loop_length,
                     sequence_length,
                 )
+                _cache_rounded_probabilities(state, scores, probabilities)
                 _accumulate_rounded_values(
                     state,
-                    scores,
+                    probabilities,
                     value,
                     head,
                     key_base,

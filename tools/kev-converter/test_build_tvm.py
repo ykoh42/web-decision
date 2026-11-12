@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import tempfile
 import tomllib
 import unittest
@@ -776,7 +777,9 @@ class UpstreamReferenceTests(unittest.TestCase):
             extend_runtime_library_path(
                 "/opt/python/lib:/opt/other-runtime/lib", Path("/usr/lib")
             ),
-            "/opt/python/lib:/opt/other-runtime/lib:/usr/lib",
+            os.pathsep.join(
+                ("/opt/python/lib:/opt/other-runtime/lib", str(Path("/usr/lib")))
+            ),
         )
 
 
