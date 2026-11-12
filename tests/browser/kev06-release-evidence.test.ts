@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   matchesInferenceReference,
   matchesOfflineToOnline,
+  parseMacHardwareEvidence,
   parseWmiHardwareEvidence,
   type ExpectedInference,
   type ObservedInference
@@ -122,6 +123,44 @@ test('WMI provenance stays separate from browser adapter information', () => {
   );
   assert.equal(hostWithHypervisor.device.evidence.host.source, 'windows-wmi/Win32_ComputerSystem');
   assert.equal(hostWithHypervisor.device.evidence.host.raw.HypervisorPresent, true);
+});
+
+test('macOS host evidence accepts any physical Apple model and preserves source fields', () => {
+  const evidence = parseMacHardwareEvidence(
+    {
+      SPHardwareDataType: [{machine_name: 'MacBook Pro', machine_model: 'Mac15,9', chip_type: 'Apple M3 Pro'}]
+    },
+    {version: 'macOS 15.1', release: '24.1.0', architecture: 'arm64'}
+  );
+
+  assert.deepEqual(evidence.device, {
+    manufacturer: null,
+    model: 'Mac15,9',
+    os: 'macOS 15.1',
+    osVersion: '24.1.0',
+    architecture: 'arm64',
+    isVirtual: false,
+    evidence: {
+      host: {
+        source: 'macos-system_profiler/SPHardwareDataType',
+        raw: {machine_name: 'MacBook Pro', machine_model: 'Mac15,9', chip_type: 'Apple M3 Pro'}
+      },
+      os: {
+        source: 'node:os',
+        raw: {version: 'macOS 15.1', release: '24.1.0', architecture: 'arm64'}
+      }
+    }
+  });
+  assert.equal('gpu' in evidence, false);
+  assert.throws(
+    () =>
+      parseMacHardwareEvidence({
+        SPHardwareDataType: [
+          {machine_name: 'Parallels Virtual Machine', machine_model: 'Virtual Model', chip_type: 'Apple M3 Pro'}
+        ]
+      }),
+    /virtual host/u
+  );
 });
 
 test('WMI evidence fails closed for known virtual signatures, missing, or ambiguous hardware', () => {

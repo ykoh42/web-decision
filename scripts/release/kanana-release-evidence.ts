@@ -126,6 +126,7 @@ export async function verifyKananaTvmBuildEvidence(
 }
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const VIRTUAL_HOST_PATTERN = /(?:virtual machine|vmware|virtualbox|qemu|\bkvm\b|\bxen\b|hyper-v|parallels)/iu;
 
 function fail(condition: unknown, message: string): asserts condition {
   assert.ok(condition, message);
@@ -466,6 +467,7 @@ function validateKananaArchiveRecord(
   assert.equal(evidence.browser?.name, policy.browser.name, 'Kanana browser name mismatch.');
   requireText(evidence.browser?.version, 'Kanana browser version');
   requireText(evidence.browser?.userAgent, 'Kanana browser user agent');
+  validateKananaDeviceEvidence(evidence.device);
   const gpu = evidence.gpu;
   assert.equal(gpu?.api, policy.gpu.api, 'Kanana GPU API mismatch.');
   assert.equal(gpu?.isFallbackAdapter, false, 'Kanana inference used a fallback GPU adapter.');
@@ -479,6 +481,50 @@ function validateKananaArchiveRecord(
   assert.equal(gpu.adapterInfo.value.isFallbackAdapter, false, 'Kanana adapter info reports a fallback adapter.');
   fail(Array.isArray(gpu.features), 'Kanana GPU features are missing.');
   validateLimits(gpu.limits, policy.gpu.requiredLimits);
+}
+
+function validateKananaDeviceEvidence(device: AnyRecord): void {
+  assert.equal(device?.isVirtual, false, 'Kanana release evidence must identify a physical host.');
+  const host = device?.evidence?.host;
+  const os = device?.evidence?.os;
+  let hostLabel: string;
+
+  if (host?.source === 'windows-wmi/Win32_ComputerSystem') {
+    const manufacturer = host.raw?.Manufacturer;
+    const model = host.raw?.Model;
+    requireText(manufacturer, 'Kanana WMI host manufacturer');
+    requireText(model, 'Kanana WMI host model');
+    fail(typeof host.raw.HypervisorPresent === 'boolean', 'Kanana WMI HypervisorPresent value is required.');
+    assert.equal(device.manufacturer, manufacturer, 'Kanana host manufacturer differs from WMI evidence.');
+    assert.equal(device.model, model, 'Kanana host model differs from WMI evidence.');
+    hostLabel = `${manufacturer} ${model}`;
+    fail(!VIRTUAL_HOST_PATTERN.test(hostLabel), 'Kanana release evidence appears to use a virtual host.');
+  } else if (host?.source === 'macos-system_profiler/SPHardwareDataType') {
+    const machineName = host.raw?.machine_name;
+    const machineModel = host.raw?.machine_model;
+    const chipType = host.raw?.chip_type;
+    requireText(machineName, 'Kanana macOS machine name');
+    requireText(machineModel, 'Kanana macOS machine model');
+    requireText(chipType, 'Kanana macOS chip type');
+    assert.equal(device.manufacturer, null, 'Kanana macOS host manufacturer must match the system_profiler schema.');
+    assert.equal(device.model, machineModel, 'Kanana host model differs from system_profiler evidence.');
+    hostLabel = chipType;
+    fail(
+      !VIRTUAL_HOST_PATTERN.test(`${machineName} ${machineModel} ${chipType}`),
+      'Kanana release evidence appears to use a virtual host.'
+    );
+  } else {
+    throw new Error('Unsupported Kanana host evidence source.');
+  }
+
+  assert.equal(device.host, hostLabel, 'Kanana host label differs from its source evidence.');
+  assert.equal(os?.source, 'node:os', 'Kanana OS evidence source is required.');
+  assert.equal(device.os, os.raw?.version, 'Kanana OS name differs from runtime evidence.');
+  assert.equal(device.osVersion, os.raw?.release, 'Kanana OS version differs from runtime evidence.');
+  assert.equal(device.architecture, os.raw?.architecture, 'Kanana architecture differs from runtime evidence.');
+  requireText(device.os, 'Kanana host OS');
+  requireText(device.osVersion, 'Kanana host OS version');
+  requireText(device.architecture, 'Kanana host architecture');
 }
 
 function validateKananaResultIdentity(output: AnyRecord, context: KananaVerificationContext, mode: string): void {

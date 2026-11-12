@@ -146,10 +146,12 @@ export async function createKananaReleaseEvidence(
 
   const hardware = collectHardwareEvidence();
   const hostEvidence = hardware.device.evidence.host;
-  assert.equal(hostEvidence.source, 'macos-system_profiler/SPHardwareDataType');
-  if (hostEvidence.source !== 'macos-system_profiler/SPHardwareDataType')
-    throw new Error('Kanana M4 release evidence requires macOS host data.');
-  assert.match(hostEvidence.raw.chip_type, /Apple M4 Pro/u);
+  assert.equal(hardware.device.isVirtual, false);
+  const host =
+    hostEvidence.source === 'macos-system_profiler/SPHardwareDataType'
+      ? hostEvidence.raw.chip_type
+      : `${hostEvidence.raw.Manufacturer} ${hostEvidence.raw.Model}`;
+  assert.ok(host.trim().length > 0);
   const isFallbackAdapter = input.adapter.isFallbackAdapter ?? input.adapter.isFallback;
   assert.equal(isFallbackAdapter, false);
   assert.equal(input.browserName, 'chromium');
@@ -188,7 +190,7 @@ export async function createKananaReleaseEvidence(
   const device = {
     manufacturer: hardware.device.manufacturer,
     model: hardware.device.model,
-    host: hostEvidence.raw.chip_type,
+    host,
     os: hardware.device.os,
     osVersion: hardware.device.osVersion,
     architecture: hardware.device.architecture,

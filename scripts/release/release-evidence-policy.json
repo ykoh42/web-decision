@@ -129,7 +129,7 @@
       }
     },
     "testSupportSources": {
-      "tests/browser/kanana-candidate-evidence.ts": "35fc53593dec0932cfcbe166ebcfc0a739fb1b78f01480998d4c5afe7727bfb0",
+      "tests/browser/kanana-candidate-evidence.ts": "b31d716209aae957a85331c8bcb577f20c978a69ec8a37762c8c8a6b2df46da6",
       "tests/browser/kanana-release-evidence.ts": "7d3bd5378a8ff7b32082b8b0e614c72467b573db2ce3635ca69cf0941d4d2764",
       "tests/browser/kanana-snapshot.ts": "0c976034d7f93aa4ec0fbd4986a39182759aad754a9a07cc03a957738a72d0c4",
       "tests/browser/kev06-release-evidence.ts": "75f2ddef3f3f805c3ef338b9bc11de08ed8c8310e537077f6dd8a4a62aab8c59"

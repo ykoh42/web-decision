@@ -677,6 +677,25 @@ function makeKananaEvidenceRecord(
       checkpointSha256: policy.model.checkpointSha256
     },
     browser: {name: policy.browser.name, version: '158.0', userAgent: 'Chromium real WebGPU'},
+    device: {
+      manufacturer: null,
+      model: 'Mac15,9',
+      host: 'Apple M3 Pro',
+      os: 'macOS 15.1',
+      osVersion: '24.1.0',
+      architecture: 'arm64',
+      isVirtual: false,
+      evidence: {
+        host: {
+          source: 'macos-system_profiler/SPHardwareDataType',
+          raw: {machine_name: 'MacBook Pro', machine_model: 'Mac15,9', chip_type: 'Apple M3 Pro'}
+        },
+        os: {
+          source: 'node:os',
+          raw: {version: 'macOS 15.1', release: '24.1.0', architecture: 'arm64'}
+        }
+      }
+    },
     gpu: {
       api: 'webgpu',
       isFallbackAdapter: false,
@@ -1159,6 +1178,58 @@ test('requires text, image, and cached-offline Kanana WebGPU evidence bound to t
     record.inference.offline.probabilities.late = 0.5;
   });
   assert.throws(() => validateKananaPlaywrightReport(offlineOutputMismatch, context));
+});
+
+test('accepts Windows and non-M4 macOS host evidence and rejects invalid host claims', async () => {
+  const context = await makeKananaVerificationContext();
+  const macReport = makeKananaPlaywrightReport(context);
+  assert.doesNotThrow(() => validateKananaPlaywrightReport(macReport, context));
+
+  const windowsReport = makeKananaPlaywrightReport(context);
+  const windowsDevice = {
+    manufacturer: 'Dell Inc.',
+    model: 'XPS 16 9640',
+    host: 'Dell Inc. XPS 16 9640',
+    os: 'Windows 11 Pro',
+    osVersion: '10.0.26100',
+    architecture: 'x64',
+    isVirtual: false,
+    evidence: {
+      host: {
+        source: 'windows-wmi/Win32_ComputerSystem',
+        raw: {Manufacturer: 'Dell Inc.', Model: 'XPS 16 9640', HypervisorPresent: false}
+      },
+      os: {
+        source: 'node:os',
+        raw: {version: 'Windows 11 Pro', release: '10.0.26100', architecture: 'x64'}
+      }
+    }
+  };
+  for (const kind of ['text', 'image', 'offline'] as const) {
+    updateKananaRecord(windowsReport, kind, (record) => {
+      record.device = structuredClone(windowsDevice);
+    });
+  }
+  assert.doesNotThrow(() => validateKananaPlaywrightReport(windowsReport, context));
+
+  const virtualHost = structuredClone(macReport);
+  updateKananaRecord(virtualHost, 'text', (record) => {
+    record.device.isVirtual = true;
+  });
+  assert.throws(() => validateKananaPlaywrightReport(virtualHost, context), /physical host/u);
+
+  const inconsistentHost = structuredClone(macReport);
+  updateKananaRecord(inconsistentHost, 'text', (record) => {
+    record.device.host = 'Apple M4 Pro';
+  });
+  assert.throws(() => validateKananaPlaywrightReport(inconsistentHost, context), /host label differs/u);
+
+  const virtualMac = structuredClone(macReport);
+  updateKananaRecord(virtualMac, 'text', (record) => {
+    record.device.evidence.host.raw.chip_type = 'Parallels Virtual GPU';
+    record.device.host = 'Parallels Virtual GPU';
+  });
+  assert.throws(() => validateKananaPlaywrightReport(virtualMac, context), /virtual host/u);
 });
 
 test('requires the exact-package maximum-context boundary report', async () => {
