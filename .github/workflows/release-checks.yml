@@ -60,6 +60,32 @@ jobs:
             *) echo "Unsupported release version: $version" >&2; exit 1 ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.release.outputs.version == '0.4.0'
+        with:
+          repository: apache/tvm
+          ref: 7b5acb32bd271342a24130f4ef439ff6c2e52c6c
+          path: .toolchains/apache-tvm-src
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.release.outputs.version == '0.4.0'
+        with:
+          repository: emscripten-core/emsdk
+          ref: d7b4130688bfa348392b921ab04015aa15c4f154
+          path: .toolchains/emsdk
+          persist-credentials: false
+      - name: Prepare pinned TVM runtime
+        if: steps.release.outputs.version == '0.4.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libatomic1
+          git -C .toolchains/apache-tvm-src submodule update --init --recursive 3rdparty/tvm-ffi
+          .toolchains/emsdk/emsdk install 4.0.23
+          .toolchains/emsdk/emsdk activate 4.0.23 --embedded
+          source .toolchains/emsdk/emsdk_env.sh
+          make -C .toolchains/apache-tvm-src/web -j4 src/tvmjs_runtime_wasi.js
       - name: Install workspace
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Enforce committed model provenance and rights evidence
