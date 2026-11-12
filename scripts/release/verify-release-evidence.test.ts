@@ -1128,9 +1128,7 @@ test('the release verifier checks committed provenance before checking build inp
       installedPackagePath: 'unused-package',
       playwrightReportPath: 'unused-report.json'
     }),
-    policyIsCommitted
-      ? /TVM build evidence is required/u
-      : /Release evidence policy must match the committed version/u
+    policyIsCommitted ? /TVM build evidence is required/u : /Release evidence policy must match the committed version/u
   );
 });
 
