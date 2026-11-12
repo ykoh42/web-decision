@@ -27,7 +27,7 @@
     },
     "config": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-config.json",
-      "sha256": "1cdf67780fdf123307689378ba15ea7ce2cd7999f3561a4fc38bc027ad296687"
+      "sha256": "f45f1b717571969660590592b6ada995eec3ee08f1cc9a59dc599aa95c56649b"
     },
     "toolchain": {
       "path": "packages/web-decision/src/catalog/provenance/kanana-conversion-toolchain.json",

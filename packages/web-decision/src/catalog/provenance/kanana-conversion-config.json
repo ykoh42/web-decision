@@ -48,22 +48,22 @@
     },
     "textCpuParityObserved": {
       "sequenceLength1WithinTolerance": true,
-      "sequenceLength1MaxAbsDelta": 7.903575897216797e-05,
-      "sequenceLength1Rmse": 1.8776381693896838e-05,
+      "sequenceLength1MaxAbsDelta": 0.00007903575897216797,
+      "sequenceLength1Rmse": 0.000018776381693896838,
       "sequenceLength8TextOnlyMaxAbsDelta": 0.00010013580322265625,
-      "sequenceLength8TextOnlyRmse": 1.8391005141890234e-05,
+      "sequenceLength8TextOnlyRmse": 0.000018391005141890234,
       "sequenceLength8WithTwoImageTokensMaxAbsDelta": 0.00013655424118041992,
-      "sequenceLength8WithTwoImageTokensRmse": 2.3196473193820566e-05
+      "sequenceLength8WithTwoImageTokensRmse": 0.000023196473193820566
     },
     "textWebgpuWasmExport": "passed",
     "textGraphSmoke": "passed",
     "curatedPublicApiReleaseTests": "passed",
     "curatedPublicApiReleaseTestsEvidence": {
       "reportPath": "candidate-kanana-rebuild-final/kanana-real-webgpu-report.json",
-      "reportSha256": "fe546c062b96a8dc2c03fc2bfa7b6258b0aec273805314151f70ac3b7fec3a86",
-      "archiveSha256": "13de93ff19d038ae4e53822ffb990d45427e8e55052ac29e4adbd28eca1299ff",
-      "packageTreeSha256": "6fcc5ca3a64246b353300b6fc87ca58b5c5784d51a51361941cfd386f231a476",
-      "bundleSha256": "d0b77f9964bf278d2126be7203b04d6048bb0684e7e00c8429dcfa71e3c86d80",
+      "reportSha256": "3e28ba4cf3dd6fb05d9b612305e96b417694d7e704ea38a32365e318b7a0d6a5",
+      "archiveSha256": "5f4302a2aecbd3cb00cb430f779abd50863f3b398b98711f8bf0d8637cdbc169",
+      "packageTreeSha256": "50097ddac16eab4305075a0a5ea6722c8ee9d8d584d5302a7a6c54f9fcf177b9",
+      "bundleSha256": "847cacc9b0875dc4543a2c72dffc7f9041611cbcf322c8f6c952b5a19f9c1421",
       "browser": "Chromium 157.0.8103.52",
       "gpu": {
         "vendor": "apple",
@@ -91,10 +91,10 @@
       "status": "passed",
       "testedLength": 20480,
       "reportPath": "candidate-kanana-rebuild-final/kanana-max-context-report.json",
-      "reportSha256": "10ee544aad39f2fa9da04b3cf16c1d5b6fe863cbaa901099db0f66b0b6129f5e",
-      "archiveSha256": "13de93ff19d038ae4e53822ffb990d45427e8e55052ac29e4adbd28eca1299ff",
-      "packageTreeSha256": "6fcc5ca3a64246b353300b6fc87ca58b5c5784d51a51361941cfd386f231a476",
-      "bundleSha256": "d0b77f9964bf278d2126be7203b04d6048bb0684e7e00c8429dcfa71e3c86d80",
+      "reportSha256": "4613ab42085d6d8d0f7cccc0b5d846b99ec1135e61a0c3a4a839026c4e266a95",
+      "archiveSha256": "5f4302a2aecbd3cb00cb430f779abd50863f3b398b98711f8bf0d8637cdbc169",
+      "packageTreeSha256": "50097ddac16eab4305075a0a5ea6722c8ee9d8d584d5302a7a6c54f9fcf177b9",
+      "bundleSha256": "847cacc9b0875dc4543a2c72dffc7f9041611cbcf322c8f6c952b5a19f9c1421",
       "browser": "Chromium 157.0.8103.52",
       "gpu": {
         "vendor": "apple",
@@ -108,7 +108,7 @@
         "maxLength": 20480,
         "peakLiveBufferBytes": 11088504640,
         "bufferCount": 1513,
-        "wholeTestSeconds": 312.192
+        "wholeTestSeconds": 308.273
       }
     },
     "note": "Full 32-layer direct-TVM text graph CPU parity passed at sequence lengths 1 and 8, with and without two image tokens. Independent direct-TVM text and vision WebGPU WASM builds match the package pins. Exact-package text, image, offline, and 20,480-token boundary tests passed on Chromium 157.0.8103.52 / Apple M4 Pro Metal 3 WebGPU; offline inference made zero network attempts."

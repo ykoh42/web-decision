@@ -7,7 +7,7 @@
       "artifactLockSha256": "536ca5587ad901f15108033c3512db88a9cffe51a9b78b2d2bf1caf58a9f012a",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
-        "sha256": "19fe98c5fbc7333e7e9580dbf595d6efb51b52ca8ce3f6fd819fb2d44da9e8c7"
+        "sha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13"
       }
     }
   ]
