@@ -6,6 +6,7 @@ import {lstat, readFile, readdir, realpath} from 'node:fs/promises';
 import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {
   assertCommittedPackageProvenance,
   assertProductionPackageRoot,
@@ -344,8 +345,15 @@ async function readTrustedPolicyBytes(workspaceRoot: string): Promise<Buffer> {
   const policyPath = resolve(workspaceRoot, relative(WORKSPACE_ROOT, POLICY_PATH));
   const bytes = await readFile(policyPath);
   const relativePolicyPath = relative(workspaceRoot, policyPath).split(sep).join('/');
-  execFileSync('git', ['ls-files', '--error-unmatch', relativePolicyPath], {cwd: workspaceRoot, stdio: 'ignore'});
-  const committed = execFileSync('git', ['show', `HEAD:${relativePolicyPath}`], {cwd: workspaceRoot});
+  execFileSync('git', ['ls-files', '--error-unmatch', relativePolicyPath], {
+    cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot),
+    stdio: 'ignore'
+  });
+  const committed = execFileSync('git', ['show', `HEAD:${relativePolicyPath}`], {
+    cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot)
+  });
   assert.deepEqual(bytes, committed, 'Release evidence policy must match the committed version.');
   return bytes;
 }
@@ -371,10 +379,12 @@ function assertCommittedCatalogSources(workspaceRoot: string): void {
   const paths = ['packages/web-decision/src', 'packages/web-decision/assets'];
   execFileSync('git', ['diff', '--quiet', 'HEAD', '--', ...paths], {
     cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot),
     stdio: 'ignore'
   });
   const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '--', ...paths], {
     cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot),
     encoding: 'utf8'
   });
   assert.equal(untracked, '', 'Model catalog and asset inputs must be committed.');
@@ -389,8 +399,15 @@ async function assertCommittedKananaTestSources(workspaceRoot: string, policy: K
   for (const test of tests) {
     const bytes = await readFile(resolve(workspaceRoot, test.file));
     assert.equal(sha256(bytes), test.sourceSha256, `Kanana test source differs from its policy pin: ${test.file}`);
-    execFileSync('git', ['ls-files', '--error-unmatch', test.file], {cwd: workspaceRoot, stdio: 'ignore'});
-    const committed = execFileSync('git', ['show', `HEAD:${test.file}`], {cwd: workspaceRoot});
+    execFileSync('git', ['ls-files', '--error-unmatch', test.file], {
+      cwd: workspaceRoot,
+      env: gitEnvironmentFor(workspaceRoot),
+      stdio: 'ignore'
+    });
+    const committed = execFileSync('git', ['show', `HEAD:${test.file}`], {
+      cwd: workspaceRoot,
+      env: gitEnvironmentFor(workspaceRoot)
+    });
     assert.deepEqual(bytes, committed, `Kanana GPU test differs from the committed source: ${test.file}`);
   }
 }
@@ -401,8 +418,15 @@ async function readCommittedFixture(workspaceRoot: string, path: string, digest:
   fail(info.isFile() && !info.isSymbolicLink(), `Reference fixture must be a regular file: ${path}`);
   const bytes = await readFile(fixturePath);
   assert.equal(sha256(bytes), digest, `Reference fixture digest mismatch: ${path}`);
-  execFileSync('git', ['ls-files', '--error-unmatch', path], {cwd: workspaceRoot, stdio: 'ignore'});
-  const committed = execFileSync('git', ['show', `HEAD:${path}`], {cwd: workspaceRoot});
+  execFileSync('git', ['ls-files', '--error-unmatch', path], {
+    cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot),
+    stdio: 'ignore'
+  });
+  const committed = execFileSync('git', ['show', `HEAD:${path}`], {
+    cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot)
+  });
   assert.deepEqual(bytes, committed, `Reference fixture differs from its committed version: ${path}`);
   return JSON.parse(bytes.toString('utf8')) as AnyRecord;
 }

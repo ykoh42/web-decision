@@ -1,11 +1,12 @@
 import {loadDecisionModel} from 'web-decision';
 import {assetUrl, CACHE_NAME, openAssetCache} from '../../packages/web-decision/src/assets.js';
-import {MODEL_CATALOG_BY_ID} from '../../packages/web-decision/src/catalog/index.generated.ts';
 import type {KevTokenizer} from '../../packages/web-decision/src/kev.js';
 import {loadCuratedKevModel} from '../../packages/web-decision/src/kev-loader.js';
+import {getModelRegistration} from '../../packages/web-decision/src/model-registry.js';
 import type {RepresentativeDecisionCase} from './kev06-expanded-inference.js';
 
 const MODEL_ID = 'kev-0.6b-q4f16';
+const ADAPTER_REQUEST_TIMEOUT_MS = 30_000;
 const DIAGNOSTIC_STORAGE_KEY = 'direct-kev-r6-webgpu-diagnostics';
 const PROGRESS_PREFIX = '__DIRECT_KEV_PROGRESS__';
 const DIRECT_ARTIFACT_ROOT = 'https://direct-kev-package-test.invalid/';
@@ -107,7 +108,16 @@ async function runDecisions(
   const decisions = [];
   for (const item of cases) {
     recordProgress(`${stagePrefix}-case-started`, {id: item.id, tokenCount: item.tokenCount});
-    const result = await model.decide(item.request);
+    const restoreDebugHooks =
+      stagePrefix === 'online-matrix' && decisions.length === 0
+        ? instrumentKevInference(model, `${stagePrefix}-${item.id}`)
+        : undefined;
+    let result: Awaited<ReturnType<typeof model.decide>>;
+    try {
+      result = await model.decide(item.request);
+    } finally {
+      restoreDebugHooks?.();
+    }
     const answer = result.answers[0];
     if (!answer) throw new Error(`The direct Kev model omitted answer ${item.id}.`);
     const decision = {
@@ -149,6 +159,43 @@ function describeFailure(value: unknown): string {
   return parts.join(' <- ') || String(value);
 }
 
+type KevRuntimeDebugSurface = {
+  fn: (this: unknown, ...args: unknown[]) => unknown;
+  device: {sync: (this: unknown, ...args: unknown[]) => unknown};
+};
+
+function instrumentKevInference(model: Awaited<ReturnType<typeof loadCuratedKevModel>>, prefix: string): () => void {
+  const runtime = model as unknown as KevRuntimeDebugSurface;
+  const originalFunction = runtime.fn;
+  const originalSync = runtime.device.sync;
+  runtime.fn = function (this: unknown, ...args: unknown[]) {
+    recordProgress(`${prefix}-tvm-call-started`, {argumentCount: args.length});
+    try {
+      const output = originalFunction.apply(this, args);
+      recordProgress(`${prefix}-tvm-call-returned`);
+      return output;
+    } catch (cause) {
+      recordProgress(`${prefix}-tvm-call-failed`, {error: describeFailure(cause)});
+      throw cause;
+    }
+  };
+  runtime.device.sync = async function (this: unknown, ...args: unknown[]) {
+    recordProgress(`${prefix}-gpu-sync-started`);
+    try {
+      const result = await originalSync.apply(this, args);
+      recordProgress(`${prefix}-gpu-sync-completed`);
+      return result;
+    } catch (cause) {
+      recordProgress(`${prefix}-gpu-sync-failed`, {error: describeFailure(cause)});
+      throw cause;
+    }
+  };
+  return () => {
+    runtime.fn = originalFunction;
+    runtime.device.sync = originalSync;
+  };
+}
+
 function instrumentCache(cache: Cache, failures: string[]): Cache {
   return new Proxy(cache, {
     get(target, property) {
@@ -170,7 +217,28 @@ function instrumentCache(cache: Cache, failures: string[]): Cache {
 
 async function readAdapterDiagnostics(): Promise<AdapterDiagnostics> {
   if (!navigator.gpu) throw new Error('WebGPU is unavailable in Chromium.');
-  const adapter = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'});
+  let timeoutId: number | undefined;
+  let adapter: GPUAdapter | null;
+  try {
+    adapter = await Promise.race([
+      navigator.gpu.requestAdapter({powerPreference: 'high-performance'}),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = window.setTimeout(() => {
+          const details = {
+            secureContext: isSecureContext,
+            origin: location.origin,
+            userAgent: navigator.userAgent
+          };
+          recordProgress('adapter-request-timeout', details);
+          reject(
+            new Error(`WebGPU adapter request timed out after ${ADAPTER_REQUEST_TIMEOUT_MS} ms at ${location.origin}.`)
+          );
+        }, ADAPTER_REQUEST_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
   if (!adapter) throw new Error('Chromium did not provide a high-performance WebGPU adapter.');
   const info = adapter.info ?? {};
   const adapterWithFallback = adapter as GPUAdapter & {readonly isFallbackAdapter?: boolean};
@@ -397,7 +465,13 @@ function createTestSource(manifestSha256: string) {
 }
 
 function createPackageDescription(manifestSha256: string): Parameters<typeof loadCuratedKevModel>[1] {
-  const {adapter: _adapter, ...described} = MODEL_CATALOG_BY_ID[MODEL_ID]!.description;
+  const {model: _legacyModelId, ...legacyDescription} = getModelRegistration(MODEL_ID).description;
+  const {assets: _legacyAssets, ...described} = legacyDescription;
+  const sourceAssets = Object.fromEntries(
+    Object.entries(legacyDescription.assets).filter(
+      ([key]) => !['manifestSha256', 'wasmSha256', 'sourceDataSha256', 'requiredFiles'].includes(key)
+    )
+  );
   return {
     ...described,
     modelId: MODEL_ID,
@@ -407,24 +481,21 @@ function createPackageDescription(manifestSha256: string): Parameters<typeof loa
       revision: 'abe7110dedfd68a185839550079bcf7c26f561ac'
     },
     assets: {
-      ...described.assets,
+      ...sourceAssets,
       manifestSha256,
       directArtifactRoot: DIRECT_ARTIFACT_ROOT
     }
-  } as Parameters<typeof loadCuratedKevModel>[1];
+  } as unknown as Parameters<typeof loadCuratedKevModel>[1];
 }
 
 async function readDefaultSourceCacheDiagnostics(
-  manifestSha256: string,
   manifestFiles: Readonly<Record<string, {sha256: string}>>
 ): Promise<DirectCacheDiagnostics> {
-  const base = new URL(`/.web-decision-package-cache/${MODEL_ID}/${manifestSha256}/`, location.origin);
+  const cacheNamespace = new URL('/.web-decision-cache/sha256/', location.origin);
   const cacheNames = await caches.keys();
   const cache = await caches.open(CACHE_NAME);
   const keys = await cache.keys();
-  const cacheKeyUrls = keys
-    .map((request) => request.url)
-    .filter((url) => new URL(url).pathname.startsWith(base.pathname));
+  const cacheKeyUrls = keys.map((request) => request.url);
   const cachedDigests = new Set(
     cacheKeyUrls
       .map((url) => new URL(url).searchParams.get('digest'))
@@ -435,7 +506,7 @@ async function readDefaultSourceCacheDiagnostics(
   const estimate = await navigator.storage?.estimate();
   return {
     cacheNames,
-    namespace: base.href,
+    namespace: cacheNamespace.href,
     cacheKeyCount: cacheKeyUrls.length,
     cacheKeyUrls,
     cachedAssetNames,
@@ -452,6 +523,8 @@ export async function runDirectKevDefaultSourceSmoke(
 ): Promise<DefaultSourceSmokeOutput> {
   const [baselineCase] = cases;
   if (!baselineCase) throw new Error('The pinned direct Kev baseline case is missing.');
+  // Avoid the direct-source warm cache masking default-source fetches.
+  await caches.delete(CACHE_NAME);
   const description = createPackageDescription(manifestSha256);
   recordProgress('default-source-online-load-started', {providerInjected: false});
   const onlineModel = await loadCuratedKevModel(
@@ -467,7 +540,7 @@ export async function runDirectKevDefaultSourceSmoke(
   } finally {
     await onlineModel.dispose();
   }
-  const cacheDiagnostics = await readDefaultSourceCacheDiagnostics(manifestSha256, manifestFiles);
+  const cacheDiagnostics = await readDefaultSourceCacheDiagnostics(manifestFiles);
   recordProgress('default-source-cache-diagnostics-complete', cacheDiagnostics);
 
   recordProgress('default-source-offline-load-started', {providerInjected: false});
@@ -494,7 +567,11 @@ export async function runDirectKevPackageGate(
   cpuBaseline: CpuBaseline
 ): Promise<GateOutput> {
   recordProgress('native-input-limits-verified', NATIVE_KEV_INPUT_LIMITS);
-  recordProgress('adapter-request-started');
+  recordProgress('adapter-request-started', {
+    webgpuAvailable: Boolean(navigator.gpu),
+    secureContext: isSecureContext,
+    origin: location.origin
+  });
   const adapter = await readAdapterDiagnostics();
   recordProgress('adapter-ready', adapter);
   await caches.delete(CACHE_NAME);

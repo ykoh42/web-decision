@@ -19,6 +19,7 @@ from kev_preprocess import (
 from tvm import relax, tirx
 
 ATTENTION_FUNCTION_NAME = "kev_attention_grid"
+ATTENTION_WRAPPER_NAME = "kev_attention_chunked"
 ATTENTION_OUTPUT_ARGUMENT_INDEX = 10
 ATTENTION_QUERY_CHUNK_SIZE = 512
 ATTENTION_QUERY_CHUNKS = 16
@@ -28,6 +29,102 @@ DEFAULT_METADATA_BINDINGS = {
     "lv59": PREPROCESS_POSITION_IDS,
     "lv3273": PREPROCESS_NEXT_DECISION,
 }
+
+
+def _build_attention_wrapper(attention_function):
+    """Guard each bounded TIR dispatch by the dynamic input length."""
+    sequence_length = tirx.Var("sequence_length", "int64")
+    query = relax.Var(
+        "query",
+        relax.TensorType((NUM_QUERY_HEADS, sequence_length, HEAD_DIM), "float16"),
+    )
+    key = relax.Var(
+        "key",
+        relax.TensorType((NUM_QUERY_HEADS, HEAD_DIM, sequence_length), "float16"),
+    )
+    value = relax.Var(
+        "value",
+        relax.TensorType((NUM_QUERY_HEADS, sequence_length, HEAD_DIM), "float32"),
+    )
+    segments = relax.Var("segments", relax.TensorType((1, sequence_length), "int32"))
+    valid = relax.Var("valid", relax.TensorType((1, sequence_length), "int32"))
+    output_type = relax.TensorType(
+        (NUM_QUERY_HEADS, sequence_length, HEAD_DIM),
+        "float32",
+    )
+
+    def call_arguments(query_start, query_chunk_length):
+        return [
+            query,
+            key,
+            value,
+            segments,
+            valid,
+            sequence_length,
+            tirx.Cast("int32", sequence_length),
+            relax.prim_value(1, dtype="int32"),
+            tirx.Cast("int32", query_start),
+            tirx.Cast("int32", query_chunk_length),
+        ]
+
+    first_length = tirx.max(
+        0,
+        tirx.min(sequence_length, ATTENTION_QUERY_CHUNK_SIZE),
+    )
+    first_output = relax.Var("attention_output", output_type)
+    bindings = [
+        relax.VarBinding(
+            first_output,
+            relax.call_tir(
+                attention_function,
+                call_arguments(0, first_length),
+                output_type,
+            ),
+        )
+    ]
+    output = first_output
+
+    for chunk_index in range(1, ATTENTION_QUERY_CHUNKS):
+        query_start = chunk_index * ATTENTION_QUERY_CHUNK_SIZE
+        query_length = tirx.max(
+            0,
+            tirx.min(sequence_length, query_start + ATTENTION_QUERY_CHUNK_SIZE)
+            - query_start,
+        )
+        arguments = call_arguments(query_start, query_length)
+        arguments.append(output)
+        chunk_call = relax.call_tir_inplace(
+            attention_function,
+            arguments,
+            inplace_indices=ATTENTION_OUTPUT_ARGUMENT_INDEX,
+            out_ty=output_type,
+        )
+        conditional_output = relax.Var("attention_output", output_type)
+        bindings.append(
+            relax.VarBinding(
+                conditional_output,
+                relax.If(
+                    sequence_length > query_start,
+                    relax.SeqExpr([], chunk_call),
+                    relax.SeqExpr([], output),
+                ),
+            )
+        )
+        output = relax.Var("attention_output", output_type)
+        bindings.append(
+            relax.VarBinding(
+                output,
+                relax.op.reshape(
+                    conditional_output,
+                    (NUM_QUERY_HEADS, sequence_length, HEAD_DIM),
+                ),
+            )
+        )
+
+    body = relax.SeqExpr([relax.BindingBlock(bindings)], output)
+    return relax.Function(
+        [query, key, value, segments, valid], body, ret_ty=output_type
+    )
 
 
 @dataclass(frozen=True)
@@ -153,13 +250,13 @@ class KevAttentionGraphMutator(relax.PyExprMutator):
     def __init__(
         self,
         module,
-        fused_gv,
+        attention_wrapper_gv,
         preprocess_var,
         sequence_length,
         metadata_bindings=None,
     ):
         super().__init__(module)
-        self.fused_gv = fused_gv
+        self.attention_wrapper_gv = attention_wrapper_gv
         self.preprocess_var = preprocess_var
         self.sequence_length = sequence_length
         self.metadata_bindings = dict(
@@ -193,73 +290,12 @@ class KevAttentionGraphMutator(relax.PyExprMutator):
         )
         return relax.op.reshape(selected, (1, self.sequence_length))
 
-    def _attention_chunk(
-        self,
-        query,
-        key,
-        value,
-        segments,
-        valid,
-        query_start,
-        query_chunk_length,
-        output_type,
-        output=None,
-    ):
-        """Build one query-range call while retaining the full key sequence."""
-        arguments = [
-            query,
-            key,
-            value,
-            segments,
-            valid,
-            self.sequence_length,
-            tirx.Cast("int32", self.sequence_length),
-            relax.prim_value(1, dtype="int32"),
-            tirx.Cast("int32", query_start),
-            tirx.Cast("int32", query_chunk_length),
-        ]
-        if output is None:
-            return relax.call_tir(self.fused_gv, arguments, output_type)
-        arguments.append(output)
-        # Each active range writes disjoint rows, so the full output buffer is reused.
-        return relax.call_tir_inplace(
-            self.fused_gv,
-            arguments,
-            inplace_indices=ATTENTION_OUTPUT_ARGUMENT_INDEX,
-            out_ty=output_type,
-        )
-
     def _attention_in_chunks(self, query, key, value, segments, valid):
-        """Partition query rows into bounded TIR dispatches."""
-        output_type = relax.TensorType(
-            (NUM_QUERY_HEADS, self.sequence_length, HEAD_DIM),
-            "float32",
+        """Delegate dynamic chunk scheduling outside the model dataflow region."""
+        return relax.Call(
+            self.attention_wrapper_gv,
+            [query, key, value, segments, valid],
         )
-        result = None
-        for chunk_index in range(ATTENTION_QUERY_CHUNKS):
-            query_start = chunk_index * ATTENTION_QUERY_CHUNK_SIZE
-            query_end = tirx.min(
-                self.sequence_length,
-                query_start + ATTENTION_QUERY_CHUNK_SIZE,
-            )
-            query_length = tirx.max(0, query_end - query_start)
-            safe_query_start = tirx.if_then_else(
-                query_length > 0,
-                query_start,
-                tirx.IntImm("int64", 0),
-            )
-            result = self._attention_chunk(
-                query,
-                key,
-                value,
-                segments,
-                valid,
-                safe_query_start,
-                query_length,
-                output_type,
-                output=result,
-            )
-        return result
 
     def visit_var_binding_(self, binding):
         """Replace selected wrapper fields before their dense consumers run."""
@@ -327,6 +363,10 @@ def rewrite_kev_attention(
 
     setup_builder = relax.BlockBuilder(module)
     fused_gv = setup_builder.add_func(attention_grid, ATTENTION_FUNCTION_NAME)
+    attention_wrapper_gv = setup_builder.add_func(
+        _build_attention_wrapper(fused_gv),
+        ATTENTION_WRAPPER_NAME,
+    )
     preprocess_module = build_kev_preprocessor_module(
         question_id, decide_id, target=target
     )
@@ -377,7 +417,7 @@ def rewrite_kev_attention(
 
     mutator = KevAttentionGraphMutator(
         prepared_module,
-        fused_gv,
+        attention_wrapper_gv,
         preprocess_var,
         sequence_length,
         metadata_bindings=metadata_bindings,

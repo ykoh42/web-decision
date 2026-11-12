@@ -46,92 +46,11 @@ export interface CommonLoadOptions {
   readonly onProgress?: (progress: ModelProgress) => void;
 }
 
-export interface KevLoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
-  readonly modelId: Extract<ModelId, 'kev-0.6b-q4f16'>;
-  readonly maxPrefetchBytes?: number;
-  readonly maxInputTokens?: number;
-  readonly maxInputCharacters?: number;
-}
-
 export interface KananaLoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
   readonly modelId: Extract<ModelId, 'kanana-2-v-decide-3b-2611'>;
 }
 
-export type LoadOptions = KevLoadOptions | KananaLoadOptions;
-
-export interface DecisionQuestion {
-  readonly instructions: string;
-  readonly options: readonly string[];
-}
-
-export interface DecisionRequest {
-  readonly state: string;
-  readonly questions: readonly DecisionQuestion[];
-}
-
-export interface DecisionResult {
-  readonly tokenCount: number;
-  readonly answers: readonly Readonly<{
-    selected: string;
-    selectedIndex: number;
-    probabilities: readonly Readonly<{option: string; probability: number; logit: number}>[];
-  }>[];
-}
-
-export type KevValue =
-  | null
-  | boolean
-  | number
-  | bigint
-  | string
-  | readonly KevValue[]
-  | Readonly<{[key: string]: KevValue}>
-  | Map<string, KevValue>;
-
-export type KevQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions?: KevValue;
-      criteria: Readonly<Record<string, KevValue>> | Map<string, KevValue>;
-      [key: string]: unknown;
-    }>
-  | Readonly<{
-      type: 'score';
-      instructions?: KevValue;
-      criteria: readonly KevValue[];
-      [key: string]: unknown;
-    }>
-  | Readonly<{
-      type: 'noul';
-      instructions?: KevValue;
-      criteria?: Readonly<Record<string, KevValue>> | Map<string, KevValue> | null;
-      [key: string]: unknown;
-    }>;
-
-export type KevAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      probabilities: Readonly<Record<string, number>>;
-      probabilityEntries: readonly (readonly [key: string, probability: number])[];
-      confidence: number;
-    }>
-  | Readonly<{
-      type: 'score';
-      score: number;
-      legend: Readonly<Record<string, string>>;
-      probabilities: Readonly<Record<string, number>>;
-      probabilityEntries: readonly (readonly [level: string, probability: number])[];
-      confidence: number;
-    }>
-  | Readonly<{type: 'noul'; noul: number}>;
-
-export interface KevResult {
-  readonly model: Extract<ModelId, 'kev-0.6b-q4f16'>;
-  readonly tokenCount: number;
-  readonly answers: Readonly<Record<string, KevAnswer>>;
-  readonly answerEntries: readonly (readonly [question: string, answer: KevAnswer])[];
-}
+export type LoadOptions = KananaLoadOptions;
 
 export interface ModelDescription {
   readonly modelId: ModelId;
@@ -165,19 +84,6 @@ export interface ModelDescription {
     rating?: Readonly<{status: 'not-implemented'}>;
   }>;
   readonly verification: Readonly<Record<string, string>>;
-}
-
-export interface DecisionModel {
-  readonly modelId: Extract<ModelId, 'kev-0.6b-q4f16'>;
-  readonly description: ModelDescription;
-  decide(request: DecisionRequest, options?: {signal?: AbortSignal}): Promise<DecisionResult>;
-  systemOne(
-    state: KevValue,
-    questions: Readonly<Record<string, KevQuestion>> | Map<string, KevQuestion>,
-    options?: {signal?: AbortSignal}
-  ): Promise<KevResult>;
-  releaseCachedMemory(): Promise<void>;
-  dispose(): Promise<void>;
 }
 
 export type KananaValue =
@@ -284,11 +190,10 @@ export interface KananaDecisionModel {
   dispose(): Promise<void>;
 }
 
-export type LoadedDecisionModel = DecisionModel | KananaDecisionModel;
+export type LoadedDecisionModel = KananaDecisionModel;
 
 export function listModels(): readonly ModelDescription[];
 export function describeModel(modelId: ModelId): ModelDescription;
-export function loadDecisionModel(options: KevLoadOptions): Promise<DecisionModel>;
 export function loadDecisionModel(options: KananaLoadOptions): Promise<KananaDecisionModel>;
 export function loadDecisionModel(options: LoadOptions): Promise<LoadedDecisionModel>;
 export function loadDecisionModel(options: CommonLoadOptions): Promise<LoadedDecisionModel>;

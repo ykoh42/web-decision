@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import fs from 'node:fs';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 
 interface ParserNode {
   readonly kind: number;
@@ -305,6 +306,7 @@ function git(args: readonly string[], options: SpawnSyncOptionsWithBufferEncodin
     cwd: ROOT,
     encoding: 'buffer',
     maxBuffer: 128 * 1024 * 1024,
+    env: gitEnvironmentFor(ROOT),
     ...options
   });
   if (result.error) throw result.error;
@@ -315,7 +317,8 @@ export function sourceNamesInWorkingTree(root = ROOT): string[] {
   const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
     cwd: root,
     encoding: 'buffer',
-    maxBuffer: 128 * 1024 * 1024
+    maxBuffer: 128 * 1024 * 1024,
+    env: gitEnvironmentFor(root)
   });
   if (result.error) throw result.error;
   if (result.status !== 0) fail(`git ls-files failed: ${result.stderr.toString('utf8')}`);
@@ -329,7 +332,8 @@ function deletedTrackedSources(root = ROOT): Set<string> {
   const result = spawnSync('git', ['ls-files', '--deleted', '-z'], {
     cwd: root,
     encoding: 'buffer',
-    maxBuffer: 128 * 1024 * 1024
+    maxBuffer: 128 * 1024 * 1024,
+    env: gitEnvironmentFor(root)
   });
   if (result.error) throw result.error;
   if (result.status !== 0) fail(`git ls-files --deleted failed: ${result.stderr.toString('utf8')}`);

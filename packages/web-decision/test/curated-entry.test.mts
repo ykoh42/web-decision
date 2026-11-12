@@ -65,7 +65,7 @@ test('invalid or caller-selected sources fail before making a network request', 
 });
 
 test(
-  'Kev-only input controls are rejected for approved Kanana before loading assets',
+  'Kev-only input controls are rejected for verified Kanana before loading assets',
   {skip: !library.listModels().some(({modelId}) => modelId === 'kanana-2-v-decide-3b-2611')},
   async () => {
     const oldFetch = globalThis.fetch;

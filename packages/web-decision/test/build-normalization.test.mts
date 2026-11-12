@@ -52,7 +52,12 @@ test('TVM source marker normalization removes checkout-depth differences', () =>
 });
 
 test('an empty approved catalog does not require TVM source markers', () => {
-  assert.doesNotThrow(() => generateBundle(plugin, {entry: {type: 'chunk' as const, code: 'const value = 1;'}}));
+  const emptyCatalogPlugin = createTvmSourceMarkerPlugin([]);
+  assert.doesNotThrow(() =>
+    generateBundle(emptyCatalogPlugin as unknown as NormalizeHook, {
+      entry: {type: 'chunk' as const, code: 'const value = 1;'}
+    })
+  );
 });
 
 test('build fails when the approved model bundle has no TVM markers', () => {

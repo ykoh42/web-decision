@@ -51,7 +51,7 @@ try {
 
 The workspace preview exposes only curated TVM models. `listModels()` and `describeModel(id)` show model capabilities and runtime requirements; `loadDecisionModel({modelId})` loads only a listed ID. Caller-supplied model URLs and unregistered models are not accepted.
 
-The Kanana candidate uses native TVM text and vision graphs, pinned assets, and only the checkpoint ranges those graphs require. Its exact npm archive passed text, image, offline-cache, and 20,480-token-boundary WebGPU checks on an Apple M4 Pro with Chromium 157. The archive is bound to the reports in the release verification gate before publication.
+The Kanana `0.4.0` candidate uses native TVM text and vision graphs, pinned assets, and only the checkpoint ranges those graphs require. Its exact candidate archive passed text, image, offline-cache, and 20,480-token-boundary WebGPU checks on an Apple M4 Pro with Chromium 157. The archive is bound to the reports in the release verification gate before publication; it is not part of published npm `0.3.0`.
 
 ## Verification
 

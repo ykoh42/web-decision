@@ -128,7 +128,7 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
           }
         ]
       }),
-    /Direct artifact roots require the direct Kev checkpoint/u
+    /Direct artifact roots are Kev-only/u
   );
 });
 
@@ -137,9 +137,14 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
   const {model: _legacyModelId, ...kevDescription} = structuredClone(
     getModelRegistration('kev-0.6b-q4f16').description
   );
+  const sourceAssets = Object.fromEntries(
+    Object.entries(kevDescription.assets).filter(
+      ([key]) => !['manifestSha256', 'wasmSha256', 'sourceDataSha256', 'requiredFiles'].includes(key)
+    )
+  );
   const sourceModel = {
     modelId: 'kev-0.6b-q4f16',
-    description: {adapter: 'kev06', ...kevDescription}
+    description: {adapter: 'kev06', ...kevDescription, assets: sourceAssets}
   };
   const artifactUpstreams = [
     {
@@ -283,7 +288,11 @@ test('generated files are deterministic and the ModelId union follows the curate
     'export type ModelIdTuple = readonly [' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(', ') + '];';
   assert.ok(typeFile.includes(expectedTuple));
   const adapterIds = [...new Set(MODEL_CATALOG.map(({description}) => description.adapter))].sort();
-  assert.ok(typeFile.includes('export type ModelAdapterId = ' + adapterIds.map((adapter) => "'" + adapter + "'").join(' | ') + ';'));
+  assert.ok(
+    typeFile.includes(
+      'export type ModelAdapterId = ' + adapterIds.map((adapter) => "'" + adapter + "'").join(' | ') + ';'
+    )
+  );
   assert.equal(typeFile.includes("from '../index.js'"), false);
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-model-catalog.mts', '--check'], {
     cwd: packageRoot,

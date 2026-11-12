@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {TextDecoder} from 'node:util';
 import {fileURLToPath} from 'node:url';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const THRESHOLD = 15;
@@ -161,10 +162,12 @@ export function requireComplete(baseline: SonarBaseline, sourcePaths: ReadonlySe
 }
 
 export function workingTreeSources(root: string): Set<string> {
+  const environment = gitEnvironmentFor(root);
   const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
     cwd: root,
     encoding: 'buffer',
-    maxBuffer: 128 * 1024 * 1024
+    maxBuffer: 128 * 1024 * 1024,
+    env: environment
   });
   if (result.error) fail(`Could not list JavaScript/TypeScript sources: ${result.error.message}`);
   if (result.status !== 0) fail(`Could not list JavaScript/TypeScript sources: ${result.stderr.toString('utf8')}`);
@@ -172,7 +175,8 @@ export function workingTreeSources(root: string): Set<string> {
   const deletedResult = spawnSync('git', ['ls-files', '--deleted', '-z'], {
     cwd: root,
     encoding: 'buffer',
-    maxBuffer: 128 * 1024 * 1024
+    maxBuffer: 128 * 1024 * 1024,
+    env: environment
   });
   if (deletedResult.error) fail(`Could not list deleted JavaScript/TypeScript sources: ${deletedResult.error.message}`);
   if (deletedResult.status !== 0)

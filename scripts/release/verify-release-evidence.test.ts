@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {
   canonicalSha256,
   loadPublicCatalog,
@@ -1260,16 +1261,42 @@ test('production release verification rejects the explicitly synthetic fixture s
 test('the release verifier checks committed provenance before checking build inputs', async () => {
   const workingPolicy = await readFile(POLICY_PATH);
   const committedPolicy = execFileSync('git', ['show', 'HEAD:scripts/release/release-evidence-policy.json'], {
-    cwd: WORKSPACE_ROOT
+    cwd: WORKSPACE_ROOT,
+    env: gitEnvironmentFor(WORKSPACE_ROOT)
   });
   const policyIsCommitted = workingPolicy.equals(committedPolicy);
+  let catalogInputsAreCommitted = true;
+  try {
+    execFileSync(
+      'git',
+      ['diff', '--quiet', 'HEAD', '--', 'packages/web-decision/src', 'packages/web-decision/assets'],
+      {
+        cwd: WORKSPACE_ROOT,
+        env: gitEnvironmentFor(WORKSPACE_ROOT),
+        stdio: 'ignore'
+      }
+    );
+    const untracked = execFileSync(
+      'git',
+      ['ls-files', '--others', '--exclude-standard', '--', 'packages/web-decision/src', 'packages/web-decision/assets'],
+      {cwd: WORKSPACE_ROOT, env: gitEnvironmentFor(WORKSPACE_ROOT), encoding: 'utf8'}
+    );
+    catalogInputsAreCommitted = untracked === '';
+  } catch {
+    catalogInputsAreCommitted = false;
+  }
+  const expectedError = !policyIsCommitted
+    ? /Release evidence policy must match the committed version/u
+    : catalogInputsAreCommitted
+      ? /TVM build evidence is required/u
+      : /git diff --quiet HEAD -- packages\/web-decision\/src/u;
   await assert.rejects(
     verifyReleaseEvidence({
       archivePath: 'unused.tgz',
       installedPackagePath: 'unused-package',
       playwrightReportPath: 'unused-report.json'
     }),
-    policyIsCommitted ? /TVM build evidence is required/u : /Release evidence policy must match the committed version/u
+    expectedError
   );
 });
 

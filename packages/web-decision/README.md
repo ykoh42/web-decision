@@ -2,7 +2,7 @@
 
 `web-decision` runs curated decision models locally in the browser with TVM WebGPU. A model ID selects a pinned model and its verified assets. Applications cannot register an arbitrary model or asset URL.
 
-The public catalog includes models with verified provenance. Kanana remains available from the current release. Kev's direct TVM conversion stays outside the public catalog until its source, conversion, rights, and exact-package gates pass.
+The current source catalog and `0.4.0` candidate include verified Kanana. It is not in published npm `0.3.0`. Kev's direct TVM candidate has passed source, conversion, full-input, and exact-package GPU checks. It remains outside the public catalog pending dataset-rights review and asset hosting.
 
 Load Kanana by its catalog ID and submit keyed typed questions with `systemOne()`:
 
@@ -35,7 +35,7 @@ For JSON state and criteria, safe integer `number` values other than negative ze
 
 Kanana's TVM graphs ship with the package, and the loader fetches only the pinned weight ranges required by those graphs. Decision inputs remain local. Verified assets can be cached for subsequent loads. `offline: true` requires all necessary cached files and does not fetch missing model assets. A successful online load alone does not guarantee that the browser saved the files: storage availability and quota vary. For offline use, the application must also make its own code and pages available offline.
 
-The model requires WebGPU and `shader-f16`. GPU, browser and model-specific limitations and actual verification evidence are described in the model catalog and release record. Model files have separate terms; see the model notices.
+The model requires WebGPU. GPU, browser and model-specific limitations and actual verification evidence are described in the model catalog and release record. Model files have separate terms; see the model notices.
 
 ## Kanana model terms
 

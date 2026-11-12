@@ -8,7 +8,101 @@ function deepFreeze<T>(value: T): Readonly<T> {
   return Object.freeze(value);
 }
 
-const catalog = [] as unknown as readonly PublicCatalogEntry[];
+const catalog = [
+  {
+    modelId: 'kanana-2-v-decide-3b-2611',
+    description: {
+      adapter: 'kanana',
+      precision: 'BF16 source, FP16 stored text weights, FP32 text compute, FP32 vision weights',
+      checkpoint: {
+        repository: 'kakaocorp/kanana-2-v-decide-3b-2611',
+        revision: '12820d654ed9789a0f7f48daeee1703c3483c464',
+        weightSha256: '528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b'
+      },
+      assets: {
+        integrity: 'pinned-manifest',
+        location: 'package-and-pinned-upstream',
+        additionalFiles:
+          'The full native TVM text and vision graphs and their manifests ship in this package. Tokenizer/configuration files and only graph-required checkpoint ranges load from the revision-pinned Hugging Face repository.',
+        requiredFiles: [
+          'manifest.json',
+          'kanana-text-model.wasm',
+          'text-weight-manifest.json',
+          'kanana-vision-model.wasm',
+          'vision-weight-manifest.json',
+          'safetensors-range-manifest.json'
+        ],
+        manifestSha256: 'd4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5'
+      },
+      licenses: {
+        project: 'Apache-2.0',
+        modelTerms: 'KananaOpenLicense',
+        modelCard:
+          'https://huggingface.co/kakaocorp/kanana-2-v-decide-3b-2611/tree/12820d654ed9789a0f7f48daeee1703c3483c464'
+      },
+      backend: {
+        name: 'tvm-webgpu',
+        requiredFeatures: [],
+        requiredLimits: {
+          maxBufferSize: 656670720,
+          maxStorageBufferBindingSize: 656670720,
+          maxComputeWorkgroupStorageSize: 32768,
+          maxStorageBuffersPerShaderStage: 6
+        },
+        requiresNonFallbackAdapter: false
+      },
+      features: {
+        textChoice: {
+          status: 'implemented',
+          abstention: 'explicit-noul',
+          limits: [
+            {
+              resource: 'tokens',
+              scope: 'question',
+              max: 20480,
+              description: 'Pinned model configuration max_length; applies to each query and candidate prompt.'
+            },
+            {
+              resource: 'questions',
+              scope: 'request',
+              min: 1
+            }
+          ],
+          handling: 'query-and-candidate-embedding-similarity',
+          tokenCount: 'sum-of-query-and-candidate-tokens',
+          score: {
+            basis: 'cosine-similarity',
+            decisionTemperature: 0.056139365295102696,
+            requestTemperature: 1,
+            calibration: 'not-guaranteed'
+          }
+        },
+        typedTextQuestionTypes: ['choice', 'noul', 'score'],
+        imageChoice: {
+          status: 'implemented',
+          limits: [
+            {
+              resource: 'images',
+              scope: 'request',
+              max: 10,
+              description: 'Pinned model-card maximum across images in state messages and the images field.'
+            }
+          ]
+        },
+        rating: {
+          status: 'not-implemented'
+        }
+      },
+      verification: {
+        currentBundleGpu: 'verified-m4-pro-chromium-157',
+        currentBundleCpuWasm: 'not-applicable',
+        currentBundleJavascript: 'not-applicable',
+        priorEvidence:
+          'The latest exact-package candidate passed public text and image inference, offline cache reuse with zero network attempts, and the 20,480 maxLength boundary on Apple M4 Pro / Chromium 157.0.8103.52 using the non-fallback Apple Metal 3 WebGPU adapter. Full 32-layer CPU parity passed for sequence lengths 1 and 8, including two image tokens. The 20,480 boundary run completed in 5.2 minutes total test time and used 11,088,503,984 live WebGPU buffer bytes. Text score, probability, and confidence deltas against pinned BF16 were 0.004926, 0.001932, and 0.007389, within their recorded tolerances.'
+      }
+    }
+  }
+] as unknown as readonly PublicCatalogEntry[];
 export const APPROVED_MODEL_IDS = Object.freeze(catalog.map(({modelId}) => modelId));
 export const MODEL_CATALOG = deepFreeze(catalog);
 export const MODEL_CATALOG_BY_ID = Object.freeze(

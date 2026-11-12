@@ -1,14 +1,16 @@
 # Model catalog
 
-`model-spec.json` is the full candidate source for model IDs, adapters,
-descriptions, capabilities, and verification evidence. Artifact hashes live in
-the generated `artifacts.lock.json`, not in the spec. `model-provenance.json`
-tracks the approval state for every candidate.
+`model-spec.json` lists models wired into current catalog generation. It
+currently contains Kanana only. Artifact hashes live in the generated
+`artifacts.lock.json`, not in the spec. `model-provenance.json` tracks only
+those catalog entries. Kev's standalone old-ONNX provenance record is not a
+direct-TVM catalog entry.
 
 The public catalog includes models with verified provenance.
 Kanana's current `verified` record keeps its existing public entry; pending
-candidates are excluded. Kev's direct TVM conversion stays pending until its
-source, conversion, rights, and exact-package gates pass.
+candidates are excluded. Kev's direct TVM candidate passes source, conversion,
+full-input, and exact-package GPU checks, but remains excluded pending
+dataset-rights review and asset hosting.
 
 `packages/web-decision/scripts/build-model-catalog.mts` validates each adapter's
 pinned artifacts and provenance, then regenerates the candidate lock/catalog,

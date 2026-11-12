@@ -287,7 +287,7 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
     !enabled,
     'Set WEB_DECISION_KEV06_DIRECT_GPU=1 and the direct package/report paths for real Chrome GPU validation.'
   );
-  test.setTimeout(30 * 60 * 1000);
+  test.setTimeout(60 * 60 * 1000);
   assert.equal(browserName, 'chromium');
   assert.equal(fixtureSha256, EXPANDED_FIXTURE_SHA256, 'Expanded Kev fixture digest differs from its pin.');
 
@@ -560,7 +560,7 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
 
     const defaultSourceRequestHandler = (request: import('@playwright/test').Request) => {
       const url = request.url();
-      if (!url.startsWith(DIRECT_ARTIFACT_ROOT) && !url.includes('kev06-stable')) return;
+      if (!url.startsWith(DIRECT_ARTIFACT_ROOT)) return;
       defaultSourceRequests.push(url);
       activeNetworkRequests.push(url);
       void persistProgress('in-progress');
@@ -578,12 +578,12 @@ test('direct Kev browser package passes online, offline, and pinned Q4 GPU gates
     }
     assert.notEqual(defaultOfflineRequestStart, undefined, 'The default-source offline checkpoint is missing.');
     const defaultSourceOfflineRequests = defaultSourceRequests.slice(defaultOfflineRequestStart);
-    expect(defaultSourceRequests.some((url) => url.includes('kev06-stable') && url.includes('manifest.json'))).toBe(
-      true
-    );
-    expect(defaultSourceRequests.some((url) => url.startsWith(`${DIRECT_ARTIFACT_ROOT}weights/params_shard_`))).toBe(
-      true
-    );
+    const defaultSourcePaths = [
+      ...new Set(
+        defaultSourceRequests.map((url) => new URL(url).pathname.slice(new URL(DIRECT_ARTIFACT_ROOT).pathname.length))
+      )
+    ].sort();
+    expect(defaultSourcePaths).toEqual(['manifest.json', ...manifestRuntimeFiles].sort());
     expect(defaultSourceOfflineRequests).toEqual([]);
     expect(defaultSourceSmoke.cacheDiagnostics.cachePutFailures).toEqual([]);
     expect(

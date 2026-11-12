@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
@@ -501,11 +502,18 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
 
 function assertCommittedFile(workspaceRoot: string, path: string, bytes: Uint8Array, description: string): void {
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', path], {cwd: workspaceRoot, stdio: 'ignore'});
+    execFileSync('git', ['ls-files', '--error-unmatch', path], {
+      cwd: workspaceRoot,
+      env: gitEnvironmentFor(workspaceRoot),
+      stdio: 'ignore'
+    });
   } catch (error) {
     throw new Error(`${description} must be tracked in Git: ${path}`, {cause: error});
   }
-  const committed = execFileSync('git', ['show', `HEAD:${path}`], {cwd: workspaceRoot});
+  const committed = execFileSync('git', ['show', `HEAD:${path}`], {
+    cwd: workspaceRoot,
+    env: gitEnvironmentFor(workspaceRoot)
+  });
   assert.deepEqual(Buffer.from(bytes), committed, `${description} must match its committed bytes.`);
 }
 

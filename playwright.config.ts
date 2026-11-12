@@ -52,7 +52,7 @@ export default defineConfig({
   use: {
     baseURL,
     browserName,
-    ...(realGPU ? {headless: false} : {}),
+    ...(realGPU ? {headless: process.env.WEB_DECISION_REAL_GPU_HEADLESS === '1'} : {}),
     ...(channel ? {channel} : {}),
     launchOptions: {
       args: realGPU && browserName === 'chromium' ? chromiumArgs : [],

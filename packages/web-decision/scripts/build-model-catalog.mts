@@ -1,14 +1,11 @@
 import {createHash} from 'node:crypto';
-import {lstat, readdir, readFile, realpath, writeFile} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {lstat, mkdtemp, readdir, readFile, realpath, rm, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import type {
-  CatalogModelDescription,
-  ModelAdapterId,
-  ModelArtifactLock,
-  ModelCatalogEntry,
-  ModelId
-} from '../src/catalog/types.generated.js';
+import {promisify} from 'node:util';
+import type {ModelArtifactLock} from '../src/catalog/types.generated.js';
 import {
   MODEL_PROVENANCE_EVIDENCE_ROOT,
   MODEL_PROVENANCE_MANIFEST_SHA256,
@@ -32,13 +29,39 @@ import {
   EXPERIMENTAL_KEV_UPSTREAM_SOURCE_SHA256
 } from '../src/kev06/upstream-contract.js';
 
-type CuratedModel = Omit<ModelCatalogEntry, 'description' | 'artifacts'> & {
+type CuratedModel = {
+  readonly modelId: string;
   readonly artifactUpstreams?: readonly DirectKevUpstream[];
-  readonly description: Omit<CatalogModelDescription, 'assets'> & {
-    readonly adapter: ModelAdapterId;
-    readonly assets: Omit<CatalogModelDescription['assets'], 'manifestSha256' | 'requiredFiles'>;
+  readonly description: {
+    readonly adapter: string;
+    readonly assets: CuratedAssets;
+    readonly features: object;
+    readonly checkpoint: Readonly<{repository: string; revision: string; weightSha256?: string}>;
+    readonly licenses: Readonly<Record<string, string>>;
+    readonly precision: string;
+    readonly backend: CuratedBackend;
+    readonly verification?: object;
+    readonly [key: string]: unknown;
   };
 };
+
+interface CuratedBackend {
+  readonly name: string;
+  readonly requiredFeatures?: readonly string[];
+  readonly requiredLimits?: Readonly<Record<string, number>> | undefined;
+  readonly requiresNonFallbackAdapter?: boolean;
+  readonly [key: string]: unknown;
+}
+
+interface CuratedAssets {
+  readonly integrity?: string;
+  readonly manifestSha256?: string;
+  readonly location?: string;
+  readonly directArtifactRoot?: string;
+  readonly requiredFiles?: readonly string[];
+  readonly additionalFiles?: string;
+  readonly [key: string]: unknown;
+}
 
 interface ManifestFile {
   readonly sha256: string;
@@ -99,6 +122,7 @@ interface CatalogGenerationOptions {
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = path.resolve(packageRoot, '../..');
+const execFileAsync = promisify(execFile);
 const catalogRoot = path.join(packageRoot, 'src/catalog');
 const specPath = path.join(catalogRoot, 'model-spec.json');
 const manifestPath = 'assets/kev06-stable/manifest.json';
@@ -633,7 +657,7 @@ async function createArtifactLock(
   options: CatalogGenerationOptions
 ): Promise<ArtifactLockFile> {
   const records = await Promise.all(
-    models.map(async (model): Promise<readonly [ModelId, CatalogArtifactLock]> => [
+    models.map(async (model): Promise<readonly [string, CatalogArtifactLock]> => [
       model.modelId,
       await createModelArtifactLock(model, options)
     ])
@@ -887,7 +911,8 @@ function renderJson(value: unknown): string {
 }
 
 async function writeOutputs(outputs: readonly (readonly [string, string])[], checkOnly: boolean): Promise<void> {
-  for (const [filePath, expected] of outputs) {
+  for (const [filePath, source] of outputs) {
+    const expected = await formatGeneratedTypeScript(filePath, source);
     if (!checkOnly) {
       await writeFile(filePath, expected);
       continue;
@@ -899,6 +924,28 @@ async function writeOutputs(outputs: readonly (readonly [string, string])[], che
       actual = '';
     }
     failUnless(actual === expected, 'Generated file is stale: ' + path.relative(repositoryRoot, filePath));
+  }
+}
+
+async function formatGeneratedTypeScript(filePath: string, source: string): Promise<string> {
+  if (!/\.(?:d\.)?(?:c|m)?ts$/.test(filePath)) return source;
+  const temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'web-decision-catalog-'));
+  const temporaryFile = path.join(temporaryDirectory, path.basename(filePath));
+  const formatter = path.join(
+    repositoryRoot,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'oxfmt.cmd' : 'oxfmt'
+  );
+  try {
+    await writeFile(temporaryFile, source);
+    await execFileAsync(formatter, ['--write', '-c', path.join(repositoryRoot, '.oxfmtrc.json'), temporaryFile], {
+      cwd: repositoryRoot,
+      shell: process.platform === 'win32'
+    });
+    return await readFile(temporaryFile, 'utf8');
+  } finally {
+    await rm(temporaryDirectory, {force: true, recursive: true});
   }
 }
 

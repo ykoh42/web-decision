@@ -110,8 +110,12 @@ class KevAttentionRelaxTests(unittest.TestCase):
             for line in script.splitlines()
             if "R.call_tir_inplace(cls.kev_attention_grid" in line
         ]
-        self.assertEqual(len(attention_calls), 28)
-        self.assertEqual(len(inplace_calls), 420)
+        wrapper_calls = [
+            line for line in script.splitlines() if "cls.kev_attention_chunked(" in line
+        ]
+        self.assertEqual(len(attention_calls), 1)
+        self.assertEqual(len(inplace_calls), ATTENTION_QUERY_CHUNKS - 1)
+        self.assertEqual(len(wrapper_calls), 28)
         self.assertEqual(ATTENTION_QUERY_CHUNK_SIZE, 512)
         self.assertEqual(ATTENTION_QUERY_CHUNKS, 16)
         self.assertIn(
@@ -123,8 +127,11 @@ class KevAttentionRelaxTests(unittest.TestCase):
             inplace_calls[0],
         )
         self.assertIn(
-            f"T.if_then_else(T.max(0, T.min(sequence_length, {2 * ATTENTION_QUERY_CHUNK_SIZE}) - {ATTENTION_QUERY_CHUNK_SIZE}) > 0, {ATTENTION_QUERY_CHUNK_SIZE}, 0)",
-            inplace_calls[0],
+            f"if sequence_length > {ATTENTION_QUERY_CHUNK_SIZE}:",
+            script,
+        )
+        self.assertEqual(
+            script.count("if sequence_length >"), ATTENTION_QUERY_CHUNKS - 1
         )
         self.assertTrue(
             all('T.Cast("int32", sequence_length)' in line for line in attention_calls)
@@ -148,6 +155,15 @@ class KevAttentionRelaxTests(unittest.TestCase):
         self.assertIn("def main[sequence_length]", script)
         self.assertIn("sequence_length", script)
         self.assertIn('R.Tensor((16, sequence_length, 128), dtype="float32")', script)
+
+    def test_dynamic_chunk_wrapper_builds_with_webgpu_pipeline(self):
+        rewritten, _ = rewrite_kev_attention(
+            _attention_graph(1),
+            question_id=151660,
+            decide_id=151661,
+            expected_attention_blocks=1,
+        )
+        tvm.relax.build(rewritten, target=tvm.target.Target("webgpu"))
 
     def test_replacement_count_mismatch_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "replacement count mismatch"):

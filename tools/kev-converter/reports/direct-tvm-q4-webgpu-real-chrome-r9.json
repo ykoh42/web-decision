@@ -1,0 +1,172 @@
+{
+  "status": "passed",
+  "modelId": "kev-0.6b-q4f16",
+  "backend": "tvm-webgpu",
+  "manifestSha256": "70f00b584e9c08c5b1bc06f7946f1709bc67cf39d82337ae4620243170df0847",
+  "parameterCount": 511,
+  "fixtureSha256": "05e7f81d2ec5e8a306c0a8034253e3daa3983c088b8ccd9c29b5130b2eecbd41",
+  "nativeKevInputLimits": {
+    "sourceRepository": "jaredpalmer/kev",
+    "sourceRevision": "37cb2f6155afec1054de2cc78dfd7c7dd24a956d",
+    "sourceFile": "kev/serve.py",
+    "maxStateTokens": 8192,
+    "maxBranchTokens": 8192,
+    "maxPositionEmbeddings": 32768,
+    "aggregateLimit": null
+  },
+  "cpuBaseline": {
+    "logits": [
+      4.57421875,
+      -0.82861328125
+    ],
+    "probabilities": [
+      0.9955163853994867,
+      0.004483614600513331
+    ],
+    "selected": "billing"
+  },
+  "baselineCpuGpuParity": {
+    "maxAbsLogitDelta": 0.00390625,
+    "maxAbsProbabilityDelta": 0.000004361008199948134,
+    "selectionMatches": true
+  },
+  "onlineComparisons": [
+    {
+      "id": "baseline-double-charge",
+      "maxAbsLogitDelta": 0.03076171875,
+      "maxAbsProbabilityDelta": 0.00011840303795773287
+    },
+    {
+      "id": "account-security",
+      "maxAbsLogitDelta": 0.1015625,
+      "maxAbsProbabilityDelta": 0.01855589967713639
+    },
+    {
+      "id": "delayed-package",
+      "maxAbsLogitDelta": 0.04296875,
+      "maxAbsProbabilityDelta": 0.004672472182304377
+    },
+    {
+      "id": "long-tracking-context",
+      "maxAbsLogitDelta": 0.13671875,
+      "maxAbsProbabilityDelta": 0.012727571376669689
+    }
+  ],
+  "boundaryProbe": {
+    "requestedTokenCount": 8192,
+    "overLimitErrorCode": "INVALID_INPUT",
+    "overLimitMessage": "Question 0 state and branch exceed 8192 tokens; no truncation was applied.",
+    "acceptedTokenCount": 8192,
+    "outputFinite": true,
+    "probabilityTotal": 1
+  },
+  "offlineParity": {
+    "maxAbsLogitDelta": 0,
+    "maxAbsProbabilityDelta": 0,
+    "selectionMatches": true
+  },
+  "defaultSourceSmoke": {
+    "onlineBaseline": {
+      "id": "baseline-double-charge",
+      "tokenCount": 22,
+      "selected": "billing",
+      "probabilities": [
+        {
+          "option": "billing",
+          "logit": 4.5703125,
+          "probability": 0.9955120243912868
+        },
+        {
+          "option": "shipping",
+          "logit": -0.83154296875,
+          "probability": 0.004487975608713279
+        }
+      ]
+    },
+    "offlineBaseline": {
+      "id": "baseline-double-charge",
+      "tokenCount": 22,
+      "selected": "billing",
+      "probabilities": [
+        {
+          "option": "billing",
+          "logit": 4.5703125,
+          "probability": 0.9955120243912868
+        },
+        {
+          "option": "shipping",
+          "logit": -0.83154296875,
+          "probability": 0.004487975608713279
+        }
+      ]
+    },
+    "cacheDiagnostics": {
+      "cacheNames": [
+        "web-decision-assets-v1"
+      ],
+      "namespace": "http://127.0.0.1:41773/.web-decision-cache/sha256/",
+      "cacheKeyCount": 9,
+      "cacheKeyUrls": [
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=7143a4974bc3ba3c2eea3bfb0b69d8b3284d7501ab7beea3312ba58e76b87251",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=59f91a2590c1732da86ccbf4ab5aff91da003b366087dbd226b7f694ea9ad171",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=d188b0eb10748d23323b86d8225e51564cf26b8bf81eaa4b09f9678fe4c42f54",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=a98fb65f04abf2785a075d9abcf2ab0daede798edededd8e163f3f710f7f3fff",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=ea4ab54910204e08039f06ab6390c1aba9b3ef0489ca57da6c0604070d6af7eb",
+        "http://127.0.0.1:41773/.web-decision-cache/sha256/?digest=a8137788c6c62204a8e2d2b477cf16f77beec65c83015a728237ee15c4488423",
+        "http://127.0.0.1:41773/.web-decision-package-cache/kev-0.6b-q4f16/70f00b584e9c08c5b1bc06f7946f1709bc67cf39d82337ae4620243170df0847/manifest.json"
+      ],
+      "cachedAssetNames": [
+        "model.wasm",
+        "model_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "weights/params_shard_0.bin",
+        "weights/params_shard_1.bin",
+        "weights/params_shard_2.bin",
+        "weights/tensor-cache.json"
+      ],
+      "missingAssetNames": [
+        "notices/kev-LICENSE",
+        "notices/qwen3-0.6b-base-LICENSE"
+      ],
+      "cachePutFailures": [],
+      "storageEstimate": {
+        "usage": 348779041,
+        "quota": 11086197281
+      }
+    }
+  },
+  "defaultSourceRequests": [
+    "https://direct-kev-package-test.invalid/manifest.json",
+    "https://direct-kev-package-test.invalid/tokenizer.json",
+    "https://direct-kev-package-test.invalid/tokenizer_config.json",
+    "https://direct-kev-package-test.invalid/model_config.json",
+    "https://direct-kev-package-test.invalid/model.wasm",
+    "https://direct-kev-package-test.invalid/weights/tensor-cache.json",
+    "https://direct-kev-package-test.invalid/weights/params_shard_0.bin",
+    "https://direct-kev-package-test.invalid/weights/params_shard_1.bin",
+    "https://direct-kev-package-test.invalid/weights/params_shard_2.bin"
+  ],
+  "defaultSourceParity": {
+    "maxAbsLogitDelta": 0,
+    "maxAbsProbabilityDelta": 0,
+    "selectionMatches": true,
+    "offlineMaxAbsLogitDelta": 0,
+    "offlineMaxAbsProbabilityDelta": 0,
+    "offlineSelectionMatches": true
+  },
+  "onlineFetchPaths": [
+    "manifest.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "model_config.json",
+    "model.wasm",
+    "weights/tensor-cache.json",
+    "weights/params_shard_0.bin",
+    "weights/params_shard_1.bin",
+    "weights/params_shard_2.bin"
+  ],
+  "offlineFetchPaths": []
+}
