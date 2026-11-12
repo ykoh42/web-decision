@@ -1116,7 +1116,7 @@ test('production release verification rejects the explicitly synthetic fixture s
   );
 });
 
-test('the release verifier blocks committed pending provenance before checking build inputs', async () => {
+test('the release verifier checks committed provenance before checking build inputs', async () => {
   const workingPolicy = await readFile(POLICY_PATH);
   const committedPolicy = execFileSync('git', ['show', 'HEAD:scripts/release/release-evidence-policy.json'], {
     cwd: WORKSPACE_ROOT
@@ -1129,7 +1129,7 @@ test('the release verifier blocks committed pending provenance before checking b
       playwrightReportPath: 'unused-report.json'
     }),
     policyIsCommitted
-      ? /Model kev-0\.6b-q4f16 provenance is pending:/u
+      ? /TVM build evidence is required/u
       : /Release evidence policy must match the committed version/u
   );
 });
