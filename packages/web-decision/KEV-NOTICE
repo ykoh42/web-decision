@@ -8,3 +8,17 @@ as LICENSE. Source: https://github.com/jaredpalmer/kev/tree/45923b7a3460b6d36358
 
 The separately obtained model checkpoint, adapter, and base weights are not
 included in this package and retain their own license terms.
+
+The upstream Kev 0.8B model card declares Apache-2.0 for its adapter and head,
+and Apache-2.0 for the Qwen base. The card also lists
+`Yelp/yelp_review_full` as a training source. Its pinned dataset card links an
+agreement that restricts dataset use to non-commercial, non-transferable use,
+limits distribution, and asserts rights over data derivatives. The published
+materials do not resolve whether those terms apply to trained model weights.
+This package does not include the Yelp dataset. Users are responsible for
+checking the terms that apply to their use.
+
+Sources:
+- https://huggingface.co/jaredpalmer/kev-0.8b/tree/bf75a6a8848ea6960ff2ed108d9ed44c2941174f
+- https://huggingface.co/datasets/Yelp/yelp_review_full/tree/c1f9ee939b7d05667af864ee1cb066393154bf85
+- https://s3-media3.fl.yelpcdn.com/assets/srv0/engineering_pages/bea5c1e92bf3/assets/vendor/yelp-dataset-agreement.pdf

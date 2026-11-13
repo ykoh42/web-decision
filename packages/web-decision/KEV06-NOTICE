@@ -30,6 +30,13 @@ have their own licenses. These cards and notices record upstream declarations
 and local file provenance; they do not determine terms for source data,
 generated training records, transformed weights, or a particular hosting use.
 
+The pinned Kev card lists `Yelp/yelp_review_full` as a training source. Its
+pinned dataset card links an agreement that restricts dataset use to
+non-commercial, non-transferable use, limits distribution, and asserts rights
+over data derivatives. The published materials do not resolve whether those
+terms apply to trained model weights. This package does not include the Yelp
+dataset. Users are responsible for checking the terms that apply to their use.
+
 Pinned upstream files:
 - https://huggingface.co/onnx-community/kev-0.6b-ONNX/tree/5a827091b3d58fe4fdfc02a5a5b2ce364047d678
 - https://huggingface.co/jaredpalmer/kev-0.6b/blob/dece6dba8d43f0f7ded45e9f5b9df12474d90843/README.md
