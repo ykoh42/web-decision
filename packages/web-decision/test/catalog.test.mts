@@ -101,7 +101,7 @@ test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entri
         models: [
           {
             ...model,
-            description: {...model.description, backend: {...model.description.backend, name: 'onnxruntime-webgpu'}}
+            description: {...model.description, backend: {...model.description.backend, name: 'unsupported-backend'}}
           }
         ]
       }),

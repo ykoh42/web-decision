@@ -7,18 +7,11 @@ import {
   normalizeStableModelOptions
 } from '../src/stable-models.js';
 
-test('stable IDs use benchmark order within evaluation sets and omit internal route names', () => {
-  assert.deepEqual(listStableModelIds(), [
-    'tamev-micro-minilm-int8',
-    'tamev-nano-tinybert-int8',
-    'tamev-nano-flash-tinybert-int8',
-    'kev-0.6b-q4f16'
-  ]);
+test('only the pinned Kev model is exposed through the stable ID API', () => {
+  assert.deepEqual(listStableModelIds(), ['kev-0.6b-q4f16']);
   assert.equal(Object.isFrozen(listStableModelIds()), true);
-  assert.equal(isStableModelId('tamev-micro-minilm-int8'), true);
-  assert.equal(isStableModelId('tamev-nano-flash-tinybert-int8'), true);
-  assert.equal(isStableModelId('experimental-tamev-micro-minilm-int8'), false);
-  assert.equal(isStableModelId('experimental-tamev-nano-flash-tinybert-int8'), false);
+  assert.equal(isStableModelId('kev-0.6b-q4f16'), true);
+  assert.equal(isStableModelId('experimental-strands-qwen-2b-fp16'), false);
   assert.equal(isStableModelId('unknown-model'), false);
 });
 
@@ -29,28 +22,21 @@ test('stable descriptions expose only the public ID', () => {
     assert.equal(description.model.startsWith('experimental-'), false);
     assert.equal(Object.isFrozen(description), true);
   }
-  assert.throws(() => describeStableModel('experimental-tamev-micro-minilm-int8'), {
-    code: 'INVALID_INPUT'
-  });
+  assert.throws(() => describeStableModel('experimental-strands-qwen-2b-fp16'), {code: 'INVALID_INPUT'});
 });
 
 test('stable options replace an undefined legacy selector with the pinned route', () => {
   const request = normalizeStableModelOptions({
-    modelId: 'tamev-micro-minilm-int8',
+    modelId: 'kev-0.6b-q4f16',
     model: undefined,
     assetsUrl: '/mirror/'
   });
 
-  assert.equal(request.modelId, 'tamev-micro-minilm-int8');
-  assert.equal(request.options.model, 'experimental-tamev-micro-minilm-int8');
+  assert.equal(request.modelId, 'kev-0.6b-q4f16');
+  assert.equal(request.options.model, 'kev-0.6b-q4f16');
   assert.equal(request.options.assetsUrl, '/mirror/');
   assert.equal(Object.hasOwn(request.options, 'modelId'), false);
-  const nanoFlashRequest = normalizeStableModelOptions({modelId: 'tamev-nano-flash-tinybert-int8'});
-  assert.equal(nanoFlashRequest.options.model, 'experimental-tamev-nano-flash-tinybert-int8');
-  assert.equal(nanoFlashRequest.options.assetsUrl, undefined);
-  assert.throws(
-    () =>
-      normalizeStableModelOptions({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'}),
-    {code: 'INVALID_INPUT'}
-  );
+  assert.throws(() => normalizeStableModelOptions({modelId: 'kev-0.6b-q4f16', model: 'other-model'}), {
+    code: 'INVALID_INPUT'
+  });
 });

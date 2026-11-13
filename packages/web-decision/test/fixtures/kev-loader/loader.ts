@@ -21,7 +21,6 @@ interface AssetReaderOptions {
 interface FakeModel {
   family: string;
   dispose?: unknown;
-  systemOne?: unknown;
 }
 
 const fixture = getFakeKevLoaderState;
@@ -214,28 +213,4 @@ export async function loadExperimentalKev08(options: unknown): Promise<FakeModel
 
 export async function loadExperimentalStrandsFromSource(options: unknown): Promise<FakeModel> {
   return loadFake('strands', options);
-}
-
-export async function loadTamev(options: {model: string}): Promise<FakeModel> {
-  const model = loadFake('tamev', options);
-  model.dispose = async () => {
-    fixture().tamevDisposals++;
-    if (fixture().tamevDisposeFails) throw new Error('fake TAMEV disposal failed');
-  };
-  const mode = fixture().tamevSystemOneMode;
-  if (mode === 'accessor') {
-    Object.defineProperty(model, 'systemOne', {get: () => () => ({model: options.model, answers: {}})});
-  } else if (mode === 'nonconfigurable') {
-    Object.defineProperty(model, 'systemOne', {
-      configurable: false,
-      enumerable: true,
-      value: async () => ({model: options.model, answers: {}}),
-      writable: false
-    });
-  } else if (mode === 'nonfunction') {
-    model.systemOne = 'not a function';
-  } else if (mode !== 'missing') {
-    model.systemOne = async () => ({model: options.model, answers: {}});
-  }
-  return model;
 }

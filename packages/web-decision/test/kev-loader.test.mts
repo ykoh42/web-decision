@@ -56,9 +56,6 @@ type LoaderFixture = LoaderState & {
   externalPrepares: number;
   gpuAvailable: boolean;
   warmCache: boolean;
-  tamevSystemOneMode: string;
-  tamevDisposeFails: boolean;
-  tamevDisposals: number;
   readonly gpu: FakeGpu;
   readonly pending: Promise<FakeRuntime>;
   readonly started: () => void;
@@ -94,7 +91,6 @@ type TestModel = {
   readonly runtime?: object;
   readonly limits?: Readonly<Record<string, unknown>>;
   readonly dispose?: () => unknown;
-  readonly systemOne?: (...args: unknown[]) => unknown;
 };
 type LoadDecisionModel = (options: unknown) => Promise<TestModel>;
 
@@ -114,18 +110,13 @@ function isDisposal(value: unknown): value is () => unknown {
   return typeof value === 'function';
 }
 
-function isSystemOne(value: unknown): value is (...args: unknown[]) => unknown {
-  return typeof value === 'function';
-}
-
 function isTestModel(value: unknown): value is TestModel {
   return (
     isRecord(value) &&
     isTestDescription(value.description) &&
     (value.runtime === undefined || isRecord(value.runtime)) &&
     (value.limits === undefined || isRecord(value.limits)) &&
-    (value.dispose === undefined || isDisposal(value.dispose)) &&
-    (value.systemOne === undefined || isSystemOne(value.systemOne))
+    (value.dispose === undefined || isDisposal(value.dispose))
   );
 }
 
@@ -142,11 +133,6 @@ function modelLimits(model: TestModel): Readonly<Record<string, unknown>> {
 function disposeModel(model: TestModel): unknown {
   if (!model.dispose) throw new TypeError('Model did not expose dispose().');
   return model.dispose();
-}
-
-async function callSystemOne(model: TestModel): Promise<unknown> {
-  if (!model.systemOne) throw new TypeError('Stable TAMEV model did not expose systemOne().');
-  return model.systemOne();
 }
 
 function requireOptions(value: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, unknown>> {
@@ -220,8 +206,7 @@ if (registerHooks) {
     './mapika/loader.js',
     './mapika-q4/loader.js',
     './kev08/loader.js',
-    './strands/loader.mjs',
-    './tamev/loader.mjs'
+    './strands/loader.mjs'
   ]);
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
@@ -352,9 +337,6 @@ function setup(
     externalPrepares: 0,
     gpuAvailable: true,
     warmCache: false,
-    tamevSystemOneMode: 'method',
-    tamevDisposeFails: false,
-    tamevDisposals: 0,
     gpu,
     pending,
     started: markStarted,
@@ -640,35 +622,6 @@ test('each non-Kev loader returns its own matching immutable description', {skip
   }
 });
 
-test(
-  'stable model IDs route through pinned implementations and expose stable identity',
-  {skip: !supportsHooks},
-  async (t) => {
-    for (const [modelId, routeModel, assetsUrl] of [
-      ['tamev-micro-minilm-int8', 'experimental-tamev-micro-minilm-int8', undefined],
-      ['tamev-nano-tinybert-int8', 'experimental-tamev-nano-tinybert-int8', 'https://mirror.example.test/nano/'],
-      ['tamev-nano-flash-tinybert-int8', 'experimental-tamev-nano-flash-tinybert-int8', undefined]
-    ]) {
-      await t.test(modelId, async (t) => {
-        const f = setup(t);
-        const model = await loadDecisionModel({modelId, ...(assetsUrl ? {assetsUrl} : {})});
-
-        assert.equal(f.fake.selectedFamily, 'tamev');
-        const selectedOptions = requireOptions(f.fake.selectedOptions);
-        assert.equal(selectedOptions.model, routeModel);
-        assert.equal(selectedOptions.assetsUrl, assetsUrl);
-        assert.equal(Object.hasOwn(selectedOptions, 'modelId'), false);
-        assert.equal(model.description, describeStableModel(modelId));
-        assert.equal(model.description.model, modelId);
-        assert.deepEqual(await callSystemOne(model), {model: modelId, answers: {}});
-        assert.equal(requirePropertyDescriptor(model, 'systemOne').enumerable, true);
-        await disposeModel(model);
-        assert.equal(f.fake.tamevDisposals, 1);
-      });
-    }
-  }
-);
-
 test('stable Kev modelId loads its pinned source without an assetsUrl', {skip: !supportsHooks}, async (t) => {
   const f = setup(t);
   const helperHook = installFakeBundledAssetsHook();
@@ -778,15 +731,12 @@ test('unknown stable IDs and bare string IDs never fall through to default Kev',
   });
   await assert.rejects(loadDecisionModel({modelId: 'not-a-model'}), {code: 'INVALID_INPUT'});
   await assert.rejects(loadDecisionModel(Object.create({modelId: 'unknown-model'})), {code: 'INVALID_INPUT'});
-  await assert.rejects(
-    loadDecisionModel({modelId: 'tamev-micro-minilm-int8', model: 'experimental-tamev-micro-minilm-int8'}),
-    {code: 'INVALID_INPUT'}
-  );
+  await assert.rejects(loadDecisionModel({modelId: 'not-a-model', model: 'legacy-model'}), {code: 'INVALID_INPUT'});
   let modelIdReads = 0;
   const accessorOptions = Object.defineProperty({}, 'modelId', {
     get() {
       modelIdReads++;
-      return 'tamev-micro-minilm-int8';
+      return 'not-a-model';
     }
   });
   await assert.rejects(loadDecisionModel(accessorOptions), {code: 'INVALID_INPUT'});
@@ -796,39 +746,3 @@ test('unknown stable IDs and bare string IDs never fall through to default Kev',
   assert.equal(f.state.instantiations, 0);
   assert.equal(f.fake.selectedFamily, undefined);
 });
-
-test(
-  'stable TAMEV adaptation disposes sessions when the public method cannot be wrapped',
-  {skip: !supportsHooks},
-  async (t) => {
-    for (const mode of ['missing', 'accessor', 'nonfunction', 'nonconfigurable']) {
-      await t.test(mode, async (t) => {
-        const f = setup(t);
-        f.fake.tamevSystemOneMode = mode;
-        if (mode === 'nonconfigurable') {
-          await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), TypeError);
-        } else {
-          await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), {
-            code: 'MODEL_LOAD_FAILED'
-          });
-        }
-        assert.equal(f.fake.tamevDisposals, 1);
-      });
-    }
-  }
-);
-
-test(
-  'stable TAMEV cleanup preserves the original adaptation error when dispose fails',
-  {skip: !supportsHooks},
-  async (t) => {
-    const f = setup(t);
-    f.fake.tamevSystemOneMode = 'missing';
-    f.fake.tamevDisposeFails = true;
-    await assert.rejects(loadDecisionModel({modelId: 'tamev-micro-minilm-int8'}), {
-      code: 'MODEL_LOAD_FAILED',
-      message: 'Stable TAMEV model has no System One method.'
-    });
-    assert.equal(f.fake.tamevDisposals, 1);
-  }
-);

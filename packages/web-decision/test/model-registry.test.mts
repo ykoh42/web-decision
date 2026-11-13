@@ -35,63 +35,14 @@ import {KEV_MAX_BRANCH_TOKENS, KEV_MAX_OPTIONS, KEV_MAX_STATE_TOKENS} from '../s
 import {REVISION as H2O_REVISION} from '../src/h2o/plan.mjs';
 import deberta from '../src/deberta/contract.json' with {type: 'json'};
 
-const currentCpuWasmVerification = new Map([
-  ['experimental-decima-small-int8', 'verified'],
-  ['experimental-decima-base-clean-int8', 'verified'],
-  ['experimental-decima-agent-int8', 'verified'],
-  ['experimental-tamev-micro-minilm-int8', 'verified'],
-  ['experimental-tamev-nano-tinybert-int8', 'verified'],
-  ['experimental-tamev-nano-flash-tinybert-int8', 'verified'],
-  ['experimental-skejja-edge32k-ft6-int8', 'verified'],
-  ['experimental-skejja-edge32k-ft6-int8dyn', 'verified'],
-  ['experimental-ettin-68m-int8', 'verified'],
-  ['experimental-xdecision-fp16', 'not-revalidated'],
-  ['experimental-laya-multilingual-fp16', 'not-revalidated'],
-  ['experimental-laya-typed-decisions-fp16', 'not-revalidated'],
-  ['experimental-gliner2.5-decide-mobile-q4f16', 'not-revalidated'],
-  ['experimental-d1-omni-600m-q8', 'not-revalidated'],
-  ['experimental-openjev-verdict-151m-fp16', 'not-revalidated'],
-  ['experimental-safedecide-140m-fp32', 'not-revalidated'],
-  ['experimental-crivo-32m-v2-fp32', 'not-revalidated'],
-  ['experimental-crivo-32m-v2-int8', 'verified']
-]);
-
 const currentGpuVerification = new Map([
   ['experimental-tinydecide-10m-q4', 'not-applicable'],
-  ['experimental-decima-small-int8', 'not-applicable'],
-  ['experimental-decima-base-clean-int8', 'not-applicable'],
-  ['experimental-decima-agent-int8', 'not-applicable'],
-  ['experimental-tamev-micro-minilm-int8', 'not-applicable'],
-  ['experimental-tamev-nano-tinybert-int8', 'not-applicable'],
-  ['experimental-tamev-nano-flash-tinybert-int8', 'not-applicable'],
-  ['experimental-skejja-edge32k-ft6-int8', 'not-applicable'],
-  ['experimental-skejja-edge32k-ft6-int8dyn', 'not-applicable'],
-  ['experimental-ettin-68m-int8', 'not-applicable'],
-  ['experimental-crivo-32m-v2-int8', 'not-applicable'],
-  ['experimental-crivo-32m-v2-fp32', 'not-revalidated'],
-  ['experimental-laya-multilingual-fp16', 'verified'],
-  ['experimental-laya-typed-decisions-fp16', 'verified'],
-  ['experimental-xdecision-fp16', 'verified'],
-  ['experimental-gliner2.5-decide-mobile-q4f16', 'verified'],
-  ['experimental-d1-omni-600m-q8', 'not-revalidated'],
-  ['experimental-openjev-verdict-151m-fp16', 'not-revalidated'],
   ['kev-0.6b-q4f16', 'verified'],
   ['experimental-strands-qwen-2b-fp16', 'verified']
 ]);
 
 const backendByFamily: Record<string, string> = {
-  decima: 'onnxruntime-web-wasm',
   tinydecide: 'javascript',
-  tamev: 'onnxruntime-web-wasm',
-  skejja: 'onnxruntime-web-wasm',
-  ettin: 'onnxruntime-web-wasm',
-  laya: 'onnxruntime-web-webgpu',
-  'laya-typed': 'onnxruntime-web-webgpu',
-  xdecision: 'onnxruntime-web-webgpu',
-  'gliner-mobile': 'onnxruntime-web-webgpu',
-  'd1-omni': 'onnxruntime-web-webgpu',
-  verdict: 'onnxruntime-web-webgpu',
-  safedecide: 'onnxruntime-web-webgpu',
   default: 'tvm-webgpu'
 };
 
@@ -112,19 +63,6 @@ test('all H2O descriptions identify the conversion revision and model card', () 
 
 test('the catalog and router describe the same implemented routes', () => {
   const expected = new Map([
-    ['experimental-decima-small-int8', 'decima'],
-    ['experimental-decima-base-clean-int8', 'decima'],
-    ['experimental-decima-agent-int8', 'decima'],
-    ['experimental-tamev-micro-minilm-int8', 'tamev'],
-    ['experimental-tamev-nano-tinybert-int8', 'tamev'],
-    ['experimental-tamev-nano-flash-tinybert-int8', 'tamev'],
-    ['experimental-skejja-edge32k-ft6-int8', 'skejja'],
-    ['experimental-skejja-edge32k-ft6-int8dyn', 'skejja'],
-    ['experimental-ettin-68m-int8', 'ettin'],
-    ['experimental-laya-multilingual-fp16', 'laya'],
-    ['experimental-laya-typed-decisions-fp16', 'laya-typed'],
-    ['experimental-xdecision-fp16', 'xdecision'],
-    ['experimental-gliner2.5-decide-mobile-q4f16', 'gliner-mobile'],
     ['experimental-tinydecide-10m-q4', 'tinydecide'],
     ['kev-0.6b-q4f16', 'kev'],
     ['experimental-kev-0.6b-q4f16-upstream', 'kev'],
@@ -138,9 +76,6 @@ test('the catalog and router describe the same implemented routes', () => {
     ['experimental-strands-qwen-2b-fp16', 'strands'],
     ['experimental-strands-gemma4-e2b-fp16', 'strands-gemma4'],
     ['experimental-opendecider-nano-fp16', 'opendecider-nano'],
-    ['experimental-safedecide-140m-fp32', 'safedecide'],
-    ['experimental-crivo-32m-v2-fp32', 'crivo'],
-    ['experimental-crivo-32m-v2-int8', 'crivo'],
     ['experimental-h2o-lightning-4b-q4f16-dlight', 'h2o'],
     ['experimental-h2o-lightning-4b-q4f16-dual', 'h2o'],
     ['experimental-nari-decision-4b-mixed16-q4f16', 'nari'],
@@ -151,9 +86,7 @@ test('the catalog and router describe the same implemented routes', () => {
     ['experimental-mapika-4b-q4f16-dlight-all', 'mapika4b'],
     ['experimental-elephant-9b-q4f16-dlight', 'elephant'],
     ['experimental-elephant-9b-q4f16-dlight-512', 'elephant'],
-    ['experimental-clef-9b-q4f16-selected', 'clef'],
-    ['experimental-d1-omni-600m-q8', 'd1-omni'],
-    ['experimental-openjev-verdict-151m-fp16', 'verdict']
+    ['experimental-clef-9b-q4f16-selected', 'clef']
   ]);
   assert.deepEqual(listDecisionModels(), [...expected.keys()]);
   assert.equal(selectModelFamily({}), 'kev');
@@ -163,17 +96,11 @@ test('the catalog and router describe the same implemented routes', () => {
     const description = describeModel(name);
     assert.equal(description.model, name);
     assert.equal(description.features.textChoice.status, 'implemented');
-    assert.equal(
-      description.features.textChoice.abstention,
-      family === 'imajev' || family === 'verdict' ? 'implemented' : 'not-implemented'
-    );
+    assert.equal(description.features.textChoice.abstention, family === 'imajev' ? 'implemented' : 'not-implemented');
     assert.equal(description.features.imageChoice.status, 'not-implemented');
     assert.equal(description.features.rating.status, 'not-implemented');
     assert.equal(description.verification.currentBundleGpu, currentGpuVerification.get(name) ?? 'not-revalidated');
-    assert.equal(
-      description.verification.currentBundleCpuWasm,
-      currentCpuWasmVerification.get(name) ?? 'not-applicable'
-    );
+    assert.equal(description.verification.currentBundleCpuWasm, 'not-applicable');
     assert.equal(
       description.verification.currentBundleJavascript,
       family === 'tinydecide' ? 'verified' : 'not-applicable'
@@ -188,12 +115,7 @@ test('the catalog and router describe the same implemented routes', () => {
     );
     assert.ok(description.assets.requiredFiles.length >= 2);
     assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.min, 1);
-    const expectedBackend =
-      family === 'crivo'
-        ? name.endsWith('-int8')
-          ? 'onnxruntime-web-wasm'
-          : 'onnxruntime-web-webgpu'
-        : (backendByFamily[family] ?? backendByFamily.default);
+    const expectedBackend = backendByFamily[family] ?? backendByFamily.default;
     assert.equal(description.backend.name, expectedBackend);
   }
 });
@@ -215,164 +137,6 @@ test('experimental upstream Kev has separate pins and leaves the stable Kev rout
   assert.equal(experimental.backend.name, 'tvm-webgpu');
   assert.equal(experimental.verification.currentBundleGpu, 'not-revalidated');
   assert.equal(selectModelFamily({model: experimental.model}), 'kev');
-});
-
-test('Laya metadata identifies WebGPU execution and runtime-managed CPU fallback', () => {
-  const description = describeModel('experimental-laya-multilingual-fp16');
-  assert.deepEqual(description.backend, {
-    name: 'onnxruntime-web-webgpu',
-    executionProvider: 'webgpu',
-    cpuFallback: 'runtime-managed',
-    requiredFeatures: [],
-    requiredLimits: {},
-    requiresNonFallbackAdapter: true
-  });
-  assert.equal(description.features.textChoice.score.basis, 'ordered-levels');
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
-  assert.deepEqual(
-    description.features.textChoice.limits.find((item) => item.resource === 'questions'),
-    {
-      resource: 'questions',
-      scope: 'request',
-      min: 1
-    }
-  );
-  assert.equal(
-    description.features.textChoice.limits.some((item) => item.resource === 'tokens' && item.scope === 'request'),
-    false
-  );
-  assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.equal(description.verification.currentBundleCpuWasm, 'not-revalidated');
-});
-
-test('Laya Typed-Decisions identifies its independent ModernBERT ONNX assets and limits', () => {
-  const description = describeModel('experimental-laya-typed-decisions-fp16');
-  assert.equal(description.checkpoint.repository, 'onnx-community/laya-typed-decisions-ONNX');
-  assert.equal(description.checkpoint.revision, '79c441b22da79eb3727bb01e8452e29a32cfa548');
-  assert.equal(description.checkpoint.graphSha256, '94c25ed9a1ebe3f13b85bdbd54cd20ed407fb1993e3993f3deda1bc5662b8ae1');
-  assert.equal(description.precision, 'f16');
-  assert.equal(description.verification.currentBundleGpu, 'verified');
-  assert.equal(description.assets.integrity, 'pinned-files');
-  assert.equal(description.assets.requiredFiles.length, 5);
-  assert.equal(
-    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max,
-    1024
-  );
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
-  assert.deepEqual(
-    description.features.textChoice.limits.find((item) => item.resource === 'questions'),
-    {
-      resource: 'questions',
-      scope: 'request',
-      min: 1
-    }
-  );
-  assert.equal(
-    description.features.textChoice.limits.some((item) => item.resource === 'tokens' && item.scope === 'request'),
-    false
-  );
-  assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-});
-
-test('xDecision exposes per-row limits without a fixed question or aggregate token cap', () => {
-  const description = describeModel('experimental-xdecision-fp16');
-  assert.equal(
-    description.features.textChoice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max,
-    1024
-  );
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 122);
-  assert.deepEqual(
-    description.features.textChoice.limits.find((item) => item.resource === 'questions'),
-    {
-      resource: 'questions',
-      scope: 'request',
-      min: 1
-    }
-  );
-  assert.equal(
-    description.features.textChoice.limits.some((item) => item.resource === 'tokens' && item.scope === 'request'),
-    false
-  );
-});
-
-test('Ettin reports native per-question and head limits without a request question cap', () => {
-  const limits = describeModel('experimental-ettin-68m-int8').features.textChoice.limits;
-  assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 2048);
-  assert.equal(limits.find((item) => item.resource === 'options' && item.scope === 'question')!.max, 10);
-  assert.equal(limits.find((item) => item.resource === 'questions')!.max, undefined);
-});
-
-test('Crivo metadata describes row and chunk bounds without question or option ceilings', () => {
-  for (const model of ['experimental-crivo-32m-v2-fp32', 'experimental-crivo-32m-v2-int8']) {
-    const description = describeModel(model);
-    const limits = description.features.textChoice.limits;
-    assert.equal(limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 2048);
-    assert.deepEqual(
-      limits.find((item) => item.resource === 'options'),
-      {
-        resource: 'options',
-        scope: 'question',
-        min: 2
-      }
-    );
-    assert.deepEqual(
-      limits.find((item) => item.resource === 'questions'),
-      {
-        resource: 'questions',
-        scope: 'request',
-        min: 1
-      }
-    );
-    assert.equal(
-      limits.some((item) => item.resource === 'tokens' && item.scope === 'request'),
-      false
-    );
-  }
-});
-
-test('GLiNER Mobile describes its pinned Q4F16 WebGPU checkpoint and sequence limits', () => {
-  const description = describeModel('experimental-gliner2.5-decide-mobile-q4f16');
-  assert.equal(description.precision, 'q4f16');
-  assert.equal(description.checkpoint.repository, 'onnx-community/GLiNER2.5-Decide-mobile-ONNX');
-  assert.equal(description.checkpoint.revision, '880d1921d315b44648c9f6c6fb6ea0b87dea2b62');
-  assert.equal(description.checkpoint.graphSha256, '99a4e4c57fb15095a7e0aada14303d3d4f4ae0c3ce09c7b456a444bc2aff0dc2');
-  assert.deepEqual(description.assets.requiredFiles, [
-    'config.json',
-    'special_tokens_map.json',
-    'tokenizer.json',
-    'tokenizer_config.json',
-    'onnx/model_q4f16.onnx',
-    'onnx/model_q4f16.onnx_data'
-  ]);
-  assert.equal(description.backend.name, 'onnxruntime-web-webgpu');
-  assert.equal(description.features.textChoice.handling, 'packed-request');
-  assert.equal(description.features.textChoice.abstention, 'not-implemented');
-  assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'tokens')!.max, 512);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 64);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
-  assert.equal(description.verification.currentBundleGpu, 'verified');
-});
-
-test('d1-omni describes its pinned text-only Q8 route and separate model license', () => {
-  const description = describeModel('experimental-d1-omni-600m-q8');
-  assert.equal(description.precision, 'q8');
-  assert.equal(description.checkpoint.repository, 'onnx-community/d1-omni-600M-ONNX');
-  assert.equal(description.checkpoint.revision, '4ebc1b97bf1477485371c79d1cf8d5e4e8eebfa0');
-  assert.equal(description.checkpoint.sourceRepository, 'LiquidAI/d1-omni-600M');
-  assert.equal(description.checkpoint.sourceRevision, '02b55d7076f15129e59ab3f94783f32c4b088674');
-  assert.equal(description.assets.integrity, 'pinned-files');
-  assert.equal(description.backend.name, 'onnxruntime-web-webgpu');
-  assert.equal(description.verification.currentBundleGpu, 'not-revalidated');
-  const limits = description.features.textChoice.limits;
-  assert.equal(limits.find((limit) => limit.resource === 'tokens' && limit.scope === 'question')?.max, 4096);
-  assert.equal(limits.find((limit) => limit.resource === 'questions')?.max, undefined);
-  assert.equal(limits.find((limit) => limit.resource === 'options')?.max, undefined);
-  assert.match(description.licenses.modelTerms, /LFM Open License v1\.0/);
-  assert.match(description.licenses.modelLicenseUrl!, /LiquidAI\/d1-omni-600M/);
-  assert.match(description.licenses.sourceModelCard!, /LiquidAI\/d1-omni-600M/);
-  assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.equal(description.features.textChoice.score.temperatureAppliedBy, 'decoder');
 });
 
 test('TinyDecide describes its pinned 4-bit files and token limits without a question-count cap', () => {
@@ -407,105 +171,6 @@ test('TinyDecide describes its pinned 4-bit files and token limits without a que
   assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, 32);
   assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
   assert.equal(description.verification.currentBundleJavascript, 'verified');
-});
-
-test('Decima describes its pinned int8 ONNX files and CPU WASM limits', () => {
-  const description = describeModel('experimental-decima-small-int8');
-  assert.equal(description.precision, 'int8');
-  assert.equal(description.checkpoint.repository, 'amyrmahdy/decima-small');
-  assert.equal(description.checkpoint.revision, '480c4ea9e54f2946b947fb3ceb3c7cc7ece77522');
-  assert.equal(description.assets.integrity, 'pinned-files');
-  assert.deepEqual(description.assets.requiredFiles, [
-    'encoder.onnx',
-    'scorer.onnx',
-    'decima.json',
-    'tokenizer/tokenizer.json',
-    'tokenizer/tokenizer_config.json'
-  ]);
-  assert.deepEqual(description.backend, {
-    name: 'onnxruntime-web-wasm',
-    executionProvider: 'wasm',
-    intraOpNumThreads: 1,
-    requiredFeatures: [],
-    requiredLimits: {},
-    requiresNonFallbackAdapter: false
-  });
-  assert.deepEqual(description.features.textChoice.limits, [
-    {
-      resource: 'tokens',
-      scope: 'state',
-      max: 512,
-      description: 'Complete question and state row; longer rows are truncated and marked.'
-    },
-    {
-      resource: 'tokens',
-      scope: 'question',
-      max: 64,
-      description: 'Each option row includes question text and special tokens; shortened rows are marked.'
-    },
-    {resource: 'options', scope: 'question', min: 2},
-    {resource: 'questions', scope: 'request', min: 1}
-  ]);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
-});
-
-test('Decima base-clean describes its pinned CPU model and rejects overlong state', () => {
-  const description = describeModel('experimental-decima-base-clean-int8');
-  assert.equal(description.precision, 'int8');
-  assert.equal(description.checkpoint.repository, 'amyrmahdy/decima-base-clean');
-  assert.equal(description.checkpoint.revision, 'a37e006fd4015c3c96176c341f3d6620f8a101f3');
-  assert.deepEqual(description.assets.requiredFiles, [
-    'encoder.onnx',
-    'scorer.onnx',
-    'decima.json',
-    'tokenizer/tokenizer.json',
-    'tokenizer/tokenizer_config.json'
-  ]);
-  assert.equal(description.features.textChoice.score.temperature, 0.6929793512269696);
-  assert.deepEqual(description.features.textChoice.limits.slice(0, 2), [
-    {
-      resource: 'tokens',
-      scope: 'state',
-      max: 512,
-      description: 'Complete question and state row; longer input is rejected before inference.'
-    },
-    {
-      resource: 'tokens',
-      scope: 'question',
-      max: 64,
-      description:
-        'Uses the checkpoint choice_fit rendering and reports the adapted rows; each row includes question text and special tokens.'
-    }
-  ]);
-  assert.equal(description.verification.currentBundleCpuWasm, 'verified');
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
-});
-
-test('Decima Agent describes its pinned CPU route and native question types', () => {
-  const description = describeModel('experimental-decima-agent-int8');
-  assert.equal(description.checkpoint.repository, 'amyrmahdy/decima-agent');
-  assert.equal(description.checkpoint.revision, '1acd2c4b1461c15ebc6b2b8f84dd9f8af18be245');
-  assert.equal(description.verification.currentBundleCpuWasm, 'verified');
-  assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'score', 'noul']);
-  assert.deepEqual(description.features.textChoice.limits.slice(0, 2), [
-    {
-      resource: 'tokens',
-      scope: 'state',
-      max: 4096,
-      description: 'Complete question and state row; longer input is rejected before inference.'
-    },
-    {
-      resource: 'tokens',
-      scope: 'question',
-      max: 64,
-      description:
-        'Uses the checkpoint choice_fit rendering and reports the adapted rows; each row includes question text and special tokens.'
-    }
-  ]);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'options')!.max, undefined);
-  assert.equal(description.features.textChoice.limits.find((item) => item.resource === 'questions')!.max, undefined);
 });
 
 test('OpenDecider-nano describes its pinned FP16 graph and independent token limit', () => {
@@ -774,20 +439,6 @@ test('limits distinguish a whole packed request from independently encoded quest
     assert.match(options.description!, /upstream Kev/i);
     assert.deepEqual(description.features.typedTextQuestionTypes, ['choice', 'noul', 'score']);
   }
-  for (const model of [
-    'experimental-tamev-micro-minilm-int8',
-    'experimental-tamev-nano-tinybert-int8',
-    'experimental-tamev-nano-flash-tinybert-int8'
-  ]) {
-    const questions = limit(model, 'questions', 'request')!;
-    assert.equal(questions.min, 1);
-    assert.equal(questions.max, undefined);
-    const options = limit(model, 'options', 'question')!;
-    assert.equal(options.min, 2);
-    assert.equal(options.max, undefined);
-    assert.equal(limit(model, 'tokens', 'state')!.max, 128);
-    assert.equal(limit(model, 'tokens', 'question')!.max, 48);
-  }
   assert.equal(limit(deberta.model, 'tokens', 'request')!.max, deberta.maxInputTokens);
   assert.equal(limit(deberta.model, 'tokens', 'state')!.max, deberta.maxStateTokens);
   assert.equal(limit('mapika-0.8b-f16', 'tokens', 'request')!.max, 512);
@@ -811,58 +462,6 @@ test('limits distinguish a whole packed request from independently encoded quest
   assert.equal(limit('mapika-0.8b-q4f16', 'questions', 'request')!.max, undefined);
   assert.equal(describeModel('mapika-0.8b-q4f16').features.textChoice.tokenCount, 'packed-request');
   assert.equal(describeModel('kev-0.8b-f16').features.textChoice.tokenCount, 'sum-question-rows');
-});
-
-test('Skejja advertises its upstream option limit and row-scoped token budget without a package question cap', () => {
-  for (const model of ['experimental-skejja-edge32k-ft6-int8', 'experimental-skejja-edge32k-ft6-int8dyn']) {
-    const choice = describeModel(model).features.textChoice;
-    const tokens = choice.limits.find((limit) => limit.resource === 'tokens')!;
-    const questions = choice.limits.find((limit) => limit.resource === 'questions')!;
-    const options = choice.limits.find((limit) => limit.resource === 'options')!;
-
-    assert.deepEqual([tokens.scope, tokens.max], ['question', 512]);
-    assert.equal(questions.min, 1);
-    assert.equal(questions.max, undefined);
-    assert.match(questions.description!, /upstream server defaults to 256/i);
-    assert.deepEqual([options.scope, options.min, options.max], ['question', 2, 255]);
-  }
-});
-
-test('Verdict exposes per-row and class limits without a request question cap', () => {
-  const choice = describeModel('experimental-openjev-verdict-151m-fp16').features.textChoice;
-  assert.equal(choice.handling, 'independent-questions');
-  assert.equal(choice.tokenCount, 'sum-question-rows');
-  assert.equal(choice.limits.find((item) => item.resource === 'tokens' && item.scope === 'question')!.max, 512);
-  assert.equal(choice.limits.find((item) => item.resource === 'questions')!.max, undefined);
-  assert.equal(choice.limits.find((item) => item.resource === 'options' && item.scope === 'question')!.max, 24);
-});
-
-test('SafeDecide describes its pinned FP32 option-pair route and selective action rules', () => {
-  const model = 'experimental-safedecide-140m-fp32';
-  const description = describeModel(model);
-  const choice = description.features.textChoice;
-
-  assert.equal(isDecisionModel(model), true);
-  assert.equal(selectModelFamily({model}), 'safedecide');
-  assert.equal(description.precision, 'f32');
-  assert.equal(description.checkpoint.repository, 'yotambr/safedecide-140m');
-  assert.equal(description.checkpoint.revision, '1934a00e6ba5242668c3f1b06fa39fb438741207');
-  assert.equal(description.checkpoint.graphSha256, 'e987d2e4c8da29b8366d2c914b93483ffe661f30593b966202051ee86811eacc');
-  assert.equal(description.backend.name, 'onnxruntime-web-webgpu');
-  assert.equal(choice.handling, 'independent-options');
-  assert.equal(choice.tokenCount, 'sum-option-pairs');
-  assert.deepEqual(
-    choice.limits.filter((limit) => limit.resource === 'options').map(({scope, min, max}) => [scope, min, max]),
-    [['question', 2, undefined]]
-  );
-  assert.equal(choice.limits.find((limit) => limit.resource === 'questions')!.max, undefined);
-  assert.equal(choice.limits.find((limit) => limit.resource === 'tokens')!.max, 640);
-  assert.deepEqual(description.features.selectiveAction!.levels, [
-    {alpha: 0.05, delta: 0.1, threshold: null},
-    {alpha: 0.1, delta: 0.1, threshold: 0.7},
-    {alpha: 0.2, delta: 0.1, threshold: 0.5}
-  ]);
-  assert.equal(description.verification.currentBundleGpu, 'not-revalidated');
 });
 
 test('asset descriptions pin the Kev 0.6B manifest and distinguish other contracts', () => {

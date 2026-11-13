@@ -89,120 +89,6 @@ export interface OpenDeciderNanoSystemOneResult {
   readonly answers: Readonly<Record<string, OpenDeciderTypedAnswer>>;
 }
 
-export type LayaSystemOneQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions: string;
-      criteria: readonly string[] | Readonly<Record<string, DecisionJsonValue>>;
-    }>
-  | Readonly<{type: 'score'; instructions: string; criteria: readonly DecisionJsonValue[]}>
-  | Readonly<{
-      type: 'noul';
-      instructions: string;
-      criteria?: Readonly<{true?: DecisionJsonValue; false?: DecisionJsonValue}>;
-      labels?: Readonly<{true: string; false: string}>;
-    }>;
-
-type LayaAnswerFields = Readonly<{
-  /** Entropy based for Choice and Score; max probability for Noul. Not calibrated. */
-  confidence: number;
-  /** Highest candidate probability, not calibrated. */
-  answerConfidence: number;
-  /** Diagnostic probability from the upstream action head; this head is not an abstention signal. */
-  actionProbability: number;
-  /** Raw two-class action-head logits for diagnostics only. */
-  actionLogits: readonly [number, number];
-}>;
-
-export type LayaSystemOneAnswer =
-  | (LayaAnswerFields &
-      Readonly<{
-        type: 'choice';
-        choice: string;
-        probabilities: Readonly<Record<string, number>>;
-      }>)
-  | (LayaAnswerFields &
-      Readonly<{
-        type: 'score';
-        /** Probability weighted mean of ordered level indices starting at zero. */
-        score: number;
-        expected: number;
-        legend: Readonly<Record<string, string>>;
-        probabilities: Readonly<Record<string, number>>;
-      }>)
-  | (LayaAnswerFields &
-      Readonly<{
-        type: 'noul';
-        /** Probability that the statement is true; this is not abstention. */
-        noul: number;
-        probabilities: Readonly<{false: number; true: number}>;
-      }>);
-
-export interface LayaSystemOneResult {
-  readonly model: 'experimental-laya-multilingual-fp16';
-  /** Sum of independently encoded question rows. */
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly truncatedQuestions?: readonly string[];
-  readonly collapsedOptions?: Readonly<Record<string, Readonly<{total: number; distinct: number}>>>;
-  readonly answers: Readonly<Record<string, LayaSystemOneAnswer>>;
-}
-
-export interface LayaTypedDecisionsSystemOneResult extends Omit<LayaSystemOneResult, 'model'> {
-  readonly model: 'experimental-laya-typed-decisions-fp16';
-}
-
-export type XDecisionSystemOneQuestion = LayaSystemOneQuestion;
-export type XDecisionSystemOneAnswer = LayaSystemOneAnswer;
-
-export interface XDecisionSystemOneResult extends Omit<LayaSystemOneResult, 'model'> {
-  readonly model: 'experimental-xdecision-fp16';
-}
-
-export type GlinerMobileSystemOneQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions: string;
-      criteria: readonly string[] | Readonly<Record<string, string | null>>;
-    }>
-  | Readonly<{type: 'score'; instructions: string; criteria: readonly string[]}>
-  | Readonly<{
-      type: 'noul';
-      instructions: string;
-      criteria?: Readonly<{true?: string | null; false?: string | null}> | null;
-    }>;
-
-export type GlinerMobileSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      confidence: number;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{
-      type: 'score';
-      /** Probability weighted mean of ordered level indices starting at zero. */
-      score: number;
-      expected: number;
-      confidence: number;
-      legend: Readonly<Record<string, string>>;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{
-      type: 'noul';
-      /** Probability that the statement is true; this model has no abstention output. */
-      noul: number;
-      confidence: number;
-      probabilities: Readonly<{false: number; true: number}>;
-    }>;
-
-export interface GlinerMobileSystemOneResult {
-  readonly model: 'experimental-gliner2.5-decide-mobile-q4f16';
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, GlinerMobileSystemOneAnswer>>;
-}
-
 export type KevSystemOneJsonValue =
   | null
   | boolean
@@ -568,90 +454,6 @@ export interface DecisionOptions {
   signal?: AbortSignal;
 }
 
-export type SafeDecideAlpha = 0.05 | 0.1 | 0.2;
-export type SafeDecideAction = 'automate' | 'escalate';
-export type SafeDecideState = string | readonly DecisionJsonValue[] | Readonly<{[key: string]: DecisionJsonValue}>;
-
-export type SafeDecideSystemOneQuestion =
-  | Readonly<{
-      type?: 'choice';
-      instructions?: string | null;
-      criteria: Readonly<Record<string, string | null | undefined>>;
-    }>
-  | Readonly<{
-      type: 'score';
-      instructions?: string | null;
-      /** Ordered from the lowest level (0) to the highest. */
-      criteria: readonly (string | null | undefined)[];
-    }>
-  | Readonly<{
-      type: 'noul';
-      instructions?: string | null;
-      criteria?: Readonly<{true?: string | null; false?: string | null}> | null;
-    }>;
-
-export type SafeDecideSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      probabilities: Readonly<Record<string, number>>;
-      confidence: number;
-      action: SafeDecideAction;
-    }>
-  | Readonly<{
-      type: 'score';
-      /** Probability-weighted mean of ordered level indices starting at zero. */
-      score: number;
-      /** Most likely ordered level label. */
-      choice: string;
-      probabilities: Readonly<Record<string, number>>;
-      confidence: number;
-      action: SafeDecideAction;
-    }>
-  | Readonly<{
-      type: 'noul';
-      /** Probability that the statement is true; this is not abstention. */
-      noul: number;
-      probabilities: Readonly<{false: number; true: number}>;
-      confidence: number;
-      action: SafeDecideAction;
-    }>;
-
-export interface SafeDecideGuarantee {
-  readonly alpha: SafeDecideAlpha;
-  readonly delta: number;
-  readonly statement: string;
-}
-
-export interface SafeDecideSystemOneResult {
-  readonly model: 'experimental-safedecide-140m-fp32';
-  readonly tokenCount: number;
-  readonly outputTokenCount: 0;
-  readonly truncated?: true;
-  readonly truncatedQuestions?: readonly string[];
-  readonly guarantee: SafeDecideGuarantee;
-  readonly answers: Readonly<Record<string, SafeDecideSystemOneAnswer>>;
-}
-
-export interface SafeDecideDecisionOptions extends DecisionOptions {
-  /** Select one of the checkpoint's certified selective-action rules. Defaults to 0.1. */
-  alpha?: SafeDecideAlpha;
-}
-
-export interface SafeDecideDecisionAnswer extends DecisionAnswer {
-  readonly confidence: number;
-  readonly action: SafeDecideAction;
-}
-
-export interface SafeDecideDecisionResult {
-  readonly tokenCount: number;
-  readonly outputTokenCount: 0;
-  readonly truncated?: true;
-  readonly truncatedQuestions?: readonly string[];
-  readonly guarantee: SafeDecideGuarantee;
-  answers: SafeDecideDecisionAnswer[];
-}
-
 export interface ModelProgress {
   loadedBytes: number;
   totalBytes: number;
@@ -660,20 +462,7 @@ export interface ModelProgress {
 }
 
 export type ModelName =
-  | 'experimental-laya-multilingual-fp16'
-  | 'experimental-laya-typed-decisions-fp16'
-  | 'experimental-xdecision-fp16'
-  | 'experimental-gliner2.5-decide-mobile-q4f16'
   | 'experimental-tinydecide-10m-q4'
-  | 'experimental-decima-small-int8'
-  | 'experimental-decima-base-clean-int8'
-  | 'experimental-decima-agent-int8'
-  | 'experimental-tamev-micro-minilm-int8'
-  | 'experimental-tamev-nano-tinybert-int8'
-  | 'experimental-tamev-nano-flash-tinybert-int8'
-  | 'experimental-skejja-edge32k-ft6-int8'
-  | 'experimental-skejja-edge32k-ft6-int8dyn'
-  | 'experimental-ettin-68m-int8'
   | 'kev-0.6b-q4f16'
   | 'experimental-kev-0.6b-q4f16-upstream'
   | 'kev-0.6b-reflexes-q4f16'
@@ -696,32 +485,14 @@ export type ModelName =
   | 'experimental-elephant-9b-q4f16-dlight'
   | 'experimental-elephant-9b-q4f16-dlight-512'
   | 'experimental-clef-9b-q4f16-selected'
-  | 'experimental-opendecider-nano-fp16'
-  | 'experimental-safedecide-140m-fp32'
-  | 'experimental-crivo-32m-v2-fp32'
-  | 'experimental-crivo-32m-v2-int8'
-  | 'experimental-d1-omni-600m-q8'
-  | 'experimental-openjev-verdict-151m-fp16';
+  | 'experimental-opendecider-nano-fp16';
 
-/** Public IDs for pinned model routes, ordered by benchmark within comparable evaluation sets. */
-export type StableModelId =
-  | 'tamev-micro-minilm-int8'
-  | 'tamev-nano-tinybert-int8'
-  | 'tamev-nano-flash-tinybert-int8'
-  | 'kev-0.6b-q4f16';
+/** Stable public IDs available through the legacy loader. */
+export type StableModelId = 'kev-0.6b-q4f16';
 
 type PrefetchModelName = Exclude<
   ModelName,
   | 'experimental-tinydecide-10m-q4'
-  | 'experimental-decima-small-int8'
-  | 'experimental-decima-base-clean-int8'
-  | 'experimental-decima-agent-int8'
-  | 'experimental-tamev-micro-minilm-int8'
-  | 'experimental-tamev-nano-tinybert-int8'
-  | 'experimental-tamev-nano-flash-tinybert-int8'
-  | 'experimental-skejja-edge32k-ft6-int8'
-  | 'experimental-skejja-edge32k-ft6-int8dyn'
-  | 'experimental-ettin-68m-int8'
   | 'experimental-strands-qwen-2b-fp16'
   | 'experimental-strands-gemma4-e2b-fp16'
   | 'experimental-nari-decision-4b-q4f16'
@@ -738,16 +509,7 @@ type PrefetchModelName = Exclude<
   | 'experimental-elephant-9b-q4f16-dlight-512'
   | 'experimental-clef-9b-q4f16-selected'
   | 'experimental-opendecider-nano-fp16'
-  | 'experimental-safedecide-140m-fp32'
-  | 'experimental-crivo-32m-v2-fp32'
-  | 'experimental-crivo-32m-v2-int8'
-  | 'experimental-d1-omni-600m-q8'
-  | 'experimental-openjev-verdict-151m-fp16'
   | 'experimental-kev-0.6b-q4f16-upstream'
-  | 'experimental-laya-multilingual-fp16'
-  | 'experimental-laya-typed-decisions-fp16'
-  | 'experimental-xdecision-fp16'
-  | 'experimental-gliner2.5-decide-mobile-q4f16'
 >;
 
 export type ModelLimit =
@@ -807,14 +569,6 @@ export type AssetIntegrity = Readonly<{
       }>
   );
 
-export interface SelectiveActionCapability {
-  readonly status: 'implemented';
-  readonly actions: readonly SafeDecideAction[];
-  readonly calibration: 'exchangeable-data';
-  readonly levels: readonly Readonly<{alpha: number; delta: number; threshold: number | null}>[];
-}
-
-/** Immutable package metadata. This is not a GPU compatibility or model-quality guarantee. */
 export interface ModelDescription {
   readonly model: ModelName;
   readonly precision: 'q4' | 'q4f16' | 'f16' | 'f32' | 'mixed-f16-q4f16' | 'int8' | 'q8';
@@ -842,30 +596,12 @@ export interface ModelDescription {
         requiredLimits: Readonly<Record<string, number>>;
         requiresNonFallbackAdapter: boolean;
       }>
-    | Readonly<{
-        name: 'onnxruntime-web-wasm';
-        executionProvider: 'wasm';
-        intraOpNumThreads: 1;
-        requiredFeatures: readonly [];
-        requiredLimits: Readonly<Record<string, number>>;
-        requiresNonFallbackAdapter: false;
-      }>
-    | Readonly<{
-        name: 'onnxruntime-web-webgpu';
-        executionProvider: 'webgpu';
-        /** ONNX Runtime may execute nodes unsupported by WebGPU on its CPU/WASM provider. */
-        cpuFallback: 'runtime-managed';
-        requiredFeatures: readonly [];
-        requiredLimits: Readonly<Record<string, number>>;
-        requiresNonFallbackAdapter: true;
-      }>
     | Readonly<{name: 'javascript'}>;
   readonly features: Readonly<{
     textChoice: TextChoiceCapability;
     /** Native typed text outputs exposed by a model-specific method. */
     typedTextQuestionTypes?: readonly ('choice' | 'noul' | 'score' | 'span')[];
     /** Model-provided selective action metadata; it is not a general calibration guarantee. */
-    selectiveAction?: SelectiveActionCapability;
     /** Metadata only: there is no image-choice method in the current package. */
     imageChoice: Readonly<{status: 'not-implemented'}>;
     /** Metadata only: there is no rating method in the current package. */
@@ -916,20 +652,6 @@ export type StandardLoadOptions =
         | {model: 'experimental-strands-qwen-2b-fp16'; debertaReadback?: undefined; maxPrefetchBytes?: 0 | undefined}
       ))
   | TinyDecideLoadOptions
-  | TamevMicroLoadOptions
-  | SafeDecideLoadOptions
-  | CrivoLoadOptions
-  | LayaLoadOptions
-  | LayaTypedDecisionsLoadOptions
-  | XDecisionLoadOptions
-  | GlinerMobileLoadOptions
-  | D1OmniLoadOptions
-  | VerdictLoadOptions
-  | TamevNanoLoadOptions
-  | TamevNanoFlashLoadOptions
-  | SkejjaInt8LoadOptions
-  | SkejjaInt8DynLoadOptions
-  | EttinLoadOptions
   | {
       model:
         | 'experimental-nari-decision-4b-q4f16'
@@ -977,68 +699,8 @@ export interface StrandsGemma4LoadOptions {
   debertaReadback?: undefined;
 }
 
-export interface DecimaSmallLoadOptions {
-  model: 'experimental-decima-small-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  cache?: boolean;
-  offline?: boolean;
-  signal?: AbortSignal;
-  onProgress?: (progress: ModelProgress) => void;
-  maxPrefetchBytes?: 0;
-}
-
-export interface DecimaBaseCleanLoadOptions extends Omit<DecimaSmallLoadOptions, 'model'> {
-  model: 'experimental-decima-base-clean-int8';
-}
-
-export interface DecimaAgentLoadOptions extends Omit<DecimaSmallLoadOptions, 'model'> {
-  model: 'experimental-decima-agent-int8';
-}
-
-export type DecimaLoadOptions = DecimaSmallLoadOptions | DecimaBaseCleanLoadOptions | DecimaAgentLoadOptions;
-
-export interface TamevMicroLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-tamev-micro-minilm-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface TamevNanoLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-tamev-nano-tinybert-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface TamevNanoFlashLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-tamev-nano-flash-tinybert-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
 export type StableKev06LoadOptions = Omit<Kev06LoadOptions, 'model' | 'assetsUrl'> & {
   modelId: 'kev-0.6b-q4f16';
-  model?: undefined;
-};
-
-export type StableTamevMicroLoadOptions = Omit<TamevMicroLoadOptions, 'model'> & {
-  modelId: 'tamev-micro-minilm-int8';
-  model?: undefined;
-};
-
-export type StableTamevNanoLoadOptions = Omit<TamevNanoLoadOptions, 'model'> & {
-  modelId: 'tamev-nano-tinybert-int8';
-  model?: undefined;
-};
-
-export type StableTamevNanoFlashLoadOptions = Omit<TamevNanoFlashLoadOptions, 'model'> & {
-  modelId: 'tamev-nano-flash-tinybert-int8';
   model?: undefined;
 };
 
@@ -1053,223 +715,7 @@ export type StableModelIdLoadOptions = Readonly<{
   debertaReadback?: undefined;
 }>;
 
-export type StableModelLoadOptions =
-  | StableKev06LoadOptions
-  | StableTamevMicroLoadOptions
-  | StableTamevNanoLoadOptions
-  | StableTamevNanoFlashLoadOptions
-  | StableModelIdLoadOptions;
-
-export type StableModelLoadOptionsWithAssetsUrl = Readonly<{
-  modelId: Exclude<StableModelId, 'kev-0.6b-q4f16'>;
-  model?: undefined;
-  assetsUrl: string;
-  cache?: boolean;
-  offline?: boolean;
-  signal?: AbortSignal;
-  onProgress?: (progress: ModelProgress) => void;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}>;
-
-export interface SkejjaInt8LoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-skejja-edge32k-ft6-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public archive. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface SkejjaInt8DynLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-skejja-edge32k-ft6-int8dyn';
-  /** Optional trusted mirror; defaults to the model's pinned public archive. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface EttinLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-ettin-68m-int8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface LayaLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-laya-multilingual-fp16';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface LayaTypedDecisionsLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-laya-typed-decisions-fp16';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface XDecisionLoadOptions extends CommonLoadOptions {
-  model: 'experimental-xdecision-fp16';
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface GlinerMobileLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-gliner2.5-decide-mobile-q4f16';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface D1OmniLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-d1-omni-600m-q8';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export interface VerdictLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
-  model: 'experimental-openjev-verdict-151m-fp16';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  maxPrefetchBytes?: 0;
-  debertaReadback?: undefined;
-}
-
-export type D1OmniSystemOneQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions: string;
-      criteria: readonly string[] | Readonly<Record<string, DecisionJsonValue>>;
-    }>
-  | Readonly<{type: 'score'; instructions: string; criteria: readonly DecisionJsonValue[]}>
-  | Readonly<{
-      type: 'noul';
-      instructions: string;
-      criteria?: Readonly<{
-        true?: DecisionJsonValue;
-        false?: DecisionJsonValue;
-        yes?: DecisionJsonValue;
-        no?: DecisionJsonValue;
-      }>;
-    }>;
-
-export type D1OmniSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      confidence: number;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{
-      type: 'score';
-      /** d1-omni's score is the probability-weighted mean of ordered levels. */
-      score: number;
-      expected: number;
-      mostLikelyLevel: number;
-      confidence: number;
-      legend: Readonly<Record<string, string>>;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{
-      type: 'noul';
-      /** Probability that the statement is true; this is not an abstention. */
-      noul: number;
-      confidence: number;
-      probabilities: Readonly<{true: number; false: number}>;
-    }>;
-
-export interface D1OmniSystemOneResult {
-  readonly model: 'experimental-d1-omni-600m-q8';
-  readonly tokenCount: number;
-  readonly outputTokenCount: 0;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, D1OmniSystemOneAnswer>>;
-}
-
-export type VerdictSystemOneQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions: string;
-      /** Stable option IDs map to model-facing natural-language descriptions. */
-      criteria: Readonly<Record<string, string>>;
-    }>
-  | Readonly<{
-      type: 'score';
-      instructions: string;
-      /** Ordered from lowest to highest; values must be finite and strictly increasing. */
-      criteria: readonly Readonly<{id: string; description: string; value: number}>[];
-    }>
-  | Readonly<{
-      type: 'noul';
-      proposition: string;
-      semantics: 'conditional_on_sufficient_evidence_v2';
-    }>;
-
-export type VerdictCalibrationSource = 'global' | 'per-cardinality';
-
-type VerdictAnswerFields = Readonly<{
-  isAbstention: boolean;
-  probabilities: Readonly<Record<string, number>>;
-  logits: Readonly<Record<string, number>>;
-  calibrationStatus: 'calibrated_for_scope';
-  calibrationTemperature: number;
-  calibrationSource: VerdictCalibrationSource;
-}>;
-
-export type VerdictSystemOneAnswer =
-  | (VerdictAnswerFields &
-      Readonly<{
-        type: 'choice';
-        /** The selected option ID, or `__insufficient_evidence__` when abstaining. */
-        choice: string;
-        selectedProbability: number;
-        concentration: number;
-      }>)
-  | (VerdictAnswerFields &
-      Readonly<{
-        type: 'score';
-        selectedLevelId: string;
-        selectedValue: number | null;
-        /** Expected rubric value conditional on not abstaining; null on abstention. */
-        expectedScore: number | null;
-        abstentionProbability: number;
-      }>)
-  | (VerdictAnswerFields &
-      Readonly<{
-        type: 'noul';
-        selectedOutcome: 'true' | 'false' | '__insufficient_evidence__';
-        /** P(true | sufficient evidence); null when the model abstains. */
-        pTrueGivenSufficientEvidence: number | null;
-        pInsufficientEvidence: number;
-      }>);
-
-export interface VerdictSystemOneResult {
-  readonly model: 'experimental-openjev-verdict-151m-fp16';
-  readonly tokenCount: number;
-  readonly outputTokenCount: 0;
-  readonly forwardPassCount: 1;
-  readonly truncated?: true;
-  readonly truncatedQuestions?: readonly string[];
-  readonly answers: Readonly<Record<string, VerdictSystemOneAnswer>>;
-}
-
-export interface VerdictDecisionAnswer extends DecisionAnswer {
-  /** True when `selected` is the reserved abstention ID and `selectedIndex` is -1. */
-  readonly abstained: boolean;
-  readonly abstentionProbability: number;
-  readonly selectedProbability: number;
-}
-
-export interface VerdictDecisionResult extends Omit<DecisionResult, 'answers'> {
-  readonly answers: VerdictDecisionAnswer[];
-}
+export type StableModelLoadOptions = StableKev06LoadOptions | StableModelIdLoadOptions;
 
 export interface TinyDecideLoadOptions extends Omit<CommonLoadOptions, 'assetsUrl'> {
   model: 'experimental-tinydecide-10m-q4';
@@ -1313,18 +759,7 @@ export type LoadOptions =
   | KevUpstreamLoadOptions
   | KevReflexesLoadOptions
   | Kev08LoadOptions
-  | DecimaLoadOptions
-  | TinyDecideLoadOptions
-  | TamevMicroLoadOptions
-  | TamevNanoLoadOptions
-  | TamevNanoFlashLoadOptions
-  | SkejjaInt8LoadOptions
-  | SkejjaInt8DynLoadOptions
-  | EttinLoadOptions
-  | SafeDecideLoadOptions
-  | CrivoLoadOptions
-  | LayaTypedDecisionsLoadOptions
-  | GlinerMobileLoadOptions;
+  | TinyDecideLoadOptions;
 
 export type Kev06LoadOptions = CommonLoadOptions & {
   model?: 'kev-0.6b-q4f16';
@@ -1504,482 +939,11 @@ export interface LoadedStrandsGemma4Model extends LoadedDecisionModel {
   ): Promise<StrandsGemma4SystemOneResult>;
 }
 
-export interface SafeDecideLoadOptions {
-  model: 'experimental-safedecide-140m-fp32';
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  /** Browser caching is opt-in because the FP32 graph is 563 MB. */
-  cache?: boolean;
-  /** Offline mode requires `cache: true`. */
-  offline?: boolean;
-  signal?: AbortSignal;
-  onProgress?: (progress: ModelProgress) => void;
-}
-
-export interface LoadedSafeDecideModel extends LoadedDecisionModel {
-  /** SafeDecide's native Choice, ordered Score, Noul, and selective-action contract. */
-  systemOne(
-    state: SafeDecideState,
-    questions: Readonly<Record<string, SafeDecideSystemOneQuestion>>,
-    options?: SafeDecideDecisionOptions
-  ): Promise<SafeDecideSystemOneResult>;
-  /** Generic option-choice API with SafeDecide's calibrated confidence and action fields. */
-  decide(request: DecisionRequest, options?: SafeDecideDecisionOptions): Promise<SafeDecideDecisionResult>;
-}
-
-export type CrivoModelName = 'experimental-crivo-32m-v2-fp32' | 'experimental-crivo-32m-v2-int8';
-
-export type CrivoSystemOneQuestion =
-  | Readonly<{
-      type: 'choice';
-      instructions?: DecisionJsonValue;
-      criteria: Readonly<Record<string, DecisionJsonValue>>;
-    }>
-  | Readonly<{
-      type: 'score';
-      instructions?: DecisionJsonValue;
-      criteria: readonly DecisionJsonValue[] | Readonly<Record<string, DecisionJsonValue>>;
-    }>
-  | Readonly<{
-      type: 'noul';
-      instructions?: DecisionJsonValue;
-      criteria?: Readonly<{true?: DecisionJsonValue; false?: DecisionJsonValue}>;
-    }>;
-
-export type CrivoSystemOneAnswer =
-  | Readonly<{type: 'choice'; choice: string; probabilities: Readonly<Record<string, number>>}>
-  | Readonly<{type: 'score'; score: number; probabilities: Readonly<Record<string, number>>}>
-  | Readonly<{type: 'noul'; noul: number}>;
-
-export interface CrivoSystemOneResult {
-  readonly model: CrivoModelName;
-  readonly tokenCount: number;
-  readonly answers: Readonly<Record<string, CrivoSystemOneAnswer>>;
-}
-
-export interface CrivoLoadOptions {
-  model: CrivoModelName;
-  /** Optional trusted mirror; defaults to the model's pinned public revision. */
-  assetsUrl?: string;
-  /** Browser caching is enabled by default. */
-  cache?: boolean;
-  /** Offline mode requires a previously cached set of verified assets and cache: true. */
-  offline?: boolean;
-  signal?: AbortSignal;
-  onProgress?: (progress: ModelProgress) => void;
-}
-
-export interface LoadedCrivoModel extends LoadedDecisionModel {
-  /** Crivo's native Choice, ordered Score and binary Noul contract. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, CrivoSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<CrivoSystemOneResult>;
-}
-
-export interface DecimaSystemOneChoiceQuestion {
-  readonly type: 'choice';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria: readonly DecisionJsonValue[] | Readonly<Record<string, DecisionJsonValue>>;
-  readonly ordinal?: boolean;
-  readonly label_blind?: boolean;
-}
-
-export interface DecimaSystemOneScoreQuestion {
-  readonly type: 'score';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria: readonly DecisionJsonValue[];
-}
-
-export interface DecimaSystemOneNoulQuestion {
-  readonly type: 'noul';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria?: Readonly<{true?: DecisionJsonValue; false?: DecisionJsonValue}> | null;
-}
-
-export interface DecimaSystemOneRankQuestion {
-  readonly type: 'rank';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria: readonly DecisionJsonValue[] | Readonly<Record<string, DecisionJsonValue>>;
-}
-
-export type DecimaSystemOneQuestion =
-  | DecimaSystemOneChoiceQuestion
-  | DecimaSystemOneScoreQuestion
-  | DecimaSystemOneNoulQuestion
-  | DecimaSystemOneRankQuestion;
-
-export type DecimaSystemOneAnswer =
-  | Readonly<{type: 'choice'; choice: string; confidence: number; probabilities: Readonly<Record<string, number>>}>
-  | Readonly<{
-      type: 'score';
-      score: number;
-      confidence: number;
-      legend: Readonly<Record<string, string>>;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{type: 'noul'; noul: number}>
-  | Readonly<{type: 'rank'; probabilities: Readonly<Record<string, number>>; order: readonly string[]}>;
-
-export interface DecimaSystemOneResult {
-  readonly model:
-    | 'experimental-decima-small-int8'
-    | 'experimental-decima-base-clean-int8'
-    | 'experimental-decima-agent-int8';
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, DecimaSystemOneAnswer>>;
-}
-
-export interface DecimaDecisionOptions extends DecisionOptions {
-  /** Language code used for Arabic and Persian text normalization; other codes pass text through. */
-  readonly language?: string;
-}
-
-export interface LoadedDecimaSmallModel extends LoadedDecisionModel {
-  /** Decima Choice, Noul, Score and independent-probability Rank routes. */
-  decide(request: DecisionRequest, options?: DecimaDecisionOptions): Promise<DecisionResult>;
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, DecimaSystemOneQuestion>>,
-    options?: DecimaDecisionOptions
-  ): Promise<DecimaSystemOneResult>;
-}
-
-export type LoadedDecimaBaseCleanModel = LoadedDecimaSmallModel;
-
-export type DecimaAgentSystemOneQuestion = Exclude<DecimaSystemOneQuestion, DecimaSystemOneRankQuestion>;
-export type DecimaAgentSystemOneAnswer = Exclude<DecimaSystemOneAnswer, {type: 'rank'}>;
-
-export interface DecimaAgentSystemOneResult {
-  readonly model: 'experimental-decima-agent-int8';
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, DecimaAgentSystemOneAnswer>>;
-}
-
-export interface TamevMicroChoiceQuestion {
-  readonly type: 'choice';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria: Readonly<Record<string, DecisionJsonValue>>;
-}
-
-export interface TamevMicroNoulQuestion {
-  readonly type: 'noul';
-  readonly instructions?: DecisionJsonValue | null;
-  readonly criteria?: Readonly<{
-    true?: DecisionJsonValue;
-    false?: DecisionJsonValue;
-    yes?: DecisionJsonValue;
-    no?: DecisionJsonValue;
-  }> | null;
-}
-
-export interface TamevMicroScoreQuestion {
-  readonly type: 'score';
-  readonly instructions?: DecisionJsonValue | null;
-  /** Ordered from the lowest level to the highest. TAMEV returns the probability-weighted expected level. */
-  readonly criteria: readonly DecisionJsonValue[];
-}
-
-export type TamevMicroSystemOneQuestion = TamevMicroChoiceQuestion | TamevMicroNoulQuestion | TamevMicroScoreQuestion;
-
-export type TamevMicroSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      confidence: number;
-      probabilities: Readonly<Record<string, number>>;
-    }>
-  | Readonly<{type: 'noul'; noul: number}>
-  | Readonly<{
-      type: 'score';
-      /** Probability-weighted expected level, not the modal level. */
-      score: number;
-      confidence: number;
-      legend: Readonly<Record<string, DecisionJsonValue>>;
-      probabilities: Readonly<Record<string, number>>;
-    }>;
-
-export interface TamevSystemOneResult<Model extends TamevModelName> {
-  readonly model: Model;
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, TamevMicroSystemOneAnswer>>;
-}
-
-export type TamevModelName =
-  | 'experimental-tamev-micro-minilm-int8'
-  | 'experimental-tamev-nano-tinybert-int8'
-  | 'experimental-tamev-nano-flash-tinybert-int8';
-export type TamevMicroSystemOneResult = TamevSystemOneResult<'experimental-tamev-micro-minilm-int8'>;
-export type TamevNanoSystemOneQuestion = TamevMicroSystemOneQuestion;
-export type TamevNanoSystemOneAnswer = TamevMicroSystemOneAnswer;
-export type TamevNanoSystemOneResult = TamevSystemOneResult<'experimental-tamev-nano-tinybert-int8'>;
-export type TamevNanoFlashSystemOneQuestion = TamevMicroSystemOneQuestion;
-export type TamevNanoFlashSystemOneAnswer = TamevMicroSystemOneAnswer;
-export type TamevNanoFlashSystemOneResult = TamevSystemOneResult<'experimental-tamev-nano-flash-tinybert-int8'>;
-
-export interface LoadedTamevModel<Model extends TamevModelName> extends LoadedDecisionModel {
-  /** TAMEV's choice helper and native Choice, Noul and Score System One protocol. */
-  decide(request: DecisionRequest, options?: DecisionOptions): Promise<DecisionResult>;
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, TamevMicroSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<TamevSystemOneResult<Model>>;
-}
-
-export type LoadedTamevMicroModel = LoadedTamevModel<'experimental-tamev-micro-minilm-int8'>;
-export type LoadedTamevNanoModel = LoadedTamevModel<'experimental-tamev-nano-tinybert-int8'>;
-export type LoadedTamevNanoFlashModel = LoadedTamevModel<'experimental-tamev-nano-flash-tinybert-int8'>;
-
-export type StableTamevModelId =
-  | 'tamev-micro-minilm-int8'
-  | 'tamev-nano-tinybert-int8'
-  | 'tamev-nano-flash-tinybert-int8';
-export type StableTamevSystemOneResult<Model extends StableTamevModelId> = Omit<
-  TamevSystemOneResult<
-    Model extends 'tamev-micro-minilm-int8'
-      ? 'experimental-tamev-micro-minilm-int8'
-      : Model extends 'tamev-nano-tinybert-int8'
-        ? 'experimental-tamev-nano-tinybert-int8'
-        : 'experimental-tamev-nano-flash-tinybert-int8'
-  >,
-  'model'
-> & {readonly model: Model};
-
-export interface LoadedStableTamevModel<
-  Model extends StableTamevModelId,
-  RouteModel extends TamevModelName
-> extends Omit<LoadedTamevModel<RouteModel>, 'description' | 'systemOne'> {
-  readonly description: StableModelDescription;
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, TamevMicroSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<StableTamevSystemOneResult<Model>>;
-}
-
-export type LoadedStableTamevMicroModel = LoadedStableTamevModel<
-  'tamev-micro-minilm-int8',
-  'experimental-tamev-micro-minilm-int8'
->;
-export type LoadedStableTamevNanoModel = LoadedStableTamevModel<
-  'tamev-nano-tinybert-int8',
-  'experimental-tamev-nano-tinybert-int8'
->;
-export type LoadedStableTamevNanoFlashModel = LoadedStableTamevModel<
-  'tamev-nano-flash-tinybert-int8',
-  'experimental-tamev-nano-flash-tinybert-int8'
->;
-
 export interface LoadedStableKev06DecisionModel extends Omit<LoadedKev06DecisionModel, 'description'> {
   readonly description: StableModelDescription;
 }
 
-export type LoadedStableDecisionModel =
-  | LoadedStableKev06DecisionModel
-  | LoadedStableTamevMicroModel
-  | LoadedStableTamevNanoModel
-  | LoadedStableTamevNanoFlashModel;
-
-export type SkejjaModelName = 'experimental-skejja-edge32k-ft6-int8' | 'experimental-skejja-edge32k-ft6-int8dyn';
-export interface SkejjaChoiceQuestion {
-  readonly type: 'choice';
-  readonly instructions?: DecisionJsonValue;
-  readonly criteria: Readonly<Record<string, DecisionJsonValue>>;
-  readonly [key: string]: unknown;
-}
-
-export interface SkejjaScoreQuestion {
-  readonly type: 'score';
-  readonly instructions?: DecisionJsonValue;
-  readonly criteria: readonly DecisionJsonValue[];
-  readonly [key: string]: unknown;
-}
-
-export interface SkejjaNoulQuestion {
-  readonly type: 'noul';
-  readonly instructions?: DecisionJsonValue;
-  readonly criteria?: Readonly<Record<string, DecisionJsonValue>> | null;
-  readonly [key: string]: unknown;
-}
-
-export type SkejjaSystemOneQuestion = SkejjaChoiceQuestion | SkejjaScoreQuestion | SkejjaNoulQuestion;
-export type SkejjaSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      probabilities: Readonly<Record<string, number>>;
-      /** Normalized probability above uniform; it is not a calibrated confidence estimate. */
-      confidence: number;
-    }>
-  | Readonly<{
-      type: 'score';
-      /** Probability-weighted expected ordinal level, starting at 0. */
-      score: number;
-      probabilities: Readonly<Record<string, number>>;
-      legend: Readonly<Record<string, DecisionJsonValue>>;
-      confidence: number;
-    }>
-  | Readonly<{type: 'noul'; /** Calibrated probability that the answer is true. */ noul: number}>;
-
-export interface SkejjaSystemOneResult<Model extends SkejjaModelName> {
-  readonly model: Model;
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, SkejjaSystemOneAnswer>>;
-}
-
-export interface SkejjaCalibrationExample {
-  readonly state: DecisionJsonValue;
-  readonly answer: boolean | 0 | 1;
-}
-
-export interface SkejjaQuestionCalibration {
-  readonly a: number;
-  readonly b: number;
-  readonly examples: number;
-  readonly positives: number;
-}
-
-export interface LoadedSkejjaModel<Model extends SkejjaModelName> extends LoadedDecisionModel {
-  /** Skejja's typed Choice, Noul, and ordinal Score outputs. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, SkejjaSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<SkejjaSystemOneResult<Model>>;
-  /** Fit in-memory Platt calibration for one Noul question using 8 to 256 labeled states. */
-  calibrateQuestion(
-    question: SkejjaNoulQuestion,
-    examples: readonly SkejjaCalibrationExample[],
-    options?: DecisionOptions
-  ): Promise<SkejjaQuestionCalibration>;
-}
-
-export type LoadedSkejjaInt8Model = LoadedSkejjaModel<'experimental-skejja-edge32k-ft6-int8'>;
-export type LoadedSkejjaInt8DynModel = LoadedSkejjaModel<'experimental-skejja-edge32k-ft6-int8dyn'>;
-
-export type EttinSystemOneQuestion =
-  | OpenDeciderChoiceQuestion
-  | OpenDeciderScoreQuestion
-  | Omit<OpenDeciderNoulQuestion, 'criteria'>
-  | Readonly<{
-      type: 'noul';
-      instructions: string;
-      criteria?: Readonly<{true?: '' | null; false?: '' | null}> | null;
-    }>;
-
-export type EttinSystemOneAnswer =
-  | Readonly<{
-      type: 'choice';
-      choice: string;
-      confidence: number;
-      probabilities: Readonly<Record<string, number>>;
-      truncated?: true;
-    }>
-  | Readonly<{
-      type: 'noul';
-      /** Probability of true (yes); the model does not abstain. */
-      noul: number;
-      probabilities: Readonly<{false: number; true: number}>;
-      truncated?: true;
-    }>
-  | Readonly<{
-      type: 'score';
-      /** Most likely ordered level, where zero is the lowest level. */
-      score: number;
-      /** Probability-weighted mean level. */
-      expected: number;
-      legend: Readonly<Record<string, string>>;
-      confidence: number;
-      probabilities: Readonly<Record<string, number>>;
-      truncated?: true;
-    }>;
-
-export interface EttinSystemOneResult {
-  readonly model: 'experimental-ettin-68m-int8';
-  readonly tokenCount: number;
-  readonly truncated?: true;
-  readonly answers: Readonly<Record<string, EttinSystemOneAnswer>>;
-}
-
-export interface LoadedEttinModel extends LoadedDecisionModel {
-  /** Decider Ettin's native Choice, Noul and ordered Score heads. Noul has no abstention path. */
-  systemOne(
-    state: string,
-    questions: Readonly<Record<string, EttinSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<EttinSystemOneResult>;
-}
-
-export interface LoadedLayaModel extends LoadedDecisionModel {
-  /** Laya's native Choice, ordered Score and Noul outputs. The diagnostic action head cannot abstain. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, LayaSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<LayaSystemOneResult>;
-}
-
-export interface LoadedLayaTypedDecisionsModel extends LoadedDecisionModel {
-  /** Laya Typed-Decisions' native Choice, ordered Score and Noul outputs. Its action head is not abstention. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, LayaSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<LayaTypedDecisionsSystemOneResult>;
-}
-
-export interface LoadedXDecisionModel extends LoadedDecisionModel {
-  /** xDecision's Choice, ordered Score and Noul outputs; action probability is not abstention. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, XDecisionSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<XDecisionSystemOneResult>;
-}
-
-export interface LoadedGlinerMobileModel extends LoadedDecisionModel {
-  /** GLiNER's Choice, ordered Score and yes/no Noul outputs; its Noul head cannot abstain. */
-  systemOne(
-    state: string,
-    questions: Readonly<Record<string, GlinerMobileSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<GlinerMobileSystemOneResult>;
-}
-
-export interface LoadedD1OmniModel extends LoadedDecisionModel {
-  /** d1-omni's text-only Choice, ordered Score, and Noul outputs. Noul is a yes probability, not abstention. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, D1OmniSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<D1OmniSystemOneResult>;
-}
-
-export interface LoadedVerdictModel extends LoadedDecisionModel {
-  /** Verdict's native Choice, ordered Score, and abstaining Noul contract. */
-  systemOne(
-    state: string,
-    questions: Readonly<Record<string, VerdictSystemOneQuestion>>,
-    options?: DecisionOptions
-  ): Promise<VerdictSystemOneResult>;
-  /** Generic Choice requests use the same 24-option limit and expose abstention explicitly. */
-  decide(request: DecisionRequest, options?: DecisionOptions): Promise<VerdictDecisionResult>;
-}
-
-export interface LoadedDecimaAgentModel extends LoadedDecisionModel {
-  /** Decima-agent 2.3 exposes the upstream Choice, Score and Noul question types. */
-  systemOne(
-    state: string | DecisionJsonValue,
-    questions: Readonly<Record<string, DecimaAgentSystemOneQuestion>>,
-    options?: DecimaDecisionOptions
-  ): Promise<DecimaAgentSystemOneResult>;
-}
+export type LoadedStableDecisionModel = LoadedStableKev06DecisionModel;
 
 export interface LoadedMapikaDecisionModel<
   Model extends MapikaSystemOneModelName = MapikaSystemOneModelName
@@ -2005,41 +969,20 @@ export function listDecisionModels(): readonly ModelName[];
 export function isDecisionModel(value: unknown): value is ModelName;
 /** Describe a route without loading assets or checking the current GPU. */
 export function describeModel(model: ModelName): ModelDescription;
-/** List stable public IDs, ordered by benchmark within comparable evaluation sets. */
+/** List stable public IDs. */
 export function listStableModelIds(): readonly StableModelId[];
 /** Narrow a dynamic value to a stable public model ID. */
 export function isStableModelId(value: unknown): value is StableModelId;
 /** Describe a stable public ID without exposing its internal route ID. */
 export function describeStableModel(model: StableModelId): StableModelDescription;
 /** Load a stable public ID. Kev reconstructs its pinned TVM assets from upstream source and does not accept assetsUrl. */
-export function loadDecisionModel(options: StableTamevMicroLoadOptions): Promise<LoadedStableTamevMicroModel>;
-export function loadDecisionModel(options: StableTamevNanoLoadOptions): Promise<LoadedStableTamevNanoModel>;
-export function loadDecisionModel(options: StableTamevNanoFlashLoadOptions): Promise<LoadedStableTamevNanoFlashModel>;
 export function loadDecisionModel(options: StableKev06LoadOptions): Promise<LoadedStableKev06DecisionModel>;
-export function loadDecisionModel(options: StableModelLoadOptionsWithAssetsUrl): Promise<LoadedStableDecisionModel>;
 export function loadDecisionModel(options: StableModelLoadOptions): Promise<LoadedStableDecisionModel>;
 /** Load a model through its existing route-specific options. */
 export function loadDecisionModel(options: ImajevLoadOptions): Promise<LoadedImajevDecisionModel>;
 export function loadDecisionModel(options: StrandsGemma4LoadOptions): Promise<LoadedStrandsGemma4Model>;
 export function loadDecisionModel(options: TinyDecideLoadOptions): Promise<LoadedTinyDecideModel>;
 export function loadDecisionModel(options: OpenDeciderNanoLoadOptions): Promise<LoadedOpenDeciderNanoModel>;
-export function loadDecisionModel(options: SafeDecideLoadOptions): Promise<LoadedSafeDecideModel>;
-export function loadDecisionModel(options: CrivoLoadOptions): Promise<LoadedCrivoModel>;
-export function loadDecisionModel(options: DecimaSmallLoadOptions): Promise<LoadedDecimaSmallModel>;
-export function loadDecisionModel(options: DecimaBaseCleanLoadOptions): Promise<LoadedDecimaBaseCleanModel>;
-export function loadDecisionModel(options: DecimaAgentLoadOptions): Promise<LoadedDecimaAgentModel>;
-export function loadDecisionModel(options: TamevMicroLoadOptions): Promise<LoadedTamevMicroModel>;
-export function loadDecisionModel(options: TamevNanoLoadOptions): Promise<LoadedTamevNanoModel>;
-export function loadDecisionModel(options: TamevNanoFlashLoadOptions): Promise<LoadedTamevNanoFlashModel>;
-export function loadDecisionModel(options: SkejjaInt8LoadOptions): Promise<LoadedSkejjaInt8Model>;
-export function loadDecisionModel(options: SkejjaInt8DynLoadOptions): Promise<LoadedSkejjaInt8DynModel>;
-export function loadDecisionModel(options: EttinLoadOptions): Promise<LoadedEttinModel>;
-export function loadDecisionModel(options: LayaLoadOptions): Promise<LoadedLayaModel>;
-export function loadDecisionModel(options: LayaTypedDecisionsLoadOptions): Promise<LoadedLayaTypedDecisionsModel>;
-export function loadDecisionModel(options: XDecisionLoadOptions): Promise<LoadedXDecisionModel>;
-export function loadDecisionModel(options: GlinerMobileLoadOptions): Promise<LoadedGlinerMobileModel>;
-export function loadDecisionModel(options: D1OmniLoadOptions): Promise<LoadedD1OmniModel>;
-export function loadDecisionModel(options: VerdictLoadOptions): Promise<LoadedVerdictModel>;
 export function loadDecisionModel(
   options: MapikaLoadOptions<'mapika-0.8b-f16'>
 ): Promise<LoadedMapikaDecisionModel<'mapika-0.8b-f16'>>;

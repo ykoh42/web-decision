@@ -2,9 +2,6 @@ import {WebDecisionError} from './kev.js';
 import {getModelRegistration} from './model-registry.js';
 
 const routes = Object.freeze({
-  'tamev-micro-minilm-int8': 'experimental-tamev-micro-minilm-int8',
-  'tamev-nano-tinybert-int8': 'experimental-tamev-nano-tinybert-int8',
-  'tamev-nano-flash-tinybert-int8': 'experimental-tamev-nano-flash-tinybert-int8',
   'kev-0.6b-q4f16': 'kev-0.6b-q4f16'
 } as const);
 

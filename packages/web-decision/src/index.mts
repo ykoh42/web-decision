@@ -19,19 +19,7 @@ import {loadMapika4Candidate} from './mapika4b/loader.mjs';
 import {loadElephantCandidate} from './elephant/loader.mjs';
 import {loadClefCandidate} from './clef/loader.mjs';
 import {loadOpenDeciderNano} from './opendecider-nano/loader.mjs';
-import {loadDecimaModel} from './decima/loader.mjs';
 import {loadTinyDecide} from './tinydecide/loader.mjs';
-import {loadTamev} from './tamev/loader.mjs';
-import {loadSkejja} from './skejja/loader.mjs';
-import {loadEttin} from './ettin/loader.mjs';
-import {loadLayaModel} from './laya/loader.mjs';
-import {loadLayaTypedDecisionsModel} from './laya-typed/loader.mjs';
-import {loadXDecisionModel} from './xdecision/loader.mjs';
-import {loadGlinerMobileModel} from './gliner-mobile/loader.mjs';
-import {loadD1OmniModel} from './d1-omni/loader.mjs';
-import {loadVerdictModel} from './verdict/loader.mjs';
-import {loadSafeDecideModel} from './safedecide/loader.mjs';
-import {loadCrivoModel} from './crivo/loader.mjs';
 
 export {WebDecisionError};
 export {describeModel, isDecisionModel, listDecisionModels} from './model-registry.js';
@@ -41,12 +29,12 @@ function loadRegisteredModel(
   family: string,
   options: Record<string, unknown>,
   description: ReturnType<typeof selectModelRegistration>['description'],
-  modelId: string | undefined
+  stableModelId: string | undefined
 ) {
   const runtimeBindings = {Tokenizer, instantiate, createPolyfillWASI};
   // Each legacy loader validates its own options and runtime bindings.
   const loaders: Record<string, () => Promise<unknown>> = {
-    kev: () => loadKevDecisionModel(options, description, modelId),
+    kev: () => loadKevDecisionModel(options, description, stableModelId),
     deberta: () => loadExperimentalDeberta(options),
     mapika: () => loadExperimentalMapika(options),
     'mapika-q4': () => loadExperimentalMapikaQ4(options as unknown as Parameters<typeof loadExperimentalMapikaQ4>[0]),
@@ -59,20 +47,7 @@ function loadRegisteredModel(
     elephant: () => loadElephantCandidate(options, runtimeBindings),
     clef: () => loadClefCandidate(options, runtimeBindings as unknown as Parameters<typeof loadClefCandidate>[1]),
     'opendecider-nano': () => loadOpenDeciderNano(options, runtimeBindings),
-    decima: () => loadDecimaModel(options),
     tinydecide: () => loadTinyDecide(options),
-    tamev: () => loadTamev(options, {publicModelId: modelId}),
-    skejja: () => loadSkejja(options),
-    ettin: () => loadEttin(options),
-    laya: () => loadLayaModel(options),
-    'laya-typed': () =>
-      loadLayaTypedDecisionsModel(options as unknown as Parameters<typeof loadLayaTypedDecisionsModel>[0]),
-    xdecision: () => loadXDecisionModel(options as unknown as Parameters<typeof loadXDecisionModel>[0]),
-    'gliner-mobile': () => loadGlinerMobileModel(options),
-    'd1-omni': () => loadD1OmniModel(options),
-    verdict: () => loadVerdictModel(options),
-    safedecide: () => loadSafeDecideModel(options),
-    crivo: () => loadCrivoModel(options),
     strands: () =>
       loadExperimentalStrandsFromSource({
         assetsUrl: options.assetsUrl,
@@ -124,16 +99,6 @@ export async function loadDecisionModel(options: unknown) {
     dispose?: () => unknown;
   };
   try {
-    if (stableRequest?.modelId.startsWith('tamev-')) {
-      const descriptor = Object.getOwnPropertyDescriptor(model, 'systemOne');
-      if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function')
-        throw new WebDecisionError('MODEL_LOAD_FAILED', 'Stable TAMEV model has no System One method.');
-      const systemOne = descriptor.value.bind(model);
-      Object.defineProperty(model, 'systemOne', {
-        ...descriptor,
-        value: async (...args: unknown[]) => ({...(await systemOne(...args)), model: stableRequest.modelId})
-      });
-    }
     // Keep route IDs internal to dispatch and expose the stable ID to callers.
     Object.defineProperty(model, 'description', {
       value: stableRequest ? describeStableModel(stableRequest.modelId) : description

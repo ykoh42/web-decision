@@ -108,26 +108,6 @@ test('allows pinned larger assets only with an explicit bounded size limit', asy
   assert.equal(fetched, 1);
 });
 
-test('allows the pinned Laya Typed-Decisions weights within its explicit one-gibibyte cap', async (t) => {
-  const bytes = 842_587_136;
-  const manifest = {files: {'weights.onnx_data': {bytes, sha256: '0'.repeat(64)}}};
-  let fetched = 0;
-  t.mock.method(globalThis, 'fetch', async () => {
-    fetched++;
-    throw new Error('Stop before reading model bytes.');
-  });
-  const base = new URL('https://example.test/model/');
-
-  await assert.rejects(readVerifiedAsset(base, manifest, 'weights.onnx_data', {maxAssetBytes: bytes - 1}), {
-    code: 'INVALID_ASSET'
-  });
-  assert.equal(fetched, 0);
-  await assert.rejects(readVerifiedAsset(base, manifest, 'weights.onnx_data', {maxAssetBytes: bytes}), {
-    code: 'ASSET_LOAD_FAILED'
-  });
-  assert.equal(fetched, 1);
-});
-
 test('offline assets never fetch and still reject same-length corruption', async (t) => {
   const good = new TextEncoder().encode('correct');
   const manifest = {files: {'file.bin': {bytes: good.byteLength, sha256: await sha256(good)}}};

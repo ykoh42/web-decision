@@ -5,24 +5,13 @@ import {ExperimentalMapikaSession} from '../src/mapika/session.js';
 import {ExperimentalKev08Session} from '../src/kev08/session.js';
 import {ExperimentalDebertaSession} from '../src/deberta/model.mjs';
 import {ExperimentalStrandsSession} from '../src/strands/session.mjs';
-import {createGlinerMobileSession} from '../src/gliner-mobile/session.mjs';
-import {GLINER_MAX_OPTIONS} from '../src/gliner-mobile/contract.mjs';
-import {createSkejjaSession} from '../src/skejja/session.mjs';
-import {SKEJJA_INT8_PROFILE} from '../src/skejja/contract.mjs';
-import {createLayaSession} from '../src/laya/session.mjs';
-import {LAYA_MAX_OPTIONS} from '../src/laya/contract.mjs';
 import {createNariSession} from '../src/nari/session.mjs';
-import {createEttinSession} from '../src/ettin/session.mjs';
-import {ETTIN_MAX_OPTIONS} from '../src/ettin/contract.mjs';
-import {createTamevSession} from '../src/tamev/session.mjs';
 import {createClefSession} from '../src/clef/session.mjs';
 import {CLEF_MAX_OPTIONS} from '../src/clef/protocol.mjs';
 import {createFlashSession} from '../src/pplx/session.mjs';
 import {FLASH_MAX_OPTIONS} from '../src/pplx/protocol.mjs';
 import {createMapika4Session} from '../src/mapika4b/session.mjs';
 import {MAPIKA4_MAX_OPTIONS} from '../src/mapika4b/contract.mjs';
-import {createVerdictSession} from '../src/verdict/session.mjs';
-import {VERDICT_MAX_CANDIDATES} from '../src/verdict/contract.mjs';
 import {createTinyDecideSession} from '../src/tinydecide/session.mjs';
 import {TINYDECIDE_MAX_CHOICES} from '../src/tinydecide/contract.mjs';
 import {createH2oSession} from '../src/h2o/session.mjs';
@@ -291,35 +280,10 @@ test('native option caps reject before reading caller option entries', async () 
   };
   const constructors: [string, number, () => unknown][] = [
     [
-      'GLiNER mobile',
-      GLINER_MAX_OPTIONS,
-      () => createGlinerMobileSession({tokenizer, runner} as unknown as Parameters<typeof createGlinerMobileSession>[0])
-    ],
-    [
-      'Skejja',
-      SKEJJA_INT8_PROFILE.maxChoices,
-      () => createSkejjaSession({runner, tokenizer} as unknown as Parameters<typeof createSkejjaSession>[0])
-    ],
-    [
-      'Laya',
-      LAYA_MAX_OPTIONS,
-      () =>
-        createLayaSession({
-          runner,
-          tokenizer,
-          temperatures: {byType: [1, 1, 1], byOptions: {}}
-        } as unknown as Parameters<typeof createLayaSession>[0])
-    ],
-    [
       'Nari',
       64,
       () =>
         createNariSession({tokenizer, controlIds: [1], runner} as unknown as Parameters<typeof createNariSession>[0])
-    ],
-    [
-      'Ettin',
-      ETTIN_MAX_OPTIONS,
-      () => createEttinSession({runner, tokenizer} as unknown as Parameters<typeof createEttinSession>[0])
     ],
     [
       'Clef',
@@ -338,14 +302,6 @@ test('native option caps reject before reading caller option entries', async () 
       () =>
         createMapika4Session({tokenizer, labels: {}, limits: {}, runner} as unknown as Parameters<
           typeof createMapika4Session
-        >[0])
-    ],
-    [
-      'Verdict',
-      VERDICT_MAX_CANDIDATES,
-      () =>
-        createVerdictSession({runner, tokenizer, calibrator: {}} as unknown as Parameters<
-          typeof createVerdictSession
         >[0])
     ],
     [
@@ -406,53 +362,6 @@ test('native option caps reject before reading caller option entries', async () 
     assert.equal(counts.runner, 0, name);
     await session.dispose?.();
   }
-});
-
-test('Tamev accepts 78 data options and rejects accessor-backed options before reading them', async () => {
-  const counts = {tokenizer: 0, runner: 0, getter: 0};
-  const tokenizer = {
-    encodeContext() {
-      counts.tokenizer++;
-      return {ids: [1], truncated: false};
-    },
-    encodeOption() {
-      counts.tokenizer++;
-      return {ids: [2], truncated: false};
-    }
-  };
-  const runner = {
-    async run(_contextIds: readonly number[], optionRows: readonly (readonly number[])[]) {
-      counts.runner++;
-      const probabilities = optionRows.map((_: readonly number[], index: number) =>
-        index === optionRows.length - 1 ? 1 : 0
-      );
-      return {logits: probabilities, probabilities};
-    },
-    async dispose() {},
-    async releaseCachedMemory() {}
-  };
-  const session = createTamevSession({runner, tokenizer, config: {calibration_by_k: {}}});
-  const options = Array.from({length: 78}, (_, index) => `option ${index}`);
-  const result = await session.decide({state: 'state', questions: [{instructions: 'Choose', options}]});
-  assert.equal(result.answers[0]!.selected, options.at(-1));
-  assert.equal(counts.runner, 1);
-
-  const accessorOptions = [...options];
-  Object.defineProperty(accessorOptions, '77', {
-    get() {
-      counts.getter++;
-      throw Error('option getter invoked');
-    }
-  });
-  const tokenCount = counts.tokenizer;
-  await assert.rejects(
-    session.decide({state: 'state', questions: [{instructions: 'Choose', options: accessorOptions}]}),
-    {code: 'INVALID_INPUT'}
-  );
-  assert.equal(counts.getter, 0);
-  assert.equal(counts.tokenizer, tokenCount);
-  assert.equal(counts.runner, 1);
-  await session.dispose();
 });
 
 test('request-wide option caps reject before reading any option entries', async () => {

@@ -12,8 +12,13 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "lib": ["ES2022", "DOM"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
   },
   "include": [
     "src/curated/**/*.ts",
@@ -32,9 +37,6 @@
     "test/decision-cancellation.test.mts",
     "test/decision-dispose-reentrancy.test.mts",
     "test/device-loss-cleanup.test.mts",
-    "test/d1-omni.test.mts",
-    "test/decima.test.mts",
-    "test/ettin.test.mts",
     "test/elephant-reference.test.mts",
     "test/gpu-preflight.test.mts",
     "test/h2o-dual-source.test.mts",
@@ -88,9 +90,6 @@
     "test/request-field-sessions.test.mts",
     "test/request-fields.test.mts",
     "test/runtime-lifecycle.test.mts",
-    "test/safedecide-source.test.mts",
-    "test/safedecide-tokenizer.test.mts",
-    "test/tamev-loader-options.test.mts",
     "test/tinydecide.test.mts",
     "test/strands-gemma4-runner.test.mts",
     "test/strands-gemma4-session.test.mts",
@@ -102,7 +101,6 @@
     "test/strands-range-source.test.mts",
     "test/strands-range-cache-transaction.test.mts",
     "test/strands-source-loader-internal.test.mts",
-    "test/preview-entrypoints.test.mts",
     "src/imajev/candidate-loader.mts",
     "src/imajev/upload.mts",
     "src/imajev/source.mts",
@@ -132,7 +130,6 @@
     "src/mapika.ts",
     "src/mapika/upload.ts",
     "src/stable-models.ts",
-    "src/skejja-preview-registry.mts",
     "src/tinydecide/inputs.mts",
     "src/tinydecide/loader.mts",
     "src/tinydecide/session.mts",
@@ -151,10 +148,6 @@
     "src/opendecider-nano/tokenizer.mts",
     "src/opendecider-nano/typed.mts",
     "src/strands/gemma4-e2b-loader.mts",
-    "src/skejja/loader.mts",
-    "src/skejja/session.mts",
-    "src/skejja/protocol.mts",
-    "src/skejja/source.mts",
     "src/request-fields.mts",
     "src/deberta/loader.mts",
     "src/index.mts",
@@ -179,15 +172,6 @@
     "src/h2o/session.mts",
     "src/h2o/plan.mts",
     "src/h2o/runner.mts",
-    "src/safedecide/*.mts",
-    "src/tamev/contract.mts",
-    "src/tamev/loader.mts",
-    "src/tamev/protocol.mts",
-    "src/tamev/runner.mts",
-    "src/tamev/session.mts",
-    "src/tamev/source.mts",
-    "src/tamev/tokenizer.mts",
-    "src/tamev/typed.mts",
     "vite.config.ts",
     "src/runtime/tvm-source.d.ts"
   ]

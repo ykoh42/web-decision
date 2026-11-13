@@ -55,7 +55,6 @@ import {
   MAPIKA4_LIMITS,
   MAPIKA4_MODEL
 } from './mapika4b/contract.mjs';
-import {DECIMA_AGENT_SPEC, DECIMA_BASE_CLEAN_SPEC, DECIMA_SMALL_SPEC} from './decima/contract.mjs';
 import {
   TINYDECIDE_FILES,
   TINYDECIDE_MAX_CHOICES,
@@ -65,84 +64,6 @@ import {
   TINYDECIDE_REPOSITORY,
   TINYDECIDE_REVISION
 } from './tinydecide/contract.mjs';
-import {TAMEV_MICRO_PROFILE, TAMEV_NANO_PROFILE, TAMEV_NANO_FLASH_PROFILE} from './tamev/contract.mjs';
-import {SKEJJA_INT8_PROFILE, SKEJJA_INT8DYN_PROFILE} from './skejja/contract.mjs';
-import {ETTIN_FILES, ETTIN_PROFILE} from './ettin/contract.mjs';
-import {
-  SAFEDECIDE_FILES,
-  SAFEDECIDE_MAX_SEQUENCE_TOKENS,
-  SAFEDECIDE_MODEL,
-  SAFEDECIDE_REPOSITORY,
-  SAFEDECIDE_REVISION,
-  SAFEDECIDE_SOURCE_REVISION
-} from './safedecide/contract.mjs';
-import {
-  CRIVO_FP32_SPEC,
-  CRIVO_INT8_SPEC,
-  CRIVO_MAX_SEQUENCE_TOKENS,
-  CRIVO_REPOSITORY,
-  CRIVO_REVISION,
-  CRIVO_SOURCE_REPOSITORY,
-  CRIVO_SOURCE_REVISION
-} from './crivo/contract.mjs';
-import {
-  LAYA_FILES,
-  LAYA_MAX_OPTIONS,
-  LAYA_MAX_SEQUENCE_TOKENS,
-  LAYA_MODEL,
-  LAYA_REPOSITORY,
-  LAYA_REVISION
-} from './laya/contract.mjs';
-import {
-  LAYA_TYPED_FILES,
-  LAYA_TYPED_MAX_OPTIONS,
-  LAYA_TYPED_MAX_SEQUENCE_TOKENS,
-  LAYA_TYPED_MODEL,
-  LAYA_TYPED_REPOSITORY,
-  LAYA_TYPED_REVISION
-} from './laya-typed/contract.mjs';
-import {
-  XDECISION_FILES,
-  XDECISION_MAX_OPTIONS,
-  XDECISION_MAX_SEQUENCE_TOKENS,
-  XDECISION_MODEL,
-  XDECISION_REPOSITORY,
-  XDECISION_REVISION
-} from './xdecision/contract.mjs';
-import {
-  GLINER_MAX_OPTIONS,
-  GLINER_MAX_TOKENS,
-  GLINER_MOBILE_FILES,
-  GLINER_MOBILE_MODEL,
-  GLINER_MOBILE_REPOSITORY,
-  GLINER_MOBILE_REVISION,
-  GLINER_SOURCE_REPOSITORY,
-  GLINER_SOURCE_REVISION
-} from './gliner-mobile/contract.mjs';
-import {
-  D1_OMNI_FILES,
-  D1_OMNI_MAX_TOKENS,
-  D1_OMNI_MODEL,
-  D1_OMNI_REPOSITORY,
-  D1_OMNI_REVISION,
-  D1_OMNI_SOURCE_REPOSITORY,
-  D1_OMNI_SOURCE_REVISION,
-  D1_OMNI_TEMPERATURES,
-  D1_OMNI_TOTAL_BYTES
-} from './d1-omni/contract.mjs';
-import {
-  VERDICT_FILES,
-  VERDICT_GLOBAL_TEMPERATURE,
-  VERDICT_MAX_CANDIDATES,
-  VERDICT_MAX_TOKENS,
-  VERDICT_MODEL,
-  VERDICT_REPOSITORY,
-  VERDICT_REVISION,
-  VERDICT_SOURCE_REPOSITORY,
-  VERDICT_SOURCE_REVISION,
-  VERDICT_TEMPERATURES,
-  VERDICT_TOTAL_BYTES
-} from './verdict/contract.mjs';
 
 type Limit = {resource: string; scope: string; min?: number; max?: number; description?: string};
 type Checkpoint = {repository: string; revision: string; [key: string]: unknown};
@@ -177,23 +98,12 @@ type RegistrationOptions = Omit<ChoiceOptions, 'tokenLimits'> & {
   requiresNonFallbackAdapter?: boolean | undefined;
   backend?: string | undefined;
   gpuVerification?: string | undefined;
-  cpuWasmVerification?: string | undefined;
   javascriptVerification?: string | undefined;
   additionalFiles?: string | undefined;
   priorEvidence?: string | undefined;
   modelTerms?: string | undefined;
   modelLicenseUrl?: string | undefined;
   sourceModelCard?: string | undefined;
-};
-type TamevProfile = typeof TAMEV_MICRO_PROFILE | typeof TAMEV_NANO_PROFILE | typeof TAMEV_NANO_FLASH_PROFILE;
-type SkejjaProfile = {
-  readonly model: string;
-  readonly repository: string;
-  readonly revision: string;
-  readonly files: Readonly<Record<string, {readonly sha256: string}>>;
-  readonly onnxFile: string;
-  readonly maxChoices: number;
-  readonly temperature: number;
 };
 
 const DEFAULT_MODEL = 'kev-0.6b-q4f16';
@@ -295,7 +205,6 @@ function registration({
   requiresNonFallbackAdapter = false,
   backend = 'tvm-webgpu',
   gpuVerification = backend === 'tvm-webgpu' ? 'not-revalidated' : 'not-applicable',
-  cpuWasmVerification = 'verified',
   javascriptVerification = 'not-revalidated',
   additionalFiles = 'Weight shards or ranges listed by the model manifest are also required.',
   priorEvidence = 'See the package README for each model.',
@@ -325,25 +234,7 @@ function registration({
       backend:
         backend === 'tvm-webgpu'
           ? {name: backend, requiredFeatures: ['shader-f16'], requiredLimits, requiresNonFallbackAdapter}
-          : backend === 'onnxruntime-web-wasm'
-            ? {
-                name: backend,
-                executionProvider: 'wasm',
-                intraOpNumThreads: 1,
-                requiredFeatures: [],
-                requiredLimits: {},
-                requiresNonFallbackAdapter: false
-              }
-            : backend === 'onnxruntime-web-webgpu'
-              ? {
-                  name: backend,
-                  executionProvider: 'webgpu',
-                  cpuFallback: 'runtime-managed',
-                  requiredFeatures: [],
-                  requiredLimits: {},
-                  requiresNonFallbackAdapter: true
-                }
-              : {name: 'javascript'},
+          : {name: 'javascript'},
       features: {
         textChoice: choice({
           tokenLimits: limits,
@@ -368,12 +259,7 @@ function registration({
       },
       verification: {
         currentBundleGpu: gpuVerification,
-        currentBundleCpuWasm:
-          backend === 'onnxruntime-web-wasm'
-            ? cpuWasmVerification
-            : backend === 'onnxruntime-web-webgpu'
-              ? 'not-revalidated'
-              : 'not-applicable',
+        currentBundleCpuWasm: 'not-applicable',
         currentBundleJavascript: backend === 'javascript' ? javascriptVerification : 'not-applicable',
         priorEvidence
       }
@@ -407,282 +293,7 @@ const kevFiles = [
 ];
 const textGraphFiles = ['manifest.json', 'model.wasm', 'tokenizer.json', 'tokenizer_config.json', 'weights/index.json'];
 
-function decimaRegistration(spec: import('./decima/contract.mjs').DecimaModelSpec) {
-  const stateLimit =
-    spec.stateOverflow === 'reject'
-      ? 'longer input is rejected before inference.'
-      : 'longer rows are truncated and marked.';
-  const choiceLimit = spec.choiceFit
-    ? 'Uses the checkpoint choice_fit rendering and reports the adapted rows; each row includes question text and special tokens.'
-    : 'Each option row includes question text and special tokens; shortened rows are marked.';
-  return registration({
-    family: 'decima',
-    model: spec.model,
-    precision: 'int8',
-    checkpoint: {repository: spec.repository, revision: spec.revision},
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(spec.files),
-    limits: [
-      tokenLimit('state', spec.maxStateTokens, `Complete question and state row; ${stateLimit}`),
-      tokenLimit('question', spec.maxChoiceTokens, choiceLimit)
-    ],
-    maxOptions: null,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: spec.temperature,
-    temperatureAppliedBy: 'model',
-    backend: 'onnxruntime-web-wasm',
-    cpuWasmVerification: spec.cpuWasmVerification,
-    typedTextQuestionTypes: spec.typedQuestionTypes,
-    additionalFiles: 'No additional files are required.'
-  });
-}
-
-function tamevRegistration(profile: TamevProfile, cpuWasmVerification: string) {
-  return registration({
-    family: 'tamev',
-    model: profile.model,
-    precision: 'int8',
-    checkpoint: {repository: profile.repository, revision: profile.revision},
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(profile.files),
-    limits: [
-      tokenLimit(
-        'state',
-        profile.maxContextTokens,
-        'Combined state and question context row, including special tokens; right truncation is reported.'
-      ),
-      tokenLimit(
-        'question',
-        profile.maxOptionTokens,
-        'Each candidate option row, including special tokens; right truncation is reported.'
-      )
-    ],
-    maxOptions: null,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: profile.temperature,
-    temperatureAppliedBy: 'model',
-    backend: 'onnxruntime-web-wasm',
-    cpuWasmVerification,
-    typedTextQuestionTypes: ['choice', 'noul', 'score'],
-    additionalFiles: 'No additional files are required.'
-  });
-}
-
-function skejjaRegistration(profile: SkejjaProfile, cpuWasmVerification: string) {
-  return registration({
-    family: 'skejja',
-    model: profile.model,
-    precision: 'int8',
-    checkpoint: {
-      repository: profile.repository,
-      revision: profile.revision,
-      graphSha256: profile.files[profile.onnxFile]!.sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(profile.files),
-    limits: [
-      tokenLimit(
-        'question',
-        512,
-        'Each question row is at most 512 tokens after adding its labels. Oversized state text is shortened from both ends.'
-      ),
-      {
-        resource: 'questions',
-        scope: 'request',
-        min: 1,
-        description:
-          'No package request-count cap. The upstream server defaults to 256 questions but allows a configured max_questions value.'
-      }
-    ],
-    maxOptions: profile.maxChoices,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: profile.temperature,
-    temperatureAppliedBy: 'decoder',
-    backend: 'onnxruntime-web-wasm',
-    cpuWasmVerification,
-    typedTextQuestionTypes: ['choice', 'noul', 'score'],
-    additionalFiles:
-      'The pinned archive also includes its NOTICE and the alternate int8 ONNX graph with sidecar. Only the graph and sidecar listed for this variant are loaded.'
-  });
-}
-
-function ettinRegistration(cpuWasmVerification: string) {
-  return registration({
-    family: 'ettin',
-    model: ETTIN_PROFILE.model,
-    precision: 'int8',
-    checkpoint: {
-      repository: ETTIN_PROFILE.repository,
-      revision: ETTIN_PROFILE.revision,
-      graphSha256: ETTIN_FILES['model_int8.onnx']!.sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(ETTIN_FILES),
-    limits: [
-      tokenLimit(
-        'question',
-        ETTIN_PROFILE.maxSequenceTokens,
-        'Each question row includes model markers and options; long state and question text is proportionally truncated from the end.'
-      )
-    ],
-    maxOptions: ETTIN_PROFILE.maxOptions,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: 1,
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-wasm',
-    cpuWasmVerification,
-    typedTextQuestionTypes: ['choice', 'noul', 'score'],
-    additionalFiles: 'No additional files are required.'
-  });
-}
-
 const models = [
-  decimaRegistration(DECIMA_SMALL_SPEC),
-  decimaRegistration(DECIMA_BASE_CLEAN_SPEC),
-  decimaRegistration(DECIMA_AGENT_SPEC),
-  tamevRegistration(TAMEV_MICRO_PROFILE, 'verified'),
-  tamevRegistration(TAMEV_NANO_PROFILE, 'verified'),
-  tamevRegistration(TAMEV_NANO_FLASH_PROFILE, 'verified'),
-  skejjaRegistration(SKEJJA_INT8_PROFILE, 'verified'),
-  skejjaRegistration(SKEJJA_INT8DYN_PROFILE, 'verified'),
-  ettinRegistration('verified'),
-  registration({
-    family: 'laya',
-    model: LAYA_MODEL,
-    precision: 'f16',
-    checkpoint: {
-      repository: LAYA_REPOSITORY,
-      revision: LAYA_REVISION,
-      graphSha256: LAYA_FILES['onnx/model_fp16.onnx'].sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(LAYA_FILES),
-    limits: [
-      tokenLimit(
-        'question',
-        LAYA_MAX_SEQUENCE_TOKENS,
-        'One sequence per question; state, instructions and options are shortened and reported to fit the 1024-token context.'
-      ),
-      {resource: 'options', scope: 'question', min: 2, max: LAYA_MAX_OPTIONS},
-      {resource: 'questions', scope: 'request', min: 1}
-    ],
-    maxOptions: LAYA_MAX_OPTIONS,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: 1,
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'verified',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    additionalFiles: 'No additional files are required.'
-  }),
-  registration({
-    family: 'laya-typed',
-    model: LAYA_TYPED_MODEL,
-    precision: 'f16',
-    checkpoint: {
-      repository: LAYA_TYPED_REPOSITORY,
-      revision: LAYA_TYPED_REVISION,
-      graphSha256: LAYA_TYPED_FILES['onnx/model_fp16.onnx'].sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(LAYA_TYPED_FILES),
-    limits: [
-      tokenLimit(
-        'question',
-        LAYA_TYPED_MAX_SEQUENCE_TOKENS,
-        'One sequence per question; state, instructions and options are shortened and reported to fit the 1024-token context.'
-      ),
-      {resource: 'options', scope: 'question', min: 2, max: LAYA_TYPED_MAX_OPTIONS},
-      {resource: 'questions', scope: 'request', min: 1}
-    ],
-    maxOptions: LAYA_TYPED_MAX_OPTIONS,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: 1,
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'verified',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    additionalFiles: 'No additional files are required.'
-  }),
-  registration({
-    family: 'xdecision',
-    model: XDECISION_MODEL,
-    precision: 'f16',
-    checkpoint: {
-      repository: XDECISION_REPOSITORY,
-      revision: XDECISION_REVISION,
-      graphSha256: XDECISION_FILES['onnx/model_fp16.onnx'].sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(XDECISION_FILES),
-    limits: [
-      tokenLimit(
-        'question',
-        XDECISION_MAX_SEQUENCE_TOKENS,
-        'One sequence per question; state, instructions and options are shortened and reported to fit the 1024-token context.'
-      ),
-      {resource: 'options', scope: 'question', min: 2, max: XDECISION_MAX_OPTIONS},
-      {resource: 'questions', scope: 'request', min: 1}
-    ],
-    maxOptions: XDECISION_MAX_OPTIONS,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: {
-      byType: {choice: 1.8352, score: 2.1167, noul: 1.6012},
-      byQuestionTypeAndOptionCount: {
-        'choice:2': 1.819,
-        'choice:3-5': 1.8945,
-        'choice:6-10': 1.774,
-        'noul:2': 1.6012,
-        'score:3-5': 2.1167
-      }
-    },
-    temperatureAppliedBy: 'decoder',
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'verified',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    additionalFiles: 'No additional files are required.'
-  }),
-  registration({
-    family: 'gliner-mobile',
-    model: GLINER_MOBILE_MODEL,
-    precision: 'q4f16',
-    checkpoint: {
-      repository: GLINER_MOBILE_REPOSITORY,
-      revision: GLINER_MOBILE_REVISION,
-      sourceRepository: GLINER_SOURCE_REPOSITORY,
-      sourceRevision: GLINER_SOURCE_REVISION,
-      graphSha256: GLINER_MOBILE_FILES['onnx/model_q4f16.onnx'].sha256
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(GLINER_MOBILE_FILES),
-    limits: [
-      tokenLimit(
-        'request',
-        GLINER_MAX_TOKENS,
-        'All question schemas and state share one sequence. Long state words are shortened and truncation is reported.'
-      ),
-      tokenLimit('state', GLINER_MAX_TOKENS, 'State shares the 512-token context with every question schema.'),
-      {resource: 'options', scope: 'question', min: 2, max: GLINER_MAX_OPTIONS},
-      {resource: 'questions', scope: 'request', min: 1}
-    ],
-    maxOptions: GLINER_MAX_OPTIONS,
-    handling: 'packed-request',
-    tokenCount: 'packed-request',
-    temperature: 1,
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'verified',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    additionalFiles: 'No additional files are required.'
-  }),
   registration({
     family: 'tinydecide',
     model: TINYDECIDE_MODEL,
@@ -1039,91 +650,7 @@ const models = [
     temperature: 1,
     requiredLimits: OPENDECIDER_NANO_LIMITS,
     requiresNonFallbackAdapter: true
-  }),
-  registration({
-    family: 'safedecide',
-    model: SAFEDECIDE_MODEL,
-    precision: 'f32',
-    checkpoint: {
-      repository: SAFEDECIDE_REPOSITORY,
-      revision: SAFEDECIDE_REVISION,
-      graphSha256: SAFEDECIDE_FILES['onnx/model.onnx'].sha256,
-      sourceRepository: 'yotambraun/safedecide',
-      sourceRevision: SAFEDECIDE_SOURCE_REVISION
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(SAFEDECIDE_FILES),
-    limits: [
-      tokenLimit(
-        'question',
-        SAFEDECIDE_MAX_SEQUENCE_TOKENS,
-        'Each state/question/option pair is right-truncated with longest-first to 640 tokens.'
-      )
-    ],
-    maxOptions: null,
-    handling: 'independent-options',
-    tokenCount: 'sum-option-pairs',
-    temperature: {
-      byType: {choice: 1.1134611876261922, noul: 1.1006431532659389, score: 1.089708955367956},
-      byQuestionTypeAndOptionCount: {}
-    },
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'not-revalidated',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    selectiveAction: {
-      status: 'implemented',
-      actions: ['automate', 'escalate'],
-      calibration: 'exchangeable-data',
-      levels: [
-        {alpha: 0.05, delta: 0.1, threshold: null},
-        {alpha: 0.1, delta: 0.1, threshold: 0.7},
-        {alpha: 0.2, delta: 0.1, threshold: 0.5}
-      ]
-    },
-    modelTerms: 'Apache-2.0 as declared by the SafeDecide model card',
-    sourceModelCard: `https://github.com/yotambraun/safedecide/tree/${SAFEDECIDE_SOURCE_REVISION}`,
-    additionalFiles: 'No additional files are required.'
-  }),
-  ...[CRIVO_FP32_SPEC, CRIVO_INT8_SPEC].map((spec) =>
-    registration({
-      family: 'crivo',
-      model: spec.model,
-      precision: spec.precision,
-      checkpoint: {
-        repository: CRIVO_REPOSITORY,
-        revision: CRIVO_REVISION,
-        graphSha256: spec.files[spec.graphFile]!.sha256,
-        sourceRepository: CRIVO_SOURCE_REPOSITORY,
-        sourceRevision: CRIVO_SOURCE_REVISION
-      },
-      assets: {integrity: 'pinned-files'},
-      requiredFiles: Object.keys(spec.files),
-      additionalFiles:
-        'The model graph and tokenizer are separate CC BY-NC 4.0 assets. The npm package does not include model files.',
-      limits: [
-        tokenLimit(
-          'question',
-          CRIVO_MAX_SEQUENCE_TOKENS,
-          'One sequence per question. Inputs longer than the training context are rejected without truncation.'
-        ),
-        {resource: 'options', scope: 'question', min: 2},
-        {resource: 'questions', scope: 'request', min: 1}
-      ],
-      maxOptions: null,
-      handling: independent,
-      tokenCount: sumRows,
-      temperature: 1,
-      scoreBasis: 'ordered-levels',
-      backend: spec.backend,
-      gpuVerification: spec.backend === 'onnxruntime-web-webgpu' ? 'not-revalidated' : 'not-applicable',
-      cpuWasmVerification: spec.backend === 'onnxruntime-web-wasm' ? 'verified' : 'not-applicable',
-      typedTextQuestionTypes: ['choice', 'score', 'noul'],
-      modelTerms: 'CC BY-NC 4.0; non-commercial use only.',
-      modelLicenseUrl: 'https://creativecommons.org/licenses/by-nc/4.0/',
-      sourceModelCard: 'https://huggingface.co/' + CRIVO_SOURCE_REPOSITORY + '/tree/' + CRIVO_SOURCE_REVISION
-    })
-  )
+  })
 ];
 const h2oDescription = models.find(
   (item) => item.description.model === 'experimental-h2o-lightning-4b-q4f16'
@@ -1336,90 +863,6 @@ models.push(
     temperature: 1,
     requiredLimits: CLEF_LIMITS,
     requiresNonFallbackAdapter: true
-  })
-);
-models.push(
-  registration({
-    family: 'd1-omni',
-    model: D1_OMNI_MODEL,
-    precision: 'q8',
-    checkpoint: {
-      repository: D1_OMNI_REPOSITORY,
-      revision: D1_OMNI_REVISION,
-      sourceRepository: D1_OMNI_SOURCE_REPOSITORY,
-      sourceRevision: D1_OMNI_SOURCE_REVISION
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(D1_OMNI_FILES),
-    additionalFiles: `Pinned text-only Q8 ONNX assets total ${D1_OMNI_TOTAL_BYTES} bytes. The image and audio encoders are not included.`,
-    limits: [
-      tokenLimit(
-        'question',
-        D1_OMNI_MAX_TOKENS,
-        'Each text question is encoded independently; state and option text follow the upstream truncation rules.'
-      )
-    ],
-    maxOptions: null,
-    handling: independent,
-    tokenCount: sumRows,
-    temperature: {
-      byType: {choice: D1_OMNI_TEMPERATURES.choice, score: D1_OMNI_TEMPERATURES.score, noul: D1_OMNI_TEMPERATURES.noul},
-      byQuestionTypeAndOptionCount: Object.fromEntries(
-        Object.entries(D1_OMNI_TEMPERATURES).filter(([key]) => key.includes(':'))
-      )
-    },
-    temperatureAppliedBy: 'decoder',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    scoreBasis: 'ordered-levels',
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'not-revalidated',
-    requiresNonFallbackAdapter: true,
-    modelTerms: 'LFM Open License v1.0; review the revenue threshold and redistribution conditions before use.',
-    modelLicenseUrl: `https://huggingface.co/${D1_OMNI_SOURCE_REPOSITORY}/blob/${D1_OMNI_SOURCE_REVISION}/LICENSE`,
-    sourceModelCard: `https://huggingface.co/${D1_OMNI_SOURCE_REPOSITORY}/tree/${D1_OMNI_SOURCE_REVISION}`
-  })
-);
-models.push(
-  registration({
-    family: 'verdict',
-    model: VERDICT_MODEL,
-    precision: 'f16',
-    checkpoint: {
-      repository: VERDICT_REPOSITORY,
-      revision: VERDICT_REVISION,
-      sourceRepository: VERDICT_SOURCE_REPOSITORY,
-      sourceRevision: VERDICT_SOURCE_REVISION
-    },
-    assets: {integrity: 'pinned-files'},
-    requiredFiles: Object.keys(VERDICT_FILES),
-    additionalFiles: `Pinned FP16 ONNX and tokenizer assets total ${VERDICT_TOTAL_BYTES} bytes.`,
-    limits: [
-      tokenLimit(
-        'question',
-        VERDICT_MAX_TOKENS,
-        'Each typed question is tokenized independently and right-truncated to the upstream Python engine limit.'
-      )
-    ],
-    maxOptions: VERDICT_MAX_CANDIDATES,
-    handling: independent,
-    tokenCount: sumRows,
-    abstention: 'implemented',
-    scoreBasis: 'ordered-levels',
-    temperature: {
-      byCandidateCount: VERDICT_TEMPERATURES,
-      fallback: VERDICT_GLOBAL_TEMPERATURE
-    },
-    temperatureAppliedBy: 'decoder',
-    typedTextQuestionTypes: ['choice', 'score', 'noul'],
-    backend: 'onnxruntime-web-webgpu',
-    gpuVerification: 'not-revalidated',
-    cpuWasmVerification: 'not-revalidated',
-    javascriptVerification: 'not-applicable',
-    requiresNonFallbackAdapter: true,
-    modelTerms:
-      'Apache-2.0 declared by the pinned model card; review the exact checkpoint and transformed assets separately.',
-    modelLicenseUrl: `https://github.com/${VERDICT_SOURCE_REPOSITORY}/blob/${VERDICT_SOURCE_REVISION}/LICENSE`,
-    sourceModelCard: `https://github.com/${VERDICT_SOURCE_REPOSITORY}/tree/${VERDICT_SOURCE_REVISION}`
   })
 );
 const byName = new Map(models.map((item) => [item.description.model, item]));

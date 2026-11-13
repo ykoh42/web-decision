@@ -22,9 +22,6 @@ export interface FakeKevLoaderState {
   stableSourceCreates: number;
   stableSourceDisposals: number;
   started: () => void;
-  tamevDisposals: number;
-  tamevDisposeFails: boolean;
-  tamevSystemOneMode: string;
   uploads: number;
   warmCache: boolean;
 }

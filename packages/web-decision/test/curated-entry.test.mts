@@ -32,7 +32,7 @@ test('the public catalog lists only provenance-verified TVM models', () => {
     if (status !== 'verified') assert.throws(() => library.describeModel(modelId as ModelId), {code: 'INVALID_INPUT'});
   }
   // @ts-expect-error Runtime validation must reject unavailable IDs too.
-  assert.throws(() => library.describeModel('tamev-micro-minilm-int8'), {code: 'INVALID_INPUT'});
+  assert.throws(() => library.describeModel('unsupported-model'), {code: 'INVALID_INPUT'});
   // @ts-expect-error Prototype names are not model IDs.
   assert.throws(() => library.describeModel('__proto__'), {code: 'INVALID_INPUT'});
 });
@@ -53,7 +53,7 @@ test('invalid or caller-selected sources fail before making a network request', 
     for (const options of [
       {},
       {model: 'kev-0.6b-q4f16'},
-      {modelId: 'tamev-micro-minilm-int8'},
+      {modelId: 'unsupported-model'},
       {modelId: 'kev-0.6b-q4f16', assetsUrl: 'https://example.org/'}
     ]) {
       await assert.rejects(library.loadDecisionModel(options), {code: 'INVALID_INPUT'});

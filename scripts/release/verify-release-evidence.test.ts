@@ -1284,8 +1284,8 @@ test('rejects incomplete or non-TVM catalogs and unpinned artifacts', async () =
   const fixture = await makeFixture();
   try {
     const nonTvm = structuredClone(required(fixture.descriptors[0], 'Fixture descriptor'));
-    nonTvm.description.backend.name = 'onnxruntime-web-webgpu';
-    nonTvm.publicDescriptor.backend.name = 'onnxruntime-web-webgpu';
+    nonTvm.description.backend.name = 'unsupported-backend';
+    nonTvm.publicDescriptor.backend.name = 'unsupported-backend';
     const {packageRoot, sourceRoot} = await putPackageTree(fixture.root, [nonTvm]);
     await assert.rejects(loadPublicCatalog(sourceRoot, 'dist/index.js'), /not a TVM WebGPU route/u);
     await writeFile(join(packageRoot, 'dist/index.js'), 'export function listDecisionModels() {}\n');
