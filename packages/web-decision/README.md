@@ -2,7 +2,12 @@
 
 `web-decision` runs curated decision models locally in the browser with TVM WebGPU. A model ID selects a pinned model and its verified assets. Applications cannot register an arbitrary model or asset URL.
 
-The current source catalog and `0.4.0` candidate include verified Kanana. It is not in published npm `0.3.0`. Kev's direct TVM candidate has passed source, conversion, full-input, and exact-package GPU checks. It remains outside the public catalog pending dataset-rights review and asset hosting.
+| Model | ID |
+| --- | --- |
+| Kanana 2 V Decide 3B | `kanana-2-v-decide-3b-2611` |
+| Strands Decider 2B Qwen3.5 | `strands-decider-2b-qwen3.5-v1-2610` |
+
+`listModels()` returns the models in the installed package. `describeModel(modelId)` shows the pinned checkpoint, input limits, and verification metadata.
 
 Load Kanana by its catalog ID and submit keyed typed questions with `systemOne()`:
 
@@ -27,15 +32,15 @@ try {
 }
 ```
 
-Kev-only load options (`maxPrefetchBytes`, `maxInputTokens`, and `maxInputCharacters`) are rejected for Kanana with `INVALID_INPUT`; they are not treated as Kanana limits. Kanana follows its pinned 20,480-token model limit, and callers may set the per-request `maxLength` through `systemOne()` options. It accepts up to 10 images per request, counting images in `state` messages and the `images` field together. The pinned model truncates overlong inputs by default; results report the affected query IDs and candidate keys in `inputTruncation`. Set `truncateInputs: false` to reject overlong input instead.
+Kanana follows its pinned 20,480-token model limit. Set the per-request `maxLength` through `systemOne()` options. Kanana accepts up to 10 images per request, counting images in `state` messages and the `images` field together. The pinned model truncates overlong inputs by default and reports the affected query IDs and candidate keys in `inputTruncation`. Set `truncateInputs: false` to reject overlong input.
 
 For JSON state and criteria, safe integer `number` values other than negative zero are rendered as Python integers; negative zero, fractional values, and unsafe `number` values are rendered as Python floats. `bigint` values remain exact integers. JavaScript cannot distinguish `2` from `2.0`; use `kananaFloat(2)` from `web-decision` when the Python prompt must contain `2.0`.
 
 ## Model files and offline use
 
-Kanana's TVM graphs ship with the package, and the loader fetches only the pinned weight ranges required by those graphs. Decision inputs remain local. Verified assets can be cached for subsequent loads. `offline: true` requires all necessary cached files and does not fetch missing model assets. A successful online load alone does not guarantee that the browser saved the files: storage availability and quota vary. For offline use, the application must also make its own code and pages available offline.
+The TVM graphs ship with the package. The loader fetches the pinned weight ranges required by the graphs, and decision inputs remain local. Use `cache: true` to save verified model assets and `offline: true` to use cached assets. Available storage and browser quotas determine what the browser can save. The application also needs to make its own code and pages available offline.
 
-The model requires WebGPU. GPU, browser and model-specific limitations and actual verification evidence are described in the model catalog and release record. Model files have separate terms; see the model notices.
+The models require WebGPU. The catalog describes model-specific limits and the release record identifies the browser and hardware used for exact-package verification.
 
 ## Kanana model terms
 
@@ -43,15 +48,6 @@ The web-decision code is Apache-2.0. Kanana model materials and their derivative
 
 When redistributing Kanana or its derivatives, the agreement requires passing on its use restrictions, notifying subsequent users, providing a copy of the agreement, marking modified files, including the notice, and showing a clearly visible “Powered by Kanana” attribution in related interfaces or documentation. Section 2.2 incorporates Kakao's **Guidelines For Responsible AI**. Kakao's current [AI Hub](https://www.kakaocorp.com/page/ai?lang=KOR) publishes its responsible-AI guidance; the pinned agreement still contains an older guidance URL. The agreement also requires a separate Kakao commercial license for offering or reselling Kanana or derivatives through remote APIs or cloud services, in system-integration or on-premise deployments, or embedded in on-device domains. This package includes compiled browser/on-device graphs, so whether that clause applies to its distribution needs confirmation from Kakao. The basic example displays the attribution when Kanana is selected; other applications must provide their own visible attribution.
 
-## Development
+## Strands Qwen3.5 model terms
 
-Run from the repository root:
-
-```sh
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm test
-pnpm check:quality
-pnpm verify:package
-```
-
-The package build uses pinned Apache TVM Web sources and Emscripten setup. Unit tests do not by themselves prove real-model GPU execution. A model is eligible for release only after the exact candidate package and its artifacts pass the release verification gates.
+The Strands checkpoint and Qwen base model use Apache-2.0. The package includes the [Strands license](./STRANDS-QWEN35-LICENSE.md), [Qwen base license](./QWEN-APACHE-LICENSE.txt), and [notice for the TVM adaptation](./STRANDS-QWEN35-NOTICE).
