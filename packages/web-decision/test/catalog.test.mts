@@ -267,7 +267,7 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
 });
 
 async function assertQwenSourceLock(lock: ModelArtifactLock) {
-  assert.equal(lock.manifest.experimental, true);
+  assert.equal(lock.manifest.experimental, false);
   assert.deepEqual(
     lock.upstreams?.map(({role}) => role),
     ['base', 'lora', 'head']

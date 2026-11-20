@@ -22,14 +22,15 @@ export function checkConsumerTypes(consumer: string, typescriptCompiler = compil
   }
   for (const [name, modelId] of [
     ['consumer.ts', 'kev-0.6b-q4f16'],
-    ['kanana-consumer.ts', 'kanana-2-v-decide-3b-2611']
+    ['kanana-consumer.ts', 'kanana-2-v-decide-3b-2611'],
+    ['strands-qwen35-consumer.ts', 'strands-decider-2b-qwen3.5-v1-2610']
   ] as const) {
     const destination = join(consumer, name);
     if (APPROVED_MODEL_IDS.includes(modelId as (typeof APPROVED_MODEL_IDS)[number]))
       copyFileSync(join(fixture, name), destination);
     else writeFileSync(destination, 'export {};\n');
   }
-  const pendingModelIds = ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611'].filter(
+  const pendingModelIds = ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610'].filter(
     (modelId) => !APPROVED_MODEL_IDS.includes(modelId as (typeof APPROVED_MODEL_IDS)[number])
   );
   const pendingChecks = pendingModelIds.map(

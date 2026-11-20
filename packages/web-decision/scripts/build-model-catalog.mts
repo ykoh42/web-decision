@@ -674,8 +674,8 @@ async function createQwen35ArtifactLock(model: CuratedModel): Promise<CatalogArt
       manifest.modelId === qwen35ModelId &&
       manifest.repository === qwen35Repository &&
       manifest.revision === qwen35Revision &&
-      manifest.experimental === true,
-    'Qwen3.5 package manifest differs from its pending candidate pin.'
+      manifest.experimental === false,
+    'Qwen3.5 package manifest differs from its artifact pin.'
   );
   failUnless(isRecord(manifest.files), 'Qwen3.5 package manifest has no file inventory.');
   const names = Object.keys(manifest.files);
@@ -780,7 +780,7 @@ async function createQwen35ArtifactLock(model: CuratedModel): Promise<CatalogArt
       rawSha256: sha256(manifestFile.bytes),
       canonicalSha256: sha256(canonicalBytes),
       canonicalBytes: canonicalBytes.byteLength,
-      experimental: true,
+      experimental: manifest.experimental,
       files
     },
     bundledRuntimeFiles,
@@ -920,7 +920,7 @@ function renderPublicModelIdType(models: readonly CuratedModel[]): string {
 function renderPublicAdapterLoaders(models: readonly CuratedModel[]): string {
   const adapters = [...new Set(models.map(({description}) => description.adapter))].sort();
   const entries = adapters
-    .map((adapter) => `  ${adapter}: () => import('../curated/adapters/${adapter}.ts')`)
+    .map((adapter) => `  ${JSON.stringify(adapter)}: () => import('../curated/adapters/${adapter}.ts')`)
     .join(',\n');
   const loaderMap = entries
     ? `{
@@ -1127,6 +1127,15 @@ async function main(): Promise<void> {
   });
   const pendingModelIds = new Set(provenance.pendingModelIds);
   const approvedModelIds = new Set(provenance.modelIds.filter((modelId) => !pendingModelIds.has(modelId)));
+  if (process.argv.includes('--combined-production-candidate')) {
+    const qwen35 = 'strands-decider-2b-qwen3.5-v1-2610';
+    failUnless(
+      approvedModelIds.size === 1 && approvedModelIds.has('kanana-2-v-decide-3b-2611'),
+      'Expected only verified Kanana.'
+    );
+    failUnless(pendingModelIds.size === 1 && pendingModelIds.has(qwen35), 'Expected only pending Qwen3.5.');
+    approvedModelIds.add(qwen35);
+  }
   const approvedModels = models.filter(({modelId}) => approvedModelIds.has(modelId));
   failUnless(approvedModels.length === approvedModelIds.size, 'Approved provenance references an unknown model.');
   const types = renderTypeFiles(models);

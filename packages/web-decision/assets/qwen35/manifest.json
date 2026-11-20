@@ -3,7 +3,7 @@
   "modelId": "strands-decider-2b-qwen3.5-v1-2610",
   "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
   "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
-  "experimental": true,
+  "experimental": false,
   "files": {
     "pinned-word-assets-manifest.json": {
       "bytes": 761512,

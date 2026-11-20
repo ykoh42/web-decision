@@ -117,6 +117,7 @@ async function checkKananaConsumerTypes(): Promise<void> {
 void checkKananaConsumerTypes;
 
 function checkLoadedModelType(model: LoadedDecisionModel): void {
+  if (model.modelId !== modelId) return;
   const kanana: KananaDecisionModel = model;
   void kanana.systemOne;
 }

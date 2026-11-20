@@ -4,7 +4,7 @@
     {
       "modelId": "kanana-2-v-decide-3b-2611",
       "status": "verified",
-      "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
+      "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
         "sha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13"
@@ -17,7 +17,7 @@
     {
       "modelId": "strands-decider-2b-qwen3.5-v1-2610",
       "status": "pending",
-      "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
+      "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json",
         "sha256": "5e1253cda760b2b49b85f026fdd1b63f84e3b38942efcb3188a5b465032fe2dd"

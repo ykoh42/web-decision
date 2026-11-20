@@ -78,10 +78,10 @@
       "schemaVersion": 1,
       "manifest": {
         "sourcePath": "assets/qwen35/manifest.json",
-        "rawSha256": "9123e964b483ff297066d63c13b9e482c90cf3054e94216c87d080c0bdc1ed64",
-        "canonicalSha256": "cc9d0ff5fe46e580d50b04066f5b23adcde338d7410b47ca5c562c0d7d3d0e67",
-        "canonicalBytes": 1345,
-        "experimental": true,
+        "rawSha256": "bd82f84848af64de4b345fe4bdc980eca2b3c1a4f2b539251f06b73766c90830",
+        "canonicalSha256": "6fba62427036712893a527264ed0c5f21ca16bf17644e30d827d2163320eb20e",
+        "canonicalBytes": 1346,
+        "experimental": false,
         "files": {
           "pinned-word-assets-manifest.json": {
             "bytes": 761512,

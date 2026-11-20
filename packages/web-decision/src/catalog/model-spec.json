@@ -173,10 +173,11 @@
           }
         },
         "verification": {
-          "currentBundleGpu": "not-revalidated",
+          "currentBundleGpu": "see-release-evidence",
+          "priorBundleGpu": "verified-apple-m4-pro-chromium-158.0.8127.18",
           "currentBundleCpuWasm": "not-applicable",
           "currentBundleJavascript": "not-applicable",
-          "priorEvidence": "Candidate artifacts and native TVM graph contracts are pinned. Exact-package full-model WebGPU text and image parity is not verified; pending evidence tracks the remaining numerical and release checks."
+          "priorEvidence": "The private 0.0.0-qwen35-candidate npm archive passed TVM WebGPU text and image parity, six accepted and three rejected boundary cases, a three-row batch at 4,096 tokens, and six offline cases with zero network attempts. Online model assets were served from a local hash-verified Hugging Face snapshot."
         }
       }
     }

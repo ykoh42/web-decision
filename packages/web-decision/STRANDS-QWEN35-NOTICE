@@ -1,0 +1,13 @@
+Strands Decider 2B Qwen3.5 by Strands Agents
+https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/tree/216d1ccb46a9e9b036eb9187b248db98480f77d4
+Upstream implementation: https://github.com/strands-labs/strands-decider/tree/13c05149265dc404c09d2469636f71b1320e1713
+The checkpoint license and upstream attributions are in STRANDS-QWEN35-LICENSE.md.
+
+Qwen3.5-2B-Base, Copyright 2026 Alibaba Cloud
+https://huggingface.co/Qwen/Qwen3.5-2B-Base/tree/b1485b2fa6dfa1287294f269f5fb618e03d52d7c
+The base checkpoint license is in QWEN-APACHE-LICENSE.txt.
+
+web-decision adapted the pinned model for browser inference and generated the
+text and vision TVM WebGPU modules, graph metadata, weight bindings, and source
+range inventories under assets/qwen35. Runtime weights are fetched separately
+from their pinned upstream sources.
