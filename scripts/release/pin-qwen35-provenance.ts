@@ -217,7 +217,7 @@ async function rightsEvidence(workspaceRoot: string, archive: ArchiveInfo) {
   );
 }
 
-function exactPackage(evidence: Record<string, unknown>, archive: ArchiveInfo, reportSha256: string) {
+function summarizeExactPackage(evidence: Record<string, unknown>, archive: ArchiveInfo, reportSha256: string) {
   const browser = object(evidence.browser, 'Qwen browser identity');
   const hardware = object(evidence.hardware, 'Qwen hardware identity');
   return {
@@ -276,7 +276,7 @@ export async function pinQwen35Provenance(options: Options) {
   return createQwen35ProvenancePins(current, pending, {
     rights,
     builds,
-    exactPackage: exactPackage(browser, archive, sha256(browserBytes))
+    exactPackage: summarizeExactPackage(browser, archive, sha256(browserBytes))
   });
 }
 
@@ -290,7 +290,7 @@ export function createQwen35ProvenancePins(
   }: {
     rights: Awaited<ReturnType<typeof rightsEvidence>>;
     builds: Awaited<ReturnType<typeof validateQwen35NativeBuild>>[];
-    exactPackage: ReturnType<typeof exactPackage>;
+    exactPackage: ReturnType<typeof summarizeExactPackage>;
   }
 ) {
   assert.ok(Array.isArray(current.models), 'Missing current provenance manifest models.');
