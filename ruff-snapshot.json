@@ -596,37 +596,6 @@
       "lint": []
     },
     {
-      "path": "scripts/record_preview_environment.py",
-      "sha256": "f4d340a076b557a6ece4acb8136c9a10545e7c19efe48365b809f103269685b8",
-      "format": true,
-      "lint": [
-        {
-          "code": "E701",
-          "row": 11,
-          "column": 60,
-          "message": "Multiple statements on one line (colon)"
-        },
-        {
-          "code": "E701",
-          "row": 23,
-          "column": 16,
-          "message": "Multiple statements on one line (colon)"
-        },
-        {
-          "code": "E702",
-          "row": 24,
-          "column": 49,
-          "message": "Multiple statements on one line (semicolon)"
-        },
-        {
-          "code": "I001",
-          "row": 3,
-          "column": 1,
-          "message": "Import block is un-sorted or un-formatted"
-        }
-      ]
-    },
-    {
       "path": "scripts/safe_output.py",
       "sha256": "d00ed5b9a7a863ff64d402350c4a2c958454838ea6411949d961f0d9a94cb307",
       "format": true,
