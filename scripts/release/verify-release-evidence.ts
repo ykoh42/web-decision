@@ -909,14 +909,44 @@ export function validateArtifactManifest(
   return {manifestSha256: digest, filesSha256: canonicalSha256(files), files, runtimeFiles};
 }
 
+function isBundledNestedManifest(
+  path: string,
+  bytes: Buffer,
+  pins: readonly BundledRuntimeFile[],
+  emitted: Set<string>
+): boolean {
+  const source = pins.find(({sourcePath}) => sourcePath === path);
+  if (source) {
+    assert.equal(bytes.byteLength, source.bytes, `Nested manifest size differs from its lock: ${path}`);
+    assert.equal(sha256(bytes), source.sha256, `Nested manifest digest differs from its lock: ${path}`);
+    return true;
+  }
+
+  if (!/^dist\/qwen35\/[\w-]+\/manifest\.json$/u.test(path)) return false;
+  const digest = sha256(bytes);
+  const matches = pins.filter(
+    (pin) => pin.sourcePath.startsWith('assets/qwen35/') && pin.bytes === bytes.byteLength && pin.sha256 === digest
+  );
+  assert.equal(matches.length, 1, `Bundled Qwen3.5 manifest does not match a unique lock entry: ${path}`);
+  const [pin] = matches as [BundledRuntimeFile];
+  assert.ok(!emitted.has(pin.sourcePath), `Archive contains a duplicate bundled manifest for ${pin.sourcePath}.`);
+  emitted.add(pin.sourcePath);
+  return true;
+}
+
 export async function readArchiveModelManifests(
   archiveInfo: ArchiveInfo,
   models: ModelRequirement[]
 ): Promise<Map<string, ArchiveManifestEvidence>> {
   const expected = new Map(models.map((model) => [model.modelId, model]));
+  const nestedPins = models.flatMap(({bundledRuntimeFiles}) =>
+    bundledRuntimeFiles.filter(({manifestName}) => manifestName.endsWith('/manifest.json'))
+  );
+  const emitted = new Set<string>();
   const candidates = new Map<string, Array<{path: string; manifest: AssetManifest}>>();
   for (const path of archiveInfo.archiveFiles.filter((name) => basename(name) === 'manifest.json')) {
     const bytes = readArchiveMember(archiveInfo.archivePath, path);
+    if (isBundledNestedManifest(path, bytes, nestedPins, emitted)) continue;
     let manifest: AssetManifest;
     try {
       manifest = JSON.parse(bytes.toString('utf8'));

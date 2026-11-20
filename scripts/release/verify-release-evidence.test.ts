@@ -1760,6 +1760,66 @@ test('rejects archive manifest changes and installed-package drift', async (t) =
   await assert.rejects(readArchiveModelManifests(changedArchive, models), /Artifact manifest SHA differs/u);
 });
 
+test('recognizes only lock-pinned nested and emitted Qwen3.5 manifests', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-qwen-nested-manifests-')));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const descriptor = makeDescriptor('strands-decider-2b-qwen3.5-v1-2610', 'b');
+  const nested = JSON.stringify({modelId: descriptor.modelId, format: 'nested'});
+  const nestedPin = {
+    manifestName: 'r19/manifest.json',
+    sourcePath: 'assets/qwen35/r19/manifest.json',
+    bytes: Buffer.byteLength(nested),
+    sha256: sha256(nested)
+  };
+  descriptor.manifest.files[nestedPin.manifestName] = {bytes: nestedPin.bytes, sha256: nestedPin.sha256};
+  const {packageRoot} = await putPackageTree(root, [descriptor]);
+  const model: Parameters<typeof validateArtifactManifest>[0] = {
+    ...descriptor.publicDescriptor,
+    manifestSha256: canonicalSha256(descriptor.manifest),
+    manifestPath: descriptor.artifacts.manifest.sourcePath,
+    manifestFiles: descriptor.manifest.files,
+    requiredFiles: ['manifest.json', ...Object.keys(descriptor.manifest.files)],
+    runtimeAssets: {mode: 'bundled'},
+    bundledRuntimeFiles: [...descriptor.artifacts.bundledRuntimeFiles, nestedPin]
+  };
+  const archivedSource = join(packageRoot, nestedPin.sourcePath);
+  const emitted = join(packageRoot, 'dist/qwen35/78svn8xS/manifest.json');
+  await mkdir(dirname(archivedSource), {recursive: true});
+  await mkdir(dirname(emitted), {recursive: true});
+  await writeFile(archivedSource, nested);
+  await writeFile(emitted, nested);
+
+  async function readManifests() {
+    const archivePath = join(root, 'web-decision-9.8.7.tgz');
+    execFileSync(TAR, ['-czf', archivePath, '-C', root, 'package']);
+    const archive = await verifyArchiveInstall(archivePath, packageRoot);
+    return readArchiveModelManifests(archive, [model]);
+  }
+
+  assert.equal((await readManifests()).get(model.modelId)?.path, model.manifestPath);
+  await writeFile(archivedSource, nested.replace('nested', 'forged'));
+  await assert.rejects(readManifests(), /Nested manifest digest differs/u);
+  await rm(archivedSource);
+  await writeFile(emitted, nested.replace('nested', 'forged'));
+  await assert.rejects(readManifests(), /does not match a unique lock entry/u);
+  await writeFile(emitted, nested);
+
+  const duplicate = join(packageRoot, 'dist/qwen35/duplicate/manifest.json');
+  await mkdir(dirname(duplicate), {recursive: true});
+  await writeFile(duplicate, nested);
+  await assert.rejects(readManifests(), /duplicate bundled manifest/u);
+  await rm(duplicate);
+
+  const unrelated = join(packageRoot, 'dist/unrelated/manifest.json');
+  await mkdir(dirname(unrelated), {recursive: true});
+  await writeFile(unrelated, nested);
+  await assert.rejects(readManifests(), /exactly one static manifest/u);
+  await rm(unrelated);
+
+  await rm(join(packageRoot, model.manifestPath));
+  await assert.rejects(readManifests(), /missing the pinned manifest path/u);
+});
+
 test('resolves Playwright test paths from its test root and rejects a different root', async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, {recursive: true, force: true}));

@@ -6,7 +6,7 @@ Release only curated models whose TVM artifacts and behavior have been verified.
 
 - Build one candidate archive from a clean checkout and install that archive in a clean consumer.
 - Check the public catalog, TypeScript API, package contents, dependency audit, pinned assets, notices, and model-data rights.
-- Pass `pnpm run check:model-provenance`; every public model must have a pinned, committed provenance record with resolved source lineage and redistribution evidence. Pending models block main CI and release verification.
+- Pass `pnpm run check:model-provenance`; every public model must have a pinned, committed provenance record with resolved source lineage and redistribution evidence. Main CI accepts pending models excluded from the public catalog, and release verification rejects pending records.
 - Run the repository's formatting, lint, cognitive complexity, type, unit, and package checks.
 - Pass `pnpm run check:typescript:complete` and `pnpm run check:complexity:complete`, plus the Python complexity completion check in CI.
 - For every included model and claimed environment, run real inference against the installed archive. Record the browser, hardware, WebGPU adapter, required features, input and output coverage, and reference comparison.
