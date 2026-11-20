@@ -16,11 +16,11 @@
     },
     {
       "modelId": "strands-decider-2b-qwen3.5-v1-2610",
-      "status": "pending",
+      "status": "verified",
       "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json",
-        "sha256": "5e1253cda760b2b49b85f026fdd1b63f84e3b38942efcb3188a5b465032fe2dd"
+        "sha256": "345710faeb096a287db352dfbcff239933c7fa96e3236ffeb0d758db8535dfad"
       }
     }
   ]

@@ -1127,15 +1127,6 @@ async function main(): Promise<void> {
   });
   const pendingModelIds = new Set(provenance.pendingModelIds);
   const approvedModelIds = new Set(provenance.modelIds.filter((modelId) => !pendingModelIds.has(modelId)));
-  if (process.argv.includes('--combined-production-candidate')) {
-    const qwen35 = 'strands-decider-2b-qwen3.5-v1-2610';
-    failUnless(
-      approvedModelIds.size === 1 && approvedModelIds.has('kanana-2-v-decide-3b-2611'),
-      'Expected only verified Kanana.'
-    );
-    failUnless(pendingModelIds.size === 1 && pendingModelIds.has(qwen35), 'Expected only pending Qwen3.5.');
-    approvedModelIds.add(qwen35);
-  }
   const approvedModels = models.filter(({modelId}) => approvedModelIds.has(modelId));
   failUnless(approvedModels.length === approvedModelIds.size, 'Approved provenance references an unknown model.');
   const types = renderTypeFiles(models);

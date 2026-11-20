@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "modelId": "strands-decider-2b-qwen3.5-v1-2610",
-  "status": "pending",
+  "status": "verified",
   "sourceLineage": [
     {
       "role": "base",
@@ -32,54 +32,89 @@
     "repository": "StrandsAgents/strands-decider",
     "revision": "13c05149265dc404c09d2469636f71b1320e1713"
   },
-  "candidate": {
-    "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
-    "activationPrecision": "float32",
-    "compiler": {
-      "tvmVersion": "0.27.0.post1",
-      "tvmRevision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
-      "emscriptenVersion": "4.0.23",
-      "emsdkRevision": "d7b4130688bfa348392b921ab04015aa15c4f154"
+  "conversion": {
+    "repository": "https://github.com/apache/tvm",
+    "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+    "recipe": {
+      "path": "packages/web-decision/src/catalog/provenance/qwen35-conversion.json",
+      "sha256": "26101ff70c6f389103a9b744a688374a6ab6798728a460ce5bf04d3eab799dc4"
     },
-    "text": {
-      "sourceRelaxSha256": "624cc890ac1ffb92caac65fd27b9c924f2d0b71bb009325bf16aa77fe8f6830a",
-      "candidateScriptSha256": "855f56c709297231a76446413b9a0a218f16b0d234fc1b72d75661f90943dbb1",
-      "wasm": {
-        "bytes": 5772332,
-        "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3"
-      },
-      "independentByteIdenticalBuilds": 2
+    "config": {
+      "path": "packages/web-decision/src/catalog/provenance/qwen35-conversion.json",
+      "sha256": "26101ff70c6f389103a9b744a688374a6ab6798728a460ce5bf04d3eab799dc4"
     },
-    "vision": {
-      "sourceRelaxSha256": "41b4495d1494328ed6092119daac990c15d3fc1e7b8aa993b1b6d5255b8aa4d4",
-      "wasm": {
-        "bytes": 4316202,
-        "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
-      },
-      "independentByteIdenticalBuilds": 2
+    "toolchain": {
+      "path": "packages/web-decision/src/catalog/provenance/qwen35-conversion.json",
+      "sha256": "26101ff70c6f389103a9b744a688374a6ab6798728a460ce5bf04d3eab799dc4"
     },
-    "browser": {
-      "status": "passed",
-      "archiveVersion": "0.0.0-qwen35-candidate",
-      "archiveSha256": "08cca5e26f477bb678b173c5367efcf70a483f963898a671a8198ef205596f67",
-      "reportSha256": "ed553cfc9f81eff36ef2a8c9526c8cff782b9aa871a7f0e03e28b872e98fb2b4",
-      "hardware": "Apple M4 Pro",
-      "browser": "Chromium 158.0.8127.18",
-      "backend": "tvm-webgpu",
-      "onlineAssetSource": "local hash-verified Hugging Face snapshot",
-      "textCases": 1,
-      "visionCases": 4,
-      "acceptedBoundaryCases": 6,
-      "rejectedBoundaryCases": 3,
-      "fullContextBatch": {
-        "batchSize": 3,
-        "sequenceLength": 4096
-      },
-      "offlineCases": 6,
-      "offlineNetworkAttempts": 0,
-      "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
-      "visionFixtureSha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
-    }
+    "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0"
   },
-  "unresolved": ["Verify the final publishable archive with the current catalog and package bytes."]
+  "rights": [
+    {
+      "subject": "Strands checkpoint adapter and pointer head",
+      "license": "Apache-2.0 as declared by the pinned model card",
+      "redistribution": "conditional",
+      "conditions": [
+        "Include the applicable Apache-2.0 license and retain applicable copyright and attribution notices.",
+        "Identify modified files as required by Apache-2.0."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/STRANDS-QWEN35-LICENSE.md",
+        "sha256": "c0d777a0fed01cceb107d91f1aef96d51737be04f2ed75b1b933286a170d7411"
+      }
+    },
+    {
+      "subject": "Qwen base checkpoint including the source of the converted vision weights",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Include the applicable Apache-2.0 license and retain applicable copyright and attribution notices.",
+        "Identify modified files as required by Apache-2.0."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/QWEN-APACHE-LICENSE.txt",
+        "sha256": "50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32"
+      }
+    }
+  ],
+  "validation": {
+    "exactPackageWebgpu": {
+      "version": "0.5.0",
+      "archiveSha256": "0f9482ae04c0115a34caaa607cf7f86e2ee7204284203d589001d99e44ba7481",
+      "packageTreeSha256": "91bcfd3ed23fdc2dec6f4dccd3bccfc8680140747957838d4d428d440d5988e8",
+      "bundleSha256": "abb66c0e389cd57cc32d31da5d2799060a3c11563d5fbbed1e8d746bf65478bd",
+      "reportSha256": "9cb81efab358b7ebd6b14826bfae80a37a37785d921ae69787bcc979a4971232",
+      "browser": {
+        "name": "chromium",
+        "version": "158.0.8127.18",
+        "channel": "chromium"
+      },
+      "hardware": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "chipType": "Apple M4 Pro"
+      },
+      "sourceCommit": "4b912b293938ada86a145ddfd6c11fb81c3064b9"
+    },
+    "rebuiltWasm": [
+      {
+        "graph": "text",
+        "artifact": "r19/qwen35-text-pointer.webgpu.wasm",
+        "bytes": 5772332,
+        "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3",
+        "reportSha256": "63cf222e1cc6f1ca6ce6c86f0ef188e0d0f3827231652e6ec2cb23bdd651e69c"
+      },
+      {
+        "graph": "vision",
+        "artifact": "vision/qwen35-dynamic-vision.webgpu.wasm",
+        "bytes": 4316202,
+        "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0",
+        "reportSha256": "ef4048cbc9e056935ce0b134d5a796aadd16a261f23b9d4fcfa762ef315bb36d"
+      }
+    ],
+    "notice": {
+      "path": "STRANDS-QWEN35-NOTICE",
+      "sha256": "39744fd3ae377af12b58765603d67e3e15684d62e4cc4de158aa57c401d69861"
+    }
+  }
 }
