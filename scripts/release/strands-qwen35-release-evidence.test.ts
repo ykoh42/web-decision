@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {copyFile, link, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import test from 'node:test';
+import {fileURLToPath} from 'node:url';
 import {installQwen35TvmDispatchCapture} from '../../tests/browser/qwen35-tvm-dispatch-capture.mts';
-import {canonicalSha256} from './verify-release-evidence.ts';
+import {canonicalSha256, type ArchiveInfo} from './verify-release-evidence.ts';
+import {
+  assertQwen35BrowserArchive,
+  assertQwen35ProductionArchive,
+  createQwen35ProvenancePins,
+  validateQwen35NativeBuild
+} from './pin-qwen35-provenance.ts';
 import {
   assertQwen35EvidenceRecord,
   assertQwen35OfflineResults,
@@ -1194,5 +1201,120 @@ test('candidate evidence requires the exact package, pinned source, M4 GPU, and 
         package: {...good.package, bundlePath: '/tmp/web-decision/dist/__test/qwen35-candidate/index.js'}
       }),
     /exact public package bundle/u
+  );
+});
+
+test('Qwen promotion rejects private versions, single-model archives, and browser reports from different bytes', () => {
+  const archive: ArchiveInfo = {
+    archivePath: '/archive/web-decision-0.5.0.tgz',
+    archiveSha256: 'a'.repeat(64),
+    installedRoot: '/install/web-decision',
+    packageName: 'web-decision',
+    packageVersion: '0.5.0',
+    packageTreeSha256: 'b'.repeat(64),
+    bundlePath: '/install/web-decision/dist/index.js',
+    bundleSha256: 'c'.repeat(64),
+    installedPackagePathSha256: 'd'.repeat(64),
+    entryPathSha256: 'e'.repeat(64),
+    archiveFiles: ['assets/kanana/manifest.json', 'assets/qwen35/manifest.json']
+  };
+  assert.doesNotThrow(() => assertQwen35ProductionArchive(archive));
+  assert.throws(
+    () => assertQwen35ProductionArchive({...archive, packageVersion: '0.0.0-qwen35-candidate'}),
+    /stable npm version/u
+  );
+  assert.throws(
+    () => assertQwen35ProductionArchive({...archive, archiveFiles: ['assets/qwen35/manifest.json']}),
+    /also contain Kanana/u
+  );
+  const {packageVersion: version, archiveSha256, packageTreeSha256, bundleSha256} = archive;
+  const evidence = {package: {version, archiveSha256, packageTreeSha256, bundleSha256}};
+  assert.doesNotThrow(() => assertQwen35BrowserArchive(evidence, archive));
+  for (const field of ['archiveSha256', 'packageTreeSha256', 'bundleSha256'] as const) {
+    assert.throws(
+      () => assertQwen35BrowserArchive(evidence, {...archive, [field]: 'f'.repeat(64)}),
+      /not collected from this exact combined npm archive/u
+    );
+  }
+});
+
+test('Qwen promotion requires unaliased rebuilt WASM and the pinned native build receipt', async (context) => {
+  const root = await mkdtemp(join(tmpdir(), 'web-decision-qwen-native-test-'));
+  context.after(() => rm(root, {recursive: true, force: true}));
+  const packagedPath = fileURLToPath(
+    new URL('../../packages/web-decision/assets/qwen35/r19/qwen35-text-pointer.webgpu.wasm', import.meta.url)
+  );
+  const authoritativeReceipt = fileURLToPath(
+    new URL('../strands/qwen35/reports/qwen35-fp32-decoder-build-2026-11-21.json', import.meta.url)
+  );
+  const wasm = join(root, 'qwen35-gdn-prefix-fp32-candidate.wasm');
+  const report = join(root, 'qwen35-gdn-prefix-fp32-candidate.json');
+  const pin = {
+    bytes: 5_772_332,
+    sha256: 'cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3'
+  };
+  await copyFile(authoritativeReceipt, report);
+  await link(packagedPath, wasm);
+  await assert.rejects(
+    validateQwen35NativeBuild('text', root, pin, [packagedPath], []),
+    /must not reuse the packaged artifact file/u
+  );
+  await rm(wasm);
+  await copyFile(packagedPath, wasm);
+  await assert.rejects(
+    validateQwen35NativeBuild('text', root, pin, [packagedPath], [root]),
+    /external Qwen build directory/u
+  );
+  assert.equal((await validateQwen35NativeBuild('text', root, pin, [packagedPath], [])).sha256, pin.sha256);
+  const reportBytes = await readFile(report);
+  await writeFile(report, Buffer.concat([reportBytes, Buffer.from('\n')]));
+  await assert.rejects(
+    validateQwen35NativeBuild('text', root, pin, [packagedPath], []),
+    /Pinned native Qwen text build report changed/u
+  );
+});
+
+test('Qwen prospective pins retain the exact historical Kanana entry', async () => {
+  const provenance = await readFile(
+    new URL('../../packages/web-decision/src/catalog/model-provenance.json', import.meta.url),
+    'utf8'
+  );
+  const qwen = await readFile(
+    new URL(
+      '../../packages/web-decision/src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  const current = JSON.parse(provenance);
+  current.models[1].status = 'pending';
+  const source = JSON.parse(qwen);
+  const pending = {
+    sourceLineage: source.sourceLineage,
+    upstreamRuntime: source.upstreamRuntime,
+    candidate: {artifactLockSha256: current.models[1].artifactLockSha256}
+  };
+  const proposal = createQwen35ProvenancePins(current, pending, {
+    rights: [],
+    builds: [],
+    exactPackage: {
+      version: '0.5.0',
+      archiveSha256: 'a'.repeat(64),
+      packageTreeSha256: 'b'.repeat(64),
+      bundleSha256: 'c'.repeat(64),
+      reportSha256: 'd'.repeat(64),
+      browser: {name: 'chromium', version: '158.0.8127.18', channel: 'chromium'},
+      hardware: {platform: 'darwin', arch: 'arm64', chipType: 'Apple M4 Pro'}
+    }
+  });
+  assert.deepEqual(proposal.manifest.models[0], current.models[0]);
+  assert.equal(current.models[1].status, 'pending');
+  assert.equal(proposal.manifest.models[1]?.status, 'verified');
+  assert.deepEqual(proposal.record.sourceLineage, pending.sourceLineage);
+  assert.equal(
+    proposal.recordSha256,
+    createHash('sha256')
+      .update(`${JSON.stringify(proposal.record, null, 2)}\n`)
+      .digest('hex')
   );
 });

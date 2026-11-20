@@ -293,7 +293,7 @@ async function validateRightsEvidence(
   }
 }
 
-async function validateCommittedEvidenceReference(
+export async function validateCommittedEvidenceReference(
   value: unknown,
   description: string,
   workspaceRoot: string,
@@ -308,7 +308,11 @@ async function validateCommittedEvidenceReference(
   failUnless(
     path.startsWith('docs/') ||
       path.startsWith('packages/web-decision/src/catalog/provenance/') ||
-      path === 'packages/web-decision/KANANA-OPEN-LICENSE.txt',
+      [
+        'packages/web-decision/KANANA-OPEN-LICENSE.txt',
+        'packages/web-decision/QWEN-APACHE-LICENSE.txt',
+        'packages/web-decision/STRANDS-QWEN35-LICENSE.md'
+      ].includes(path),
     `${description} must be under docs/, the catalog provenance directory, or the packaged model license.`
   );
   const absolute = resolve(workspaceRoot, path);

@@ -703,7 +703,7 @@ export async function loadInstalledCatalog(packageRoot: string): Promise<PublicC
 
 async function loadCommittedCatalog(
   packageRoot: string,
-  provenanceMode: 'production' | 'test-fixture' = 'production',
+  provenanceMode: 'production' | 'test-fixture' | 'pending-qwen35' = 'production',
   workspaceRoot = WORKSPACE_ROOT
 ): Promise<{models: ModelRequirement[]; provenanceSha256: string}> {
   const catalogRoot = join(packageRoot, 'src/catalog');
@@ -739,7 +739,9 @@ async function loadCommittedCatalog(
     provenanceSha256 = checked.manifestSha256;
   } else {
     assertProductionPackageRoot(packageRoot, workspaceRoot);
-    const checked = await assertCommittedPackageProvenance(workspaceRoot);
+    const allowPending = provenanceMode === 'pending-qwen35';
+    const checked = await assertCommittedPackageProvenance(workspaceRoot, {allowPending});
+    if (allowPending) assert.deepEqual(checked.pendingModelIds, ['strands-decider-2b-qwen3.5-v1-2610']);
     provenanceSha256 = checked.manifestSha256;
   }
 
@@ -789,6 +791,23 @@ async function loadCommittedCatalog(
     };
   });
   return {models: models.sort((left, right) => left.modelId.localeCompare(right.modelId)), provenanceSha256};
+}
+
+export async function validateQwen35CandidateArchiveCatalog(archive: ArchiveInfo, workspaceRoot: string) {
+  const {models} = await loadCommittedCatalog(
+    join(workspaceRoot, 'packages/web-decision'),
+    'pending-qwen35',
+    workspaceRoot
+  );
+  const expected = models.map(({modelId, backend, manifestSha256, requiredFiles}) => ({
+    modelId,
+    backend,
+    manifestSha256,
+    requiredFiles
+  }));
+  assert.deepEqual(await loadInstalledCatalog(archive.installedRoot), expected, 'Combined archive catalog changed.');
+  const manifests = await readArchiveModelManifests(archive, models);
+  return {models, manifests};
 }
 
 export function validateRuntimeAssetConfiguration(

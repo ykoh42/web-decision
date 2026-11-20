@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "recipe": [
+    {
+      "path": "scripts/strands/qwen35/build_gdn_prefix_candidate.py",
+      "sha256": "c3bcee5726d87d1bf6c51e5815a43869ebabcb0ef652cc0668ee1e452bda089c"
+    },
+    {
+      "path": "scripts/strands/qwen35/build_fp32_vision_webgpu.py",
+      "sha256": "1795f51c336541572aba03f5c53156f247f3a1419dacf139242905fd644ef3fd"
+    },
+    {
+      "path": "scripts/strands/qwen35/qwen35_tvm_build.py",
+      "sha256": "53a8c7f3e6e48e1461be6c7b59814af8bee8c5b11c5a8b740e89c2c42f98073c"
+    },
+    {
+      "path": "scripts/strands/qwen35/qwen35_vm_shape_order.py",
+      "sha256": "7fb6d5b810cd8d045aad81e695a0124990b3352950edbcb7160d2dd979ea27c8"
+    }
+  ],
+  "config": {
+    "path": "scripts/strands/qwen35/compiler-inputs/metadata.json",
+    "sha256": "0542af92a73d0c5944b0c8a33e41e7c80e251d433ebfc48c5c8e06b66bd3495b"
+  },
+  "toolchain": {
+    "tvm": {
+      "version": "0.27.0.post1",
+      "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+      "sourcePatches": []
+    },
+    "emsdk": {
+      "version": "4.0.23",
+      "revision": "d7b4130688bfa348392b921ab04015aa15c4f154"
+    }
+  },
+  "activationPrecision": "float32",
+  "onnxImportOrExportUsed": false
+}
