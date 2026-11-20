@@ -3,7 +3,12 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
-import {MODEL_PROVENANCE_MANIFEST_PATH, validateCommittedEvidenceReference} from '../ci/model-provenance.ts';
+import {
+  MODEL_PROVENANCE_MANIFEST_PATH,
+  MODEL_PROVENANCE_MANIFEST_SHA256,
+  validateCommittedEvidenceReference,
+  validateLockedUpstream
+} from '../ci/model-provenance.ts';
 import {
   QWEN35_RELEASE_MODEL,
   assertQwen35EvidenceRecord,
@@ -248,8 +253,9 @@ export async function pinQwen35Provenance(options: Options) {
     rightsEvidence(workspaceRoot, archive),
     validateCommittedEvidenceReference(CONVERSION, 'Qwen native conversion', workspaceRoot, true)
   ]);
-  const browser = assertQwen35EvidenceRecord(json(browserBytes));
+  const browser = object(json(browserBytes), 'Qwen browser evidence');
   assertQwen35BrowserArchive(browser, archive);
+  assertQwen35EvidenceRecord(browser);
   checkBrowserArtifacts(browser, inputs);
   assert.deepEqual(inputs.artifactSha256, archiveFiles, 'Browser Qwen files differ from the combined archive assets.');
   const builds = await Promise.all(
@@ -267,9 +273,16 @@ export async function pinQwen35Provenance(options: Options) {
       );
     })
   );
-  const pending = object(json(await readFile(join(packageRoot, EVIDENCE_PATH))), 'pending Qwen provenance');
-  const manifestBytes = await readFile(join(packageRoot, MODEL_PROVENANCE_MANIFEST_PATH));
+  const [pendingBytes, manifestBytes, lockBytes] = await Promise.all([
+    readFile(join(packageRoot, EVIDENCE_PATH)),
+    readFile(join(packageRoot, MODEL_PROVENANCE_MANIFEST_PATH)),
+    readFile(join(packageRoot, 'src/catalog/artifacts.lock.json'))
+  ]);
+  assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256, 'Provenance manifest changed.');
+  const pending = object(json(pendingBytes), 'pending Qwen provenance');
   const current = object(json(manifestBytes), 'model provenance manifest');
+  const lock = object(json(lockBytes), 'current artifact lock');
+  validateLockedUpstream(pending.sourceLineage, object(lock.byModelId, 'artifact-lock models')[MODEL_ID], MODEL_ID);
   const finalArchive = await verifyQwen35ExactPackage(options.archivePath, options.installedPackagePath);
   assertQwen35BrowserArchive(browser, finalArchive.archive);
   assert.equal(archive.archiveSha256, finalArchive.archive.archiveSha256, 'Archive changed during verification.');
@@ -294,7 +307,16 @@ export function createQwen35ProvenancePins(
   }
 ) {
   assert.ok(Array.isArray(current.models), 'Missing current provenance manifest models.');
-  const candidate = object(pending.candidate, 'pending Qwen conversion');
+  const entries = current.models.map((entry: unknown) => object(entry, 'model provenance entry'));
+  const qwenEntries = entries.filter(({modelId}) => modelId === MODEL_ID);
+  assert.equal(qwenEntries.length, 1, 'Expected one pending Qwen provenance entry.');
+  const qwen = qwenEntries[0];
+  assert.equal(qwen?.status, 'pending');
+  const artifactLockSha256 = qwen.artifactLockSha256;
+  assert.ok(
+    typeof artifactLockSha256 === 'string' && /^[a-f0-9]{64}$/u.test(artifactLockSha256),
+    'Current Qwen artifact-lock SHA-256 is invalid.'
+  );
   const record = {
     schemaVersion: 1,
     modelId: MODEL_ID,
@@ -307,7 +329,7 @@ export function createQwen35ProvenancePins(
       recipe: CONVERSION,
       config: CONVERSION,
       toolchain: CONVERSION,
-      artifactLockSha256: candidate.artifactLockSha256
+      artifactLockSha256
     },
     rights,
     validation: {
@@ -317,12 +339,9 @@ export function createQwen35ProvenancePins(
     }
   };
   const recordSha256 = sha256(`${JSON.stringify(record, null, 2)}\n`);
-  const models = current.models.map((entry: unknown) => {
-    const model = object(entry, 'model provenance entry');
-    if (model.modelId !== MODEL_ID) return model;
-    assert.equal(model.status, 'pending');
-    return {...model, status: 'verified', evidence: {path: EVIDENCE_PATH, sha256: recordSha256}};
-  });
+  const models = entries.map((model) =>
+    model === qwen ? {...model, status: 'verified', evidence: {path: EVIDENCE_PATH, sha256: recordSha256}} : model
+  );
   const manifest = {...current, models};
   return {record, recordSha256, manifest, manifestSha256: sha256(`${JSON.stringify(manifest, null, 2)}\n`)};
 }

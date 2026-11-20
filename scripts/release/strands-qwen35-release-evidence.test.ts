@@ -1292,7 +1292,7 @@ test('Qwen prospective pins retain the exact historical Kanana entry', async () 
   const pending = {
     sourceLineage: source.sourceLineage,
     upstreamRuntime: source.upstreamRuntime,
-    candidate: {artifactLockSha256: current.models[1].artifactLockSha256}
+    candidate: {artifactLockSha256: '1'.repeat(64)}
   };
   const proposal = createQwen35ProvenancePins(current, pending, {
     rights: [],
@@ -1311,6 +1311,8 @@ test('Qwen prospective pins retain the exact historical Kanana entry', async () 
   assert.equal(current.models[1].status, 'pending');
   assert.equal(proposal.manifest.models[1]?.status, 'verified');
   assert.deepEqual(proposal.record.sourceLineage, pending.sourceLineage);
+  assert.equal(proposal.record.conversion.artifactLockSha256, current.models[1].artifactLockSha256);
+  assert.notEqual(proposal.record.conversion.artifactLockSha256, pending.candidate.artifactLockSha256);
   assert.equal(
     proposal.recordSha256,
     createHash('sha256')
