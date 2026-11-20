@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
+import {assertCommittedPackageProvenance} from '../ci/model-provenance.ts';
 import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {
   canonicalSha256,
@@ -1356,11 +1357,14 @@ test('the release verifier checks committed provenance before checking build inp
   } catch {
     catalogInputsAreCommitted = false;
   }
-  const expectedError = !policyIsCommitted
-    ? /Release evidence policy must match the committed version/u
-    : catalogInputsAreCommitted
-      ? /TVM build evidence is required/u
-      : /git diff --quiet HEAD -- packages\/web-decision\/src/u;
+  let expectedError = /Release evidence policy must match the committed version/u;
+  if (policyIsCommitted && !catalogInputsAreCommitted) {
+    expectedError = /git diff --quiet HEAD -- packages\/web-decision\/src/u;
+  }
+  if (policyIsCommitted && catalogInputsAreCommitted) {
+    const {pendingModelIds} = await assertCommittedPackageProvenance(WORKSPACE_ROOT, {allowPending: true});
+    expectedError = pendingModelIds.length > 0 ? /Model .+ provenance is pending:/u : /TVM build evidence is required/u;
+  }
   await assert.rejects(
     verifyReleaseEvidence({
       archivePath: 'unused.tgz',
