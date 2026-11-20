@@ -501,7 +501,10 @@ function verifyPackageInventory(
 function selectArchive(packedPath: string, requestedPath?: string): string {
   if (!requestedPath) return packedPath;
   const archivePath = resolve(requestedPath);
-  assert.ok(readFileSync(archivePath).equals(readFileSync(packedPath)), 'Release archive differs from npm pack output.');
+  assert.ok(
+    readFileSync(archivePath).equals(readFileSync(packedPath)),
+    'Release archive differs from npm pack output.'
+  );
   return archivePath;
 }
 
