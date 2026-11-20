@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "byModelId": {
+    "kanana-2-v-decide-3b-2611": {
+      "schemaVersion": 1,
+      "manifest": {
+        "sourcePath": "assets/kanana/manifest.json",
+        "rawSha256": "6ad86479bd30e9913ea5d4a1d5d17342d2bdd39d1b091af2156aaf4d87a35839",
+        "canonicalSha256": "d4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5",
+        "canonicalBytes": 1706,
+        "experimental": false,
+        "files": {
+          "kanana-text-model.wasm": {
+            "bytes": 4208785,
+            "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
+          },
+          "text-weight-manifest.json": {
+            "bytes": 102978,
+            "sha256": "77e08b6da97ecff6ffdbc576c2afb7b614197e9f7d292e5229472379f6d36fed"
+          },
+          "kanana-vision-model.wasm": {
+            "bytes": 4414887,
+            "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
+          },
+          "vision-weight-manifest.json": {
+            "bytes": 100018,
+            "sha256": "622ff1e944d3e41557e3a2a14bb071f8c3ce7ec13c291afdfcb60f0102dfc384"
+          },
+          "safetensors-range-manifest.json": {
+            "bytes": 632507,
+            "sha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+          }
+        }
+      },
+      "bundledRuntimeFiles": [
+        {
+          "manifestName": "kanana-text-model.wasm",
+          "sourcePath": "assets/kanana/kanana-text-model.wasm",
+          "bytes": 4208785,
+          "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
+        },
+        {
+          "manifestName": "text-weight-manifest.json",
+          "sourcePath": "assets/kanana/text-weight-manifest.json",
+          "bytes": 102978,
+          "sha256": "77e08b6da97ecff6ffdbc576c2afb7b614197e9f7d292e5229472379f6d36fed"
+        },
+        {
+          "manifestName": "kanana-vision-model.wasm",
+          "sourcePath": "assets/kanana/kanana-vision-model.wasm",
+          "bytes": 4414887,
+          "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
+        },
+        {
+          "manifestName": "vision-weight-manifest.json",
+          "sourcePath": "assets/kanana/vision-weight-manifest.json",
+          "bytes": 100018,
+          "sha256": "622ff1e944d3e41557e3a2a14bb071f8c3ce7ec13c291afdfcb60f0102dfc384"
+        },
+        {
+          "manifestName": "safetensors-range-manifest.json",
+          "sourcePath": "assets/kanana/safetensors-range-manifest.json",
+          "bytes": 632507,
+          "sha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+        }
+      ],
+      "upstream": {
+        "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+        "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+        "sourcePath": "model.safetensors",
+        "sourceBytes": 7330945212,
+        "sourceSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+        "rangeManifestPath": "assets/kanana/safetensors-range-manifest.json",
+        "rangeManifestSha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+      }
+    }
+  }
+}

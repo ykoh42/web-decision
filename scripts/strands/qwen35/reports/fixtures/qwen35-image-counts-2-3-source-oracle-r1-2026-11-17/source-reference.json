@@ -1,0 +1,731 @@
+{
+  "format": "qwen35-image-counts-2-3-source-reference-v1",
+  "status": "passed-cpu-source-reference",
+  "verification": "pinned-Strands-VisionEngine-CPU BF16 source plus standard CPU FP32 precision reference; not TVM/WebGPU/package parity",
+  "source": {
+    "strandsRepository": "StrandsAgents/strands-decider",
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "strandsVersion": "0.2.1.dev7+g13c0514",
+    "sourceVisionFileSha256": "705238d4f294b9724bee9026d3365594cd075ce1bf3b4fd0aa97dc49a80cbdd5",
+    "responseModelName": "strands-decider-0.2.1.dev7+g13c0514",
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "runner": "VisionDeciderModel.load/VisionEngine.evaluate",
+    "cpuPrecision": "BF16 checkpoint source result plus standard upstream CPU FP32 result",
+    "weightsLoaded": true,
+    "tvmUsed": false
+  },
+  "toolchain": {
+    "python": "3.11.11",
+    "torch": "2.8.0",
+    "transformers": "5.22.2",
+    "pillow": "13.0.0"
+  },
+  "processor": {
+    "name": "Qwen2VLImageProcessorPil",
+    "transformersVersion": "5.22.2",
+    "pillowVersion": "13.0.0",
+    "configSha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    "imageLongSide": 448,
+    "maxImages": 4,
+    "maxImagePixels": 16777216,
+    "minPixels": 65536,
+    "maxPixels": 16777216,
+    "patchSize": 16,
+    "resizeFactor": 32
+  },
+  "assets": {
+    "base": {
+      "config.json": {
+        "relativePath": "config.json",
+        "bytes": 2908,
+        "sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+        "rehashPerformed": true
+      },
+      "model.safetensors.index.json": {
+        "relativePath": "model.safetensors.index.json",
+        "bytes": 64460,
+        "sha256": "74d2ddfe79f10f35b27b498632f02b97b60dd9ec39b35d7c5a890c399284e319",
+        "rehashPerformed": true
+      },
+      "model.safetensors-00001-of-00001.safetensors": {
+        "relativePath": "model.safetensors-00001-of-00001.safetensors",
+        "bytes": 4548221488,
+        "sha256": "928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d",
+        "verifiedBy": "scripts/strands/qwen35/reports/base-f16-storage-webgpu-r1-2026-11-15.json",
+        "rehashPerformed": false
+      },
+      "preprocessor_config.json": {
+        "relativePath": "preprocessor_config.json",
+        "bytes": 390,
+        "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+        "rehashPerformed": true
+      },
+      "tokenizer.json": {
+        "relativePath": "tokenizer.json",
+        "bytes": 12807196,
+        "sha256": "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927",
+        "rehashPerformed": true
+      },
+      "tokenizer_config.json": {
+        "relativePath": "tokenizer_config.json",
+        "bytes": 16712,
+        "sha256": "e611fbccc7c29ef3b1cafb1cb7ea548d189968632901d678fd62be68c47885de",
+        "rehashPerformed": true
+      },
+      "vocab.json": {
+        "relativePath": "vocab.json",
+        "bytes": 6722759,
+        "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+        "rehashPerformed": true
+      }
+    },
+    "checkpoint": {
+      "MANIFEST.sha256": {
+        "relativePath": "MANIFEST.sha256",
+        "bytes": 2484,
+        "sha256": "874dfc3d47c22b5c50b387fabd1e549be483f6e29c127ec6f852125779fa3371",
+        "rehashPerformed": true
+      },
+      "strands_decider_config.json": {
+        "relativePath": "strands_decider_config.json",
+        "bytes": 746,
+        "sha256": "1d9625055e88c254d50089116992d08b0567286c9d6fcefb3c025922058ee65a",
+        "rehashPerformed": true
+      },
+      "provenance.json": {
+        "relativePath": "provenance.json",
+        "bytes": 967,
+        "sha256": "8713fedb4e67fb6c60f41dc73c937635377506671e09978f92a2d447ac5264bd",
+        "rehashPerformed": true
+      },
+      "head.safetensors": {
+        "relativePath": "head.safetensors",
+        "bytes": 12605928,
+        "sha256": "ace56742545b505e6fae34ada85c8edbeedb23ba8974d8680aebe0380d6083a1",
+        "rehashPerformed": true
+      },
+      "lora/adapter_config.json": {
+        "relativePath": "lora/adapter_config.json",
+        "bytes": 1271,
+        "sha256": "0ced130cefbad13b092425de87680347ce01d09c833cf8e3870e8156db18ffcc",
+        "rehashPerformed": true
+      },
+      "lora/adapter_model.safetensors": {
+        "relativePath": "lora/adapter_model.safetensors",
+        "bytes": 201878888,
+        "sha256": "ae1d0cd1ac3edec6df0a519a3ad18f1c382099032d493f8f98c96a80cfebb4c7",
+        "rehashPerformed": true
+      },
+      "tokenizer.json": {
+        "relativePath": "tokenizer.json",
+        "bytes": 19989592,
+        "sha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86",
+        "rehashPerformed": true
+      },
+      "tokenizer_config.json": {
+        "relativePath": "tokenizer_config.json",
+        "bytes": 1128,
+        "sha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45",
+        "rehashPerformed": true
+      }
+    }
+  },
+  "scope": {
+    "modelInstancesLoaded": 1,
+    "modelInferencePerformed": true,
+    "gpuUsed": false,
+    "tvmUsed": false,
+    "sourceCpuUpcastApplied": true
+  },
+  "memory": [
+    {
+      "stage": "before-model-load",
+      "availableBytes": 15562162176,
+      "totalBytes": 25769803776,
+      "availableRatio": 0.6038913726806641,
+      "processRssBytes": 326647808
+    },
+    {
+      "stage": "after-bf16-model-load",
+      "availableBytes": 15208038400,
+      "totalBytes": 25769803776,
+      "availableRatio": 0.5901495615641276,
+      "processRssBytes": 902381568
+    },
+    {
+      "stage": "after-bf16-source-inference",
+      "availableBytes": 15156051968,
+      "totalBytes": 25769803776,
+      "availableRatio": 0.5881322224934896,
+      "processRssBytes": 4620075008
+    },
+    {
+      "stage": "after-standard-cpu-fp32-upcast",
+      "availableBytes": 8785510400,
+      "totalBytes": 25769803776,
+      "availableRatio": 0.34092267354329425,
+      "processRssBytes": 9880272896
+    },
+    {
+      "stage": "after-fp32-source-inference",
+      "availableBytes": 9368502272,
+      "totalBytes": 25769803776,
+      "availableRatio": 0.3635457356770833,
+      "processRssBytes": 10047782912
+    }
+  ],
+  "loadSeconds": 0.887,
+  "sourceInferenceSeconds": 21.159,
+  "cases": [
+    {
+      "name": "two-image-mixed-aspect",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Inspect the attached geometric images in their listed order.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "type": "choice",
+              "instructions": "Which shape is centered in the first attached image?",
+              "criteria": {
+                "Yellow square": "A yellow square centered on the blue background.",
+                "Green circle": "A green circle centered on the red background.",
+                "White triangle": "A white triangle centered on the dark background.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image."
+              }
+            }
+          ],
+          [
+            "image_score",
+            {
+              "type": "score",
+              "instructions": "Rate how well the description matches the first attached image.",
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ]
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "type": "noul",
+              "instructions": "The first attached image has a yellow square centered on the blue background.",
+              "criteria": null
+            }
+          ]
+        ]
+      },
+      "imageFiles": [
+        {
+          "path": "vision-input/yellow-square-portrait-320x416.png",
+          "bytes": 975,
+          "sha256": "8e7f591f12138a7aabfa826e0aaea218294032b3fecae3d6fa19342c0f23c9f6",
+          "mimeType": "image/png",
+          "sourceWidth": 320,
+          "sourceHeight": 416
+        },
+        {
+          "path": "vision-input/green-circle-landscape-416x320.png",
+          "bytes": 1209,
+          "sha256": "df6e8d522206f7762704b1c16d462332a3f64e7092ac6d323a9dabb409ff6859",
+          "mimeType": "image/png",
+          "sourceWidth": 416,
+          "sourceHeight": 320
+        }
+      ],
+      "imageGeometry": [
+        {
+          "width": 320,
+          "height": 416,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 416,
+          "height": 320,
+          "longSide": 416,
+          "patchRows": 520
+        }
+      ],
+      "processorInputs": {
+        "imageGridThw": [
+          [
+            1,
+            26,
+            20
+          ],
+          [
+            1,
+            20,
+            26
+          ]
+        ],
+        "pixelValuesShape": [
+          1040,
+          1536
+        ],
+        "pixelValuesSha256LittleEndianF32": "8fe14d31be7ef98f1035beb722017489ed45f8b751f97494215c468689830c0e"
+      },
+      "expected": {
+        "model": "strands-decider-0.2.1.dev7+g13c0514",
+        "usage": {
+          "input_tokens": 558,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "type": "choice",
+            "choice": "Yellow square",
+            "probabilities": {
+              "Yellow square": 0.9839,
+              "Green circle": 0.0102,
+              "White triangle": 0.002,
+              "Orange diamond": 0.0023,
+              "Red triangle": 0.0016
+            },
+            "confidence": 0.9799
+          },
+          "image_score": {
+            "type": "score",
+            "score": 1.0297,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.3222,
+              "1": 0.3259,
+              "2": 0.3519
+            },
+            "confidence": 0.2626
+          },
+          "image_noul": {
+            "type": "noul",
+            "noul": 0.9658
+          }
+        }
+      },
+      "precisionReference": {
+        "model": "strands-decider-0.2.1.dev7+g13c0514",
+        "usage": {
+          "input_tokens": 558,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "type": "choice",
+            "choice": "Yellow square",
+            "probabilities": {
+              "Yellow square": 0.9836,
+              "Green circle": 0.0104,
+              "White triangle": 0.002,
+              "Orange diamond": 0.0023,
+              "Red triangle": 0.0016
+            },
+            "confidence": 0.9795
+          },
+          "image_score": {
+            "type": "score",
+            "score": 1.0158,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.329,
+              "1": 0.3261,
+              "2": 0.3448
+            },
+            "confidence": 0.2622
+          },
+          "image_noul": {
+            "type": "noul",
+            "noul": 0.9656
+          }
+        }
+      },
+      "precisionEnvelope": {
+        "formula": "abs(bf16-fp32)+roundingTolerance",
+        "roundingTolerance": 0.0001,
+        "answers": {
+          "image_choice": {
+            "confidence": {
+              "bf16": 0.9799,
+              "fp32": 0.9795,
+              "absoluteDelta": 0.00039999999999995595,
+              "allowedDelta": 0.000499999999999956
+            },
+            "probabilities": {
+              "Yellow square": {
+                "bf16": 0.9839,
+                "fp32": 0.9836,
+                "absoluteDelta": 0.00029999999999996696,
+                "allowedDelta": 0.00039999999999996695
+              },
+              "Green circle": {
+                "bf16": 0.0102,
+                "fp32": 0.0104,
+                "absoluteDelta": 0.0001999999999999988,
+                "allowedDelta": 0.0002999999999999988
+              },
+              "White triangle": {
+                "bf16": 0.002,
+                "fp32": 0.002,
+                "absoluteDelta": 0.0,
+                "allowedDelta": 0.0001
+              },
+              "Orange diamond": {
+                "bf16": 0.0023,
+                "fp32": 0.0023,
+                "absoluteDelta": 0.0,
+                "allowedDelta": 0.0001
+              },
+              "Red triangle": {
+                "bf16": 0.0016,
+                "fp32": 0.0016,
+                "absoluteDelta": 0.0,
+                "allowedDelta": 0.0001
+              }
+            }
+          },
+          "image_score": {
+            "score": {
+              "bf16": 1.0297,
+              "fp32": 1.0158,
+              "absoluteDelta": 0.013900000000000023,
+              "allowedDelta": 0.014000000000000023
+            },
+            "confidence": {
+              "bf16": 0.2626,
+              "fp32": 0.2622,
+              "absoluteDelta": 0.00040000000000001146,
+              "allowedDelta": 0.0005000000000000115
+            },
+            "probabilities": {
+              "0": {
+                "bf16": 0.3222,
+                "fp32": 0.329,
+                "absoluteDelta": 0.006800000000000028,
+                "allowedDelta": 0.0069000000000000285
+              },
+              "1": {
+                "bf16": 0.3259,
+                "fp32": 0.3261,
+                "absoluteDelta": 0.00019999999999997797,
+                "allowedDelta": 0.00029999999999997796
+              },
+              "2": {
+                "bf16": 0.3519,
+                "fp32": 0.3448,
+                "absoluteDelta": 0.007099999999999995,
+                "allowedDelta": 0.0071999999999999955
+              }
+            }
+          },
+          "image_noul": {
+            "noul": {
+              "bf16": 0.9658,
+              "fp32": 0.9656,
+              "absoluteDelta": 0.00019999999999997797,
+              "allowedDelta": 0.00029999999999997796
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "three-image-mixed-aspect",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Inspect the attached geometric images in their listed order.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "type": "choice",
+              "instructions": "Which shape is centered in the first attached image?",
+              "criteria": {
+                "Yellow square": "A yellow square centered on the blue background.",
+                "Green circle": "A green circle centered on the red background.",
+                "White triangle": "A white triangle centered on the dark background.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image."
+              }
+            }
+          ],
+          [
+            "image_score",
+            {
+              "type": "score",
+              "instructions": "Rate how well the description matches the first attached image.",
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ]
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "type": "noul",
+              "instructions": "The first attached image has a green circle centered on the red background.",
+              "criteria": null
+            }
+          ]
+        ]
+      },
+      "imageFiles": [
+        {
+          "path": "vision-input/green-circle-landscape-416x320.png",
+          "bytes": 1209,
+          "sha256": "df6e8d522206f7762704b1c16d462332a3f64e7092ac6d323a9dabb409ff6859",
+          "mimeType": "image/png",
+          "sourceWidth": 416,
+          "sourceHeight": 320
+        },
+        {
+          "path": "vision-input/yellow-square-portrait-320x416.png",
+          "bytes": 975,
+          "sha256": "8e7f591f12138a7aabfa826e0aaea218294032b3fecae3d6fa19342c0f23c9f6",
+          "mimeType": "image/png",
+          "sourceWidth": 320,
+          "sourceHeight": 416
+        },
+        {
+          "path": "vision-input/white-triangle-small-128x128.png",
+          "bytes": 358,
+          "sha256": "43308dd51f240a9933f2f15d23771b0fb69f83dde61dfc235d8f2abd20223ee9",
+          "mimeType": "image/png",
+          "sourceWidth": 128,
+          "sourceHeight": 128
+        }
+      ],
+      "imageGeometry": [
+        {
+          "width": 416,
+          "height": 320,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 320,
+          "height": 416,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "longSide": 256,
+          "patchRows": 256
+        }
+      ],
+      "processorInputs": {
+        "imageGridThw": [
+          [
+            1,
+            20,
+            26
+          ],
+          [
+            1,
+            26,
+            20
+          ],
+          [
+            1,
+            16,
+            16
+          ]
+        ],
+        "pixelValuesShape": [
+          1296,
+          1536
+        ],
+        "pixelValuesSha256LittleEndianF32": "ad7343aa8f5b24a54ac83971b01fcd504a4a8d097144daf55032f780b2d2505a"
+      },
+      "expected": {
+        "model": "strands-decider-0.2.1.dev7+g13c0514",
+        "usage": {
+          "input_tokens": 625,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "type": "choice",
+            "choice": "Green circle",
+            "probabilities": {
+              "Yellow square": 0.0065,
+              "Green circle": 0.9762,
+              "White triangle": 0.0101,
+              "Orange diamond": 0.0034,
+              "Red triangle": 0.0038
+            },
+            "confidence": 0.9702
+          },
+          "image_score": {
+            "type": "score",
+            "score": 0.8125,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.4399,
+              "1": 0.3077,
+              "2": 0.2524
+            },
+            "confidence": 0.2769
+          },
+          "image_noul": {
+            "type": "noul",
+            "noul": 0.9649
+          }
+        }
+      },
+      "precisionReference": {
+        "model": "strands-decider-0.2.1.dev7+g13c0514",
+        "usage": {
+          "input_tokens": 625,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "type": "choice",
+            "choice": "Green circle",
+            "probabilities": {
+              "Yellow square": 0.0067,
+              "Green circle": 0.9753,
+              "White triangle": 0.0106,
+              "Orange diamond": 0.0035,
+              "Red triangle": 0.0039
+            },
+            "confidence": 0.9692
+          },
+          "image_score": {
+            "type": "score",
+            "score": 0.802,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.4462,
+              "1": 0.3055,
+              "2": 0.2483
+            },
+            "confidence": 0.2786
+          },
+          "image_noul": {
+            "type": "noul",
+            "noul": 0.9646
+          }
+        }
+      },
+      "precisionEnvelope": {
+        "formula": "abs(bf16-fp32)+roundingTolerance",
+        "roundingTolerance": 0.0001,
+        "answers": {
+          "image_choice": {
+            "confidence": {
+              "bf16": 0.9702,
+              "fp32": 0.9692,
+              "absoluteDelta": 0.0010000000000000009,
+              "allowedDelta": 0.001100000000000001
+            },
+            "probabilities": {
+              "Yellow square": {
+                "bf16": 0.0065,
+                "fp32": 0.0067,
+                "absoluteDelta": 0.00020000000000000052,
+                "allowedDelta": 0.0003000000000000005
+              },
+              "Green circle": {
+                "bf16": 0.9762,
+                "fp32": 0.9753,
+                "absoluteDelta": 0.0009000000000000119,
+                "allowedDelta": 0.001000000000000012
+              },
+              "White triangle": {
+                "bf16": 0.0101,
+                "fp32": 0.0106,
+                "absoluteDelta": 0.0005000000000000004,
+                "allowedDelta": 0.0006000000000000005
+              },
+              "Orange diamond": {
+                "bf16": 0.0034,
+                "fp32": 0.0035,
+                "absoluteDelta": 0.00010000000000000026,
+                "allowedDelta": 0.00020000000000000025
+              },
+              "Red triangle": {
+                "bf16": 0.0038,
+                "fp32": 0.0039,
+                "absoluteDelta": 9.999999999999983e-05,
+                "allowedDelta": 0.00019999999999999982
+              }
+            }
+          },
+          "image_score": {
+            "score": {
+              "bf16": 0.8125,
+              "fp32": 0.802,
+              "absoluteDelta": 0.010499999999999954,
+              "allowedDelta": 0.010599999999999953
+            },
+            "confidence": {
+              "bf16": 0.2769,
+              "fp32": 0.2786,
+              "absoluteDelta": 0.0017000000000000348,
+              "allowedDelta": 0.0018000000000000349
+            },
+            "probabilities": {
+              "0": {
+                "bf16": 0.4399,
+                "fp32": 0.4462,
+                "absoluteDelta": 0.006299999999999972,
+                "allowedDelta": 0.0063999999999999726
+              },
+              "1": {
+                "bf16": 0.3077,
+                "fp32": 0.3055,
+                "absoluteDelta": 0.0021999999999999797,
+                "allowedDelta": 0.0022999999999999796
+              },
+              "2": {
+                "bf16": 0.2524,
+                "fp32": 0.2483,
+                "absoluteDelta": 0.00410000000000002,
+                "allowedDelta": 0.0042000000000000206
+              }
+            }
+          },
+          "image_noul": {
+            "noul": {
+              "bf16": 0.9649,
+              "fp32": 0.9646,
+              "absoluteDelta": 0.00029999999999996696,
+              "allowedDelta": 0.00039999999999996695
+            }
+          }
+        }
+      }
+    }
+  ],
+  "limits": [
+    "Two and three image source cases only; not complete model validation.",
+    "Pinned CPU Strands output is not TVM, WebGPU, exact-package, or browser parity evidence."
+  ]
+}

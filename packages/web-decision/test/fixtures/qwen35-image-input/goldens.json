@@ -1,0 +1,1584 @@
+{
+  "batches": [
+    {
+      "files": [
+        "single-pixel.png"
+      ],
+      "imageGridThw": [
+        [
+          1,
+          16,
+          16
+        ]
+      ],
+      "name": "one-image",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "3def6c99409a5602a037b874dc95f4bd89bd33cad6e43f6e6bfcc97ce05f12d8"
+    },
+    {
+      "files": [
+        "small-upscale.png",
+        "vision-mid-p520.png"
+      ],
+      "imageGridThw": [
+        [
+          1,
+          16,
+          16
+        ],
+        [
+          1,
+          26,
+          20
+        ]
+      ],
+      "name": "mixed-two-images",
+      "pixelShape": [
+        776,
+        1536
+      ],
+      "pixelValuesSha256": "292dce2308508def640eee8ea310419806a48f8113cf800d6933b653c1e83703"
+    },
+    {
+      "files": [
+        "single-pixel.png",
+        "fit-and-resize.png",
+        "png-orientation-6.png",
+        "aspect-boundary-200.png"
+      ],
+      "imageGridThw": [
+        [
+          1,
+          16,
+          16
+        ],
+        [
+          1,
+          20,
+          28
+        ],
+        [
+          1,
+          24,
+          12
+        ],
+        [
+          1,
+          2,
+          228
+        ]
+      ],
+      "name": "maximum-four-images",
+      "pixelShape": [
+        1560,
+        1536
+      ],
+      "pixelValuesSha256": "69dfd2c81eea76c7993e619a4b3de7fdb4be0846951327f1708bcdcbd150d34d"
+    }
+  ],
+  "cases": [
+    {
+      "decodedSize": [
+        64,
+        64
+      ],
+      "encodedBytes": 1216,
+      "encodedSha256": "67e27e9eb1321b67839b8f7490b8ff362fd24e1c615cef3701ae02e01a879100",
+      "file": "rgba-alpha.png",
+      "fittedSize": [
+        64,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        16,
+        16
+      ],
+      "name": "rgba-alpha",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "874d1c1f2ba46a928b53c068332dcd627f0e0cb32d1b874a3babc866f95f74ee",
+      "processedSize": [
+        256,
+        256
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        64
+      ],
+      "encodedBytes": 178,
+      "encodedSha256": "8be0adffcd0c4c1cd258f50898ce2f33b8cdc865a3042dc7a31f288bbcd1dc44",
+      "file": "la-alpha.png",
+      "fittedSize": [
+        64,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        16,
+        16
+      ],
+      "name": "la-alpha",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "40046342da5465bdbb52a9d95054c1802ac47dc3dc7180c2c3415b6069e65191",
+      "processedSize": [
+        256,
+        256
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        64
+      ],
+      "encodedBytes": 915,
+      "encodedSha256": "e7cdb270078f419bd0811f86c9c40b22b4a9513388ed4800ae71d1bf61092ba5",
+      "file": "palette-alpha.png",
+      "fittedSize": [
+        64,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        16,
+        16
+      ],
+      "name": "palette-alpha",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "1d9c75eadcbfabb4773532167bce42c731f6beeab9052d9e9074e60841488e22",
+      "processedSize": [
+        256,
+        256
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "7f637eafb730843eca266b94fa4fc0c6b6c02c9987a0f8f10c6066a889459460",
+      "file": "jpeg-orientation-1.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "jpeg-orientation-1",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "1cf28babaac70a07476f2d48da5cd068fc06d68ba361fdb11edc68b2d8c5364f",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "18a137592f7743a5d8cd3cb278f40e273bfef26dff0c3bbf215f64b0c9a0b617",
+      "file": "jpeg-orientation-2.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "jpeg-orientation-2",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "f51a1b006c9d01db8d05faef570c2aaeed56efbcc9cfd43dba57ae94cab4aab2",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "9ad380763b29abb2b4508fd13a945dbc8cc8bc11ef4f06c128c521bd97f0d6a9",
+      "file": "jpeg-orientation-3.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "jpeg-orientation-3",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "7e44f0c3d2e144ea5098fd07346add17700b928c3b31b2053b13764b0c110996",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "33f095b5b47baf5fca3851ca497cc5b7ed023a7dae57a9e14848a8aafd21a1d8",
+      "file": "jpeg-orientation-4.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "jpeg-orientation-4",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "d972adc27999b4d433aeda5310ed0563b3d80f1b4b80d70feeb3a7ba8ed43973",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "588f34f6752aefa9a9eeae66bbabf4a1b0b44c50345b146b7bdddaeec9936254",
+      "file": "jpeg-orientation-5.jpg",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "jpeg-orientation-5",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "101114cf380d6752645c8efc277198c033310d3239841a345066fc424d84486b",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "bccb0b8b643bcb23f25fee0173680c1986715df378220f7c5c886624619f8b34",
+      "file": "jpeg-orientation-6.jpg",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "jpeg-orientation-6",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "5603957e5cbf338ac1ed8205cce31ca43d4246a64311a6abe3792f9b8dca5012",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "b2038735c4c7de038c78670267880d799254543ebaded6d3a0bcea09136d02ad",
+      "file": "jpeg-orientation-7.jpg",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "jpeg-orientation-7",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "5bbffa4856038e0b640d714aea05ff184a07b74c2d4921e279ce808e3e9c9c47",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 2979,
+      "encodedSha256": "0069d61a3c5cfcaf9aaa894a3853ef125265ad5dfffcb44bcf9a3725d4182ff3",
+      "file": "jpeg-orientation-8.jpg",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "jpeg-orientation-8",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "2af32fb1510e79dcb013a83c02a3d51f3c649d5b0369eaa8b42dec286a345e78",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 2190,
+      "encodedSha256": "b8069b1c7df2c595113a27723432fe226fc3409e3b8ffd567c530cc30a620cda",
+      "file": "grayscale.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "grayscale",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "0006b632d46b643206a0f0a2c2a80629e64845cbf11925fcff80aa7182100674",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 7366,
+      "encodedSha256": "7b690e841bb24edb5f972e8ccd2163ba0a529c49dd99e006c69c9bef17a01b36",
+      "file": "cmyk.jpg",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "cmyk",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "e94b0facac311732f2b31184ac16a000385031467c16dd3dbc108460a1312779",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "3210534c9cdcb6d22b7a7ebd008f27d2e03d597a27a8147e475881787a9b98db",
+      "file": "png-orientation-1.png",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "png-orientation-1",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "26ce9326dc0444208d31326e72c2edb85607d7a98d27adec736e80943c8d1232",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "56954d949055254e3baa0a4d8817f50e3f327df6148fddc079b07fd083e566ba",
+      "file": "webp-orientation-1.webp",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "webp-orientation-1",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "26ce9326dc0444208d31326e72c2edb85607d7a98d27adec736e80943c8d1232",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "04894937c7397e7eadc73f4314f03fd52e78e3f17c966d0793a8495093e6211f",
+      "file": "png-orientation-2.png",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "png-orientation-2",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "aac4e8a24df5bddc41baddf781cb73f2c6dcdf9967f45e952124a3085cc670f3",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "b9b3ef6f8c4129090ff521aa3758b6641d412216768882f992a64a65d7835ea5",
+      "file": "webp-orientation-2.webp",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "webp-orientation-2",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "aac4e8a24df5bddc41baddf781cb73f2c6dcdf9967f45e952124a3085cc670f3",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "451dfa4b9922bec2a37b1ca30c6e9d93a9747fceee8f45fe68eb8a04f3614eab",
+      "file": "png-orientation-3.png",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "png-orientation-3",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "9248cb164a0fd63ce55382cd274116cf6ebd8c19dda64d0c14bd44bf19a56301",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "3962c868e94fb1361d22fa605a20f02e47000aa2da2fde91cda06999801cf6f0",
+      "file": "webp-orientation-3.webp",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "webp-orientation-3",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "9248cb164a0fd63ce55382cd274116cf6ebd8c19dda64d0c14bd44bf19a56301",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "7a74097c23e57bbf0c3ad55345f9adb7ed1b4d79aede3fa203908ee4f7c06884",
+      "file": "png-orientation-4.png",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "png-orientation-4",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "d1905bfda8f77aaa730cf44fb0d961ed55e6cb377f1c1823d555349b17437316",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "b8ac2862f094eafe4c7232845939e2c5bf19d3a481f095d1df888e2f5dddb469",
+      "file": "webp-orientation-4.webp",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "webp-orientation-4",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "d1905bfda8f77aaa730cf44fb0d961ed55e6cb377f1c1823d555349b17437316",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "c0070e763a416dae1cf90b08c2c9e452eba8b49ff6560e3d9efa9832dcf3dfa1",
+      "file": "png-orientation-5.png",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "png-orientation-5",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "6f3c2a615d6a757975635978f2d9a5e653102160736bf1c457b4b765f1aa0504",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "4f52e2435f7c1f72685fc12b49552d901349c2b4324c9a4ec6e3c48a4d8af9bd",
+      "file": "webp-orientation-5.webp",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "webp-orientation-5",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "6f3c2a615d6a757975635978f2d9a5e653102160736bf1c457b4b765f1aa0504",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "db783597f6619a72d8ff66bb29a1eda9fb02ca0fe42d43ffdb8e69e803a88093",
+      "file": "png-orientation-6.png",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "png-orientation-6",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "eab8e0626bee268f554a41aafc8b2152e464dab4cef0e970aa21e7bb73c3e2ef",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "2cc75941cf003834b3ebdf19e2e119fab2ca8f891474549a4a5b4f62aae4a133",
+      "file": "webp-orientation-6.webp",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "webp-orientation-6",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "eab8e0626bee268f554a41aafc8b2152e464dab4cef0e970aa21e7bb73c3e2ef",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "31f2a1b43c4d4d09888f9ad2880abb4ca6d4917859335bc4b11107ccf5c65176",
+      "file": "png-orientation-7.png",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "png-orientation-7",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "635c16d9398f4910ab6056b3522923d124f1e759a2b750112c790ecc9936640a",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "ccaf3d652396fb7b1bd72ec5f47a808f0f2c49fe857167182dbcb6aa71495215",
+      "file": "webp-orientation-7.webp",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "webp-orientation-7",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "635c16d9398f4910ab6056b3522923d124f1e759a2b750112c790ecc9936640a",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 537,
+      "encodedSha256": "f188d0ead47ebf99743ac863906d8c2d5dab7f692b08d9c693cd5321085be462",
+      "file": "png-orientation-8.png",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "png-orientation-8",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "6f7ea34a208a7753bf4a96e453c76a2696a3d2fc20e76e1b75745323dbcd5b4a",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        32,
+        64
+      ],
+      "encodedBytes": 120,
+      "encodedSha256": "52762a5d61ae9b4bb840e8872069515006d197afeb3fe3ab9dd3e9081fe53f0f",
+      "file": "webp-orientation-8.webp",
+      "fittedSize": [
+        32,
+        64
+      ],
+      "imageGridThw": [
+        1,
+        24,
+        12
+      ],
+      "name": "webp-orientation-8",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "6f7ea34a208a7753bf4a96e453c76a2696a3d2fc20e76e1b75745323dbcd5b4a",
+      "processedSize": [
+        192,
+        384
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 264,
+      "encodedSha256": "855ab926a4e730e25eb3c9ca03017e4c2969fe237238fd15138dcc0e8f70104d",
+      "file": "webp-alpha.webp",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "webp-alpha",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "02e79dcd264f8f713cd8fb39019698a305a2a0b2fc655aae6952e7b55f72b2b9",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        64,
+        32
+      ],
+      "encodedBytes": 1855,
+      "encodedSha256": "b83965ecc75a362848c2c3f0fae57a3a2f667ace879127f11632d73b8dcd4a55",
+      "file": "gif-first-transparent.gif",
+      "fittedSize": [
+        64,
+        32
+      ],
+      "imageGridThw": [
+        1,
+        12,
+        24
+      ],
+      "name": "gif-first-transparent",
+      "pixelShape": [
+        288,
+        1536
+      ],
+      "pixelValuesSha256": "c6e5fd5f7511551316bccc0801b719b7848f9f8ba1c23ea26c54182ae9e6442b",
+      "processedSize": [
+        384,
+        192
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        640,
+        480
+      ],
+      "encodedBytes": 25664,
+      "encodedSha256": "7cad350fc799d524e44b02856c3262b8e8f97d116ed7c1e7f07a3745c02b59d6",
+      "file": "fit-and-resize.png",
+      "fittedSize": [
+        448,
+        336
+      ],
+      "imageGridThw": [
+        1,
+        20,
+        28
+      ],
+      "name": "fit-and-resize",
+      "pixelShape": [
+        560,
+        1536
+      ],
+      "pixelValuesSha256": "982151025b3d6a43b04db336d49dd019c170ce24da137536f31c7cc1e2d20541",
+      "processedSize": [
+        448,
+        320
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        128,
+        128
+      ],
+      "encodedBytes": 2589,
+      "encodedSha256": "da7d567a36e98800b47499daf3a5d0571f58848bb2c3d162ba8c1cfdc221dbfc",
+      "file": "small-upscale.png",
+      "fittedSize": [
+        128,
+        128
+      ],
+      "imageGridThw": [
+        1,
+        16,
+        16
+      ],
+      "name": "small-upscale",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "95128119edfca327e48450f7944d6744c461cb05ae222ccfd5d9777d9efe08ce",
+      "processedSize": [
+        256,
+        256
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        320,
+        416
+      ],
+      "encodedBytes": 16881,
+      "encodedSha256": "960d62ccd00835601f0dc7c54c4fd0d948691565c0e6b8e16691786e391c55ca",
+      "file": "vision-mid-p520.png",
+      "fittedSize": [
+        320,
+        416
+      ],
+      "imageGridThw": [
+        1,
+        26,
+        20
+      ],
+      "name": "vision-mid-p520",
+      "pixelShape": [
+        520,
+        1536
+      ],
+      "pixelValuesSha256": "d8eca5e4a659c0939f5cc3182c3fb11b966c8d4fb7f1c157540d28779ca86887",
+      "processedSize": [
+        320,
+        416
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        448,
+        448
+      ],
+      "encodedBytes": 20736,
+      "encodedSha256": "51238e3398b504deb7b0ad697e655e93e494e009c367aed333bbd0f8b66d5dca",
+      "file": "vision-max-p784.png",
+      "fittedSize": [
+        448,
+        448
+      ],
+      "imageGridThw": [
+        1,
+        28,
+        28
+      ],
+      "name": "vision-max-p784",
+      "pixelShape": [
+        784,
+        1536
+      ],
+      "pixelValuesSha256": "9bf7477aafb2e3ec39af437364125da3da3a4fe9e8589bbaedb3f0331e764be0",
+      "processedSize": [
+        448,
+        448
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        1,
+        1
+      ],
+      "encodedBytes": 69,
+      "encodedSha256": "ac5a13ec1e039de5073aa38d8cd724bf1a92dab5707a90aa32b14c1e470d43f7",
+      "file": "single-pixel.png",
+      "fittedSize": [
+        1,
+        1
+      ],
+      "imageGridThw": [
+        1,
+        16,
+        16
+      ],
+      "name": "single-pixel",
+      "pixelShape": [
+        256,
+        1536
+      ],
+      "pixelValuesSha256": "3def6c99409a5602a037b874dc95f4bd89bd33cad6e43f6e6bfcc97ce05f12d8",
+      "processedSize": [
+        256,
+        256
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        400,
+        2
+      ],
+      "encodedBytes": 163,
+      "encodedSha256": "802ccf41c7d1d8c3405f6b70c1b957f225c1396e5b0bb7e85c5878c9c998b3d1",
+      "file": "aspect-boundary-200.png",
+      "fittedSize": [
+        400,
+        2
+      ],
+      "imageGridThw": [
+        1,
+        2,
+        228
+      ],
+      "name": "aspect-boundary-200",
+      "pixelShape": [
+        456,
+        1536
+      ],
+      "pixelValuesSha256": "84ceb2335b0d1097b40384da825b38c0988ab90a01a94a75277bf33dbb3f298c",
+      "processedSize": [
+        3648,
+        32
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        600,
+        2
+      ],
+      "encodedBytes": 176,
+      "encodedSha256": "bf6918bf8f80684b3c1793c26ac7ed9f0779b5fdb0a791f2f2c46d730b5babe4",
+      "error": "absolute aspect ratio must be smaller than 200, got 448.0",
+      "errorType": "ValueError",
+      "file": "aspect-rejected.png",
+      "fittedSize": [
+        448,
+        1
+      ],
+      "name": "aspect-rejected",
+      "status": "rejected-by-pinned-source"
+    },
+    {
+      "decodedSize": [
+        3,
+        2
+      ],
+      "encodedBytes": 79,
+      "encodedSha256": "e84cd2086d3ea51aefcc280c1a68ca8a84e33068a8d22a318c91431af1d8bd80",
+      "file": "gray-16bit.png",
+      "fittedSize": [
+        3,
+        2
+      ],
+      "imageGridThw": [
+        1,
+        14,
+        20
+      ],
+      "name": "gray-16bit",
+      "pixelShape": [
+        280,
+        1536
+      ],
+      "pixelValuesSha256": "a4a76fc0bfb14681b65b99c37a1180d610b63fe5489be30e3239441040b69a54",
+      "processedSize": [
+        320,
+        224
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        3,
+        2
+      ],
+      "encodedBytes": 89,
+      "encodedSha256": "b2f2fe1502e317e520270ed53e8b9f64d42aaa57eb8e9e093be9fe7e615b437e",
+      "file": "rgb-16bit.png",
+      "fittedSize": [
+        3,
+        2
+      ],
+      "imageGridThw": [
+        1,
+        14,
+        20
+      ],
+      "name": "rgb-16bit",
+      "pixelShape": [
+        280,
+        1536
+      ],
+      "pixelValuesSha256": "09bb7ae6b5686c5f6e13ab02b41090ad78337d09b8c428040fee87e6066037a0",
+      "processedSize": [
+        320,
+        224
+      ],
+      "status": "generated"
+    },
+    {
+      "decodedSize": [
+        3,
+        2
+      ],
+      "encodedBytes": 91,
+      "encodedSha256": "36cd62db02ab23dbae95beff3f8bbdd5ee7ee5c6f6befca2ab17e8d9ff8e3302",
+      "file": "rgba-16bit.png",
+      "fittedSize": [
+        3,
+        2
+      ],
+      "imageGridThw": [
+        1,
+        14,
+        20
+      ],
+      "name": "rgba-16bit",
+      "pixelShape": [
+        280,
+        1536
+      ],
+      "pixelValuesSha256": "b1d50bbdf9b5f5ec2176c926ff9337f2acdb44f4f11150264ad0cf9f27e0ce80",
+      "processedSize": [
+        320,
+        224
+      ],
+      "status": "generated"
+    }
+  ],
+  "format": "qwen35-image-input-pillow-golden-v1",
+  "maxImages": 4,
+  "maxPixelBoundary": {
+    "decodedSize": [
+      4096,
+      4096
+    ],
+    "encodedBytes": 498608,
+    "encodedSha256": "b467f586bb95aa9e3cdbe513f94c7f72c3376e9bc2533d032f07e9eb4ecb9821",
+    "featureRows": 16384,
+    "file": "max-pixels-4096.png",
+    "fittedSize": [
+      4096,
+      4096
+    ],
+    "imageGridThw": [
+      1,
+      256,
+      256
+    ],
+    "imageLongSide": 0,
+    "name": "max-pixel-boundary-4096",
+    "patchRows": 65536,
+    "pixelShape": [
+      65536,
+      1536
+    ],
+    "pixelValuesSha256": "5989840d853946e3c84eb3ed67fa7ee1be7002052c9f1789932acc1cfe99a293"
+  },
+  "modelConfigSha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+  "pillow": "13.0.0",
+  "processor": {
+    "imageLongSide": 448,
+    "imageMean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "imageStd": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "maxImagePixels": 16777216,
+    "maxPixels": 16777216,
+    "mergeSize": 2,
+    "minPixels": 65536,
+    "patchSize": 16,
+    "pixelWidth": 1536,
+    "preprocessorConfigSha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    "resizeFactor": 32,
+    "temporalPatchSize": 2
+  },
+  "scope": "pinned Strands decode_image/fit_image and Qwen2VLImageProcessorPil; no model weights, TVM, or GPU",
+  "status": "goldens-generated",
+  "strandsDeciderRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+  "transformers": "5.22.2",
+  "visionGeometry": {
+    "alignCorners": true,
+    "cases": [
+      {
+        "files": [
+          "small-upscale.png"
+        ],
+        "name": "p256",
+        "perImage": [
+          {
+            "cuSeqlens": [
+              0,
+              256
+            ],
+            "cuSeqlensSha256": "be58233c8b1c33d2911eccf0f47364922b872acca2e95e4423bc21820b59ddf6",
+            "featureRows": 64,
+            "gridThw": [
+              1,
+              16,
+              16
+            ],
+            "gridThwInputSha256": "a0b383241ee4aa9e2c907843deddb025ffe3629366d688f2cbebe3ab56df595e",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 0,
+            "interpIndicesSha256": "e7ef0a4c70bdc4a75fc172d776ed2646e41ff72d47715046354fe4bb87c4b12e",
+            "interpIndicesShape": [
+              256,
+              4
+            ],
+            "interpWeightsSha256": "e115a98a3fc37defe2b405e58b6075970225f457022f65e2e10c88ec2ba7a77f",
+            "interpWeightsShape": [
+              256,
+              4
+            ],
+            "patchRows": 256,
+            "positionIdsByTokenSha256": "1bab81fecd461ffe4d43b3b6a7677838c54a1cb9e0cac096a891b8b19d4f6b6e",
+            "positionIdsShape": [
+              64,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "files": [
+          "vision-mid-p520.png"
+        ],
+        "name": "p520",
+        "perImage": [
+          {
+            "cuSeqlens": [
+              0,
+              520
+            ],
+            "cuSeqlensSha256": "45cdd1b20d03d747e6a373ad08019a31f6e60d6765f80d38cd47b3692035521d",
+            "featureRows": 130,
+            "gridThw": [
+              1,
+              26,
+              20
+            ],
+            "gridThwInputSha256": "b9c73e823cacc67a050cf4dfb35983ba9c6c28d0bbfa5d226c4c5309f4d51cb7",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 0,
+            "interpIndicesSha256": "0719971c95a2405c2e9e200484802f762cb6f52d2155f4d858ffc2467018a76d",
+            "interpIndicesShape": [
+              520,
+              4
+            ],
+            "interpWeightsSha256": "76e10cb8c67871741f98ebb72a936bd6a3d476e9a88ffd3e5b7af7f87a0d8b0b",
+            "interpWeightsShape": [
+              520,
+              4
+            ],
+            "patchRows": 520,
+            "positionIdsByTokenSha256": "867e21cc14731abe78e01083b1abbce0ed224bd4a72adfd967ee1d4045b8dc71",
+            "positionIdsShape": [
+              130,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "files": [
+          "vision-max-p784.png"
+        ],
+        "name": "p784",
+        "perImage": [
+          {
+            "cuSeqlens": [
+              0,
+              784
+            ],
+            "cuSeqlensSha256": "07312073f7e1a48d26f562f5073be80af91552f12244e122e14b12c65dad77ef",
+            "featureRows": 196,
+            "gridThw": [
+              1,
+              28,
+              28
+            ],
+            "gridThwInputSha256": "48be419db4a3f2684829641d15ee86f73999388182e80747fda90fc53d1ea880",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 0,
+            "interpIndicesSha256": "092a77bf20c84d741a343889db77d4c41a64c8d16703f0c320c4d7e9840c21f0",
+            "interpIndicesShape": [
+              784,
+              4
+            ],
+            "interpWeightsSha256": "d3e0d4f02cb6ab6e89dff5b4d6e6855fb92c3c3ee75388e1030aa423ba6b2959",
+            "interpWeightsShape": [
+              784,
+              4
+            ],
+            "patchRows": 784,
+            "positionIdsByTokenSha256": "d72674d53ca91310e9ef481c7d9d7e5e4ddfd25fb133e24cd4a90508425eacff",
+            "positionIdsShape": [
+              196,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "files": [
+          "small-upscale.png",
+          "vision-mid-p520.png"
+        ],
+        "name": "mixed-p256-p520",
+        "perImage": [
+          {
+            "cuSeqlens": [
+              0,
+              256
+            ],
+            "cuSeqlensSha256": "be58233c8b1c33d2911eccf0f47364922b872acca2e95e4423bc21820b59ddf6",
+            "featureRows": 64,
+            "gridThw": [
+              1,
+              16,
+              16
+            ],
+            "gridThwInputSha256": "a0b383241ee4aa9e2c907843deddb025ffe3629366d688f2cbebe3ab56df595e",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 0,
+            "interpIndicesSha256": "e7ef0a4c70bdc4a75fc172d776ed2646e41ff72d47715046354fe4bb87c4b12e",
+            "interpIndicesShape": [
+              256,
+              4
+            ],
+            "interpWeightsSha256": "e115a98a3fc37defe2b405e58b6075970225f457022f65e2e10c88ec2ba7a77f",
+            "interpWeightsShape": [
+              256,
+              4
+            ],
+            "patchRows": 256,
+            "positionIdsByTokenSha256": "1bab81fecd461ffe4d43b3b6a7677838c54a1cb9e0cac096a891b8b19d4f6b6e",
+            "positionIdsShape": [
+              64,
+              8
+            ]
+          },
+          {
+            "cuSeqlens": [
+              0,
+              520
+            ],
+            "cuSeqlensSha256": "45cdd1b20d03d747e6a373ad08019a31f6e60d6765f80d38cd47b3692035521d",
+            "featureRows": 130,
+            "gridThw": [
+              1,
+              26,
+              20
+            ],
+            "gridThwInputSha256": "b9c73e823cacc67a050cf4dfb35983ba9c6c28d0bbfa5d226c4c5309f4d51cb7",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 1,
+            "interpIndicesSha256": "0719971c95a2405c2e9e200484802f762cb6f52d2155f4d858ffc2467018a76d",
+            "interpIndicesShape": [
+              520,
+              4
+            ],
+            "interpWeightsSha256": "76e10cb8c67871741f98ebb72a936bd6a3d476e9a88ffd3e5b7af7f87a0d8b0b",
+            "interpWeightsShape": [
+              520,
+              4
+            ],
+            "patchRows": 520,
+            "positionIdsByTokenSha256": "867e21cc14731abe78e01083b1abbce0ed224bd4a72adfd967ee1d4045b8dc71",
+            "positionIdsShape": [
+              130,
+              8
+            ]
+          }
+        ]
+      },
+      {
+        "files": [],
+        "imageGridThw": [
+          [
+            1,
+            256,
+            256
+          ]
+        ],
+        "name": "max-p65536",
+        "perImage": [
+          {
+            "cuSeqlens": [
+              0,
+              65536
+            ],
+            "cuSeqlensSha256": "30e06038fb18a7cfda688d7bfe8de1ca8fee6002c5b4a498e6993a3592e88893",
+            "featureRows": 16384,
+            "gridThw": [
+              1,
+              256,
+              256
+            ],
+            "gridThwInputSha256": "eb1646cc9211ed78e395c5538ec7d6ce41664e0c64fb9a3b3e708ffcf312bbd4",
+            "gridThwInputShape": [
+              1,
+              3
+            ],
+            "imageIndex": 0,
+            "interpIndicesSha256": "b5337019fc13d3b4f5c3c8ed632ae160240d594da85c021b0d6d11fe57073636",
+            "interpIndicesShape": [
+              65536,
+              4
+            ],
+            "interpWeightsSha256": "fcecdb1668e3fd3ec032fb813bd34c5b5dac4443a775fb877b3dada28af73217",
+            "interpWeightsShape": [
+              65536,
+              4
+            ],
+            "patchRows": 65536,
+            "positionIdsByTokenSha256": "e60480fcd786d0106e79c272e8f2ed7931597eb32bd2e69dc380ca36e36d7850",
+            "positionIdsShape": [
+              16384,
+              8
+            ]
+          }
+        ]
+      }
+    ],
+    "interpolationMode": "bilinear",
+    "modelConfigSha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+    "numGridPerSide": 48,
+    "numPositionEmbeddings": 2304,
+    "spatialMergeSize": 2
+  }
+}

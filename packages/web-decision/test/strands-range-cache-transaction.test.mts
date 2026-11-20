@@ -160,8 +160,100 @@ test('reads constructor getters in order and commits only after all verified ran
   assert.equal(events.at(-1), 'cache.put:marker');
   assert.deepEqual(
     events.filter((event) => event.startsWith('fetch:')),
-    ['fetch:first.bin', 'fetch:second.bin', 'fetch:second.bin']
+    ['fetch:first.bin', 'fetch:second.bin']
   );
+});
+
+test('serves a resident verified snapshot after the cache entry is replaced or deleted', async (t) => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const corruptBytes = Uint8Array.of(5, 6, 7, 8);
+  const spec = rangeSpec('mutable.bin', bytes);
+  const entries = new Map<string, Response>();
+  const cache: AssetCache = {
+    async match(key) {
+      return entries.get(key)?.clone() ?? null;
+    },
+    async put(key, response) {
+      entries.set(key, response.clone());
+    }
+  };
+  let fetches = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetches++;
+    return new Response(bytes, {
+      status: 206,
+      headers: {
+        'content-range': `bytes 0-${bytes.byteLength - 1}/${bytes.byteLength}`,
+        'content-length': String(bytes.byteLength)
+      }
+    });
+  });
+
+  const transaction = new RangeCacheTransaction({base: BASE, cache, markerId: 'resident-range'});
+  await transaction.open();
+  transaction.require([spec]);
+  transaction.seal();
+  assert.equal((await transaction.read(BASE, spec)).cachedByHash, true);
+  const rangeKey = [...entries.keys()].find((key) => new URL(key).pathname === '/.web-decision-cache/sha256/');
+  assert.ok(rangeKey);
+
+  entries.set(rangeKey, new Response(corruptBytes));
+  assert.deepEqual(new Uint8Array((await transaction.read(BASE, spec)).bytes), bytes);
+  entries.delete(rangeKey);
+  assert.deepEqual(new Uint8Array((await transaction.read(BASE, spec)).bytes), bytes);
+  assert.equal(fetches, 1, 'the verified in-memory snapshot avoids another fetch');
+  assert.equal(await transaction.commit(), false, 'a missing CacheStorage entry cannot complete offline caching');
+});
+
+test('failed rereads clear prior cache verification before a completion marker can be committed', async (t) => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const corruptBytes = Uint8Array.of(5, 6, 7, 8);
+  const spec = rangeSpec('mutable.bin', bytes);
+  const fillers = Array.from({length: 4}, (_, index) => {
+    const data = Uint8Array.of(index + 10, 2, 3, 4);
+    return {spec: rangeSpec(`filler-${index}.bin`, data), data};
+  });
+  const payloads = new Map(fillers.map(({spec: filler, data}) => [filler.path, data]));
+  const entries = new Map<string, Response>();
+  const cache: AssetCache = {
+    async match(key) {
+      return entries.get(key)?.clone() ?? null;
+    },
+    async put(key, response) {
+      entries.set(key, response.clone());
+    }
+  };
+  let responseBytes = bytes;
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
+    const path = new URL(String(input)).pathname.split('/').at(-1)!;
+    const data = path === spec.path ? responseBytes : payloads.get(path)!;
+    return new Response(data, {
+      status: 206,
+      headers: {
+        'content-range': `bytes 0-${data.byteLength - 1}/${data.byteLength}`,
+        'content-length': String(data.byteLength)
+      }
+    });
+  });
+
+  const transaction = new RangeCacheTransaction({base: BASE, cache, markerId: 'mutable-range'});
+  await transaction.open();
+  transaction.require([spec, ...fillers.map(({spec: filler}) => filler)]);
+  transaction.seal();
+  assert.equal((await transaction.read(BASE, spec)).cachedByHash, true);
+  for (const {spec: filler} of fillers) await transaction.read(BASE, filler);
+
+  const rangeKey = [...entries.keys()].find((key) => new URL(key).pathname === '/.web-decision-cache/sha256/');
+  assert.ok(rangeKey);
+  entries.set(rangeKey, new Response(corruptBytes));
+  responseBytes = corruptBytes;
+  await assert.rejects(transaction.read(BASE, spec), {
+    code: 'INVALID_ASSET',
+    message: 'Range integrity check failed.'
+  });
+
+  assert.equal(await transaction.commit(), false);
+  assert.equal(entries.has(new URL('strands-offline-complete-v1.json', BASE).href), false);
 });
 
 test('removes both combined-signal listeners and cancels a late response after abort', async (t) => {
@@ -212,6 +304,9 @@ test('removes both combined-signal listeners and cancels a late response after a
 
   await assert.rejects(pending, (error: unknown) => error === reason);
   assert.deepEqual(events, [
+    'transaction.add:abort',
+    'transaction.add:abort',
+    'transaction.remove:abort',
     'read.signal',
     'transaction.add:abort',
     'operation.add:abort',
@@ -222,4 +317,58 @@ test('removes both combined-signal listeners and cancels a late response after a
   resolveFetch(lateResponse(events));
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(events.at(-1), 'late-body.cancel');
+  transaction.dispose();
+  assert.equal(events.at(-1), 'transaction.remove:abort', 'disposing removes the transaction lifetime listener');
+});
+
+test('manual disposal cancels a pending cache check before it can publish the completion marker', async (t) => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const spec = rangeSpec('pending-commit.bin', bytes);
+  const entries = new Map<string, Response>();
+  let pendingKey: string | undefined, resolveMatch!: (response: Response | null) => void, markMatchStarted!: () => void;
+  const matchStarted = new Promise<void>((resolve) => {
+    markMatchStarted = resolve;
+  });
+  const cache: AssetCache = {
+    async match(key) {
+      if (key === pendingKey) {
+        markMatchStarted();
+        return new Promise<Response | null>((resolve) => {
+          resolveMatch = resolve;
+        });
+      }
+      return entries.get(key)?.clone() ?? null;
+    },
+    async put(key, response) {
+      entries.set(key, response.clone());
+    }
+  };
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(bytes, {
+        status: 206,
+        headers: {
+          'content-range': `bytes 0-${bytes.byteLength - 1}/${bytes.byteLength}`,
+          'content-length': String(bytes.byteLength)
+        }
+      })
+  );
+
+  const transaction = new RangeCacheTransaction({base: BASE, cache, markerId: 'dispose-pending-commit'});
+  await transaction.open();
+  transaction.require([spec]);
+  transaction.seal();
+  await transaction.read(BASE, spec);
+  pendingKey = [...entries.keys()][0];
+  assert.ok(pendingKey);
+
+  const pending = transaction.commit();
+  await matchStarted;
+  transaction.dispose();
+  await assert.rejects(pending, {code: 'SESSION_CLOSED'});
+  resolveMatch(entries.get(pendingKey)?.clone() ?? null);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(entries.has(new URL('strands-offline-complete-v1.json', BASE).href), false);
 });

@@ -33,6 +33,7 @@
     "build": "vite build --config vite.config.ts",
     "check:catalog": "node --import tsx scripts/build-model-catalog.mts --check",
     "typecheck:curated": "tsc --project tsconfig.curated.json",
+    "typecheck:strands-qwen35": "tsc --project tsconfig.strands-qwen35.json",
     "typecheck:kev": "tsc --project tsconfig.kev.json",
     "test": "node --import tsx ../../scripts/kanana/run-node-tests.mts",
     "test:kanana-core": "node --import tsx ../../scripts/kanana/run-node-tests.mts --core",

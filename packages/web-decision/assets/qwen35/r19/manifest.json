@@ -1,0 +1,50 @@
+{
+  "abi": {
+    "argumentNamesSha256": "f2a0e40d162bcd064e9f924c7ee91f50dd91604ed362b0a2e9cab9187d4e313f",
+    "bindingsSha256": "bfdd259943568b0b8a08594a75ba35d47133a60b2418c3fa8f2c8bce4ece801f",
+    "externalWeightCount": 697,
+    "fullParameterNamesSha256": "2bec9ebc149e5ef7389de06d8fea4615e30618f54ca6c226ed8c45fb509f487f",
+    "mainParameterCount": 704,
+    "packedBf16ParameterCount": 319,
+    "packedInt32ParameterCount": 319,
+    "retainedFp32ParameterCount": 378,
+    "runtimeInputNames": [
+      "inputs_embeds",
+      "attention_mask",
+      "position_ids",
+      "option_indices",
+      "temperatures",
+      "n_slots",
+      "source_prefix"
+    ]
+  },
+  "files": {
+    "fixture.json": {
+      "bytes": 202061,
+      "sha256": "7989413cb90ce9f60d01d25a8a96ad86a4ab74212e234d8f650e7ad3a891e7a9"
+    },
+    "qwen35-text-pointer.webgpu.wasm": {
+      "bytes": 5772332,
+      "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3"
+    },
+    "weight-bindings.json": {
+      "bytes": 392846,
+      "sha256": "03604675d3bdbf6f8a7cef7dcc372c0626a0f4d0b9964ec06b200dc5918d5526"
+    }
+  },
+  "format": "web-decision-qwen35-r19-text-artifact-manifest-v1",
+  "generation": "R19",
+  "modelId": "strands-decider-2b-qwen3.5-v1-2610",
+  "source": {
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "importReport": "scripts/strands/qwen35/reports/qwen35-inputs-embeds-packed-bf16-full-tvmjs-batch3-2026-11-19.json",
+    "importReportSha256": "d278da94de41ba53c4a42c922f67193ff3762937ece55e3a7f77a1051d80e899",
+    "packedAbiSha256": "accc30973a0612f8b30da8e416ea082d6aa3e0c7b3eee80eb3ab17bfdc3dd783",
+    "parameterInventorySha256": "a27d37aef07c1fa67d78653dc4da01945ef54af473f465e98795e72f16ab5f2b",
+    "relaxModuleSha256": "624cc890ac1ffb92caac65fd27b9c924f2d0b71bb009325bf16aa77fe8f6830a",
+    "strandsDeciderSourceRevision": "13c05149265dc404c09d2469636f71b1320e1713"
+  }
+}

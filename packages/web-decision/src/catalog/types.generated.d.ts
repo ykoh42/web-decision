@@ -1,11 +1,13 @@
-export type ModelId = 'kanana-2-v-decide-3b-2611';
-export type ModelIdTuple = readonly ['kanana-2-v-decide-3b-2611'];
-export type ModelAdapterId = 'kanana';
+export type ModelId = 'kanana-2-v-decide-3b-2611' | 'strands-decider-2b-qwen3.5-v1-2610';
+export type ModelIdTuple = readonly ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610'];
+export type ModelAdapterId = 'kanana' | 'strands-qwen35';
 export interface CatalogModelLimit {
   readonly resource: 'tokens' | 'options' | 'questions' | 'images';
   readonly scope: 'state' | 'question' | 'request';
   readonly min?: number;
   readonly max?: number;
+  /** Default maximum the caller may override. */
+  readonly defaultMax?: number;
   readonly description?: string;
 }
 export interface CatalogModelDescription {

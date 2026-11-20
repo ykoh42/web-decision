@@ -6,7 +6,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'f382ba7df661fa58fc189ad8b54e56c9ceb7fabeaea98ccff16557654277aa88';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'f2182cee0f385444cae3c4d9448cfde3f1c22b15cf7fe7676b92c7c0ea0890a6';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';
@@ -21,6 +21,7 @@ interface ModelProvenanceEntry {
   status: 'pending' | 'verified' | 'test-fixture';
   artifactLockSha256: string;
   evidence: {path: string; sha256: string};
+  conversionLockEvidence?: {path: string; sha256: string};
 }
 
 interface ProvenanceManifest {
@@ -93,12 +94,12 @@ function modelIds(spec: unknown): string[] {
   return ids.sort();
 }
 
-function lockModelIds(lock: unknown): string[] {
+function artifactLockEntries(lock: unknown): Record<string, unknown> {
   failUnless(
     isRecord(lock) && lock.schemaVersion === 1 && isRecord(lock.byModelId),
     'Artifact lock has an unsupported schema.'
   );
-  return Object.keys(lock.byModelId).sort();
+  return lock.byModelId;
 }
 
 function parseManifest(bytes: Uint8Array): ProvenanceManifest {
@@ -297,7 +298,7 @@ async function validateCommittedEvidenceReference(
   description: string,
   workspaceRoot: string,
   requireCommitted: boolean
-): Promise<void> {
+): Promise<Buffer> {
   failUnless(isRecord(value), `${description} must include a committed file reference.`);
   const path = safeRelativePath(value.path, `${description} path`);
   failUnless(
@@ -318,6 +319,39 @@ async function validateCommittedEvidenceReference(
   const bytes = await readFile(absolute);
   assert.equal(sha256(bytes), value.sha256, `${description} SHA-256 mismatch.`);
   if (requireCommitted) assertCommittedFile(workspaceRoot, path, bytes, description);
+  return bytes;
+}
+
+async function assertApprovedConversionLock(
+  entry: ModelProvenanceEntry,
+  conversionLockSha256: unknown,
+  artifactEntry: unknown,
+  context: {artifactLockSha256: string; workspaceRoot: string; requireCommitted: boolean}
+): Promise<void> {
+  if (conversionLockSha256 === context.artifactLockSha256) return;
+
+  const reference = entry.conversionLockEvidence;
+  assert.equal(
+    reference?.sha256,
+    conversionLockSha256,
+    `Historical conversion artifact-lock pin differs for ${entry.modelId}.`
+  );
+  const historicalBytes = await validateCommittedEvidenceReference(
+    reference,
+    `Historical conversion artifact lock for ${entry.modelId}`,
+    context.workspaceRoot,
+    context.requireCommitted
+  );
+  const historicalEntries = artifactLockEntries(JSON.parse(historicalBytes.toString('utf8')) as unknown);
+  failUnless(
+    Object.hasOwn(historicalEntries, entry.modelId),
+    `Historical conversion lock is missing ${entry.modelId}.`
+  );
+  assert.deepEqual(
+    artifactEntry,
+    historicalEntries[entry.modelId],
+    `Live artifact lock entry differs from approved conversion for ${entry.modelId}.`
+  );
 }
 
 async function validatePendingProvenance(
@@ -372,9 +406,12 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     );
   }
   const artifactLockSha256 = sha256(options.artifactLockBytes);
+  const parsedArtifactLock = JSON.parse(Buffer.from(options.artifactLockBytes).toString('utf8')) as unknown;
+  assert.deepEqual(options.artifactLock, parsedArtifactLock, 'Artifact lock must match its pinned bytes.');
+  const artifactEntries = artifactLockEntries(parsedArtifactLock);
   const ids = modelIds(options.modelSpec);
   assert.deepEqual(
-    lockModelIds(options.artifactLock),
+    Object.keys(artifactEntries).sort(),
     ids,
     'Artifact lock model IDs must exactly match the model spec.'
   );
@@ -389,10 +426,7 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
   failUnless(new Set(entryIds).size === entryIds.length, 'Provenance manifest contains duplicate model IDs.');
 
   for (const entry of manifest.models) {
-    failUnless(
-      entry.modelId in (options.artifactLock as {byModelId: Record<string, unknown>}).byModelId,
-      `Artifact lock is missing ${entry.modelId}.`
-    );
+    const artifactEntry = artifactEntries[entry.modelId];
     assert.equal(
       entry.artifactLockSha256,
       artifactLockSha256,
@@ -472,7 +506,7 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     await validateReviewEvidence(
       evidenceValue,
       entry.modelId,
-      (options.artifactLock as {byModelId: Record<string, unknown>}).byModelId[entry.modelId],
+      artifactEntry,
       options.workspaceRoot,
       options.requireCommitted
     );
@@ -490,11 +524,11 @@ export async function validateModelProvenance(options: ProvenanceValidationOptio
     );
     const conversion = evidenceValue.conversion;
     failUnless(isRecord(conversion), `Verified model ${entry.modelId} has no conversion evidence.`);
-    assert.equal(
-      conversion.artifactLockSha256,
+    await assertApprovedConversionLock(entry, conversion.artifactLockSha256, artifactEntry, {
       artifactLockSha256,
-      `Approved conversion artifact-lock digest differs for ${entry.modelId}.`
-    );
+      workspaceRoot: options.workspaceRoot,
+      requireCommitted: options.requireCommitted
+    });
   }
 
   return {manifestSha256, artifactLockSha256, modelIds: ids, pendingModelIds};

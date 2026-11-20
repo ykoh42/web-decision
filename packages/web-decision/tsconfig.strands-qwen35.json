@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.curated.json",
+  "include": [
+    "src/kanana/magick-wasm-url.d.ts",
+    "src/strands/qwen35-r13-asset-url.d.ts",
+    "src/strands/qwen35-*.mts",
+    "test/strands-qwen35-*.test.mts",
+    "test/strands-qwen-overlength.test.mts",
+    "test/lossless-json.mts"
+  ],
+  "exclude": ["test/strands-qwen35-package-integration.test.mts"]
+}

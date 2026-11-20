@@ -1,0 +1,190 @@
+{
+  "artifactDirectory": "scripts/strands/qwen35/reports/r13-saved-relax-codegen-hashseed0-r4-2026-11-17.artifacts",
+  "buildPerformed": true,
+  "buildSeconds": 5.245,
+  "buildTarget": "webgpu",
+  "deviceRuntimePerformed": false,
+  "elapsedSeconds": 33.96,
+  "emsdkRevision": "d7b4130688bfa348392b921ab04015aa15c4f154",
+  "fixturePath": "scripts/strands/qwen35/reports/r13-saved-relax-codegen-hashseed0-r4-2026-11-17.artifacts/fixture.json",
+  "fixtureSha256": "bde2174935a064392cadea8331c03752980fc99ef3f0de0807d4499b994b105b",
+  "format": "qwen35-saved-r13-relax-tvmjs-export-v1",
+  "liveStopFloorRatio": 0.4,
+  "memory": [
+    {
+      "availableBytes": 16396075008,
+      "availableRatio": 0.6362514495849609,
+      "processRssBytes": 33865728,
+      "stage": "before-load-saved-relax-module",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 15346237440,
+      "availableRatio": 0.5955123901367188,
+      "processRssBytes": 567148544,
+      "stage": "before-relax-build",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 15911862272,
+      "availableRatio": 0.6174615224202474,
+      "processRssBytes": 695599104,
+      "stage": "after-relax-build",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 15902228480,
+      "availableRatio": 0.6170876820882162,
+      "processRssBytes": 705216512,
+      "stage": "before-tvmjs-wasm-export",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 15319351296,
+      "availableRatio": 0.5944690704345703,
+      "processRssBytes": 757432320,
+      "stage": "after-save-build-artifacts",
+      "totalBytes": 25769803776
+    }
+  ],
+  "modelNumericalInferencePerformed": false,
+  "onnxUsed": false,
+  "parameterValuesLoadedForBuild": false,
+  "parametersAreRuntimeInputs": true,
+  "parserNormalization": {
+    "alphaRenamedTypeVariables": {
+      "batch": "batch_dim",
+      "sequence": "sequence_dim"
+    },
+    "compiledSourceSha256": "68f23b3d632d59464a9ae144a4140c389a29a624eb554d633b0af5d24be556f6",
+    "normalizedSha256": "68f23b3d632d59464a9ae144a4140c389a29a624eb554d633b0af5d24be556f6",
+    "serializedBufferShapeExpressionsRenamed": 5,
+    "sourceSha256": "58ad45fde5515b810c92e836697a737836be870fab6c41af63910c4537d8366e",
+    "targetBufferShapeNamesMadeExplicit": [
+      "batch",
+      "sequence"
+    ],
+    "targetFunction": "qwen35_pointer_online_sdpa_int32_padding",
+    "tokenEditCount": 98
+  },
+  "relaxBatchBoundAdjustment": {
+    "attribute": "tir_var_upper_bound",
+    "compiledGraphBatchUpperBound": 3,
+    "compiledUpperBounds": {
+      "s0": 3,
+      "s22": 4096,
+      "s86": 255
+    },
+    "function": "main",
+    "mainParameterCount": 703,
+    "onlyRelaxMainBatchUpperBoundChanged": true,
+    "publicRequestMaxBatch": 32,
+    "relaxFunctionCount": 15,
+    "sourceBatchUpperBound": 32,
+    "sourceUpperBounds": {
+      "s0": 32,
+      "s22": 4096,
+      "s86": 255
+    }
+  },
+  "relaxFunctionCount": 15,
+  "relaxMainArgumentCount": 703,
+  "relaxParameterInputCount": 697,
+  "relaxRuntimeInputCount": 6,
+  "runtimeAssets": [
+    {
+      "bytes": 321411,
+      "file": "tvmjs.bundle.generated.js",
+      "sha256": "10c50cdf352367c97879d2cf67888ba923a31d15e59acb1463aa10e5d0734334"
+    },
+    {
+      "bytes": 83600,
+      "file": "tvmjs_runtime.wasi.generated.js",
+      "sha256": "90f6f4c47493373e70afe1b5c716f902f10e5e0cfc03e59df2cd2b73c74121f0"
+    },
+    {
+      "bytes": 5905031,
+      "file": "tvmjs_runtime.wasm",
+      "sha256": "830ce3cc78f45a9f18eae6e9397e806a89f71c930e29bcc14bdb77923ff3f92c"
+    }
+  ],
+  "runtimeParameterMetadataRemoved": true,
+  "scope": "compile and export the exact saved R13 Relax graph; no weights loaded or model execution",
+  "shaderEquivalence": {
+    "canonicalShaderSha256": "1b6dd50a2c108d4a70636316a0dace3df9da4aa2fde5b2ee1d829148c401b5a0",
+    "compiledShaderSha256": "3404a31c9892bc77c94de0cb848d191e5667ca6316b02ba3558afef3437ea682",
+    "ignoredDifferences": [
+      "function ordering",
+      "batch/sequence alpha-renaming"
+    ],
+    "shaderModuleCount": 1,
+    "sourceShaderSha256": "6c9a3a9880c795a6a3c7698206b3c3e7f9e5a50aafe707dce5059f509d9fb49e",
+    "status": "passed-exact-module-equivalence-after-alpha-renaming",
+    "tvmFunctionCount": 163
+  },
+  "shaderInventory": {
+    "arrayElementTypes": [
+      "bool",
+      "f32",
+      "i32",
+      "u32"
+    ],
+    "shaderBytes": 1432678,
+    "shaderModuleCount": 1,
+    "shaderSha256": "3404a31c9892bc77c94de0cb848d191e5667ca6316b02ba3558afef3437ea682",
+    "storageBindingCount": 412,
+    "storageElementTypes": [
+      "f32",
+      "i32"
+    ],
+    "unsupportedArrayTypes": [],
+    "unsupportedStorageTypes": []
+  },
+  "shaderSourceBytes": 1432678,
+  "shaderSourcePath": "scripts/strands/qwen35/reports/r13-saved-relax-codegen-hashseed0-r4-2026-11-17.artifacts/pointer.webgpu.wgsl",
+  "shaderSourceSha256": "3404a31c9892bc77c94de0cb848d191e5667ca6316b02ba3558afef3437ea682",
+  "sourceExportedGraph": "scripts/strands/qwen35/reports/qwen35-inputs-embeds-pointer-full-layout-webgpu-r13-2026-11-16.torch-exported.py",
+  "sourceGenericConstantEvidence": {
+    "exportedGraphSha256": "9a7d7ed9a10964a07b4a1ec4ef0de498938378ca3d804518d62737250a04b46c",
+    "genericConstantCount": 19,
+    "ropeInverseFrequencySha256": "ec4437c15ead01576c3e6c7412c11daba363d17cee8bfce5c5d1c54e2e09d2d0",
+    "sourceNoneConvolutionBiasCount": 18,
+    "zeroBiasGenericConstantIndices": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ]
+  },
+  "sourceImportReport": "scripts/strands/qwen35/reports/qwen35-inputs-embeds-pointer-full-layout-webgpu-r13-2026-11-16.json",
+  "sourceProof": "full-pinned-webgpu-codegen-only",
+  "sourceRelaxModule": "scripts/strands/qwen35/reports/qwen35-inputs-embeds-pointer-full-layout-webgpu-r13-2026-11-16.relax.py",
+  "sourceRelaxModuleBytes": 925850,
+  "sourceRelaxModuleSha256": "58ad45fde5515b810c92e836697a737836be870fab6c41af63910c4537d8366e",
+  "sourceReportSha256": "bd6018ca62518be0a178739fdca8991b12d0d2c6b0cfbffaae1e3accf914aabe",
+  "startGateRatio": 0.6,
+  "status": "artifact-ready-not-run",
+  "strandsDeciderSourceRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+  "targetRuntimeExecuted": false,
+  "tvmSourcePatched": false,
+  "tvmSourceRevision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+  "tvmVersion": "0.27.0.post1",
+  "tvmjsExportPerformed": true,
+  "wasmBytes": 6455483,
+  "wasmPath": "scripts/strands/qwen35/reports/r13-saved-relax-codegen-hashseed0-r4-2026-11-17.artifacts/qwen35-text-pointer.webgpu.wasm",
+  "wasmSha256": "8d86864fc8235d300c7b8a13f5f5a3c735c52a9a8a564855542039125f1642b5"
+}

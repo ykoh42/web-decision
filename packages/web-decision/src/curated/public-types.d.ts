@@ -7,6 +7,8 @@ export interface CatalogModelLimit {
   readonly scope: 'state' | 'question' | 'request';
   readonly min?: number;
   readonly max?: number;
+  /** Default configured maximum when the caller can choose a different limit. */
+  readonly defaultMax?: number;
   readonly description?: string;
 }
 

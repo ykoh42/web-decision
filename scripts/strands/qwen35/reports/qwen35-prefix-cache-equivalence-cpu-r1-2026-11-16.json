@@ -1,0 +1,1869 @@
+{
+  "cachedDefault": {
+    "activeProbabilities": {
+      "runtime": [
+        0.17012028396129608,
+        0.12486649304628372,
+        0.7050132751464844
+      ],
+      "serverless": [
+        0.10433175414800644,
+        0.8956682682037354
+      ],
+      "suitability": [
+        0.20719236135482788,
+        0.2589574158191681,
+        0.2802515923976898,
+        0.253598690032959
+      ]
+    },
+    "answers": {
+      "runtime": {
+        "choice": "TVM WebGPU",
+        "confidence": 0.5575,
+        "probabilities": {
+          "Node.js": 0.1249,
+          "TVM WebGPU": 0.705,
+          "WebGPU": 0.1701
+        },
+        "type": "choice"
+      },
+      "serverless": {
+        "noul": 0.8957,
+        "type": "noul"
+      },
+      "suitability": {
+        "confidence": 0.3553,
+        "legend": {
+          "0": "Poor fit",
+          "1": "Limited fit",
+          "2": "Good fit",
+          "3": "Excellent fit"
+        },
+        "probabilities": {
+          "0": 0.2072,
+          "1": 0.259,
+          "2": 0.2803,
+          "3": 0.2536
+        },
+        "score": 1.5803,
+        "type": "score"
+      }
+    },
+    "cacheFallbackFlag": false,
+    "rawPointerLogits": [
+      [
+        -0.002098528668284416,
+        -0.26897671818733215,
+        1.2247748374938965
+      ],
+      [
+        0.1751871258020401,
+        0.58428955078125,
+        0.7292520999908447,
+        0.5459310412406921
+      ],
+      [
+        -0.5869165062904358,
+        1.7145222425460815
+      ]
+    ],
+    "returnedCaches": [
+      {
+        "layerCount": 24,
+        "present": true,
+        "sampleLayerStates": [
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 0
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 1
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 2
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 3
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 4
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 5
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 6
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 7
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 8
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 9
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 10
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 11
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 12
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 13
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 14
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 15
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 16
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 17
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 18
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 19
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 20
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 21
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  1,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  1,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 22
+          },
+          {
+            "fields": {
+              "keys": [
+                1,
+                2,
+                57,
+                256
+              ],
+              "values": [
+                1,
+                2,
+                57,
+                256
+              ]
+            },
+            "layer": 23
+          }
+        ],
+        "stateKinds": [
+          "conv_states",
+          "keys",
+          "recurrent_states",
+          "values"
+        ],
+        "type": "DynamicCache"
+      },
+      {
+        "layerCount": 24,
+        "present": true,
+        "sampleLayerStates": [
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 0
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 1
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 2
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 3
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 4
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 5
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 6
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 7
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 8
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 9
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 10
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 11
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 12
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 13
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 14
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 15
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 16
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 17
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 18
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 19
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 20
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 21
+          },
+          {
+            "fields": {
+              "conv_states": {
+                "0": [
+                  3,
+                  6144,
+                  4
+                ]
+              },
+              "recurrent_states": {
+                "0": [
+                  3,
+                  16,
+                  128,
+                  128
+                ]
+              }
+            },
+            "layer": 22
+          },
+          {
+            "fields": {
+              "keys": [
+                3,
+                2,
+                134,
+                256
+              ],
+              "values": [
+                3,
+                2,
+                134,
+                256
+              ]
+            },
+            "layer": 23
+          }
+        ],
+        "stateKinds": [
+          "conv_states",
+          "keys",
+          "recurrent_states",
+          "values"
+        ],
+        "type": "DynamicCache"
+      }
+    ],
+    "seconds": 9.9436,
+    "torsoCalls": [
+      {
+        "attentionShape": [
+          1,
+          57
+        ],
+        "inputShape": [
+          1,
+          57
+        ],
+        "pastCache": {
+          "present": false
+        },
+        "useCache": true
+      },
+      {
+        "attentionShape": [
+          3,
+          134
+        ],
+        "inputShape": [
+          3,
+          77
+        ],
+        "pastCache": {
+          "layerCount": 24,
+          "present": true,
+          "sampleLayerStates": [
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 0
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 1
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 2
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 3
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 4
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 5
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 6
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 7
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 8
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 9
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 10
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 11
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 12
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 13
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 14
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 15
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 16
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 17
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 18
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 19
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 20
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 21
+            },
+            {
+              "fields": {
+                "conv_states": {
+                  "0": [
+                    3,
+                    6144,
+                    4
+                  ]
+                },
+                "recurrent_states": {
+                  "0": [
+                    3,
+                    16,
+                    128,
+                    128
+                  ]
+                }
+              },
+              "layer": 22
+            },
+            {
+              "fields": {
+                "keys": [
+                  3,
+                  2,
+                  57,
+                  256
+                ],
+                "values": [
+                  3,
+                  2,
+                  57,
+                  256
+                ]
+              },
+              "layer": 23
+            }
+          ],
+          "stateKinds": [
+            "conv_states",
+            "keys",
+            "recurrent_states",
+            "values"
+          ],
+          "type": "DynamicCache"
+        },
+        "useCache": true
+      }
+    ],
+    "usage": {
+      "input_tokens": 281,
+      "output_tokens": 3
+    },
+    "usePrefixCache": true
+  },
+  "candidateReadiness": "unverified-cached-default-parity-no-m4-readback",
+  "candidateUsageExpectation": {
+    "accountingContract": "The package counts the prefix once per max_batch/max_batch_tokens source group; this is semantic usage, not the TVM graph's repeated full-row work.",
+    "expectedToMatchCachedSourceUsage": {
+      "input_tokens": 281,
+      "output_tokens": 3
+    },
+    "observedFromM4CandidateRun": false
+  },
+  "comparison": {
+    "allTypedValuesWithinTolerance": true,
+    "cachedUsage": {
+      "input_tokens": 281,
+      "output_tokens": 3
+    },
+    "expectedSharedPrefixTokensSaved": 114,
+    "hybridGdnKvCacheObserved": true,
+    "maxAbsProbabilityDelta": 0.001657530665397644,
+    "maxAbsRawPointerLogitDelta": 0.012700298801064491,
+    "maxAbsTypedValueDelta": 0.0008999999999999009,
+    "pointerLogitTolerance": 0.1,
+    "probabilityTolerance": 0.01,
+    "questionResults": [
+      {
+        "cachedProbabilities": [
+          0.17012028396129608,
+          0.12486649304628372,
+          0.7050132751464844
+        ],
+        "cachedTypedValue": "TVM WebGPU",
+        "maxAbsProbabilityDelta": 0.001657530665397644,
+        "maxAbsRawPointerLogitDelta": 0.012700298801064491,
+        "maxAbsTypedValueDelta": null,
+        "name": "runtime",
+        "type": "choice",
+        "typedValueWithinTolerance": true,
+        "uncachedProbabilities": [
+          0.17177781462669373,
+          0.12478697299957275,
+          0.7034351825714111
+        ],
+        "uncachedTypedValue": "TVM WebGPU"
+      },
+      {
+        "cachedProbabilities": [
+          0.20719236135482788,
+          0.2589574158191681,
+          0.2802515923976898,
+          0.253598690032959
+        ],
+        "cachedTypedValue": 1.5803,
+        "maxAbsProbabilityDelta": 0.0008347928524017334,
+        "maxAbsRawPointerLogitDelta": 0.005041956901550293,
+        "maxAbsTypedValueDelta": 0.0008999999999999009,
+        "name": "suitability",
+        "type": "score",
+        "typedValueWithinTolerance": true,
+        "uncachedProbabilities": [
+          0.20737746357917786,
+          0.25812262296676636,
+          0.28044959902763367,
+          0.2540503144264221
+        ],
+        "uncachedTypedValue": 1.5812
+      },
+      {
+        "cachedProbabilities": [
+          0.10433175414800644,
+          0.8956682682037354
+        ],
+        "cachedTypedValue": 0.8957,
+        "maxAbsProbabilityDelta": 0.0003058910369873047,
+        "maxAbsRawPointerLogitDelta": 0.0048416852951049805,
+        "maxAbsTypedValueDelta": 0.00029999999999996696,
+        "name": "serverless",
+        "type": "noul",
+        "typedValueWithinTolerance": true,
+        "uncachedProbabilities": [
+          0.10402592271566391,
+          0.8959741592407227
+        ],
+        "uncachedTypedValue": 0.896
+      }
+    ],
+    "typedNumberTolerance": 0.01,
+    "uncachedUsage": {
+      "input_tokens": 395,
+      "output_tokens": 3
+    },
+    "usageEqual": false
+  },
+  "format": "qwen35-prefix-cache-equivalence-cpu-v1",
+  "limitations": [
+    "One pinned mixed request establishes source float-tolerance agreement for these weights and inputs only.",
+    "The cached CPU path was slower for this short request; this timing is not a TVM or WebGPU performance claim.",
+    "The exact M4 fixture request is identifiable, but that TVM run returned no outputs, so candidate-to-cached parity remains unverified.",
+    "The TVM candidate still runs the full-row path; this report does not show cache acceleration in TVM.",
+    "The report is CPU source evidence, not exact npm-package or WebGPU evidence."
+  ],
+  "m4FixtureComparison": {
+    "cachedDefaultVsM4ReferenceFixture": {
+      "activeSlotLabels": [
+        "WebGPU",
+        "Node.js",
+        "TVM WebGPU"
+      ],
+      "cachedChoice": "TVM WebGPU",
+      "maxAbsProbabilityDelta": 0.001657530665397644,
+      "maxAbsRawPointerLogitDelta": 0.012700298801064491
+    },
+    "m4CandidateOutputLimitation": "The recorded M4 TVM run has empty output arrays, so candidate-to-cached metrics cannot be computed.",
+    "m4CandidateOutputsAvailable": false,
+    "m4CandidateVsCachedMetrics": null,
+    "m4RuntimeReport": "scripts/strands/qwen35/reports/qwen35-full-text-pointer-tvmjs-browser-r1-2026-11-16.json",
+    "m4RuntimeStatus": "failed-runtime",
+    "m4WrapperReport": "scripts/strands/qwen35/reports/qwen35-full-text-pointer-tvmjs-webgpu-m4-r1-2026-11-16.json",
+    "m4WrapperStatus": "failed-browser-runner",
+    "referenceFixtureInputIdsMatchBothSourceAndCachedComparison": true,
+    "referenceFixtureInputTokenCount": 134,
+    "referenceFixtureMatchesUncachedRun": {
+      "maxAbsProbabilityDelta": 0.0,
+      "maxAbsRawPointerLogitDelta": 0.0
+    },
+    "referenceFixtureSourceReportSha256": "e66e7adedadd68932726e0a8dce5e5f603ead2bb96356fa9586081dcc41a97e2"
+  },
+  "memory": [
+    {
+      "availableBytes": 14096252928,
+      "availableRatio": 0.5470066070556641,
+      "processRssBytes": 232161280,
+      "stage": "before-assets",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 13119127552,
+      "availableRatio": 0.5090891520182291,
+      "processRssBytes": 885374976,
+      "stage": "after-model-load",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 13118652416,
+      "availableRatio": 0.5090707143147787,
+      "processRssBytes": 885997568,
+      "stage": "before-first-forward",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 13182386176,
+      "availableRatio": 0.5115439097086588,
+      "processRssBytes": 3647258624,
+      "stage": "after-uncached-forward",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 13089259520,
+      "availableRatio": 0.5079301198323568,
+      "processRssBytes": 3754344448,
+      "stage": "after-cached-forward",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 13089259520,
+      "availableRatio": 0.5079301198323568,
+      "processRssBytes": 3754344448,
+      "stage": "complete",
+      "totalBytes": 25769803776
+    }
+  ],
+  "pins": {
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "baseWeightsSha256": "928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d",
+    "checkpointConfigSha256": "1d9625055e88c254d50089116992d08b0567286c9d6fcefb3c025922058ee65a",
+    "checkpointFilesVerified": 8,
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "strandsRepository": "StrandsAgents/strands-decider",
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713"
+  },
+  "request": {
+    "batchSize": 3,
+    "contextLimit": 4096,
+    "questionOrder": [
+      "runtime",
+      "suitability",
+      "serverless"
+    ],
+    "questionTokens": {
+      "runtime": 77,
+      "serverless": 70,
+      "suitability": 77
+    },
+    "questionTypes": {
+      "runtime": "choice",
+      "serverless": "noul",
+      "suitability": "score"
+    },
+    "renderedStateSha256": "3f7ab2ba76717663577c4b6bac063bfdc7063f58c33957039ead3a054a31cc48",
+    "requestIsIdenticalAcrossPaths": true,
+    "sequenceTokenIdsSha256": {
+      "runtime": "05ab1aa82b6704fcf392123a60b8e62be0fc6da398ac12c4c84b467c1e34b4b5",
+      "serverless": "040e577db3e45c5c763d39fa1c418f940e77df969310e2f55bda2ca8cf032b90",
+      "suitability": "06f818ab4ba51450412bc9cc8d250c9c9ff614ff5a6efe243e9f421a4b8786b5"
+    },
+    "sequenceTokens": {
+      "runtime": 134,
+      "serverless": 127,
+      "suitability": 134
+    },
+    "sourceReference": {
+      "reportPath": "scripts/strands/qwen35/reports/qwen35-source-reference-cpu-r3-mixed-2026-11-15.json",
+      "reportSha256": "e66e7adedadd68932726e0a8dce5e5f603ead2bb96356fa9586081dcc41a97e2",
+      "usePrefixCache": false
+    },
+    "stateTokens": 57
+  },
+  "scope": {
+    "cachedPathExecuted": true,
+    "gpuUsed": false,
+    "pinnedWeights": true,
+    "sameModelInstanceForBothPaths": true,
+    "tvmUsed": false,
+    "uncachedPathExecuted": true
+  },
+  "sourceModel": {
+    "loadSeconds": 1.205,
+    "loader": "StrandsDeciderModel.load(local_checkpoint, device_map=None, attn_implementation=None)",
+    "modelInstances": 1,
+    "parameterBytes": 3978086016,
+    "parameterTensorCount": 698,
+    "torsoDtype": "torch.bfloat16"
+  },
+  "status": "passed-source-prefix-cache-tolerance",
+  "toolchain": {
+    "python": "3.11.11",
+    "strandsDecider": "0.2.1.dev7+g13c0514",
+    "torch": "2.8.0",
+    "transformers": "5.22.2"
+  },
+  "uncached": {
+    "activeProbabilities": {
+      "runtime": [
+        0.17177781462669373,
+        0.12478697299957275,
+        0.7034351825714111
+      ],
+      "serverless": [
+        0.10402592271566391,
+        0.8959741592407227
+      ],
+      "suitability": [
+        0.20737746357917786,
+        0.25812262296676636,
+        0.28044959902763367,
+        0.2540503144264221
+      ]
+    },
+    "answers": {
+      "runtime": {
+        "choice": "TVM WebGPU",
+        "confidence": 0.5552,
+        "probabilities": {
+          "Node.js": 0.1248,
+          "TVM WebGPU": 0.7034,
+          "WebGPU": 0.1718
+        },
+        "type": "choice"
+      },
+      "serverless": {
+        "noul": 0.896,
+        "type": "noul"
+      },
+      "suitability": {
+        "confidence": 0.3549,
+        "legend": {
+          "0": "Poor fit",
+          "1": "Limited fit",
+          "2": "Good fit",
+          "3": "Excellent fit"
+        },
+        "probabilities": {
+          "0": 0.2074,
+          "1": 0.2581,
+          "2": 0.2804,
+          "3": 0.2541
+        },
+        "score": 1.5812,
+        "type": "score"
+      }
+    },
+    "cacheFallbackFlag": false,
+    "rawPointerLogits": [
+      [
+        0.010601770132780075,
+        -0.26519352197647095,
+        1.2271740436553955
+      ],
+      [
+        0.17860306799411774,
+        0.580144464969635,
+        0.7323257923126221,
+        0.5509729981422424
+      ],
+      [
+        -0.5855827331542969,
+        1.7193639278411865
+      ]
+    ],
+    "returnedCaches": [
+      {
+        "present": false
+      }
+    ],
+    "seconds": 8.5074,
+    "torsoCalls": [
+      {
+        "attentionShape": [
+          3,
+          134
+        ],
+        "inputShape": [
+          3,
+          134
+        ],
+        "pastCache": {
+          "present": false
+        },
+        "useCache": false
+      }
+    ],
+    "usage": {
+      "input_tokens": 395,
+      "output_tokens": 3
+    },
+    "usePrefixCache": false
+  }
+}

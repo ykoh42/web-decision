@@ -85,6 +85,100 @@
           "priorEvidence": "The latest exact-package candidate passed public text and image inference, offline cache reuse with zero network attempts, and the 20,480 maxLength boundary on Apple M4 Pro / Chromium 157.0.8103.52 using the non-fallback Apple Metal 3 WebGPU adapter. Full 32-layer CPU parity passed for sequence lengths 1 and 8, including two image tokens. The 20,480 boundary run completed in 5.2 minutes total test time and used 11,088,503,984 live WebGPU buffer bytes. Text score, probability, and confidence deltas against pinned BF16 were 0.004926, 0.001932, and 0.007389, within their recorded tolerances."
         }
       }
+    },
+    {
+      "modelId": "strands-decider-2b-qwen3.5-v1-2610",
+      "description": {
+        "adapter": "strands-qwen35",
+        "precision": "BF16 base checkpoint with FP32 Strands adapter, pointer head, and vision weights",
+        "checkpoint": {
+          "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+          "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4"
+        },
+        "assets": {
+          "integrity": "pinned-manifest",
+          "location": "package-and-pinned-upstream",
+          "additionalFiles": "Pinned native TVM text and vision WebGPU graphs and their manifests are packaged. Base, LoRA, and pointer-head weights are loaded from immutable upstream revisions by verified ranges."
+        },
+        "licenses": {
+          "project": "Apache-2.0",
+          "modelTerms": "Apache-2.0 as declared by the pinned model card",
+          "modelCard": "https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610/tree/216d1ccb46a9e9b036eb9187b248db98480f77d4"
+        },
+        "backend": {
+          "name": "tvm-webgpu",
+          "requiredFeatures": [],
+          "requiredLimits": {
+            "maxBufferSize": 1073741824,
+            "maxStorageBufferBindingSize": 1073741824,
+            "maxComputeWorkgroupStorageSize": 8192
+          },
+          "requiresNonFallbackAdapter": false
+        },
+        "features": {
+          "textChoice": {
+            "status": "implemented",
+            "abstention": "not-implemented",
+            "limits": [
+              {
+                "resource": "tokens",
+                "scope": "question",
+                "max": 4096,
+                "description": "Pinned Qwen3.5 graph context length; the Strands request fitter applies source behavior."
+              },
+              {
+                "resource": "options",
+                "scope": "question",
+                "min": 2,
+                "max": 255
+              },
+              {
+                "resource": "options",
+                "scope": "question",
+                "min": 2,
+                "max": 10
+              },
+              {
+                "resource": "questions",
+                "scope": "request",
+                "min": 1
+              }
+            ],
+            "handling": "source-faithful-packed-requests",
+            "tokenCount": "source-input-token-usage",
+            "score": {
+              "basis": "ordered-levels",
+              "temperatureAppliedBy": "decoder",
+              "calibration": "not-guaranteed"
+            }
+          },
+          "typedTextQuestionTypes": [
+            "choice",
+            "noul",
+            "score"
+          ],
+          "imageChoice": {
+            "status": "implemented",
+            "limits": [
+              {
+                "resource": "images",
+                "scope": "request",
+                "defaultMax": 4,
+                "description": "Defaults to 4 images per request; systemOne's maxImages option can set a different limit. The PIL processor has no separate fixed image-count ceiling."
+              }
+            ]
+          },
+          "rating": {
+            "status": "not-implemented"
+          }
+        },
+        "verification": {
+          "currentBundleGpu": "not-revalidated",
+          "currentBundleCpuWasm": "not-applicable",
+          "currentBundleJavascript": "not-applicable",
+          "priorEvidence": "Candidate artifacts and native TVM graph contracts are pinned. Exact-package full-model WebGPU text and image parity is not verified; pending evidence tracks the remaining numerical and release checks."
+        }
+      }
     }
   ]
 }

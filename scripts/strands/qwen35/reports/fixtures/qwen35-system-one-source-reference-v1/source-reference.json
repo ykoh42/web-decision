@@ -1,0 +1,1608 @@
+{
+  "assets": {
+    "base": {
+      "config.json": {
+        "bytes": 2908,
+        "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/blobs/d30a15be1bbfd610f58ad80f1fbeb6778f58a80f",
+        "sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4"
+      },
+      "model.safetensors.index.json": {
+        "bytes": 64460,
+        "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/blobs/10fd4fbf87dc5e198b28d9e0598c70a9780b72c1",
+        "sha256": "74d2ddfe79f10f35b27b498632f02b97b60dd9ec39b35d7c5a890c399284e319"
+      },
+      "preprocessor_config.json": {
+        "bytes": 390,
+        "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/blobs/2ea84a437d448ff71b08df68fdd949d5cc4ebb64",
+        "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516"
+      },
+      "tokenizer.json": {
+        "bytes": 12807196,
+        "path": "huggingface-cache/blobs/59036b7ec9c1c130de9dd3716f37308a51038389ae6fb9ba62e87c246696707a",
+        "sha256": "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927"
+      },
+      "tokenizer_config.json": {
+        "bytes": 16712,
+        "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/blobs/34e1f7a59c40a7a4197ce3dbb242b94dc5bef1dd",
+        "sha256": "e611fbccc7c29ef3b1cafb1cb7ea548d189968632901d678fd62be68c47885de"
+      },
+      "vocab.json": {
+        "bytes": 6722759,
+        "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/blobs/0aa0ce0658d60ac4a5d609f4eadb0e8e43514176",
+        "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+      }
+    },
+    "baseWeightShard": {
+      "bytes": 4548221488,
+      "path": "huggingface-cache/models--Qwen--Qwen3.5-2B-Base/snapshots/b1485b2fa6dfa1287294f269f5fb618e03d52d7c/model.safetensors-00001-of-00001.safetensors",
+      "rehashPerformed": false,
+      "sha256": "928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d",
+      "shaReusedFrom": "scripts/strands/qwen35/reports/base-f16-storage-webgpu-r1-2026-11-15.json"
+    },
+    "checkpoint": {
+      "MANIFEST.sha256": {
+        "bytes": 2484,
+        "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/blobs/ba28683a888159acc4d96caaeece27eb96c9630b",
+        "sha256": "874dfc3d47c22b5c50b387fabd1e549be483f6e29c127ec6f852125779fa3371"
+      },
+      "head.safetensors": {
+        "bytes": 12605928,
+        "path": "huggingface-cache/blobs/0b9e73dcb764f2a6d35a010fd20bbe1f2a7e1e54e6b004b08f479e6278bcadcf",
+        "sha256": "ace56742545b505e6fae34ada85c8edbeedb23ba8974d8680aebe0380d6083a1"
+      },
+      "lora/adapter_config.json": {
+        "bytes": 1271,
+        "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/blobs/1b497a2e565f5b9dd1adef530657115cbfef5cae",
+        "sha256": "0ced130cefbad13b092425de87680347ce01d09c833cf8e3870e8156db18ffcc"
+      },
+      "lora/adapter_model.safetensors": {
+        "bytes": 201878888,
+        "path": "huggingface-cache/blobs/47ee46d5ecca77fec40d7d7cbe4e5d2044b44984f34b09092ac9c6b5cdb78144",
+        "sha256": "ae1d0cd1ac3edec6df0a519a3ad18f1c382099032d493f8f98c96a80cfebb4c7"
+      },
+      "provenance.json": {
+        "bytes": 967,
+        "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/blobs/1dcabf404c6a5881ecb59d95d03cf87b9473bb60",
+        "sha256": "8713fedb4e67fb6c60f41dc73c937635377506671e09978f92a2d447ac5264bd"
+      },
+      "strands_decider_config.json": {
+        "bytes": 746,
+        "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/blobs/3063a85052c99fc353aaba368a2818a3381417e4",
+        "sha256": "1d9625055e88c254d50089116992d08b0567286c9d6fcefb3c025922058ee65a"
+      },
+      "tokenizer.json": {
+        "bytes": 19989592,
+        "path": "huggingface-cache/blobs/d3aa2a0e5f04237c1d3b754b1deea09704924f97511aed36aa20f510a97555d8",
+        "sha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86"
+      },
+      "tokenizer_config.json": {
+        "bytes": 1128,
+        "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/blobs/fa833096a2f03c2ff89094eb1ba7716fbd98b102",
+        "sha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45"
+      }
+    },
+    "tokenizer": {
+      "bytes": 19989592,
+      "loadedBy": "StrandsDeciderModel.load local checkpoint path",
+      "path": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/snapshots/216d1ccb46a9e9b036eb9187b248db98480f77d4/tokenizer.json",
+      "sha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86",
+      "verified": true
+    }
+  },
+  "cases": [
+    {
+      "answers": {
+        "runtime": {
+          "choice": "TVM WebGPU",
+          "confidence": 0.5636,
+          "probabilities": {
+            "WebGPU": 0.1662,
+            "Node.js": 0.1247,
+            "TVM WebGPU": 0.7091
+          },
+          "type": "choice"
+        },
+        "suitability": {
+          "confidence": 0.3556,
+          "legend": {
+            "0": "Poor fit",
+            "1": "Limited fit",
+            "2": "Good fit",
+            "3": "Excellent fit"
+          },
+          "probabilities": {
+            "0": 0.2061,
+            "1": 0.2586,
+            "2": 0.2808,
+            "3": 0.2545
+          },
+          "score": 1.5837,
+          "type": "score"
+        },
+        "serverless": {
+          "noul": 0.8943,
+          "type": "noul"
+        }
+      },
+      "decisionLogitsAfterTemperature": [
+        [
+          -0.016578879207372665,
+          -0.30421966314315796,
+          1.433935523033142,
+          1.8468282222747803
+        ],
+        [
+          0.09042604267597198,
+          0.31723499298095703,
+          0.399522602558136,
+          0.3014128804206848
+        ],
+        [
+          -0.5417860746383667,
+          1.5939319133758545,
+          0.5106406211853027,
+          0.5106406211853027
+        ]
+      ],
+      "engineResponseModel": "strands-decider-0.2.1.dev7+g13c0514",
+      "evaluateSeconds": 0.862,
+      "expected": {
+        "answers": {
+          "runtime": {
+            "choice": "TVM WebGPU",
+            "confidence": 0.5636,
+            "probabilities": {
+              "WebGPU": 0.1662,
+              "Node.js": 0.1247,
+              "TVM WebGPU": 0.7091
+            },
+            "type": "choice"
+          },
+          "suitability": {
+            "confidence": 0.3556,
+            "legend": {
+              "0": "Poor fit",
+              "1": "Limited fit",
+              "2": "Good fit",
+              "3": "Excellent fit"
+            },
+            "probabilities": {
+              "0": 0.2061,
+              "1": 0.2586,
+              "2": 0.2808,
+              "3": 0.2545
+            },
+            "score": 1.5837,
+            "type": "score"
+          },
+          "serverless": {
+            "noul": 0.8943,
+            "type": "noul"
+          }
+        },
+        "model": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+        "usage": {
+          "input_tokens": 395,
+          "output_tokens": 3
+        }
+      },
+      "fullResponse": {
+        "answers": {
+          "runtime": {
+            "choice": "TVM WebGPU",
+            "confidence": 0.5636,
+            "probabilities": {
+              "WebGPU": 0.1662,
+              "Node.js": 0.1247,
+              "TVM WebGPU": 0.7091
+            },
+            "type": "choice"
+          },
+          "suitability": {
+            "confidence": 0.3556,
+            "legend": {
+              "0": "Poor fit",
+              "1": "Limited fit",
+              "2": "Good fit",
+              "3": "Excellent fit"
+            },
+            "probabilities": {
+              "0": 0.2061,
+              "1": 0.2586,
+              "2": 0.2808,
+              "3": 0.2545
+            },
+            "score": 1.5837,
+            "type": "score"
+          },
+          "serverless": {
+            "noul": 0.8943,
+            "type": "noul"
+          }
+        },
+        "model": "strands-decider-0.2.1.dev7+g13c0514",
+        "usage": {
+          "input_tokens": 395,
+          "output_tokens": 3
+        }
+      },
+      "input": {
+        "attentionMask": [
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "inputIds": [
+          [
+            27,
+            2374,
+            29,
+            198,
+            90,
+            198,
+            220,
+            328,
+            1967,
+            763,
+            328,
+            5439,
+            425,
+            264,
+            6713,
+            14934,
+            5307,
+            8813,
+            8871,
+            10152,
+            198,
+            220,
+            328,
+            63106,
+            763,
+            498,
+            198,
+            262,
+            328,
+            2665,
+            3421,
+            487,
+            198,
+            262,
+            328,
+            900,
+            5726,
+            6129,
+            487,
+            198,
+            262,
+            328,
+            6516,
+            303,
+            6278,
+            31769,
+            1,
+            198,
+            220,
+            2205,
+            198,
+            92,
+            198,
+            510,
+            2374,
+            29,
+            198,
+            27,
+            7593,
+            913,
+            420,
+            11409,
+            731,
+            198,
+            3270,
+            6681,
+            799,
+            2904,
+            13,
+            198,
+            22365,
+            15135,
+            1786,
+            17759,
+            279,
+            10661,
+            16484,
+            30,
+            198,
+            27,
+            2782,
+            29,
+            198,
+            16,
+            13,
+            4736,
+            48213,
+            1892,
+            357,
+            6713,
+            21966,
+            12204,
+            5165,
+            13,
+            198,
+            17,
+            13,
+            5829,
+            2764,
+            1892,
+            357,
+            3421,
+            23314,
+            12544,
+            15135,
+            13,
+            198,
+            18,
+            13,
+            5701,
+            44,
+            4736,
+            48213,
+            1892,
+            357,
+            6713,
+            15135,
+            19095,
+            364,
+            4736,
+            48213,
+            13,
+            198,
+            510,
+            2782,
+            29,
+            198,
+            510,
+            7593,
+            29,
+            198,
+            27,
+            8944,
+            29
+          ],
+          [
+            27,
+            2374,
+            29,
+            198,
+            90,
+            198,
+            220,
+            328,
+            1967,
+            763,
+            328,
+            5439,
+            425,
+            264,
+            6713,
+            14934,
+            5307,
+            8813,
+            8871,
+            10152,
+            198,
+            220,
+            328,
+            63106,
+            763,
+            498,
+            198,
+            262,
+            328,
+            2665,
+            3421,
+            487,
+            198,
+            262,
+            328,
+            900,
+            5726,
+            6129,
+            487,
+            198,
+            262,
+            328,
+            6516,
+            303,
+            6278,
+            31769,
+            1,
+            198,
+            220,
+            2205,
+            198,
+            92,
+            198,
+            510,
+            2374,
+            29,
+            198,
+            27,
+            7593,
+            913,
+            420,
+            11985,
+            731,
+            198,
+            11231,
+            279,
+            1528,
+            2272,
+            279,
+            11128,
+            5684,
+            3559,
+            318,
+            86806,
+            1118,
+            553,
+            198,
+            4199,
+            14037,
+            369,
+            411,
+            8871,
+            364,
+            279,
+            8813,
+            30,
+            198,
+            27,
+            2782,
+            29,
+            198,
+            16,
+            13,
+            220,
+            15,
+            1892,
+            43191,
+            4786,
+            198,
+            17,
+            13,
+            220,
+            16,
+            1892,
+            18335,
+            4786,
+            198,
+            18,
+            13,
+            220,
+            17,
+            1892,
+            7441,
+            4786,
+            198,
+            19,
+            13,
+            220,
+            18,
+            1892,
+            35548,
+            4786,
+            198,
+            510,
+            2782,
+            29,
+            198,
+            510,
+            7593,
+            29,
+            198,
+            27,
+            8944,
+            29
+          ],
+          [
+            27,
+            2374,
+            29,
+            198,
+            90,
+            198,
+            220,
+            328,
+            1967,
+            763,
+            328,
+            5439,
+            425,
+            264,
+            6713,
+            14934,
+            5307,
+            8813,
+            8871,
+            10152,
+            198,
+            220,
+            328,
+            63106,
+            763,
+            498,
+            198,
+            262,
+            328,
+            2665,
+            3421,
+            487,
+            198,
+            262,
+            328,
+            900,
+            5726,
+            6129,
+            487,
+            198,
+            262,
+            328,
+            6516,
+            303,
+            6278,
+            31769,
+            1,
+            198,
+            220,
+            2205,
+            198,
+            92,
+            198,
+            510,
+            2374,
+            29,
+            198,
+            27,
+            7593,
+            913,
+            420,
+            77,
+            10644,
+            731,
+            198,
+            4741,
+            562,
+            3315,
+            279,
+            4952,
+            369,
+            804,
+            314,
+            279,
+            1528,
+            13,
+            198,
+            6503,
+            411,
+            8813,
+            1542,
+            1973,
+            44569,
+            264,
+            3421,
+            30,
+            198,
+            27,
+            2782,
+            29,
+            198,
+            16,
+            13,
+            867,
+            1892,
+            561,
+            8813,
+            3749,
+            264,
+            8434,
+            3421,
+            13,
+            198,
+            17,
+            13,
+            804,
+            1892,
+            561,
+            8813,
+            8213,
+            22756,
+            303,
+            279,
+            6713,
+            13,
+            198,
+            510,
+            2782,
+            29,
+            198,
+            510,
+            7593,
+            29,
+            198,
+            27,
+            8944,
+            29,
+            248044,
+            248044,
+            248044,
+            248044,
+            248044,
+            248044,
+            248044
+          ]
+        ],
+        "nSlots": [
+          [
+            3,
+            4,
+            2
+          ]
+        ],
+        "optionIndices": [
+          [
+            93,
+            105,
+            121,
+            -1
+          ],
+          [
+            97,
+            105,
+            113,
+            121
+          ],
+          [
+            101,
+            114,
+            -1,
+            -1
+          ]
+        ],
+        "optionTokenBindings": [
+          {
+            "name": "runtime",
+            "optionPositionTokenIds": [
+              13,
+              13,
+              13
+            ],
+            "optionTokenPositions": [
+              93,
+              105,
+              121
+            ],
+            "slotLabelsByPosition": [
+              "WebGPU",
+              "Node.js",
+              "TVM WebGPU"
+            ]
+          },
+          {
+            "name": "suitability",
+            "optionPositionTokenIds": [
+              4786,
+              4786,
+              4786,
+              4786
+            ],
+            "optionTokenPositions": [
+              97,
+              105,
+              113,
+              121
+            ],
+            "slotLabelsByPosition": [
+              "0",
+              "1",
+              "2",
+              "3"
+            ]
+          },
+          {
+            "name": "serverless",
+            "optionPositionTokenIds": [
+              13,
+              13
+            ],
+            "optionTokenPositions": [
+              101,
+              114
+            ],
+            "slotLabelsByPosition": [
+              "false",
+              "true"
+            ]
+          }
+        ],
+        "realTokenCount": 395,
+        "temperatures": [
+          [
+            0.862955629825592,
+            1.8344091176986694,
+            1.0704394578933716
+          ]
+        ]
+      },
+      "logProbabilities": [
+        [
+          -1.7943127155303955,
+          -2.081953525543213,
+          -0.34379830956459045,
+          "-Infinity"
+        ],
+        [
+          -1.5793250799179077,
+          -1.3525161743164062,
+          -1.2702285051345825,
+          -1.3683382272720337
+        ],
+        [
+          -2.2474021911621094,
+          -0.11168427020311356,
+          "-Infinity",
+          "-Infinity"
+        ]
+      ],
+      "name": "mixed-choice-score-noul-system-one-engine-cpu",
+      "probabilities": [
+        [
+          0.16624167561531067,
+          0.12468639761209488,
+          0.709071934223175,
+          0
+        ],
+        [
+          0.20611415803432465,
+          0.2585887908935547,
+          0.2807674705982208,
+          0.25452956557273865
+        ],
+        [
+          0.10567338764667511,
+          0.8943265676498413,
+          0,
+          0
+        ]
+      ],
+      "questionOutputs": [
+        {
+          "decisionLogitsAfterTemperature": [
+            -0.016578879207372665,
+            -0.30421966314315796,
+            1.433935523033142
+          ],
+          "logProbabilities": [
+            -1.7943127155303955,
+            -2.081953525543213,
+            -0.34379830956459045
+          ],
+          "name": "runtime",
+          "probabilities": [
+            0.16624167561531067,
+            0.12468639761209488,
+            0.709071934223175
+          ],
+          "rawPointerLogits": [
+            -0.014306836761534214,
+            -0.26252806186676025,
+            1.2374227046966553
+          ],
+          "slotCount": 3,
+          "slotLabelsByPosition": [
+            "WebGPU",
+            "Node.js",
+            "TVM WebGPU"
+          ],
+          "slots": [
+            {
+              "decisionLogitAfterTemperature": -0.016578879207372665,
+              "label": "WebGPU",
+              "logProbability": -1.7943127155303955,
+              "optionPositionTokenId": 13,
+              "optionTokenPosition": 93,
+              "position": 0,
+              "probability": 0.16624167561531067,
+              "rawPointerLogit": -0.014306836761534214
+            },
+            {
+              "decisionLogitAfterTemperature": -0.30421966314315796,
+              "label": "Node.js",
+              "logProbability": -2.081953525543213,
+              "optionPositionTokenId": 13,
+              "optionTokenPosition": 105,
+              "position": 1,
+              "probability": 0.12468639761209488,
+              "rawPointerLogit": -0.26252806186676025
+            },
+            {
+              "decisionLogitAfterTemperature": 1.433935523033142,
+              "label": "TVM WebGPU",
+              "logProbability": -0.34379830956459045,
+              "optionPositionTokenId": 13,
+              "optionTokenPosition": 121,
+              "position": 2,
+              "probability": 0.709071934223175,
+              "rawPointerLogit": 1.2374227046966553
+            }
+          ],
+          "sourceAnswer": {
+            "choice": "TVM WebGPU",
+            "confidence": 0.5636,
+            "probabilities": {
+              "WebGPU": 0.1662,
+              "Node.js": 0.1247,
+              "TVM WebGPU": 0.7091
+            },
+            "type": "choice"
+          },
+          "type": "choice",
+          "typedValue": "TVM WebGPU",
+          "typedValueType": "string"
+        },
+        {
+          "decisionLogitsAfterTemperature": [
+            0.09042604267597198,
+            0.31723499298095703,
+            0.399522602558136,
+            0.3014128804206848
+          ],
+          "logProbabilities": [
+            -1.5793250799179077,
+            -1.3525161743164062,
+            -1.2702285051345825,
+            -1.3683382272720337
+          ],
+          "name": "suitability",
+          "probabilities": [
+            0.20611415803432465,
+            0.2585887908935547,
+            0.2807674705982208,
+            0.25452956557273865
+          ],
+          "rawPointerLogits": [
+            0.16587835550308228,
+            0.5819387435913086,
+            0.7328879237174988,
+            0.552914559841156
+          ],
+          "slotCount": 4,
+          "slotLabelsByPosition": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "slots": [
+            {
+              "decisionLogitAfterTemperature": 0.09042604267597198,
+              "label": "0",
+              "logProbability": -1.5793250799179077,
+              "optionPositionTokenId": 4786,
+              "optionTokenPosition": 97,
+              "position": 0,
+              "probability": 0.20611415803432465,
+              "rawPointerLogit": 0.16587835550308228
+            },
+            {
+              "decisionLogitAfterTemperature": 0.31723499298095703,
+              "label": "1",
+              "logProbability": -1.3525161743164062,
+              "optionPositionTokenId": 4786,
+              "optionTokenPosition": 105,
+              "position": 1,
+              "probability": 0.2585887908935547,
+              "rawPointerLogit": 0.5819387435913086
+            },
+            {
+              "decisionLogitAfterTemperature": 0.399522602558136,
+              "label": "2",
+              "logProbability": -1.2702285051345825,
+              "optionPositionTokenId": 4786,
+              "optionTokenPosition": 113,
+              "position": 2,
+              "probability": 0.2807674705982208,
+              "rawPointerLogit": 0.7328879237174988
+            },
+            {
+              "decisionLogitAfterTemperature": 0.3014128804206848,
+              "label": "3",
+              "logProbability": -1.3683382272720337,
+              "optionPositionTokenId": 4786,
+              "optionTokenPosition": 121,
+              "position": 3,
+              "probability": 0.25452956557273865,
+              "rawPointerLogit": 0.552914559841156
+            }
+          ],
+          "sourceAnswer": {
+            "confidence": 0.3556,
+            "legend": {
+              "0": "Poor fit",
+              "1": "Limited fit",
+              "2": "Good fit",
+              "3": "Excellent fit"
+            },
+            "probabilities": {
+              "0": 0.2061,
+              "1": 0.2586,
+              "2": 0.2808,
+              "3": 0.2545
+            },
+            "score": 1.5837,
+            "type": "score"
+          },
+          "type": "score",
+          "typedValue": 1.5837,
+          "typedValueType": "number"
+        },
+        {
+          "decisionLogitsAfterTemperature": [
+            -0.5417860746383667,
+            1.5939319133758545
+          ],
+          "logProbabilities": [
+            -2.2474021911621094,
+            -0.11168427020311356
+          ],
+          "name": "serverless",
+          "probabilities": [
+            0.10567338764667511,
+            0.8943265676498413
+          ],
+          "rawPointerLogits": [
+            -0.5799492001533508,
+            1.7062076330184937
+          ],
+          "slotCount": 2,
+          "slotLabelsByPosition": [
+            "false",
+            "true"
+          ],
+          "slots": [
+            {
+              "decisionLogitAfterTemperature": -0.5417860746383667,
+              "label": "false",
+              "logProbability": -2.2474021911621094,
+              "optionPositionTokenId": 13,
+              "optionTokenPosition": 101,
+              "position": 0,
+              "probability": 0.10567338764667511,
+              "rawPointerLogit": -0.5799492001533508
+            },
+            {
+              "decisionLogitAfterTemperature": 1.5939319133758545,
+              "label": "true",
+              "logProbability": -0.11168427020311356,
+              "optionPositionTokenId": 13,
+              "optionTokenPosition": 114,
+              "position": 1,
+              "probability": 0.8943265676498413,
+              "rawPointerLogit": 1.7062076330184937
+            }
+          ],
+          "sourceAnswer": {
+            "noul": 0.8943,
+            "type": "noul"
+          },
+          "type": "noul",
+          "typedValue": 0.8943,
+          "typedValueType": "number"
+        }
+      ],
+      "rawPointerLogits": [
+        [
+          -0.014306836761534214,
+          -0.26252806186676025,
+          1.2374227046966553,
+          1.5937308073043823
+        ],
+        [
+          0.16587835550308228,
+          0.5819387435913086,
+          0.7328879237174988,
+          0.552914559841156
+        ],
+        [
+          -0.5799492001533508,
+          1.7062076330184937,
+          0.5466098785400391,
+          0.5466098785400391
+        ]
+      ],
+      "request": {
+        "questions": [
+          [
+            "runtime",
+            {
+              "criteria": {
+                "WebGPU": "A browser GPU compute API.",
+                "Node.js": "A server-side JavaScript runtime.",
+                "TVM WebGPU": "A browser runtime compiled for WebGPU."
+              },
+              "instructions": "Which runtime best fits the stated constraints?",
+              "type": "choice"
+            }
+          ],
+          [
+            "suitability",
+            {
+              "criteria": [
+                "Poor fit",
+                "Limited fit",
+                "Good fit",
+                "Excellent fit"
+              ],
+              "instructions": "How suitable is this candidate for the widget?",
+              "type": "score"
+            }
+          ],
+          [
+            "serverless",
+            {
+              "criteria": {
+                "false": "The widget needs a remote server.",
+                "true": "The widget runs locally in the browser."
+              },
+              "instructions": "Can this widget run without contacting a server?",
+              "type": "noul"
+            }
+          ]
+        ],
+        "state": {
+          "request": "Assess a browser-only decision widget candidate.",
+          "constraints": [
+            "No server",
+            "TypeScript package",
+            "Run in modern browsers"
+          ]
+        }
+      },
+      "candidateUsageExpectation": {
+        "mode": "observed-default-cache-source",
+        "usage": {
+          "input_tokens": 281,
+          "output_tokens": 3
+        },
+        "evidence": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-prefix-cache-equivalence-cpu-r1-2026-11-16.json",
+          "reportSha256": "5d3edb124eade595add47aed99e8635e064392f319e77088a38787de0f38bf92",
+          "cachedUsageField": "cachedDefault.usage",
+          "uncachedUsageField": "uncached.usage"
+        }
+      }
+    }
+  ],
+  "engineConfig": {
+    "effectiveValues": {
+      "device": "cpu",
+      "max_batch": 32,
+      "max_batch_tokens": null,
+      "max_question_fraction": 0.75,
+      "model_name": "strands-decider-0.2.1.dev7+g13c0514",
+      "strict_window": false,
+      "use_prefix_cache": false
+    },
+    "explicitOverrides": {
+      "device": "cpu",
+      "use_prefix_cache": false
+    },
+    "upstreamDefaultsPreservedForAllOtherFields": true
+  },
+  "format": "qwen35-system-one-source-reference-v1",
+  "limitations": [
+    "One mixed text request is CPU pinned-source evidence only.",
+    "It does not establish TVM, WebGPU, browser, or package parity."
+  ],
+  "memory": [
+    {
+      "availableBytes": 18118426624,
+      "availableRatio": 0.7030874888102213,
+      "processRssBytes": 231817216,
+      "stage": "before-assets",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 18118426624,
+      "availableRatio": 0.7030874888102213,
+      "processRssBytes": 263798784,
+      "stage": "after-asset-verification",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 10822074368,
+      "availableRatio": 0.4199517567952474,
+      "processRssBytes": 8289583104,
+      "stage": "after-standard-engine-construction",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 10822074368,
+      "availableRatio": 0.4199517567952474,
+      "processRssBytes": 8289763328,
+      "stage": "before-evaluate",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 10818863104,
+      "availableRatio": 0.419827143351237,
+      "processRssBytes": 8423833600,
+      "stage": "after-evaluate",
+      "totalBytes": 25769803776
+    },
+    {
+      "availableBytes": 10818863104,
+      "availableRatio": 0.419827143351237,
+      "processRssBytes": 8423833600,
+      "stage": "complete",
+      "totalBytes": 25769803776
+    }
+  ],
+  "numericEncoding": {
+    "nonFiniteFloatValues": "string sentinels NaN, Infinity, -Infinity",
+    "reason": "standard JSON has no numeric representation for IEEE non-finite values; padded diagnostic logits are preserved explicitly"
+  },
+  "responseModelSemantics": {
+    "engineReturnedModelName": "strands-decider-0.2.1.dev7+g13c0514",
+    "expectedModelUsesPinnedCheckpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "fullResponsePreservesUnmodifiedEngineModelName": true
+  },
+  "scope": {
+    "cpuFp32UpcastApplied": true,
+    "gpuUsed": false,
+    "modelInferencePerformed": true,
+    "modelInstancesLoaded": 1,
+    "sourceDecisionForwardPerformed": true,
+    "systemOneEngineConstructorUsed": true,
+    "tvmUsed": false,
+    "weightsLoaded": true
+  },
+  "source": {
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "runner": "StrandsDeciderModel.load/SystemOneEngine.evaluate",
+    "strandsRepository": "StrandsAgents/strands-decider",
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "tvmUsed": false,
+    "weightsLoaded": true
+  },
+  "sourceModel": {
+    "engineConstructionSeconds": 2.503,
+    "engineConstructor": "SystemOneEngine(model, EngineConfig(device='cpu', use_prefix_cache=False))",
+    "loader": "StrandsDeciderModel.load(local_checkpoint, device_map=None, attn_implementation=None)",
+    "modelLoadSeconds": 1.385,
+    "parameterBytesAfterCpuUpcast": 7741736192,
+    "parameterTensorCount": 698,
+    "tokenizerClass": "Qwen2Tokenizer",
+    "tokenizerNameOrPath": "huggingface-cache/models--StrandsAgents--strands-decider-2B-qwen3.5-v1-2610/snapshots/216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "torsoDtypesAfterCpuUpcast": [
+      "torch.float32"
+    ]
+  },
+  "status": "passed-cpu-source-reference",
+  "toolchain": {
+    "expectedTorch": "2.8.0",
+    "expectedTransformers": "5.22.2",
+    "python": "3.11.11",
+    "strandsDecider": "0.2.1.dev7+g13c0514",
+    "torch": "2.8.0",
+    "transformers": "5.22.2"
+  }
+}

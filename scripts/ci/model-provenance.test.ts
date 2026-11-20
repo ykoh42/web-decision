@@ -75,26 +75,27 @@ async function validateTemporaryManifest(
   }
 }
 
-test('the pinned public-model record has verified source and conditional-rights evidence', async () => {
+test('the provenance manifest covers verified Kanana and pending Qwen', async () => {
   const {manifestBytes, modelSpec, artifactLock} = await readProductionInputs();
   const catalogIds = (modelSpec as {models: Array<{modelId: string}>}).models.map(({modelId}) => modelId).sort();
   const lockIds = Object.keys((artifactLock as {byModelId: Record<string, unknown>}).byModelId).sort();
   const manifestIds = (JSON.parse(manifestBytes.toString('utf8')) as {models: Array<{modelId: string}>}).models
     .map(({modelId}) => modelId)
     .sort();
-  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611']);
+  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610']);
   assert.deepEqual(manifestIds, catalogIds);
   assert.deepEqual(lockIds, catalogIds);
   assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256);
-  const result = await validateTemporaryManifest(manifestBytes);
-  assert.deepEqual(result.pendingModelIds, []);
+  const result = await validateTemporaryManifest(manifestBytes, {allowPending: true});
+  assert.deepEqual(result.pendingModelIds, ['strands-decider-2b-qwen3.5-v1-2610']);
 });
 
-test('verified records pass the provenance gate without a project license approval record', async () => {
+test('release provenance rejects the pending Qwen candidate', async () => {
   const {manifestBytes} = await readProductionInputs();
-  const result = await validateTemporaryManifest(manifestBytes, {allowPending: true});
-
-  assert.deepEqual(result.pendingModelIds, []);
+  await assert.rejects(
+    validateTemporaryManifest(manifestBytes),
+    /strands-decider-2b-qwen3\.5-v1-2610 provenance is pending/u
+  );
 });
 
 test('Kanana provenance pins the license conditions and captured build environment', async () => {
@@ -143,7 +144,10 @@ test('Kanana provenance pins the license conditions and captured build environme
   assert.equal(toolchain.observedBuildEnvironment.host.system, 'Darwin');
   assert.equal(toolchain.observedBuildEnvironment.host.build, '26B123');
   assert.equal(toolchain.observedBuildEnvironment.host.machine, 'arm64');
-  assert.equal(evidence.conversion.artifactLockSha256, sha256(await readFile(ARTIFACT_LOCK_PATH)));
+  const historicalLock = await readFile(
+    join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT, 'kanana-verified-artifact-lock.json')
+  );
+  assert.equal(evidence.conversion.artifactLockSha256, sha256(historicalLock));
   for (const reference of [evidence.conversion.recipe, evidence.conversion.config, evidence.conversion.toolchain]) {
     const bytes = await readFile(join(WORKSPACE_ROOT, reference.path));
     assert.equal(sha256(bytes), reference.sha256);
@@ -274,6 +278,67 @@ test('verified provenance requires immutable lineage, pinned conversion, and exp
   });
   assert.deepEqual(checked.modelIds, [modelId]);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
+
+  await t.test('a new model preserves an approved conversion only when its lock entry matches', async () => {
+    const archivedPath = 'docs/approved-artifact-lock.json';
+    await writeFile(join(temporaryRoot, archivedPath), artifactLockBytes);
+    const newModelId = 'pending-model';
+    const newEvidencePath = `src/catalog/provenance/${newModelId}.json`;
+    const newEvidence = Buffer.from(
+      JSON.stringify({modelId: newModelId, status: 'pending', unresolved: ['Validation.']})
+    );
+    await writeFile(join(packageRoot, newEvidencePath), newEvidence);
+    const approve = (currentEntry: unknown, historicalSha256 = artifactLockSha256) => {
+      const currentLock = {
+        schemaVersion: 1,
+        byModelId: {[modelId]: currentEntry, [newModelId]: {}}
+      };
+      const currentLockBytes = Buffer.from(JSON.stringify(currentLock));
+      const currentLockSha256 = sha256(currentLockBytes);
+      const currentManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 1,
+          models: [
+            {
+              modelId,
+              status: 'verified',
+              artifactLockSha256: currentLockSha256,
+              evidence: {path: `src/catalog/provenance/${modelId}.json`, sha256: sha256(evidenceBytes)},
+              conversionLockEvidence: {path: archivedPath, sha256: historicalSha256}
+            },
+            {
+              modelId: newModelId,
+              status: 'pending',
+              artifactLockSha256: currentLockSha256,
+              evidence: {path: newEvidencePath, sha256: sha256(newEvidence)}
+            }
+          ]
+        })
+      );
+      return validateModelProvenance({
+        packageRoot,
+        workspaceRoot: temporaryRoot,
+        modelSpec: {...verifiedSpec, models: [...verifiedSpec.models, {modelId: newModelId}]},
+        artifactLock: currentLock,
+        artifactLockBytes: currentLockBytes,
+        manifestBytes: currentManifest,
+        expectedManifestSha256: sha256(currentManifest),
+        expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+        allowTestFixture: false,
+        requireCommitted: false,
+        allowPending: true
+      });
+    };
+
+    assert.deepEqual((await approve(modelLockEntry)).pendingModelIds, [newModelId]);
+    await assert.rejects(
+      approve({...modelLock, changedArtifact: true}),
+      /Live artifact lock entry differs from approved conversion/u
+    );
+    await assert.rejects(approve(modelLockEntry, '0'.repeat(64)), /Historical conversion artifact-lock pin differs/u);
+    await writeFile(join(temporaryRoot, archivedPath), `${artifactLockBytes.toString('utf8')}\n`);
+    await assert.rejects(approve(modelLockEntry), /Historical conversion artifact lock.*SHA-256 mismatch/u);
+  });
 
   const missingConditions = structuredClone(verifiedEvidence);
   missingConditions.rights[0]!.conditions = [];

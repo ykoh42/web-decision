@@ -1,0 +1,1252 @@
+{
+  "format": "qwen35-official-vision-source-reference-v2",
+  "generatedAt": "2026-11-18T00:00:00Z",
+  "source": {
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "strandsRepository": "StrandsAgents/strands-decider",
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "runner": "StrandsDeciderModel.load/VisionEngine.evaluate",
+    "sourceVisionClass": "strands_decider.vision.VisionEngine",
+    "sourceVisionFileSha256": "705238d4f294b9724bee9026d3365594cd075ce1bf3b4fd0aa97dc49a80cbdd5",
+    "responseModelName": "strands-decider-0.2.1.dev7+g13c0514",
+    "weightsLoaded": true,
+    "tvmUsed": false,
+    "cpuPrecision": "BF16 outputs use pinned checkpoint precision; FP32 precision references use the pinned VisionEngine CPU upcast path. Default and forced-MATH profiler runs are preserved as source evidence.",
+    "sourceReports": [
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-source-bf16-default-repeat-cpu-r1-2026-11-18.json",
+        "sha256": "6d241d6098e064a0b286db3369cbc03ccc1b84ef78fb12f8355006e4969e2a41",
+        "case": "official-vision-1-image-448",
+        "mode": "bf16-default",
+        "torsoDtype": "torch.bfloat16",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_flash_attention_for_cpu": 36,
+          "aten::scaled_dot_product_attention": 36
+        },
+        "pixelValuesSha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9"
+      },
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json",
+        "sha256": "3085e229bc1c1e0d861f702eb3402fffa36d98ad88a25394535c4cc4ebe9a2a7",
+        "case": "official-vision-1-image-448",
+        "mode": "fp32-default",
+        "torsoDtype": "torch.float32",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_flash_attention_for_cpu": 36,
+          "aten::scaled_dot_product_attention": 36
+        },
+        "pixelValuesSha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9"
+      },
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json",
+        "sha256": "3085e229bc1c1e0d861f702eb3402fffa36d98ad88a25394535c4cc4ebe9a2a7",
+        "case": "official-vision-1-image-448",
+        "mode": "fp32-forced-math",
+        "torsoDtype": "torch.float32",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_attention_math": 36,
+          "aten::scaled_dot_product_attention": 36
+        },
+        "pixelValuesSha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9"
+      },
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-bf16-default-source-cpu-r1-2026-11-18.json",
+        "sha256": "adedc5deb429b4cde35dc8c47c3045a20147bdf9fbe728658b03d07274a995a9",
+        "case": "official-vision-4-image-448",
+        "mode": "bf16-default",
+        "torsoDtype": "torch.bfloat16",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_flash_attention_for_cpu": 108,
+          "aten::scaled_dot_product_attention": 108
+        },
+        "pixelValuesSha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2"
+      },
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+        "sha256": "c0e9a0f3424020562f032683401485b3dbdc825b6ee732b587779b65ce7cbe83",
+        "case": "official-vision-4-image-448",
+        "mode": "fp32-default",
+        "torsoDtype": "torch.float32",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_flash_attention_for_cpu": 108,
+          "aten::scaled_dot_product_attention": 108
+        },
+        "pixelValuesSha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2"
+      },
+      {
+        "path": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+        "sha256": "c0e9a0f3424020562f032683401485b3dbdc825b6ee732b587779b65ce7cbe83",
+        "case": "official-vision-4-image-448",
+        "mode": "fp32-forced-math",
+        "torsoDtype": "torch.float32",
+        "profilerEnabled": true,
+        "sdpaCounts": {
+          "aten::_scaled_dot_product_attention_math": 108,
+          "aten::scaled_dot_product_attention": 108
+        },
+        "pixelValuesSha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2"
+      }
+    ]
+  },
+  "processor": {
+    "configSha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    "imageLongSide": 448,
+    "maxImages": 4,
+    "maxPixels": 16777216,
+    "minPixels": 65536,
+    "name": "Qwen2VLImageProcessorPil",
+    "patchSize": 16,
+    "pillowVersion": "13.0.0",
+    "resizeFactor": 32,
+    "transformersVersion": "5.22.2"
+  },
+  "toolchain": {
+    "cpuConvInstalled": true,
+    "cpuThreads": 4,
+    "pillow": "13.0.0",
+    "python": "3.11.11",
+    "torch": "2.8.0",
+    "transformers": "5.22.2"
+  },
+  "scope": {
+    "gpuUsed": false,
+    "tvmUsed": false,
+    "modelInferencePerformed": true,
+    "sourceCpuUpcastApplied": true,
+    "sourceVisionEngineEvaluateCalled": true,
+    "modelInstancesLoadedPerCase": 1,
+    "profilerEnabled": true
+  },
+  "assets": {
+    "base": {
+      "config.json": {
+        "bytes": 2908,
+        "rehashPerformed": true,
+        "relativePath": "config.json",
+        "sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4"
+      },
+      "model.safetensors-00001-of-00001.safetensors": {
+        "bytes": 4548221488,
+        "rehashPerformed": false,
+        "relativePath": "model.safetensors-00001-of-00001.safetensors",
+        "sha256": "928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d",
+        "verifiedBy": "scripts/strands/qwen35/reports/base-f16-storage-webgpu-r1-2026-11-15.json"
+      },
+      "model.safetensors.index.json": {
+        "bytes": 64460,
+        "rehashPerformed": true,
+        "relativePath": "model.safetensors.index.json",
+        "sha256": "74d2ddfe79f10f35b27b498632f02b97b60dd9ec39b35d7c5a890c399284e319"
+      },
+      "preprocessor_config.json": {
+        "bytes": 390,
+        "rehashPerformed": true,
+        "relativePath": "preprocessor_config.json",
+        "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516"
+      },
+      "tokenizer.json": {
+        "bytes": 12807196,
+        "rehashPerformed": true,
+        "relativePath": "tokenizer.json",
+        "sha256": "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927"
+      },
+      "tokenizer_config.json": {
+        "bytes": 16712,
+        "rehashPerformed": true,
+        "relativePath": "tokenizer_config.json",
+        "sha256": "e611fbccc7c29ef3b1cafb1cb7ea548d189968632901d678fd62be68c47885de"
+      },
+      "vocab.json": {
+        "bytes": 6722759,
+        "rehashPerformed": true,
+        "relativePath": "vocab.json",
+        "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+      }
+    },
+    "checkpoint": {
+      "MANIFEST.sha256": {
+        "bytes": 2484,
+        "rehashPerformed": true,
+        "relativePath": "MANIFEST.sha256",
+        "sha256": "874dfc3d47c22b5c50b387fabd1e549be483f6e29c127ec6f852125779fa3371"
+      },
+      "head.safetensors": {
+        "bytes": 12605928,
+        "rehashPerformed": true,
+        "relativePath": "head.safetensors",
+        "sha256": "ace56742545b505e6fae34ada85c8edbeedb23ba8974d8680aebe0380d6083a1"
+      },
+      "lora/adapter_config.json": {
+        "bytes": 1271,
+        "rehashPerformed": true,
+        "relativePath": "lora/adapter_config.json",
+        "sha256": "0ced130cefbad13b092425de87680347ce01d09c833cf8e3870e8156db18ffcc"
+      },
+      "lora/adapter_model.safetensors": {
+        "bytes": 201878888,
+        "rehashPerformed": true,
+        "relativePath": "lora/adapter_model.safetensors",
+        "sha256": "ae1d0cd1ac3edec6df0a519a3ad18f1c382099032d493f8f98c96a80cfebb4c7"
+      },
+      "provenance.json": {
+        "bytes": 967,
+        "rehashPerformed": true,
+        "relativePath": "provenance.json",
+        "sha256": "8713fedb4e67fb6c60f41dc73c937635377506671e09978f92a2d447ac5264bd"
+      },
+      "strands_decider_config.json": {
+        "bytes": 746,
+        "rehashPerformed": true,
+        "relativePath": "strands_decider_config.json",
+        "sha256": "1d9625055e88c254d50089116992d08b0567286c9d6fcefb3c025922058ee65a"
+      },
+      "tokenizer.json": {
+        "bytes": 19989592,
+        "rehashPerformed": true,
+        "relativePath": "tokenizer.json",
+        "sha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86"
+      },
+      "tokenizer_config.json": {
+        "bytes": 1128,
+        "rehashPerformed": true,
+        "relativePath": "tokenizer_config.json",
+        "sha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45"
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "official-vision-1-image-448",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Look at the attached geometric image.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "criteria": {
+                "Blue circle": "A blue circle centered in the image.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image.",
+                "White triangle": "A white triangle centered in the image.",
+                "Yellow square": "A yellow square centered on a blue background."
+              },
+              "instructions": "Which shape is centered in the image?",
+              "type": "choice"
+            }
+          ],
+          [
+            "image_score",
+            {
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ],
+              "instructions": "Rate how well the description matches the image.",
+              "type": "score"
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "criteria": null,
+              "instructions": "The image has a yellow square centered on a blue background.",
+              "type": "noul"
+            }
+          ]
+        ]
+      },
+      "choiceLabels": [
+        "Blue circle",
+        "Orange diamond",
+        "Red triangle",
+        "White triangle",
+        "Yellow square"
+      ],
+      "expected": {
+        "model": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+        "usage": {
+          "input_tokens": 480,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "choice": "Yellow square",
+            "confidence": 0.9801,
+            "probabilities": {
+              "Blue circle": 0.006,
+              "Orange diamond": 0.0042,
+              "Red triangle": 0.0029,
+              "White triangle": 0.0028,
+              "Yellow square": 0.984
+            },
+            "type": "choice"
+          },
+          "image_score": {
+            "confidence": 0.3175,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.2436,
+              "1": 0.3654,
+              "2": 0.391
+            },
+            "score": 1.1474,
+            "type": "score"
+          },
+          "image_noul": {
+            "noul": 0.9567,
+            "type": "noul"
+          }
+        }
+      },
+      "precisionReference": {
+        "model": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+        "usage": {
+          "input_tokens": 480,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "choice": "Yellow square",
+            "confidence": 0.981,
+            "probabilities": {
+              "Blue circle": 0.0056,
+              "Orange diamond": 0.004,
+              "Red triangle": 0.0028,
+              "White triangle": 0.0027,
+              "Yellow square": 0.9848
+            },
+            "type": "choice"
+          },
+          "image_score": {
+            "confidence": 0.3188,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.2416,
+              "1": 0.3656,
+              "2": 0.3928
+            },
+            "score": 1.1512,
+            "type": "score"
+          },
+          "image_noul": {
+            "noul": 0.9587,
+            "type": "noul"
+          }
+        }
+      },
+      "precisionEnvelope": {
+        "formula": "abs(bf16-fp32)+roundingTolerance",
+        "roundingTolerance": 0.0001,
+        "answers": {
+          "image_choice": {
+            "confidence": {
+              "bf16": 0.9801,
+              "fp32": 0.981,
+              "absoluteDelta": 0.0009000000000000119,
+              "allowedDelta": 0.001000000000000012
+            },
+            "probabilities": {
+              "Blue circle": {
+                "bf16": 0.006,
+                "fp32": 0.0056,
+                "absoluteDelta": 0.0004000000000000002,
+                "allowedDelta": 0.0005000000000000002
+              },
+              "Orange diamond": {
+                "bf16": 0.0042,
+                "fp32": 0.004,
+                "absoluteDelta": 0.00019999999999999966,
+                "allowedDelta": 0.00029999999999999965
+              },
+              "Red triangle": {
+                "bf16": 0.0029,
+                "fp32": 0.0028,
+                "absoluteDelta": 0.00009999999999999983,
+                "allowedDelta": 0.00019999999999999982
+              },
+              "White triangle": {
+                "bf16": 0.0028,
+                "fp32": 0.0027,
+                "absoluteDelta": 0.00009999999999999983,
+                "allowedDelta": 0.00019999999999999982
+              },
+              "Yellow square": {
+                "bf16": 0.984,
+                "fp32": 0.9848,
+                "absoluteDelta": 0.0008000000000000229,
+                "allowedDelta": 0.000900000000000023
+              }
+            }
+          },
+          "image_score": {
+            "score": {
+              "bf16": 1.1474,
+              "fp32": 1.1512,
+              "absoluteDelta": 0.0038000000000000256,
+              "allowedDelta": 0.0039000000000000254
+            },
+            "confidence": {
+              "bf16": 0.3175,
+              "fp32": 0.3188,
+              "absoluteDelta": 0.0012999999999999678,
+              "allowedDelta": 0.001399999999999968
+            },
+            "probabilities": {
+              "0": {
+                "bf16": 0.2436,
+                "fp32": 0.2416,
+                "absoluteDelta": 0.0020000000000000018,
+                "allowedDelta": 0.0021000000000000016
+              },
+              "1": {
+                "bf16": 0.3654,
+                "fp32": 0.3656,
+                "absoluteDelta": 0.00019999999999997797,
+                "allowedDelta": 0.00029999999999997796
+              },
+              "2": {
+                "bf16": 0.391,
+                "fp32": 0.3928,
+                "absoluteDelta": 0.0017999999999999683,
+                "allowedDelta": 0.0018999999999999683
+              }
+            }
+          },
+          "image_noul": {
+            "noul": {
+              "bf16": 0.9567,
+              "fp32": 0.9587,
+              "absoluteDelta": 0.0020000000000000018,
+              "allowedDelta": 0.0021000000000000016
+            }
+          }
+        }
+      },
+      "imageFiles": [
+        {
+          "bytes": 1581,
+          "mimeType": "image/png",
+          "path": "vision-input/yellow-square-blue-448.png",
+          "sha256": "3cc779c2ae8d12fa5d82f501ce88cc81b242d485cf9053f58857db97401b891d"
+        }
+      ],
+      "imageGeometry": [
+        {
+          "height": 448,
+          "longSide": 448,
+          "patchRows": 784,
+          "width": 448
+        }
+      ],
+      "sourceEvidence": {
+        "bf16Default": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-source-bf16-default-repeat-cpu-r1-2026-11-18.json",
+          "reportSha256": "6d241d6098e064a0b286db3369cbc03ccc1b84ef78fb12f8355006e4969e2a41",
+          "runName": "bf16-default",
+          "torsoDtype": "torch.bfloat16",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 4816896,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9",
+            "shape": [
+              784,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_flash_attention_for_cpu": 36,
+            "aten::scaled_dot_product_attention": 36
+          },
+          "elapsedSeconds": 16.191,
+          "memory": {
+            "after": {
+              "availableBytes": 14368899072,
+              "availableRatio": 0.557586669921875,
+              "processRssBytes": 4564598784,
+              "stage": "after-bf16-default",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 14491566080,
+              "availableRatio": 0.5623467763264974,
+              "processRssBytes": 901431296,
+              "stage": "before-bf16-default",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": null
+        },
+        "fp32Default": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json",
+          "reportSha256": "3085e229bc1c1e0d861f702eb3402fffa36d98ad88a25394535c4cc4ebe9a2a7",
+          "runName": "fp32-default",
+          "torsoDtype": "torch.float32",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 4816896,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9",
+            "shape": [
+              784,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_flash_attention_for_cpu": 36,
+            "aten::scaled_dot_product_attention": 36
+          },
+          "elapsedSeconds": 2.87,
+          "memory": {
+            "after": {
+              "availableBytes": 8503394304,
+              "availableRatio": 0.3299751281738281,
+              "processRssBytes": 6219317248,
+              "stage": "after-fp32-default",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 10354589696,
+              "availableRatio": 0.4018109639485677,
+              "processRssBytes": 9618685952,
+              "stage": "before-fp32-default",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": {
+            "canonicalSupervisorCommand": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/supervise_official_vision_fp32_source_cpu.py"
+            ],
+            "childReturnCode": 0,
+            "command": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/run_official_vision_source_matrix_cpu.py",
+              "--mode",
+              "fp32-only",
+              "--min-available-ratio",
+              "0.2",
+              "--max-process-rss-gib",
+              "14",
+              "--report",
+              "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json"
+            ],
+            "finalMemory": {
+              "availableBytes": 15834431488,
+              "availableRatio": 0.6144568125406901,
+              "totalBytes": 25769803776
+            },
+            "finalTreeRssBytes": 0,
+            "maximumTreeRssBytesGuard": 15032385536,
+            "minimumAvailableBytes": 6933544960,
+            "minimumAvailableBytesGuard": 5368709120,
+            "minimumAvailableRatio": 0.2690569559733073,
+            "peakTreeRssBytes": 11216273408,
+            "preflight": {
+              "availableBytes": 15202041856,
+              "availableRatio": 0.5899168650309244,
+              "totalBytes": 25769803776
+            },
+            "sampleCount": 61,
+            "sampleIntervalSeconds": 0.25,
+            "status": "completed",
+            "supervisorInvocation": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/supervise_official_vision_fp32_source_cpu.py",
+              "--help"
+            ],
+            "supervisorInvocationNote": "The initial wrapper invocation included an unused --help argument; this wrapper has no argument parser, so it ran the configured FP32-only child command recorded in command. Reproduce with canonicalSupervisorCommand."
+          }
+        },
+        "fp32ForcedMath": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json",
+          "reportSha256": "3085e229bc1c1e0d861f702eb3402fffa36d98ad88a25394535c4cc4ebe9a2a7",
+          "runName": "fp32-forced-math",
+          "torsoDtype": "torch.float32",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 4816896,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "e18ba6d461dcee924be2d2e537da64569bc01e833331e234bd01a04cd80549d9",
+            "shape": [
+              784,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_attention_math": 36,
+            "aten::scaled_dot_product_attention": 36
+          },
+          "elapsedSeconds": 2.384,
+          "memory": {
+            "after": {
+              "availableBytes": 9186607104,
+              "availableRatio": 0.3564872741699219,
+              "processRssBytes": 8789819392,
+              "stage": "after-fp32-forced-math",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 7198605312,
+              "availableRatio": 0.2793426513671875,
+              "processRssBytes": 4198907904,
+              "stage": "before-fp32-forced-math",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": {
+            "canonicalSupervisorCommand": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/supervise_official_vision_fp32_source_cpu.py"
+            ],
+            "childReturnCode": 0,
+            "command": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/run_official_vision_source_matrix_cpu.py",
+              "--mode",
+              "fp32-only",
+              "--min-available-ratio",
+              "0.2",
+              "--max-process-rss-gib",
+              "14",
+              "--report",
+              "scripts/strands/qwen35/reports/qwen35-official-vision-source-fp32-only-cpu-r1-2026-11-18.json"
+            ],
+            "finalMemory": {
+              "availableBytes": 15834431488,
+              "availableRatio": 0.6144568125406901,
+              "totalBytes": 25769803776
+            },
+            "finalTreeRssBytes": 0,
+            "maximumTreeRssBytesGuard": 15032385536,
+            "minimumAvailableBytes": 6933544960,
+            "minimumAvailableBytesGuard": 5368709120,
+            "minimumAvailableRatio": 0.2690569559733073,
+            "peakTreeRssBytes": 11216273408,
+            "preflight": {
+              "availableBytes": 15202041856,
+              "availableRatio": 0.5899168650309244,
+              "totalBytes": 25769803776
+            },
+            "sampleCount": 61,
+            "sampleIntervalSeconds": 0.25,
+            "status": "completed",
+            "supervisorInvocation": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/supervise_official_vision_fp32_source_cpu.py",
+              "--help"
+            ],
+            "supervisorInvocationNote": "The initial wrapper invocation included an unused --help argument; this wrapper has no argument parser, so it ran the configured FP32-only child command recorded in command. Reproduce with canonicalSupervisorCommand."
+          }
+        }
+      }
+    },
+    {
+      "name": "official-vision-4-image-448",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Look at the attached geometric images in their given order.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "criteria": {
+                "Blue circle": "A blue circle centered in the image.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image.",
+                "White triangle": "A white triangle centered in the image.",
+                "Yellow square": "A yellow square centered on a blue background."
+              },
+              "instructions": "Which shape is centered in the first attached image?",
+              "type": "choice"
+            }
+          ],
+          [
+            "image_score",
+            {
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ],
+              "instructions": "Rate how well the description matches the first attached image.",
+              "type": "score"
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "criteria": null,
+              "instructions": "The first attached image has a yellow square centered on a blue background.",
+              "type": "noul"
+            }
+          ]
+        ]
+      },
+      "choiceLabels": [
+        "Blue circle",
+        "Orange diamond",
+        "Red triangle",
+        "White triangle",
+        "Yellow square"
+      ],
+      "expected": {
+        "model": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+        "usage": {
+          "input_tokens": 1087,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "choice": "Yellow square",
+            "confidence": 0.9779,
+            "probabilities": {
+              "Blue circle": 0.0059,
+              "Orange diamond": 0.0046,
+              "Red triangle": 0.0032,
+              "White triangle": 0.0039,
+              "Yellow square": 0.9823
+            },
+            "type": "choice"
+          },
+          "image_score": {
+            "confidence": 0.2536,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.3653,
+              "1": 0.3147,
+              "2": 0.32
+            },
+            "score": 0.9547,
+            "type": "score"
+          },
+          "image_noul": {
+            "noul": 0.9611,
+            "type": "noul"
+          }
+        }
+      },
+      "precisionReference": {
+        "model": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+        "usage": {
+          "input_tokens": 1087,
+          "output_tokens": 3
+        },
+        "answers": {
+          "image_choice": {
+            "choice": "Yellow square",
+            "confidence": 0.9782,
+            "probabilities": {
+              "Blue circle": 0.0059,
+              "Orange diamond": 0.0045,
+              "Red triangle": 0.0031,
+              "White triangle": 0.0039,
+              "Yellow square": 0.9825
+            },
+            "type": "choice"
+          },
+          "image_score": {
+            "confidence": 0.2583,
+            "legend": {
+              "0": "The description does not match the image.",
+              "1": "The description partly matches the image.",
+              "2": "The description exactly matches the image."
+            },
+            "probabilities": {
+              "0": 0.3599,
+              "1": 0.3204,
+              "2": 0.3197
+            },
+            "score": 0.9597,
+            "type": "score"
+          },
+          "image_noul": {
+            "noul": 0.9618,
+            "type": "noul"
+          }
+        }
+      },
+      "precisionEnvelope": {
+        "formula": "abs(bf16-fp32)+roundingTolerance",
+        "roundingTolerance": 0.0001,
+        "answers": {
+          "image_choice": {
+            "confidence": {
+              "bf16": 0.9779,
+              "fp32": 0.9782,
+              "absoluteDelta": 0.00029999999999996696,
+              "allowedDelta": 0.00039999999999996695
+            },
+            "probabilities": {
+              "Blue circle": {
+                "bf16": 0.0059,
+                "fp32": 0.0059,
+                "absoluteDelta": 0,
+                "allowedDelta": 0.0001
+              },
+              "Orange diamond": {
+                "bf16": 0.0046,
+                "fp32": 0.0045,
+                "absoluteDelta": 0.00010000000000000026,
+                "allowedDelta": 0.00020000000000000025
+              },
+              "Red triangle": {
+                "bf16": 0.0032,
+                "fp32": 0.0031,
+                "absoluteDelta": 0.00010000000000000026,
+                "allowedDelta": 0.00020000000000000025
+              },
+              "White triangle": {
+                "bf16": 0.0039,
+                "fp32": 0.0039,
+                "absoluteDelta": 0,
+                "allowedDelta": 0.0001
+              },
+              "Yellow square": {
+                "bf16": 0.9823,
+                "fp32": 0.9825,
+                "absoluteDelta": 0.000200000000000089,
+                "allowedDelta": 0.000300000000000089
+              }
+            }
+          },
+          "image_score": {
+            "score": {
+              "bf16": 0.9547,
+              "fp32": 0.9597,
+              "absoluteDelta": 0.0050000000000000044,
+              "allowedDelta": 0.005100000000000005
+            },
+            "confidence": {
+              "bf16": 0.2536,
+              "fp32": 0.2583,
+              "absoluteDelta": 0.004699999999999982,
+              "allowedDelta": 0.004799999999999982
+            },
+            "probabilities": {
+              "0": {
+                "bf16": 0.3653,
+                "fp32": 0.3599,
+                "absoluteDelta": 0.005400000000000016,
+                "allowedDelta": 0.005500000000000016
+              },
+              "1": {
+                "bf16": 0.3147,
+                "fp32": 0.3204,
+                "absoluteDelta": 0.005700000000000038,
+                "allowedDelta": 0.005800000000000039
+              },
+              "2": {
+                "bf16": 0.32,
+                "fp32": 0.3197,
+                "absoluteDelta": 0.00030000000000002247,
+                "allowedDelta": 0.00040000000000002246
+              }
+            }
+          },
+          "image_noul": {
+            "noul": {
+              "bf16": 0.9611,
+              "fp32": 0.9618,
+              "absoluteDelta": 0.0007000000000000339,
+              "allowedDelta": 0.000800000000000034
+            }
+          }
+        }
+      },
+      "imageFiles": [
+        {
+          "bytes": 1581,
+          "mimeType": "image/png",
+          "path": "vision-input/yellow-square-blue-448.png",
+          "sha256": "3cc779c2ae8d12fa5d82f501ce88cc81b242d485cf9053f58857db97401b891d"
+        },
+        {
+          "bytes": 2329,
+          "mimeType": "image/png",
+          "path": "vision-input/green-circle-red-448.png",
+          "sha256": "20729f0a68f8042ca2aeb30123fb57d0c8b59177fda5143f663ca9f3afa4e09b"
+        },
+        {
+          "bytes": 2268,
+          "mimeType": "image/png",
+          "path": "vision-input/white-triangle-purple-448.png",
+          "sha256": "d13c8b5a63f4a24f189b805c017683ac8101340fff05b30fd0f0eb980bcced07"
+        },
+        {
+          "bytes": 2764,
+          "mimeType": "image/png",
+          "path": "vision-input/orange-diamond-black-448.png",
+          "sha256": "78e1178ddf10d9579c36fffca70d4024c896b33c9b974fa858b815ba3e8abc22"
+        }
+      ],
+      "imageGeometry": [
+        {
+          "height": 448,
+          "longSide": 448,
+          "patchRows": 784,
+          "width": 448
+        },
+        {
+          "height": 448,
+          "longSide": 448,
+          "patchRows": 784,
+          "width": 448
+        },
+        {
+          "height": 448,
+          "longSide": 448,
+          "patchRows": 784,
+          "width": 448
+        },
+        {
+          "height": 448,
+          "longSide": 448,
+          "patchRows": 784,
+          "width": 448
+        }
+      ],
+      "sourceEvidence": {
+        "bf16Default": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-bf16-default-source-cpu-r1-2026-11-18.json",
+          "reportSha256": "adedc5deb429b4cde35dc8c47c3045a20147bdf9fbe728658b03d07274a995a9",
+          "runName": "bf16-default",
+          "torsoDtype": "torch.bfloat16",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 19267584,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2",
+            "shape": [
+              3136,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_flash_attention_for_cpu": 108,
+            "aten::scaled_dot_product_attention": 108
+          },
+          "elapsedSeconds": 47.336,
+          "memory": {
+            "after": {
+              "availableBytes": 12725682176,
+              "availableRatio": 0.4938214619954427,
+              "processRssBytes": 4823367680,
+              "stage": "after-bf16-default",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 13432438784,
+              "availableRatio": 0.5212472279866537,
+              "processRssBytes": 901742592,
+              "stage": "before-bf16-default",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": {
+            "childReturnCode": 0,
+            "command": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/run_official_vision_source_matrix_cpu.py",
+              "--mode",
+              "bf16-default",
+              "--min-available-ratio",
+              "0.2",
+              "--max-process-rss-gib",
+              "14",
+              "--report",
+              "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-bf16-default-source-cpu-r1-2026-11-18.json",
+              "--case",
+              "official-vision-4-image-448"
+            ],
+            "finalMemory": {
+              "availableBytes": 13519798272,
+              "availableRatio": 0.5246372222900391,
+              "totalBytes": 25769803776
+            },
+            "finalTreeRssBytes": 0,
+            "maximumTreeRssBytesGuard": 15032385536,
+            "minimumAvailableBytes": 12172083200,
+            "minimumAvailableBytesGuard": 5368709120,
+            "minimumAvailableRatio": 0.4723389943440755,
+            "peakTreeRssBytes": 5713788928,
+            "preflight": {
+              "availableBytes": 14278787072,
+              "availableRatio": 0.5540898640950521,
+              "totalBytes": 25769803776
+            },
+            "sampleCount": 215,
+            "sampleIntervalSeconds": 0.25,
+            "status": "completed"
+          }
+        },
+        "fp32Default": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+          "reportSha256": "c0e9a0f3424020562f032683401485b3dbdc825b6ee732b587779b65ce7cbe83",
+          "runName": "fp32-default",
+          "torsoDtype": "torch.float32",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 19267584,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2",
+            "shape": [
+              3136,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_flash_attention_for_cpu": 108,
+            "aten::scaled_dot_product_attention": 108
+          },
+          "elapsedSeconds": 4.911,
+          "memory": {
+            "after": {
+              "availableBytes": 9305833472,
+              "availableRatio": 0.3611138661702474,
+              "processRssBytes": 7955267584,
+              "stage": "after-fp32-default",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 10385113088,
+              "availableRatio": 0.40299542744954425,
+              "processRssBytes": 3867590656,
+              "stage": "before-fp32-default",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": {
+            "childReturnCode": 0,
+            "command": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/run_official_vision_source_matrix_cpu.py",
+              "--mode",
+              "fp32-only",
+              "--min-available-ratio",
+              "0.2",
+              "--max-process-rss-gib",
+              "14",
+              "--report",
+              "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+              "--case",
+              "official-vision-4-image-448"
+            ],
+            "finalMemory": {
+              "availableBytes": 16489447424,
+              "availableRatio": 0.6398747762044271,
+              "totalBytes": 25769803776
+            },
+            "finalTreeRssBytes": 0,
+            "maximumTreeRssBytesGuard": 15032385536,
+            "minimumAvailableBytes": 5807882240,
+            "minimumAvailableBytesGuard": 5368709120,
+            "minimumAvailableRatio": 0.22537549336751303,
+            "peakTreeRssBytes": 11702714368,
+            "preflight": {
+              "availableBytes": 13485686784,
+              "availableRatio": 0.5233135223388672,
+              "totalBytes": 25769803776
+            },
+            "sampleCount": 102,
+            "sampleIntervalSeconds": 0.25,
+            "status": "completed"
+          }
+        },
+        "fp32ForcedMath": {
+          "reportPath": "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+          "reportSha256": "c0e9a0f3424020562f032683401485b3dbdc825b6ee732b587779b65ce7cbe83",
+          "runName": "fp32-forced-math",
+          "torsoDtype": "torch.float32",
+          "responseModel": "strands-decider-0.2.1.dev7+g13c0514",
+          "pixelInput": {
+            "byteLength": 19267584,
+            "dtype": "torch.float32",
+            "imageGridThw": [
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ],
+              [
+                1,
+                28,
+                28
+              ]
+            ],
+            "sha256": "30f3c1bb4265a4390e32693b59603e7f3845dcdcbfb3b1796a6337207c1883c2",
+            "shape": [
+              3136,
+              1536
+            ]
+          },
+          "profilingEnabled": true,
+          "sdpaCounts": {
+            "aten::_scaled_dot_product_attention_math": 108,
+            "aten::scaled_dot_product_attention": 108
+          },
+          "elapsedSeconds": 4.425,
+          "memory": {
+            "after": {
+              "availableBytes": 9147416576,
+              "availableRatio": 0.3549664815266927,
+              "processRssBytes": 9563308032,
+              "stage": "after-fp32-forced-math",
+              "totalBytes": 25769803776
+            },
+            "before": {
+              "availableBytes": 8809201664,
+              "availableRatio": 0.3418420155843099,
+              "processRssBytes": 7946780672,
+              "stage": "before-fp32-forced-math",
+              "totalBytes": 25769803776
+            }
+          },
+          "memoryMonitor": {
+            "childReturnCode": 0,
+            "command": [
+              "scripts/strands/qwen35/build-env/.venv/bin/python",
+              "scripts/strands/qwen35/run_official_vision_source_matrix_cpu.py",
+              "--mode",
+              "fp32-only",
+              "--min-available-ratio",
+              "0.2",
+              "--max-process-rss-gib",
+              "14",
+              "--report",
+              "scripts/strands/qwen35/reports/qwen35-official-vision-four-image-fp32-only-source-cpu-r1-2026-11-18.json",
+              "--case",
+              "official-vision-4-image-448"
+            ],
+            "finalMemory": {
+              "availableBytes": 16489447424,
+              "availableRatio": 0.6398747762044271,
+              "totalBytes": 25769803776
+            },
+            "finalTreeRssBytes": 0,
+            "maximumTreeRssBytesGuard": 15032385536,
+            "minimumAvailableBytes": 5807882240,
+            "minimumAvailableBytesGuard": 5368709120,
+            "minimumAvailableRatio": 0.22537549336751303,
+            "peakTreeRssBytes": 11702714368,
+            "preflight": {
+              "availableBytes": 13485686784,
+              "availableRatio": 0.5233135223388672,
+              "totalBytes": 25769803776
+            },
+            "sampleCount": 102,
+            "sampleIntervalSeconds": 0.25,
+            "status": "completed"
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Pinned Strands/PyTorch CPU source evidence only; this report makes no TVM, WebGPU, package, or browser parity claim.",
+    "FP32 precision references use the pinned VisionEngine CPU upcast path; forced-MATH outputs are retained as profiler evidence, not as the primary precision reference."
+  ],
+  "status": "passed-cpu-source-reference"
+}

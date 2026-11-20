@@ -67,13 +67,17 @@ test('reads source options and requests the pinned manifest range before cancell
     events.push('fetch');
     assert.equal(String(input), `${BASE}${FIRST_PATH}`);
     assert.equal(new Headers(init?.headers).get('range'), `bytes=0-${MANIFEST_BYTES - 1}`);
-    assert.equal(init?.signal, undefined);
+    assert.ok(init?.signal instanceof AbortSignal);
+    assert.equal(init.signal.aborted, false);
     return invalidRangeResponse(events);
   });
 
-  await assert.rejects(openPinnedRangeSource(options), {
-    code: 'INVALID_ASSET',
-    message: 'Invalid or inaccessible Content-Range or Content-Length response.'
+  await assert.rejects(openPinnedRangeSource(options), (error: unknown) => {
+    const failure = error as Error & {readonly code?: string};
+    assert.equal(failure.code, 'INVALID_ASSET');
+    assert.match(failure.message, /^Invalid or inaccessible Content-Range or Content-Length response:/u);
+    assert.match(failure.message, /responseStatus=200/u);
+    return true;
   });
   assert.deepEqual(events, [
     'options.base',
@@ -84,6 +88,7 @@ test('reads source options and requests the pinned manifest range before cancell
     'cache.match:/.web-decision-cache/sha256/',
     'fetch',
     'headers.get:content-length',
+    'headers.get:content-range',
     'body.cancel'
   ]);
 });
@@ -114,9 +119,13 @@ test('propagates abort from the first range and cancels its late response body',
 
   const pending = openPinnedRangeSource(options);
   await fetchStarted;
-  assert.equal(fetchSignal, controller.signal);
+  assert.ok(fetchSignal instanceof AbortSignal);
+  assert.notEqual(fetchSignal, controller.signal, 'the source adds its disposal signal to the caller signal');
+  assert.equal(fetchSignal.aborted, false);
   controller.abort(reason);
   await assert.rejects(pending, (error: unknown) => error === reason);
+  assert.equal(fetchSignal.aborted, true);
+  assert.equal(fetchSignal.reason, reason);
   resolveFetch(invalidRangeResponse(events));
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.deepEqual(events, ['fetch', 'body.cancel']);

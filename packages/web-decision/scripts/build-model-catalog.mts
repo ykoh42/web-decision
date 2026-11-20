@@ -137,6 +137,21 @@ const bundledFiles: readonly (readonly [string, string])[] = [
   ['weights/tensor-cache.json', 'assets/experimental-kev-upstream/weights/tensor-cache.json']
 ];
 const kananaManifestPath = 'assets/kanana/manifest.json';
+const qwen35ManifestPath = 'assets/qwen35/manifest.json';
+const qwen35Repository = 'StrandsAgents/strands-decider-2B-qwen3.5-v1-2610';
+const qwen35Revision = '216d1ccb46a9e9b036eb9187b248db98480f77d4';
+const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
+const qwen35Files = [
+  'pinned-word-assets-manifest.json',
+  'source-range-inventory.json',
+  'r19/manifest.json',
+  'r19/fixture.json',
+  'r19/weight-bindings.json',
+  'r19/qwen35-text-pointer.webgpu.wasm',
+  'vision/fixture.json',
+  'vision/weight-bindings.json',
+  'vision/qwen35-dynamic-vision.webgpu.wasm'
+] as const;
 
 function failUnless(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -642,6 +657,137 @@ async function createKananaArtifactLock(model: CuratedModel): Promise<ModelArtif
   };
 }
 
+async function createQwen35ArtifactLock(model: CuratedModel): Promise<CatalogArtifactLock> {
+  failUnless(model.modelId === qwen35ModelId, 'Qwen3.5 catalog model ID differs from its pinned model.');
+  failUnless(model.description.adapter === 'strands-qwen35', 'Qwen3.5 package requires its dedicated adapter.');
+  failUnless(
+    model.description.checkpoint.repository === qwen35Repository &&
+      model.description.checkpoint.revision === qwen35Revision,
+    'Qwen3.5 catalog checkpoint differs from its immutable pin.'
+  );
+
+  const manifestFile = await readJson(path.join(packageRoot, qwen35ManifestPath));
+  const manifest = manifestFile.value;
+  failUnless(isRecord(manifest), 'Qwen3.5 package manifest must be an object.');
+  failUnless(
+    manifest.format === 'web-decision-qwen35-tvm-artifacts-v1' &&
+      manifest.modelId === qwen35ModelId &&
+      manifest.repository === qwen35Repository &&
+      manifest.revision === qwen35Revision &&
+      manifest.experimental === true,
+    'Qwen3.5 package manifest differs from its pending candidate pin.'
+  );
+  failUnless(isRecord(manifest.files), 'Qwen3.5 package manifest has no file inventory.');
+  const names = Object.keys(manifest.files);
+  failUnless(
+    JSON.stringify([...names].sort()) === JSON.stringify([...qwen35Files].sort()),
+    'Qwen3.5 package manifest file set differs from its graph and source inventory.'
+  );
+
+  const files: Record<string, ManifestFile> = {};
+  const bundledRuntimeFiles: NonNullable<ModelArtifactLock['bundledRuntimeFiles']>[number][] = [];
+  for (const name of names) {
+    failUnless(safeManifestPath(name), 'Qwen3.5 package manifest contains an unsafe file path.');
+    const expected = manifest.files[name];
+    failUnless(
+      isRecord(expected) &&
+        Object.keys(expected).sort().join(',') === 'bytes,sha256' &&
+        Number.isSafeInteger(expected.bytes) &&
+        (expected.bytes as number) > 0 &&
+        typeof expected.sha256 === 'string' &&
+        /^[0-9a-f]{64}$/u.test(expected.sha256),
+      'Qwen3.5 package manifest has invalid file metadata: ' + name + '.'
+    );
+    const sourcePath = `assets/qwen35/${name}`;
+    const bytes = await readFile(path.join(packageRoot, sourcePath));
+    const digest = sha256(bytes);
+    failUnless(expected.bytes === bytes.byteLength, 'Qwen3.5 package asset size differs: ' + name + '.');
+    failUnless(expected.sha256 === digest, 'Qwen3.5 package asset hash differs: ' + name + '.');
+    files[name] = {bytes: bytes.byteLength, sha256: digest};
+    bundledRuntimeFiles.push({manifestName: name, sourcePath, bytes: bytes.byteLength, sha256: digest});
+  }
+
+  const wordManifest = await readJson(path.join(packageRoot, 'assets/qwen35/pinned-word-assets-manifest.json'));
+  const sourceInventoryFile = await readJson(path.join(packageRoot, 'assets/qwen35/source-range-inventory.json'));
+  failUnless(
+    isRecord(wordManifest.value) && wordManifest.value.format === 'web-decision-qwen35-pinned-word-assets-v2',
+    'Qwen3.5 word manifest format is invalid.'
+  );
+  const inventory = sourceInventoryFile.value;
+  failUnless(
+    isRecord(inventory) &&
+      inventory.format === 'web-decision-qwen35-source-range-inventory-v1' &&
+      inventory.wordManifestSha256 === sha256(wordManifest.bytes) &&
+      inventory.maxRangeBytes === 8 * 1024 * 1024,
+    'Qwen3.5 source range inventory differs from its packaged word manifest.'
+  );
+  const rangeAssets = inventory.assets;
+  failUnless(isRecord(rangeAssets), 'Qwen3.5 source range inventory has no assets.');
+  const wordAssets = isRecord(wordManifest.value.assets) ? wordManifest.value.assets : undefined;
+  failUnless(wordAssets, 'Qwen3.5 word manifest has no upstream inventory.');
+  const roles = ['base', 'lora', 'head'] as const;
+  failUnless(
+    JSON.stringify(Object.keys(wordAssets).sort()) === JSON.stringify([...roles].sort()) &&
+      JSON.stringify(Object.keys(rangeAssets).sort()) === JSON.stringify([...roles].sort()),
+    'Qwen3.5 upstream asset set differs from the pinned base, LoRA, and pointer head.'
+  );
+  const upstreams = roles.map((role) => {
+    const wordAsset = wordAssets[role];
+    const rangeAsset = rangeAssets[role];
+    failUnless(isRecord(wordAsset) && isRecord(wordAsset.source), 'Qwen3.5 source metadata is invalid: ' + role + '.');
+    failUnless(isRecord(rangeAsset) && isRecord(rangeAsset.source), 'Qwen3.5 range metadata is invalid: ' + role + '.');
+    const source = wordAsset.source;
+    const rangeSource = rangeAsset.source;
+    failUnless(
+      source.repository === rangeSource.repository &&
+        source.revision === rangeSource.revision &&
+        source.file === rangeSource.file &&
+        source.bytes === rangeSource.bytes &&
+        source.sha256 === rangeSource.sha256,
+      'Qwen3.5 range source differs from its word manifest: ' + role + '.'
+    );
+    failUnless(
+      typeof source.repository === 'string' &&
+        typeof source.revision === 'string' &&
+        /^[a-f0-9]{40}$/u.test(source.revision) &&
+        typeof source.file === 'string' &&
+        Number.isSafeInteger(source.bytes) &&
+        typeof source.sha256 === 'string' &&
+        /^[0-9a-f]{64}$/u.test(source.sha256),
+      'Qwen3.5 upstream pin is incomplete: ' + role + '.'
+    );
+    const sourceBytes = source.bytes as number;
+    return {
+      role,
+      repository: source.repository,
+      revision: source.revision,
+      sourcePath: source.file,
+      sourceBytes,
+      sourceSha256: source.sha256
+    };
+  });
+  const adapterUpstream = upstreams.find(({role}) => role === 'lora');
+  failUnless(
+    adapterUpstream?.repository === qwen35Repository && adapterUpstream.revision === qwen35Revision,
+    'Qwen3.5 adapter weights differ from the catalog checkpoint.'
+  );
+
+  const canonicalBytes = canonicalManifestBytes(manifest);
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath: qwen35ManifestPath,
+      rawSha256: sha256(manifestFile.bytes),
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: true,
+      files
+    },
+    bundledRuntimeFiles,
+    upstreams
+  };
+}
+
 export async function createModelArtifactLock(
   model: CuratedModel,
   options: Readonly<{directKevArtifactDirectory?: string}> = {}
@@ -649,6 +795,7 @@ export async function createModelArtifactLock(
   if (model.description.adapter === 'kev06')
     return createKev06ArtifactLock(model, options.directKevArtifactDirectory ?? directKevArtifactDirectory);
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
+  if (model.description.adapter === 'strands-qwen35') return createQwen35ArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
@@ -790,14 +937,17 @@ export const APPROVED_ADAPTER_LOADERS: Readonly<Record<string, () => Promise<Mod
 `;
 }
 
-function renderPublicModelLoadOptions(models: readonly CuratedModel[]): string {
+export function publicLoadOptionsForAdapter(adapter: string): readonly string[] {
   const commonOptions = ['modelId', 'cache', 'offline', 'signal', 'onProgress'];
+  if (adapter === 'kev06') return [...commonOptions, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters'];
+  if (adapter === 'kanana' || adapter === 'strands-qwen35') return commonOptions;
+  throw new Error('No public load options are defined for adapter ' + adapter + '.');
+}
+
+function renderPublicModelLoadOptions(models: readonly CuratedModel[]): string {
   const optionsByModelId = Object.fromEntries(
     models.map(({modelId, description}) => {
-      if (description.adapter === 'kev06')
-        return [modelId, [...commonOptions, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']];
-      if (description.adapter === 'kanana') return [modelId, commonOptions];
-      throw new Error('No public load options are defined for adapter ' + description.adapter + '.');
+      return [modelId, publicLoadOptionsForAdapter(description.adapter)];
     })
   );
   return `export const APPROVED_MODEL_LOAD_OPTIONS: Readonly<Record<string, readonly string[]>> = Object.freeze(${JSON.stringify(optionsByModelId, null, 2)});
@@ -819,6 +969,8 @@ function renderTypeFiles(models: readonly CuratedModel[]): {types: string; entry
       "  readonly scope: 'state' | 'question' | 'request';",
       '  readonly min?: number;',
       '  readonly max?: number;',
+      '  /** Default maximum the caller may override. */',
+      '  readonly defaultMax?: number;',
       '  readonly description?: string;',
       '}',
       'export interface CatalogModelDescription {',

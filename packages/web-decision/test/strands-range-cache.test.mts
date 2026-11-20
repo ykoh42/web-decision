@@ -58,14 +58,18 @@ test('short and oversized range bodies fail without caching', async (t) => {
   const expected = Uint8Array.of(1, 2, 3, 4);
   const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
   let body: unknown;
+  let requests = 0;
   let writes = 0,
     released = 0,
     cancelled = 0;
-  t.mock.method(globalThis, 'fetch', async () => ({
-    status: 206,
-    headers: new Headers({'content-range': 'bytes 0-3/4'}),
-    body
-  }));
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    return {
+      status: 206,
+      headers: new Headers({'content-range': 'bytes 0-3/4'}),
+      body
+    };
+  });
   const cache = {
     async match() {
       return undefined;
@@ -96,8 +100,205 @@ test('short and oversized range bodies fail without caching', async (t) => {
     await assert.rejects(readVerifiedRange(base, spec, {cache}), {code: 'ASSET_LOAD_FAILED'});
   }
   assert.equal(writes, 0);
+  assert.equal(requests, 2, 'short and oversized body lengths must not retry');
   assert.equal(released, 2);
   assert.equal(cancelled, 1);
+});
+
+test('retries a transient range body error and caches only the fully verified retry', async (t) => {
+  const expected = Uint8Array.of(1, 2, 3, 4);
+  const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
+  const requestRanges: string[] = [];
+  let requests = 0;
+  let writes = 0;
+  const cache = {
+    async match() {
+      return null;
+    },
+    async put(_key: string, response: Response) {
+      assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expected);
+      writes++;
+    }
+  };
+  t.mock.method(globalThis, 'fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requests++;
+    requestRanges.push(new Headers(init?.headers).get('Range') ?? '');
+    if (requests === 1) {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(expected.subarray(0, 2));
+          controller.error(new TypeError('net::ERR_HTTP2_PROTOCOL_ERROR'));
+        }
+      });
+      return new Response(body, {
+        status: 206,
+        headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+      });
+    }
+    assert.equal(writes, 0, 'partial bytes from the failed body must not be cached');
+    return new Response(expected, {
+      status: 206,
+      headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+    });
+  });
+
+  const result = await readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache});
+
+  assert.deepEqual(new Uint8Array(result.bytes), expected);
+  assert.equal(result.cachedByHash, true);
+  assert.deepEqual(requestRanges, ['bytes=0-3', 'bytes=0-3']);
+  assert.equal(requests, 2);
+  assert.equal(writes, 1);
+});
+
+test('aborting after a transient range body error prevents the retry and preserves the reason', async (t) => {
+  const expected = Uint8Array.of(1, 2, 3, 4);
+  const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
+  const controller = new AbortController();
+  const reason = new Error('stop before range retry');
+  let markBodyReadFailed!: () => void;
+  const bodyReadFailed = new Promise<void>((resolve) => {
+    markBodyReadFailed = resolve;
+  });
+  let requests = 0;
+  let writes = 0;
+  const cache = {
+    async match() {
+      return null;
+    },
+    async put() {
+      writes++;
+    }
+  };
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    const body = {
+      getReader() {
+        return {
+          read() {
+            return Promise.reject(new TypeError('transient body transport failure'));
+          },
+          cancel() {},
+          releaseLock() {
+            markBodyReadFailed();
+          }
+        };
+      }
+    };
+    return {
+      status: 206,
+      headers: new Headers({'content-range': 'bytes 0-3/4', 'content-length': '4'}),
+      body
+    } as unknown as Response;
+  });
+
+  const pending = readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache, signal: controller.signal});
+  const assertion = assert.rejects(pending, (error) => error === reason);
+  await bodyReadFailed;
+  await nextTurn();
+  controller.abort(reason);
+
+  await assertion;
+  assert.equal(requests, 1);
+  assert.equal(writes, 0);
+});
+
+test('mixed fetch and body transport failures exhaust three total attempts without caching', async (t) => {
+  const expected = Uint8Array.of(1, 2, 3, 4);
+  const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
+  let requests = 0;
+  let writes = 0;
+  const cache = {
+    async match() {
+      return null;
+    },
+    async put() {
+      writes++;
+    }
+  };
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    if (requests === 2) {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(new TypeError('transient body transport failure'));
+        }
+      });
+      return new Response(body, {
+        status: 206,
+        headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+      });
+    }
+    throw new TypeError('temporary fetch transport failure');
+  });
+
+  await assert.rejects(readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache}), (error: unknown) => {
+    assert.equal((error as {code?: unknown}).code, 'ASSET_LOAD_FAILED');
+    assert.match((error as Error).message, /Could not fetch range/u);
+    return true;
+  });
+
+  assert.equal(requests, 3);
+  assert.equal(writes, 0);
+});
+
+test('invalid content hashes fail without transport retry', async (t) => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: '0'.repeat(64)};
+  let requests = 0;
+  let writes = 0;
+  const cache = {
+    async match() {
+      return null;
+    },
+    async put() {
+      writes++;
+    }
+  };
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    return new Response(bytes, {
+      status: 206,
+      headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+    });
+  });
+
+  await assert.rejects(readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache}), {code: 'INVALID_ASSET'});
+  assert.equal(requests, 1);
+  assert.equal(writes, 0);
+});
+
+test('malformed range body chunks fail without transport retry', async (t) => {
+  const expected = Uint8Array.of(1, 2, 3, 4);
+  const spec = {path: 'fixture.bin', totalBytes: 4, offset: 0, length: 4, sha256: digest(expected)};
+  let requests = 0;
+  let writes = 0;
+  const cache = {
+    async match() {
+      return null;
+    },
+    async put() {
+      writes++;
+    }
+  };
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue('not a byte chunk' as unknown as Uint8Array);
+      }
+    });
+    return new Response(body, {
+      status: 206,
+      headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+    });
+  });
+
+  await assert.rejects(readVerifiedRange(base, spec, {cache: cache as unknown as AssetCache}), {
+    code: 'ASSET_LOAD_FAILED'
+  });
+  assert.equal(requests, 1);
+  assert.equal(writes, 0);
 });
 
 test('aborting a pending range body preserves the reason and cancels its reader', async (t) => {

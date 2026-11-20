@@ -1,0 +1,242 @@
+{
+  "format": "qwen35-image-counts-2-3-input-fixture-v1",
+  "status": "prepared-source-inputs",
+  "source": {
+    "strandsRepository": "StrandsAgents/strands-decider",
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "tvmUsed": false,
+    "gpuUsed": false,
+    "modelInferencePerformed": false
+  },
+  "processor": {
+    "name": "Qwen2VLImageProcessorPil",
+    "transformersVersion": "5.22.2",
+    "pillowVersion": "13.0.0",
+    "configSha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    "imageLongSide": 448,
+    "maxImages": 4,
+    "maxImagePixels": 16777216,
+    "minPixels": 65536,
+    "maxPixels": 16777216,
+    "patchSize": 16,
+    "resizeFactor": 32
+  },
+  "cases": [
+    {
+      "name": "two-image-mixed-aspect",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Inspect the attached geometric images in their listed order.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "type": "choice",
+              "instructions": "Which shape is centered in the first attached image?",
+              "criteria": {
+                "Yellow square": "A yellow square centered on the blue background.",
+                "Green circle": "A green circle centered on the red background.",
+                "White triangle": "A white triangle centered on the dark background.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image."
+              }
+            }
+          ],
+          [
+            "image_score",
+            {
+              "type": "score",
+              "instructions": "Rate how well the description matches the first attached image.",
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ]
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "type": "noul",
+              "instructions": "The first attached image has a yellow square centered on the blue background.",
+              "criteria": null
+            }
+          ]
+        ]
+      },
+      "imageFiles": [
+        {
+          "path": "vision-input/yellow-square-portrait-320x416.png",
+          "bytes": 975,
+          "sha256": "8e7f591f12138a7aabfa826e0aaea218294032b3fecae3d6fa19342c0f23c9f6",
+          "mimeType": "image/png",
+          "sourceWidth": 320,
+          "sourceHeight": 416
+        },
+        {
+          "path": "vision-input/green-circle-landscape-416x320.png",
+          "bytes": 1209,
+          "sha256": "df6e8d522206f7762704b1c16d462332a3f64e7092ac6d323a9dabb409ff6859",
+          "mimeType": "image/png",
+          "sourceWidth": 416,
+          "sourceHeight": 320
+        }
+      ],
+      "imageGeometry": [
+        {
+          "width": 320,
+          "height": 416,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 416,
+          "height": 320,
+          "longSide": 416,
+          "patchRows": 520
+        }
+      ],
+      "processorInputs": {
+        "imageGridThw": [
+          [
+            1,
+            26,
+            20
+          ],
+          [
+            1,
+            20,
+            26
+          ]
+        ],
+        "pixelValuesShape": [
+          1040,
+          1536
+        ],
+        "pixelValuesSha256LittleEndianF32": "8fe14d31be7ef98f1035beb722017489ed45f8b751f97494215c468689830c0e"
+      }
+    },
+    {
+      "name": "three-image-mixed-aspect",
+      "request": {
+        "model": "strands-decider-latest",
+        "state": "Inspect the attached geometric images in their listed order.",
+        "questions": [
+          [
+            "image_choice",
+            {
+              "type": "choice",
+              "instructions": "Which shape is centered in the first attached image?",
+              "criteria": {
+                "Yellow square": "A yellow square centered on the blue background.",
+                "Green circle": "A green circle centered on the red background.",
+                "White triangle": "A white triangle centered on the dark background.",
+                "Orange diamond": "An orange diamond centered in the image.",
+                "Red triangle": "A red triangle centered in the image."
+              }
+            }
+          ],
+          [
+            "image_score",
+            {
+              "type": "score",
+              "instructions": "Rate how well the description matches the first attached image.",
+              "criteria": [
+                "The description does not match the image.",
+                "The description partly matches the image.",
+                "The description exactly matches the image."
+              ]
+            }
+          ],
+          [
+            "image_noul",
+            {
+              "type": "noul",
+              "instructions": "The first attached image has a green circle centered on the red background.",
+              "criteria": null
+            }
+          ]
+        ]
+      },
+      "imageFiles": [
+        {
+          "path": "vision-input/green-circle-landscape-416x320.png",
+          "bytes": 1209,
+          "sha256": "df6e8d522206f7762704b1c16d462332a3f64e7092ac6d323a9dabb409ff6859",
+          "mimeType": "image/png",
+          "sourceWidth": 416,
+          "sourceHeight": 320
+        },
+        {
+          "path": "vision-input/yellow-square-portrait-320x416.png",
+          "bytes": 975,
+          "sha256": "8e7f591f12138a7aabfa826e0aaea218294032b3fecae3d6fa19342c0f23c9f6",
+          "mimeType": "image/png",
+          "sourceWidth": 320,
+          "sourceHeight": 416
+        },
+        {
+          "path": "vision-input/white-triangle-small-128x128.png",
+          "bytes": 358,
+          "sha256": "43308dd51f240a9933f2f15d23771b0fb69f83dde61dfc235d8f2abd20223ee9",
+          "mimeType": "image/png",
+          "sourceWidth": 128,
+          "sourceHeight": 128
+        }
+      ],
+      "imageGeometry": [
+        {
+          "width": 416,
+          "height": 320,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 320,
+          "height": 416,
+          "longSide": 416,
+          "patchRows": 520
+        },
+        {
+          "width": 256,
+          "height": 256,
+          "longSide": 256,
+          "patchRows": 256
+        }
+      ],
+      "processorInputs": {
+        "imageGridThw": [
+          [
+            1,
+            20,
+            26
+          ],
+          [
+            1,
+            26,
+            20
+          ],
+          [
+            1,
+            16,
+            16
+          ]
+        ],
+        "pixelValuesShape": [
+          1296,
+          1536
+        ],
+        "pixelValuesSha256LittleEndianF32": "ad7343aa8f5b24a54ac83971b01fcd504a4a8d097144daf55032f780b2d2505a"
+      }
+    }
+  ],
+  "sourceInferencePrerequisite": {
+    "requiredAdmissionAvailableRatio": 0.5,
+    "command": "scripts/strands/qwen35/build-env/.venv/bin/python scripts/strands/qwen35/generate_image_count_2_3_source_oracle.py --source-inference",
+    "note": "Input fixture and pinned processor geometry only; no full model source output or parity claim is present until the guarded source-inference stage passes."
+  }
+}

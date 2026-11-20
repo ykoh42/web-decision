@@ -35,6 +35,8 @@
     "direct-kev-package-harness.ts",
     "kev06-expanded-inference.ts",
     "kev06-release-evidence.ts",
-    "kev06-release-evidence.test.ts"
+    "kev06-release-evidence.test.ts",
+    "strands-qwen2-real-webgpu.spec.ts",
+    "qwen35-tvm-dispatch-capture.mts"
   ]
 }

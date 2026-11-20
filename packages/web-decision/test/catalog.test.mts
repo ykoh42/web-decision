@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID, MODEL_IDS} from '../src/catalog/index.generated.ts';
+import type {ModelArtifactLock} from '../src/catalog/types.generated.js';
 import modelProvenance from '../src/catalog/model-provenance.json' with {type: 'json'};
 import {
   APPROVED_MODEL_IDS,
@@ -38,9 +39,9 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('candidate catalog retains the verified Kanana TVM descriptor', () => {
-  assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611']);
-  assert.equal(MODEL_CATALOG.length, 1);
+test('candidate catalog retains verified Kanana and pending Qwen TVM descriptors', () => {
+  assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610']);
+  assert.equal(MODEL_CATALOG.length, 2);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
   assert.equal(kanana, MODEL_CATALOG[0]);
@@ -64,6 +65,29 @@ test('candidate catalog retains the verified Kanana TVM descriptor', () => {
   assert.equal(Object.hasOwn(kanana.description, 'model'), false);
   assert.equal(Object.hasOwn(kanana.description.assets, 'assetsUrl'), false);
   assert.equal(Object.hasOwn(kanana.description.assets, 'manifestSha256'), true);
+
+  const qwen = MODEL_CATALOG_BY_ID['strands-decider-2b-qwen3.5-v1-2610'];
+  assert.equal(qwen, MODEL_CATALOG[1]);
+  assert.equal(qwen.description.adapter, 'strands-qwen35');
+  assert.equal(qwen.description.backend.name, 'tvm-webgpu');
+  assert.deepEqual(qwen.description.backend.requiredLimits, {
+    maxBufferSize: 1_073_741_824,
+    maxStorageBufferBindingSize: 1_073_741_824,
+    maxComputeWorkgroupStorageSize: 8_192
+  });
+  assert.equal(qwen.description.checkpoint.repository, 'StrandsAgents/strands-decider-2B-qwen3.5-v1-2610');
+  assert.equal(qwen.description.verification.currentBundleGpu, 'not-revalidated');
+  assert.deepEqual(qwen.description.features.imageChoice?.limits, [
+    {
+      resource: 'images',
+      scope: 'request',
+      defaultMax: 4,
+      description:
+        "Defaults to 4 images per request; systemOne's maxImages option can set a different limit. The PIL processor has no separate fixed image-count ceiling."
+    }
+  ]);
+  assert.equal(Object.hasOwn(qwen.description.features.imageChoice?.limits?.[0] ?? {}, 'max'), false);
+  assert.equal(Object.hasOwn(qwen.description.assets, 'assetsUrl'), false);
 });
 
 test('public generated catalog and model ID type include verified models only', async () => {
@@ -74,6 +98,9 @@ test('public generated catalog and model ID type include verified models only', 
     approvedIds
   );
   assert.deepEqual(Object.keys(PUBLIC_MODEL_CATALOG_BY_ID), approvedIds);
+  assert.deepEqual(approvedIds, ['kanana-2-v-decide-3b-2611']);
+  assert.equal(Object.hasOwn(PUBLIC_MODEL_CATALOG_BY_ID, 'strands-decider-2b-qwen3.5-v1-2610'), false);
+  assert.equal(Object.hasOwn(APPROVED_ADAPTER_LOADERS, 'strands-qwen35'), false);
   assert.deepEqual(
     Object.keys(APPROVED_ADAPTER_LOADERS).sort(),
     [...new Set(PUBLIC_MODEL_CATALOG.map(({description}) => description.adapter))].sort()
@@ -239,6 +266,33 @@ test('direct Kev recipe locks a manifest-only remote package and rejects malform
   }
 });
 
+async function assertQwenSourceLock(lock: ModelArtifactLock) {
+  assert.equal(lock.manifest.experimental, true);
+  assert.deepEqual(
+    lock.upstreams?.map(({role}) => role),
+    ['base', 'lora', 'head']
+  );
+  const wordManifest = JSON.parse(
+    await readFile(packageFile('assets/qwen35/pinned-word-assets-manifest.json'), 'utf8')
+  );
+  const sourceInventory = JSON.parse(await readFile(packageFile('assets/qwen35/source-range-inventory.json'), 'utf8'));
+  assert.equal(
+    sourceInventory.wordManifestSha256,
+    sha256(await readFile(packageFile('assets/qwen35/pinned-word-assets-manifest.json')))
+  );
+  for (const upstream of lock.upstreams ?? []) {
+    const source = wordManifest.assets[upstream.role].source;
+    assert.equal(source.repository, upstream.repository);
+    assert.equal(source.revision, upstream.revision);
+    assert.equal(source.file, upstream.sourcePath);
+    assert.equal(source.bytes, upstream.sourceBytes);
+    assert.equal(source.sha256, upstream.sourceSha256);
+    const rangeSource = sourceInventory.assets[upstream.role].source;
+    for (const key of ['repository', 'revision', 'file', 'bytes', 'sha256'])
+      assert.equal(rangeSource[key], source[key]);
+  }
+}
+
 test('artifact locks hash packaged manifests, runtime files, and model ranges', async () => {
   const lockFile = JSON.parse(await readFile(packageFile('src/catalog/artifacts.lock.json'), 'utf8'));
   assert.deepEqual(Object.keys(lockFile.byModelId), MODEL_IDS);
@@ -277,6 +331,7 @@ test('artifact locks hash packaged manifests, runtime files, and model ranges', 
       const rangeBytes = await readFile(packageFile(lock.upstream.rangeManifestPath));
       assert.equal(lock.upstream.rangeManifestSha256, sha256(rangeBytes));
     }
+    if (entry.modelId === 'strands-decider-2b-qwen3.5-v1-2610') await assertQwenSourceLock(lock);
   }
 });
 

@@ -1,0 +1,41 @@
+{
+  "format": "qwen35-fp32-vision-webgpu-build-v1",
+  "activationPrecision": "float32",
+  "sourceRelaxSha256": "41b4495d1494328ed6092119daac990c15d3fc1e7b8aa993b1b6d5255b8aa4d4",
+  "toolchain": {
+    "apache-tvm": "0.27.0.post1"
+  },
+  "tvmCommit": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+  "execution": {
+    "onnxUsed": false
+  },
+  "tvmWebgpuBuild": {
+    "status": "passed",
+    "deviceRuntimeExecuted": false
+  },
+  "tvmJsArtifact": {
+    "status": "passed",
+    "wasm": {
+      "bytes": 4316202,
+      "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+    }
+  },
+  "replacedKernel": "round_bf16_webgpu",
+  "hostShapeStoreOrder": [
+    0,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "vmSha256": "be2f5f6209bc1c79b8fd2f1eba540fe0ab21c1afd60460de893e277f54d86a5f",
+  "shaderInventorySha256": "c1c8827d4e633d292898210f2667b2b780fd97774d97bed3323d650119fd0537",
+  "wgslSha256": "dd65f8f26b49f29835fd8174c6718ee25471a07fd493cbb4f18286804010da4e",
+  "wasm": "qwen35-dynamic-vision.webgpu.wasm",
+  "wasmBytes": 4316202,
+  "wasmSha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+}

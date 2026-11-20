@@ -1,0 +1,505 @@
+{
+  "format": "qwen35-text-vision-bridge-golden-v1",
+  "source": {
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "transformers": "5.22.2",
+    "torch": "2.8.0",
+    "pillow": "13.0.0",
+    "baseRepository": "Qwen/Qwen3.5-2B-Base",
+    "baseRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "checkpointRepository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "tokenizerSha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86",
+    "tokenizerConfigSha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45",
+    "modelConfigSha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+    "processorConfigSha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+    "maxLength": 4096,
+    "maxQuestionFraction": 0.75,
+    "imageTokenId": 248056,
+    "visionEndTokenId": 248054,
+    "padTokenId": 248044,
+    "spatialMergeSize": 2,
+    "weightsLoaded": false,
+    "gpuUsed": false,
+    "processorExpansion": "Qwen3VLProcessor.replace_image_token + ProcessorMixin.get_text_with_replacements",
+    "mrope": "Qwen3_5Model.get_rope_index",
+    "contextFit": "SystemOneEngine._fit / VisionEngine._fit_images"
+  },
+  "state": "Read the attached visuals in their listed order.",
+  "questions": [
+    {
+      "name": "choice",
+      "type": "choice"
+    },
+    {
+      "name": "noul",
+      "type": "noul"
+    }
+  ],
+  "cases": [
+    {
+      "name": "text-only",
+      "files": [],
+      "expandedStateTextSha256": "25b11b303fb293c738f77ebe963505a3f0be35c4e6c0940f0f278a8b77e662e5",
+      "gridThw": [],
+      "imageTokenCounts": [],
+      "prefixInputShape": [
+        1,
+        18
+      ],
+      "prefixInputIdsSha256": "3d42a22037bb23fef03ef0aa0ca94ca4235d6b3d04771bc7a7eb34b4202d72f7",
+      "mmTokenTypeIdsSha256": "834a709ba2534ebe3ee1397fd4f7bd288b2acc1d20a08d6c862dcd99b6f04400",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        18
+      ],
+      "prefixPositionIdsSha256": "5904e6ceb6ef48cf3c81c7b932c9b1fc8dcabd8c91384a940839a9acff601904",
+      "ropeDelta": 0,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "b3d68e6f4618fe7af4d510dd90028cbf745e54490d28dccd7363713791ae0769",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 143,
+      "visionBlockEnd": 0,
+      "fittedStateTextTokens": 18,
+      "rawStateTextTokens": 18,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    },
+    {
+      "name": "one-image",
+      "files": [
+        "small-upscale.png"
+      ],
+      "expandedStateTextSha256": "52c748e47df929caf1d82e609836e58a03958e72aed0974a895d62224d3283e8",
+      "gridThw": [
+        [
+          1,
+          16,
+          16
+        ]
+      ],
+      "imageTokenCounts": [
+        64
+      ],
+      "prefixInputShape": [
+        1,
+        85
+      ],
+      "prefixInputIdsSha256": "98ca2a0e35fb006370b622079950d46f0f852d07a0219015be909e37962a9909",
+      "mmTokenTypeIdsSha256": "411354fa4a4194b306279f97a83322603abf47b01b7eab23f642c8557d9da042",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        85
+      ],
+      "prefixPositionIdsSha256": "6e3a06d7ec3cde8c82f051fcff60d3a3ea24dbc44978feff496a19a9bb5ca4d1",
+      "ropeDelta": -56,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "f460bf046296caa50c45029c8711c22b7a3b9cb857a403e947f3572c0a9df1e2",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 210,
+      "visionBlockEnd": 70,
+      "fittedStateTextTokens": 85,
+      "rawStateTextTokens": 85,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    },
+    {
+      "name": "interleaved-two-images",
+      "files": [
+        "small-upscale.png",
+        "vision-mid-p520.png"
+      ],
+      "expandedStateTextSha256": "a3aae89e5ad1940a83cc54148254d65b94cca22a4aa54a6d0dfff72a08f0d8c6",
+      "gridThw": [
+        [
+          1,
+          16,
+          16
+        ],
+        [
+          1,
+          26,
+          20
+        ]
+      ],
+      "imageTokenCounts": [
+        64,
+        130
+      ],
+      "prefixInputShape": [
+        1,
+        218
+      ],
+      "prefixInputIdsSha256": "60ee31e78112ebb148fbd7fa6d24c556379567a6f9db3c2e11e196d10fc99f36",
+      "mmTokenTypeIdsSha256": "9df73077d02a91270ececb7221b5f20210546b659993828bc0a57c399f2c8fe4",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        218
+      ],
+      "prefixPositionIdsSha256": "f4d6cbb9795b0e7e566684c273c0d397fc10da6e7df8de166b49d1d0e64adbad",
+      "ropeDelta": -173,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "e04a77f2f2ba028702d89b3db3fecaacea142a7a734fb20674ffdb84079e880a",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 343,
+      "visionBlockEnd": 203,
+      "fittedStateTextTokens": 218,
+      "rawStateTextTokens": 218,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    },
+    {
+      "name": "three-image-order",
+      "files": [
+        "vision-mid-p520.png",
+        "small-upscale.png",
+        "vision-max-p784.png"
+      ],
+      "expandedStateTextSha256": "f4ad00e3a1ae1feed92b55fbb14af1ec0a5c92d4af46be3421049d1e38c04abb",
+      "gridThw": [
+        [
+          1,
+          26,
+          20
+        ],
+        [
+          1,
+          16,
+          16
+        ],
+        [
+          1,
+          28,
+          28
+        ]
+      ],
+      "imageTokenCounts": [
+        130,
+        64,
+        196
+      ],
+      "prefixInputShape": [
+        1,
+        417
+      ],
+      "prefixInputIdsSha256": "70d8829aaaea612cfca2d87a76773896badf87bf4c1bebedcf09bcc490e678ee",
+      "mmTokenTypeIdsSha256": "7341b6ed6c14e198c6c15d946104917d4cf440199ba06c83e81641fbe680026e",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        417
+      ],
+      "prefixPositionIdsSha256": "7d7f19cf3415f9c08e54100876e01e6febb4cb5ad29d093d278840b3acf3ab12",
+      "ropeDelta": -355,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "4b8af48413a264a4debe9e2a54c9fa8cc44a5ed7c601d3d04aaabdcd53c2e703",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 542,
+      "visionBlockEnd": 402,
+      "fittedStateTextTokens": 417,
+      "rawStateTextTokens": 417,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    },
+    {
+      "name": "four-image-boundary",
+      "files": [
+        "single-pixel.png",
+        "fit-and-resize.png",
+        "png-orientation-6.png",
+        "aspect-boundary-200.png"
+      ],
+      "expandedStateTextSha256": "cc6e1b3742dc0a176f5d5a75d2babd2bd71594466a81090ede21fdf25c5198fb",
+      "gridThw": [
+        [
+          1,
+          16,
+          16
+        ],
+        [
+          1,
+          20,
+          28
+        ],
+        [
+          1,
+          24,
+          12
+        ],
+        [
+          1,
+          2,
+          228
+        ]
+      ],
+      "imageTokenCounts": [
+        64,
+        140,
+        72,
+        114
+      ],
+      "prefixInputShape": [
+        1,
+        420
+      ],
+      "prefixInputIdsSha256": "58fe73472e0256c32c24aac7feabad1aa30908f56dd7c70943a62420c17fc158",
+      "mmTokenTypeIdsSha256": "b21f2524f2b7dd3f40797b806c62ef7221230b10560f0b68e40929f81ebc6762",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        420
+      ],
+      "prefixPositionIdsSha256": "eebf926c0c8df3baf15bac70a956b8d12307c1fe609e865508c2f49c26900e2c",
+      "ropeDelta": -242,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "52d0cda370352d38c26165287f6dba4de4b1fa28d00fca6fc83ba071acc2f401",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 545,
+      "visionBlockEnd": 405,
+      "fittedStateTextTokens": 420,
+      "rawStateTextTokens": 420,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    },
+    {
+      "name": "one-image-context-fit",
+      "files": [
+        "small-upscale.png"
+      ],
+      "expandedStateTextSha256": "bfdb3c90f7a8cf8d10795d9c78adc8ead197e6d15aa39a5a8c07d606f0fd0438",
+      "gridThw": [
+        [
+          1,
+          16,
+          16
+        ]
+      ],
+      "imageTokenCounts": [
+        64
+      ],
+      "prefixInputShape": [
+        1,
+        4023
+      ],
+      "prefixInputIdsSha256": "1004e31a744d1d13060c2ba6f3d3c4d1771c26f35f27843e65af5ef271136f28",
+      "mmTokenTypeIdsSha256": "491cdced4f0ddd2feafb678ea4c9aa1115d2a39f831cd0ede9878d07765f816d",
+      "prefixPositionIdsShape": [
+        4,
+        1,
+        4023
+      ],
+      "prefixPositionIdsSha256": "5098f51d9d0eaa81a98b5040a571e3536370ed9d11642c872cda7c94d3a21bd5",
+      "ropeDelta": -56,
+      "suffixInputShape": [
+        2,
+        73
+      ],
+      "suffixInputIdsSha256": "b11306f5602df3addb92276c3c6ffb5f3f09dbb399407dd5caca35d7471bdf38",
+      "suffixAttentionMaskSha256": "918b1b9fadf4cc9008e2a390e7630490894112b866a88d30a420c0bf84b362db",
+      "suffixPositionIdsShape": [
+        4,
+        2,
+        73
+      ],
+      "suffixPositionIdsSha256": "56550e74d3d88709cf669142e4b8479d8a8be83028b38f3e2553d8b74e44d6b7",
+      "questionLengths": [
+        52,
+        73
+      ],
+      "questionInputIdsSha256": [
+        "edb47b887f79ec49d24300b44b1d15ea198603bc8c4097fe61c5c888fb09d82c",
+        "73a5215231b81723886ffb99a8e316e82334d49a06c1f56d04b9bb320434bc5f"
+      ],
+      "optionIndices": [
+        [
+          30,
+          39
+        ],
+        [
+          49,
+          60
+        ]
+      ],
+      "inputTokenCount": 4148,
+      "visionBlockEnd": 70,
+      "fittedStateTextTokens": 4023,
+      "rawStateTextTokens": 10476,
+      "rawQuestionLengths": [
+        52,
+        73
+      ],
+      "questionTextsSha256": [
+        "0e8bef03efd5d3435f7bc939e0b9a6de1fe2a0a1ca5b8b6fd68500bbbbf09449",
+        "09bc098ac1069e18ad626cad34f9cfc5a19ec694f8f9fcf6982ce88031d55caa"
+      ]
+    }
+  ]
+}

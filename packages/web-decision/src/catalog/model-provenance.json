@@ -4,10 +4,23 @@
     {
       "modelId": "kanana-2-v-decide-3b-2611",
       "status": "verified",
-      "artifactLockSha256": "536ca5587ad901f15108033c3512db88a9cffe51a9b78b2d2bf1caf58a9f012a",
+      "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
         "sha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13"
+      },
+      "conversionLockEvidence": {
+        "path": "packages/web-decision/src/catalog/provenance/kanana-verified-artifact-lock.json",
+        "sha256": "536ca5587ad901f15108033c3512db88a9cffe51a9b78b2d2bf1caf58a9f012a"
+      }
+    },
+    {
+      "modelId": "strands-decider-2b-qwen3.5-v1-2610",
+      "status": "pending",
+      "artifactLockSha256": "b926b24cf38c4cd6a5e89fd673842f7037eb9cea6212ba278312f5b2cd324170",
+      "evidence": {
+        "path": "src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json",
+        "sha256": "5e1253cda760b2b49b85f026fdd1b63f84e3b38942efcb3188a5b465032fe2dd"
       }
     }
   ]

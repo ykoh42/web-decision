@@ -1,0 +1,45 @@
+{
+  "format": "web-decision-qwen35-tvm-artifacts-v1",
+  "modelId": "strands-decider-2b-qwen3.5-v1-2610",
+  "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+  "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+  "experimental": true,
+  "files": {
+    "pinned-word-assets-manifest.json": {
+      "bytes": 761512,
+      "sha256": "54256df07cde4990833d232acac1d6962d3945f1ccdd1957ff1a6fab773dac69"
+    },
+    "source-range-inventory.json": {
+      "bytes": 66164,
+      "sha256": "63f1106e10da5973d9e5c8ba58ec00e53d33fc61672b14cf0c3d767c3aa42f8e"
+    },
+    "r19/manifest.json": {
+      "bytes": 2114,
+      "sha256": "6aa54189a087d199338ffe271e0469c9b719110ebac2363d637d2159419d7157"
+    },
+    "r19/fixture.json": {
+      "bytes": 202061,
+      "sha256": "7989413cb90ce9f60d01d25a8a96ad86a4ab74212e234d8f650e7ad3a891e7a9"
+    },
+    "r19/weight-bindings.json": {
+      "bytes": 392846,
+      "sha256": "03604675d3bdbf6f8a7cef7dcc372c0626a0f4d0b9964ec06b200dc5918d5526"
+    },
+    "r19/qwen35-text-pointer.webgpu.wasm": {
+      "bytes": 5772332,
+      "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3"
+    },
+    "vision/fixture.json": {
+      "bytes": 336938,
+      "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+    },
+    "vision/weight-bindings.json": {
+      "bytes": 104081,
+      "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+    },
+    "vision/qwen35-dynamic-vision.webgpu.wasm": {
+      "bytes": 4316202,
+      "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+    }
+  }
+}

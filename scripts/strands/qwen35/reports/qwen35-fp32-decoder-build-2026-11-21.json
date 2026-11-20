@@ -1,0 +1,19 @@
+{
+  "sourceGraphSha256": "624cc890ac1ffb92caac65fd27b9c924f2d0b71bb009325bf16aa77fe8f6830a",
+  "candidateScriptSha256": "855f56c709297231a76446413b9a0a218f16b0d234fc1b72d75661f90943dbb1",
+  "tvm": "0.27.0.post1",
+  "wasmSha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3",
+  "mainArguments": 704,
+  "requestArguments": [
+    "inputs_embeds",
+    "attention_mask",
+    "position_ids",
+    "option_indices",
+    "temperatures",
+    "n_slots",
+    "source_prefix"
+  ],
+  "maxSequence": 4096,
+  "maxChunks": 65,
+  "activationPrecision": "fp32"
+}

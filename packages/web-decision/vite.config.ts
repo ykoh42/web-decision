@@ -80,6 +80,14 @@ export default defineConfig({
     },
     target: 'es2022',
     minify: false,
-    rollupOptions: {external: ['@huggingface/tokenizers']}
+    rollupOptions: {
+      external: ['@huggingface/tokenizers'],
+      output: {
+        assetFileNames(assetInfo) {
+          const sourcePath = assetInfo.originalFileName?.replaceAll('\\', '/') ?? '';
+          return sourcePath.includes('assets/qwen35/') ? 'qwen35/[hash]/[name].[ext]' : '[name].[ext]';
+        }
+      }
+    }
   }
 });

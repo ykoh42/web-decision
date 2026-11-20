@@ -1,0 +1,870 @@
+{
+  "format": "qwen35-source-request-boundaries-golden-v1",
+  "source": {
+    "strandsRevision": "13c05149265dc404c09d2469636f71b1320e1713",
+    "checkpointRevision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "tokenizerSha256": "a2cdd2e108566b09079afa8d266e9e65e7c280f27b771218237a06de5ba9cd86",
+    "tokenizerConfigSha256": "8671bed7c852ce9e661be94f179a7b4ffd091c2a65aea0363e5501c20318ee45",
+    "maxLength": 4096,
+    "maxQuestionFraction": 0.75,
+    "maxBatch": 32,
+    "maxChoiceOptions": 255,
+    "minScoreLevels": 2,
+    "maxScoreLevels": 10,
+    "contentDefinition": "str | dict[str, Any] | list[Any]",
+    "generator": "pinned Pydantic request schema + Strands prompting + EngineConfig + AutoTokenizer",
+    "weightsLoaded": false
+  },
+  "contentCases": [
+    {
+      "name": "question-type-omitted-defaults-to-noul",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": true,
+      "expectedQuestionType": "noul"
+    },
+    {
+      "name": "question-type-omitted-noul-criteria",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "instructions": "instruction",
+            "criteria": {
+              "false": "no",
+              "true": "yes"
+            }
+          }
+        }
+      },
+      "accepted": true,
+      "expectedQuestionType": "noul"
+    },
+    {
+      "name": "question-type-omitted-infers-choice",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "instructions": "instruction",
+            "criteria": {
+              "left": null,
+              "right": null
+            }
+          }
+        }
+      },
+      "accepted": true,
+      "expectedQuestionType": "choice"
+    },
+    {
+      "name": "question-type-omitted-infers-score",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "instructions": "instruction",
+            "criteria": [
+              "low",
+              "high"
+            ]
+          }
+        }
+      },
+      "accepted": true,
+      "expectedQuestionType": "score"
+    },
+    {
+      "name": "state-string",
+      "request": {
+        "state": "structured content",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "state-object-with-nested-scalars",
+      "request": {
+        "state": {
+          "items": [
+            null,
+            true,
+            7,
+            0.25
+          ]
+        },
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "state-list",
+      "request": {
+        "state": [
+          "structured",
+          {
+            "ok": false
+          }
+        ],
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "state-number",
+      "request": {
+        "state": 7,
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "state-boolean",
+      "request": {
+        "state": true,
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "state-null",
+      "request": {
+        "state": null,
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "instructions-string",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "structured instruction"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "instructions-object-with-nested-scalars",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": {
+              "flags": [
+                false,
+                3
+              ]
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "instructions-list",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": [
+              "brief",
+              {
+                "allowed": true
+              }
+            ]
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "instructions-number",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": 7
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "instructions-boolean",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": true
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "instructions-null",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": null
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "choice-description-string",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": "description",
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "choice-description-object-with-nested-scalars",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": {
+                "rubric": [
+                  null,
+                  true,
+                  0.5
+                ]
+              },
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "choice-description-list",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": [
+                "description",
+                {
+                  "enabled": false
+                }
+              ],
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "choice-description-null",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": null,
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "choice-description-number",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": 7,
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "choice-description-boolean",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "choice",
+            "instructions": "instruction",
+            "criteria": {
+              "first": true,
+              "second": null
+            }
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "noul-description-string",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": "description"
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "noul-description-object-with-nested-scalars",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": {
+                "rubric": [
+                  null,
+                  true,
+                  0.5
+                ]
+              }
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "noul-description-list",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": [
+                "description",
+                {
+                  "enabled": false
+                }
+              ]
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "noul-description-null",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": null
+            }
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "noul-description-number",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": 7
+            }
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "noul-description-boolean",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "criteria": {
+              "true": true
+            }
+          }
+        }
+      },
+      "accepted": false
+    },
+    {
+      "name": "request-extra-unexpected-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        },
+        "unexpected": "ignored"
+      },
+      "accepted": true
+    },
+    {
+      "name": "question-extra-unexpected-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "unexpected": "ignored"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "request-extra-image-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        },
+        "image": "ignored"
+      },
+      "accepted": true
+    },
+    {
+      "name": "question-extra-image-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "image": "ignored"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "request-extra-video-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        },
+        "video": "ignored"
+      },
+      "accepted": true
+    },
+    {
+      "name": "question-extra-video-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "video": "ignored"
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "name": "request-extra-audio-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction"
+          }
+        },
+        "audio": "ignored"
+      },
+      "accepted": true
+    },
+    {
+      "name": "question-extra-audio-is-ignored",
+      "request": {
+        "state": "state",
+        "questions": {
+          "q": {
+            "type": "noul",
+            "instructions": "instruction",
+            "audio": "ignored"
+          }
+        }
+      },
+      "accepted": true
+    }
+  ],
+  "tokenizerCase": {
+    "request": {
+      "state": "Café 　— <|image_pad|> 👩‍🚀",
+      "questions": {
+        "route": {
+          "type": "choice",
+          "instructions": "Pick café́, 你好, 😀, and <|vision_start|>.",
+          "criteria": {
+            "café": "  Use <|image_pad|> for 👩‍🚀  ",
+            "<|vision_start|>": null,
+            "plain": "plain"
+          }
+        }
+      },
+      "model": "strands-decider-latest",
+      "images": []
+    },
+    "stateText": "<state>\nCafé 　— <|image_pad|> 👩‍🚀\n</state>\n",
+    "questionText": "<question type=\"choice\">\nSelect exactly one option.\nPick café́, 你好, 😀, and <|vision_start|>.\n<options>\n1. café — Use <|image_pad|> for 👩‍🚀\n2. <|vision_start|>\n3. plain — plain\n</options>\n</question>\n<answer>",
+    "labels": [
+      "café",
+      "<|vision_start|>",
+      "plain"
+    ],
+    "stateTokenIds": [
+      27,
+      2374,
+      29,
+      198,
+      34,
+      2492,
+      933,
+      220,
+      21742,
+      2218,
+      373,
+      101,
+      248056,
+      59720,
+      102,
+      373,
+      235,
+      9008,
+      248,
+      222,
+      198,
+      510,
+      2374,
+      29,
+      198
+    ],
+    "questionTokenIds": [
+      27,
+      7593,
+      913,
+      420,
+      11409,
+      731,
+      198,
+      3270,
+      6681,
+      799,
+      2904,
+      13,
+      198,
+      35728,
+      50203,
+      52033,
+      11,
+      220,
+      109266,
+      11,
+      87209,
+      11,
+      321,
+      220,
+      248053,
+      13,
+      198,
+      27,
+      2782,
+      29,
+      198,
+      16,
+      13,
+      50203,
+      1892,
+      5272,
+      220,
+      248056,
+      364,
+      59720,
+      102,
+      373,
+      235,
+      9008,
+      248,
+      222,
+      198,
+      17,
+      13,
+      220,
+      248053,
+      198,
+      18,
+      13,
+      13983,
+      1892,
+      13983,
+      198,
+      510,
+      2782,
+      29,
+      198,
+      510,
+      7593,
+      29,
+      198,
+      27,
+      8944,
+      29
+    ],
+    "inputIds": [
+      27,
+      2374,
+      29,
+      198,
+      34,
+      2492,
+      933,
+      220,
+      21742,
+      2218,
+      373,
+      101,
+      248056,
+      59720,
+      102,
+      373,
+      235,
+      9008,
+      248,
+      222,
+      198,
+      510,
+      2374,
+      29,
+      198,
+      27,
+      7593,
+      913,
+      420,
+      11409,
+      731,
+      198,
+      3270,
+      6681,
+      799,
+      2904,
+      13,
+      198,
+      35728,
+      50203,
+      52033,
+      11,
+      220,
+      109266,
+      11,
+      87209,
+      11,
+      321,
+      220,
+      248053,
+      13,
+      198,
+      27,
+      2782,
+      29,
+      198,
+      16,
+      13,
+      50203,
+      1892,
+      5272,
+      220,
+      248056,
+      364,
+      59720,
+      102,
+      373,
+      235,
+      9008,
+      248,
+      222,
+      198,
+      17,
+      13,
+      220,
+      248053,
+      198,
+      18,
+      13,
+      13983,
+      1892,
+      13983,
+      198,
+      510,
+      2782,
+      29,
+      198,
+      510,
+      7593,
+      29,
+      198,
+      27,
+      8944,
+      29
+    ],
+    "optionIndices": [
+      70,
+      75,
+      81
+    ],
+    "answerIndex": 93,
+    "addedTokens": [
+      "<|image_pad|>",
+      "<|vision_start|>"
+    ]
+  },
+  "batchCase": {
+    "questionCount": 33,
+    "names": [
+      "q00",
+      "q01",
+      "q02",
+      "q03",
+      "q04",
+      "q05",
+      "q06",
+      "q07",
+      "q08",
+      "q09",
+      "q10",
+      "q11",
+      "q12",
+      "q13",
+      "q14",
+      "q15",
+      "q16",
+      "q17",
+      "q18",
+      "q19",
+      "q20",
+      "q21",
+      "q22",
+      "q23",
+      "q24",
+      "q25",
+      "q26",
+      "q27",
+      "q28",
+      "q29",
+      "q30",
+      "q31",
+      "q32"
+    ],
+    "chunkSizes": [
+      32,
+      1
+    ],
+    "stateText": "<state>\nA shared state.\n</state>\n",
+    "questionText": "<question type=\"choice\">\nSelect exactly one option.\nChoose exactly one.\n<options>\n1. left\n2. right\n</options>\n</question>\n<answer>",
+    "stateTokenCount": 13,
+    "questionTokenCount": 41,
+    "inputTokenCount": 1379
+  }
+}
