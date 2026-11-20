@@ -294,7 +294,8 @@ test('verified provenance requires immutable lineage, pinned conversion, and exp
   assert.deepEqual(checked.modelIds, [modelId]);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
 
-  await t.test('a new model preserves an approved conversion only when its lock entry matches', async () => {
+  // Run the historical-lock checks before mutating this shared fixture.
+  {
     const archivedPath = 'docs/approved-artifact-lock.json';
     await writeFile(join(temporaryRoot, archivedPath), artifactLockBytes);
     const newModelId = 'pending-model';
@@ -353,7 +354,7 @@ test('verified provenance requires immutable lineage, pinned conversion, and exp
     await assert.rejects(approve(modelLockEntry, '0'.repeat(64)), /Historical conversion artifact-lock pin differs/u);
     await writeFile(join(temporaryRoot, archivedPath), `${artifactLockBytes.toString('utf8')}\n`);
     await assert.rejects(approve(modelLockEntry), /Historical conversion artifact lock.*SHA-256 mismatch/u);
-  });
+  }
 
   const missingConditions = structuredClone(verifiedEvidence);
   missingConditions.rights[0]!.conditions = [];
