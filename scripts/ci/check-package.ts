@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {execFileSync, type ExecFileSyncOptions} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
-import {join, resolve} from 'node:path';
+import {basename, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {APPROVED_MODEL_IDS} from '../../packages/web-decision/src/catalog/public-catalog.generated.ts';
 import {hasQuotedAssetKey} from './asset-key.ts';
@@ -14,6 +14,7 @@ const stableKevModelId = 'kev-0.6b-q4f16';
 const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4fcd9ad0c535878fe2';
 const kananaModelId = 'kanana-2-v-decide-3b-2611';
 const kananaManifestSha256 = 'd4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5';
+const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
 const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
 const kananaRequiredNotice =
   'Kanana is licensed in accordance with the Kanana Open License Agreement. Copyright © KAKAO Corp. All Rights Reserved.';
@@ -23,6 +24,11 @@ type AssetInput = readonly [name: string, sourcePath: string];
 type ManifestFile = Readonly<{sha256: string; bytes: number}>;
 type StableManifest = Readonly<{files: Readonly<Record<string, ManifestFile>>}>;
 type PackageMetadata = Readonly<{name: string; version: string; license: string; private?: boolean}>;
+type LockedModelAsset = ManifestFile & Readonly<{sourcePath: string; manifestName: string}>;
+type BundledArtifactLock = Readonly<{
+  manifest: StableManifest & Readonly<{sourcePath: string; rawSha256: string; canonicalSha256: string}>;
+  bundledRuntimeFiles: readonly LockedModelAsset[];
+}>;
 type PackArchive = Readonly<{filename: string; files: readonly Readonly<{path: string}>[]}>;
 
 const stableAssetInputs: readonly AssetInput[] = [
@@ -48,6 +54,16 @@ const packagedSourceFiles = [
   'src/curated/public-index.d.ts',
   'src/curated/public-types.d.ts',
   'src/curated/public-model-id.generated.d.ts'
+];
+const qwen35LicensePins = {
+  'QWEN-APACHE-LICENSE.txt': '50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32',
+  'STRANDS-QWEN35-LICENSE.md': 'c0d777a0fed01cceb107d91f1aef96d51737be04f2ed75b1b933286a170d7411'
+};
+const qwen35PackageFiles = [
+  ...Object.keys(qwen35LicensePins),
+  'STRANDS-QWEN35-NOTICE',
+  'src/curated/strands-qwen35-candidate-types.d.ts',
+  'src/kanana/json-float.d.ts'
 ];
 
 function canonical(value: unknown): unknown {
@@ -185,9 +201,15 @@ function stableInlineHashes(manifest: StableManifest): Record<string, string> {
   );
 }
 
-function runInstalledApiSmoke(consumer: string, requiredFiles: readonly string[]): void {
+function runInstalledApiSmoke(
+  consumer: string,
+  requiredFiles: readonly string[],
+  qwen35Manifest?: BundledArtifactLock['manifest']
+): void {
   const approvedModelIds = new Set<string>(APPROVED_MODEL_IDS);
-  const unavailableCandidateIds = [stableKevModelId, kananaModelId].filter((modelId) => !approvedModelIds.has(modelId));
+  const unavailableCandidateIds = [stableKevModelId, kananaModelId, qwen35ModelId].filter(
+    (modelId) => !approvedModelIds.has(modelId)
+  );
   const smokeTest = [
     "import assert from 'node:assert/strict';",
     "import * as library from 'web-decision';",
@@ -231,11 +253,23 @@ function runInstalledApiSmoke(consumer: string, requiredFiles: readonly string[]
             ');'
         ]
       : []),
+    ...(qwen35Manifest
+      ? [
+          'const qwen35 = library.describeModel(' + JSON.stringify(qwen35ModelId) + ');',
+          'assert.equal(qwen35.assets.manifestSha256, ' + JSON.stringify(qwen35Manifest.canonicalSha256) + ');',
+          'assert.deepEqual([...qwen35.assets.requiredFiles].sort(), ' +
+            JSON.stringify(['manifest.json', ...Object.keys(qwen35Manifest.files)].sort()) +
+            ');'
+        ]
+      : []),
     "const invalidInput = (error) => error instanceof library.WebDecisionError && error.code === 'INVALID_INPUT';",
     'const originalFetch = globalThis.fetch;',
     'let networkRequested = false;',
     "globalThis.fetch = async () => { networkRequested = true; throw new Error('unexpected network access'); };",
     'try {',
+    '  for (const {modelId} of models) {',
+    "    await assert.rejects(library.loadDecisionModel({modelId, assetsUrl: 'https://example.invalid/'}), invalidInput);",
+    '  }',
     ...(approvedModelIds.has(kananaModelId)
       ? [
           "  for (const option of ['maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters']) {",
@@ -306,33 +340,68 @@ function runCli(command: string, args: readonly string[], options: ExecFileSyncO
   });
 }
 
-function assertConsumerBytes(consumer: string, files: readonly string[], distFiles: readonly string[]): void {
+function assertConsumerBytes(consumer: string, files: readonly string[]): void {
   const installedPackage = join(consumer, 'node_modules/web-decision');
-  for (const file of packagedSourceFiles) {
-    assert.deepEqual(
-      readFileSync(join(installedPackage, file)),
-      readFileSync(join(pkg, file)),
-      'The tarball must preserve ' + file + '.'
-    );
-  }
-  for (const name of distFiles) {
-    assert.deepEqual(
-      readFileSync(join(installedPackage, 'dist', name)),
-      readFileSync(join(pkg, 'dist', name)),
-      'The tarball must preserve dist/' + name + '.'
-    );
-  }
   for (const file of files) {
-    assert.deepEqual(
-      findPackedContentIssues(readFileSync(join(installedPackage, file))),
-      [],
-      'Potential private content in packed file: ' + file
-    );
+    const bytes = readFileSync(join(installedPackage, file));
+    assert.ok(bytes.equals(readFileSync(join(pkg, file))), 'The tarball must preserve ' + file + '.');
+    assert.deepEqual(findPackedContentIssues(bytes), [], 'Potential private content in packed file: ' + file);
   }
 }
 
-function expectedPackageFiles(distFiles: readonly string[]): string[] {
-  return [...packagedSourceFiles, ...distFiles.map((name) => 'dist/' + name), 'package.json'].sort();
+function listDistFiles(directory: string): string[] {
+  return readdirSync(directory, {recursive: true, withFileTypes: true})
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => {
+      assert.ok(entry.isFile(), `The build emitted a non-regular file: ${entry.name}.`);
+      return relative(directory, join(entry.parentPath, entry.name)).split(sep).join('/');
+    })
+    .sort();
+}
+
+function readBundledArtifactLock(modelId: string): BundledArtifactLock {
+  const lock = JSON.parse(readFileSync(join(pkg, 'src/catalog/artifacts.lock.json'), 'utf8')) as {
+    byModelId: Readonly<Record<string, BundledArtifactLock>>;
+  };
+  const artifact = lock.byModelId[modelId];
+  assert.ok(artifact, 'Missing artifact lock for ' + modelId + '.');
+  return artifact;
+}
+
+function matchesAsset(path: string, metadata: ManifestFile): boolean {
+  const bytes = readFileSync(path);
+  return bytes.byteLength === metadata.bytes && createHash('sha256').update(bytes).digest('hex') === metadata.sha256;
+}
+
+function verifyCanonicalAssets({manifest, bundledRuntimeFiles}: BundledArtifactLock): string[] {
+  const manifestBytes = readFileSync(join(pkg, manifest.sourcePath));
+  assert.equal(createHash('sha256').update(manifestBytes).digest('hex'), manifest.rawSha256, manifest.sourcePath);
+  for (const pin of bundledRuntimeFiles) {
+    assert.ok(matchesAsset(join(pkg, pin.sourcePath), pin), 'Source asset differs from its lock: ' + pin.sourcePath);
+  }
+  return [manifest.sourcePath, ...bundledRuntimeFiles.map(({sourcePath}) => sourcePath)];
+}
+
+function verifyQwen35Artifacts(
+  distDirectory: string,
+  distFiles: readonly string[],
+  {bundledRuntimeFiles}: BundledArtifactLock
+): string[] {
+  const pending = new Set(distFiles.filter((name) => name.startsWith('qwen35/')));
+  const wasm: string[] = [];
+  for (const pin of bundledRuntimeFiles) {
+    // These two JSON imports are compiled into the model chunk by Vite.
+    if (['pinned-word-assets-manifest.json', 'source-range-inventory.json'].includes(pin.manifestName)) continue;
+    const matches = [...pending].filter(
+      (name) => basename(name) === basename(pin.manifestName) && matchesAsset(join(distDirectory, name), pin)
+    );
+    assert.equal(matches.length, 1, 'Expected one exact bundled Qwen3.5 asset: ' + pin.manifestName);
+    const [name] = matches as [string];
+    pending.delete(name);
+    if (name.endsWith('.wasm')) wasm.push('dist/' + name);
+  }
+  assert.deepEqual([...pending], [], 'The package emitted unexpected Qwen3.5 assets.');
+  return wasm;
 }
 
 function verifyKananaArtifacts(distDirectory: string, distFiles: readonly string[]): void {
@@ -383,8 +452,100 @@ function verifyKananaLicenseNotice(): void {
     assert.ok(readme.includes(term), 'The package README must pass on Kanana license requirements: ' + term + '.');
 }
 
+function verifyQwen35LicenseNotice(): void {
+  for (const [name, pin] of Object.entries(qwen35LicensePins)) {
+    assert.equal(
+      createHash('sha256')
+        .update(readFileSync(join(pkg, name)))
+        .digest('hex'),
+      pin,
+      name
+    );
+  }
+  const notice = readFileSync(join(pkg, 'STRANDS-QWEN35-NOTICE'), 'utf8');
+  for (const term of ['Strands Decider 2B Qwen3.5', 'Copyright 2026 Alibaba Cloud', 'web-decision adapted']) {
+    assert.ok(notice.includes(term), 'The Qwen3.5 notice must preserve ' + term + '.');
+  }
+}
+
+function verifyPackageInventory(
+  packageFiles: readonly string[],
+  distDirectory: string,
+  distFiles: readonly string[],
+  kananaApproved: boolean,
+  qwen35?: BundledArtifactLock
+): void {
+  const assetFiles = [
+    ...(kananaApproved && qwen35 ? verifyCanonicalAssets(readBundledArtifactLock(kananaModelId)) : []),
+    ...(qwen35 ? verifyCanonicalAssets(qwen35) : [])
+  ];
+  const files = [
+    ...packagedSourceFiles,
+    ...(qwen35 ? qwen35PackageFiles : []),
+    ...assetFiles,
+    ...distFiles.map((name) => 'dist/' + name),
+    'package.json'
+  ];
+  assert.deepEqual(packageFiles, files.sort());
+  const wasm = [
+    ...(kananaApproved ? kananaWasmFiles.map((name) => 'dist/' + name) : []),
+    ...(qwen35 ? verifyQwen35Artifacts(distDirectory, distFiles, qwen35) : []),
+    ...assetFiles.filter((name) => name.endsWith('.wasm'))
+  ];
+  assert.deepEqual(
+    packageFiles.filter((file) => file.endsWith('.wasm')),
+    wasm.sort()
+  );
+}
+
+function selectArchive(packedPath: string, requestedPath?: string): string {
+  if (!requestedPath) return packedPath;
+  const archivePath = resolve(requestedPath);
+  assert.ok(readFileSync(archivePath).equals(readFileSync(packedPath)), 'Release archive differs from npm pack output.');
+  return archivePath;
+}
+
+function verifyBuiltChunks(
+  distDirectory: string,
+  distFiles: readonly string[],
+  approvedModelIds: ReadonlySet<string>
+): void {
+  const chunks = distFiles
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => ({name, text: readFileSync(join(distDirectory, name), 'utf8')}));
+  const unverifiedWasmHash = candidateWasmHash();
+  if (unverifiedWasmHash) {
+    assert.ok(
+      !inlineDataHashes(chunks).has(unverifiedWasmHash),
+      'The unverified candidate WASM must not be embedded in the package.'
+    );
+  }
+  for (const {name, text} of chunks) {
+    if (!approvedModelIds.has(qwen35ModelId)) {
+      assert.doesNotMatch(
+        text,
+        /strands-decider-2b-qwen3\.5-v1-2610|qwen35-(?:dynamic-vision|text-pointer)/u,
+        'Pending Qwen3.5 IDs or graph assets leaked into dist/' + name + '.'
+      );
+    }
+    if (!approvedModelIds.has(stableKevModelId) && !approvedModelIds.has(kananaModelId)) {
+      assert.doesNotMatch(
+        text,
+        /kev-0\.6b-q4f16|kanana-2-v-decide-3b-2611/u,
+        'Pending model IDs leaked into dist/' + name + '.'
+      );
+    }
+    assert.doesNotMatch(
+      text,
+      /\b(?:from\s*|import\s*\(\s*)["'][^"']*\?url(?:&|["'])/u,
+      'The published chunk dist/' + name + ' must not depend on consumer asset plugins.'
+    );
+  }
+}
+
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const pkg = join(root, 'packages/web-decision');
+assert.ok(process.argv.length <= 3, 'Expected at most one release archive path.');
 withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   const npmConsumer = makeTempDirectory('web-decision-ci-npm-consumer-');
   const pnpmConsumer = makeTempDirectory('web-decision-ci-pnpm-consumer-');
@@ -397,7 +558,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   const kevApproved = approvedModelIds.has(stableKevModelId);
   const kananaApproved = approvedModelIds.has(kananaModelId);
 
-  const output = runCli(npm, ['pack', '--json', '--pack-destination', npmConsumer], {
+  const output = runCli(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', npmConsumer], {
     cwd: pkg,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'inherit']
@@ -406,22 +567,20 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   assert.ok(archive, 'npm pack did not return an archive.');
   const packageFiles = archive.files.map((file) => file.path).sort();
   const distDirectory = join(pkg, 'dist');
-  const distFiles = readdirSync(distDirectory).sort();
+  const distFiles = listDistFiles(distDirectory);
+  const qwen35 = approvedModelIds.has(qwen35ModelId) ? readBundledArtifactLock(qwen35ModelId) : undefined;
   if (kananaApproved) {
     verifyKananaArtifacts(distDirectory, distFiles);
     verifyKananaLicenseNotice();
   }
-  const expectedFiles = expectedPackageFiles(distFiles);
-  assert.deepEqual(packageFiles, expectedFiles);
-  assert.ok(
-    packageFiles.every((file) => !file.startsWith('assets/')),
-    'Source candidate assets must not be copied into the published package.'
-  );
-  assert.deepEqual(
-    packageFiles.filter((file) => file.endsWith('.wasm')).sort(),
-    kananaApproved ? ['dist/kanana-text-model.wasm', 'dist/kanana-vision-model.wasm'].sort() : []
-  );
-
+  if (qwen35) verifyQwen35LicenseNotice();
+  verifyPackageInventory(packageFiles, distDirectory, distFiles, kananaApproved, qwen35);
+  if (!approvedModelIds.has(qwen35ModelId)) {
+    assert.ok(
+      packageFiles.every((file) => !file.startsWith('dist/') || !/qwen35|strands-qwen/iu.test(file)),
+      'Pending Qwen3.5 assets and candidate modules must not enter the npm archive.'
+    );
+  }
   const packageEntry = readFileSync(join(distDirectory, 'index.js'), 'utf8');
   let stableAssetChunks: BundleChunk[] = [];
   let expectedInlineHashes: Readonly<Record<string, string>> = {};
@@ -442,34 +601,9 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
     verifyInlineAssets(stableAssetChunks, stableAssetInputs, 'stable Kev');
   }
 
-  const allDistChunks = distFiles
-    .filter((name) => name.endsWith('.js'))
-    .map((name) => ({name, text: readFileSync(join(distDirectory, name), 'utf8')}));
-  const unverifiedWasmHash = candidateWasmHash();
-  if (unverifiedWasmHash) {
-    assert.ok(
-      !inlineDataHashes(allDistChunks).has(unverifiedWasmHash),
-      'The unverified candidate WASM must not be embedded in the package.'
-    );
-  }
-  if (!kevApproved && !kananaApproved) {
-    for (const {name, text} of allDistChunks) {
-      assert.doesNotMatch(
-        text,
-        /kev-0\.6b-q4f16|kanana-2-v-decide-3b-2611/u,
-        'Pending model IDs leaked into dist/' + name + '.'
-      );
-    }
-  }
-  for (const {name, text} of allDistChunks) {
-    assert.doesNotMatch(
-      text,
-      /\b(?:from\s*|import\s*\(\s*)["'][^"']*\?url(?:&|["'])/u,
-      'The published chunk dist/' + name + ' must not depend on consumer asset plugins.'
-    );
-  }
+  verifyBuiltChunks(distDirectory, distFiles, approvedModelIds);
 
-  const packagePath = resolve(npmConsumer, archive.filename);
+  const packagePath = selectArchive(resolve(npmConsumer, archive.filename), process.argv[2]);
   writeFileSync(join(npmConsumer, 'package.json'), '{"private":true,"type":"module"}\n');
   runCli(npm, ['install', '--ignore-scripts', '--no-audit', '--no-fund', packagePath], {
     cwd: npmConsumer,
@@ -481,8 +615,8 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   ) as PackageMetadata;
   assert.equal(installed.version, metadata.version);
   assert.equal(installed.license, metadata.license);
-  assertConsumerBytes(npmConsumer, packageFiles, distFiles);
-  runInstalledApiSmoke(npmConsumer, requiredKevFiles);
+  assertConsumerBytes(npmConsumer, packageFiles);
+  runInstalledApiSmoke(npmConsumer, requiredKevFiles, qwen35?.manifest);
   if (kevApproved)
     runInstalledAssetSmoke(
       npmConsumer,
@@ -510,8 +644,8 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
   ) as PackageMetadata;
   assert.equal(pnpmInstalled.version, metadata.version);
   assert.equal(pnpmInstalled.license, metadata.license);
-  assertConsumerBytes(pnpmConsumer, packageFiles, distFiles);
-  runInstalledApiSmoke(pnpmConsumer, requiredKevFiles);
+  assertConsumerBytes(pnpmConsumer, packageFiles);
+  runInstalledApiSmoke(pnpmConsumer, requiredKevFiles, qwen35?.manifest);
   if (kevApproved)
     runInstalledAssetSmoke(
       pnpmConsumer,

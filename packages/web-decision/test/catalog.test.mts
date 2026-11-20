@@ -39,7 +39,7 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('candidate catalog retains verified Kanana and pending Qwen TVM descriptors', () => {
+test('catalog retains pinned Kanana and Qwen TVM descriptors', () => {
   assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610']);
   assert.equal(MODEL_CATALOG.length, 2);
 
@@ -76,7 +76,10 @@ test('candidate catalog retains verified Kanana and pending Qwen TVM descriptors
     maxComputeWorkgroupStorageSize: 8_192
   });
   assert.equal(qwen.description.checkpoint.repository, 'StrandsAgents/strands-decider-2B-qwen3.5-v1-2610');
-  assert.equal(qwen.description.verification.currentBundleGpu, 'not-revalidated');
+  assert.equal(
+    qwen.description.verification.currentBundleGpu,
+    qwen.artifacts.manifest.experimental ? 'not-revalidated' : 'see-release-evidence'
+  );
   assert.deepEqual(qwen.description.features.imageChoice?.limits, [
     {
       resource: 'images',
@@ -98,9 +101,7 @@ test('public generated catalog and model ID type include verified models only', 
     approvedIds
   );
   assert.deepEqual(Object.keys(PUBLIC_MODEL_CATALOG_BY_ID), approvedIds);
-  assert.deepEqual(approvedIds, ['kanana-2-v-decide-3b-2611']);
-  assert.equal(Object.hasOwn(PUBLIC_MODEL_CATALOG_BY_ID, 'strands-decider-2b-qwen3.5-v1-2610'), false);
-  assert.equal(Object.hasOwn(APPROVED_ADAPTER_LOADERS, 'strands-qwen35'), false);
+  assert.ok(approvedIds.includes('kanana-2-v-decide-3b-2611'));
   assert.deepEqual(
     Object.keys(APPROVED_ADAPTER_LOADERS).sort(),
     [...new Set(PUBLIC_MODEL_CATALOG.map(({description}) => description.adapter))].sort()

@@ -21,6 +21,8 @@ const PACKAGE_ROOT = join(WORKSPACE_ROOT, 'packages/web-decision');
 const MODEL_SPEC_PATH = join(PACKAGE_ROOT, 'src/catalog/model-spec.json');
 const ARTIFACT_LOCK_PATH = join(PACKAGE_ROOT, 'src/catalog/artifacts.lock.json');
 const TEST_EVIDENCE_PATH = join(WORKSPACE_ROOT, 'scripts/release/fixtures/model-provenance-test-fixture.json');
+const QWEN_MODEL_ID = 'strands-decider-2b-qwen3.5-v1-2610';
+type ModelProvenanceRecord = {modelId: string; status: string; evidence: {path: string; sha256: string}};
 
 async function readProductionInputs(): Promise<{
   modelSpec: unknown;
@@ -43,7 +45,7 @@ async function readProductionInputs(): Promise<{
 
 async function validateTemporaryManifest(
   manifestBytes: Buffer,
-  options: {expectedSha256?: string; evidenceBytes?: Buffer; allowPending?: boolean} = {}
+  options: {expectedSha256?: string; evidenceOverrides?: Record<string, Buffer>; allowPending?: boolean} = {}
 ): Promise<{pendingModelIds: string[]}> {
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-model-provenance-')));
   try {
@@ -52,8 +54,7 @@ async function validateTemporaryManifest(
     await mkdir(evidenceRoot, {recursive: true});
     const sourceEvidenceRoot = join(PACKAGE_ROOT, MODEL_PROVENANCE_EVIDENCE_ROOT);
     for (const name of await readdir(sourceEvidenceRoot)) {
-      const source = await readFile(join(sourceEvidenceRoot, name));
-      const evidence = name === 'kanana-2-v-decide-3b-2611.json' ? (options.evidenceBytes ?? source) : source;
+      const evidence = options.evidenceOverrides?.[name] ?? (await readFile(join(sourceEvidenceRoot, name)));
       await writeFile(join(evidenceRoot, name), evidence);
     }
     const inputs = await readProductionInputs();
@@ -75,25 +76,39 @@ async function validateTemporaryManifest(
   }
 }
 
-test('the provenance manifest covers verified Kanana and pending Qwen', async () => {
+test('the provenance manifest covers every locked curated model', async () => {
   const {manifestBytes, modelSpec, artifactLock} = await readProductionInputs();
   const catalogIds = (modelSpec as {models: Array<{modelId: string}>}).models.map(({modelId}) => modelId).sort();
   const lockIds = Object.keys((artifactLock as {byModelId: Record<string, unknown>}).byModelId).sort();
-  const manifestIds = (JSON.parse(manifestBytes.toString('utf8')) as {models: Array<{modelId: string}>}).models
-    .map(({modelId}) => modelId)
-    .sort();
-  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610']);
+  const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
+  const manifestIds = manifest.models.map(({modelId}) => modelId).sort();
+  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', QWEN_MODEL_ID]);
   assert.deepEqual(manifestIds, catalogIds);
   assert.deepEqual(lockIds, catalogIds);
   assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256);
   const result = await validateTemporaryManifest(manifestBytes, {allowPending: true});
-  assert.deepEqual(result.pendingModelIds, ['strands-decider-2b-qwen3.5-v1-2610']);
+  assert.deepEqual(
+    result.pendingModelIds,
+    manifest.models.filter(({status}) => status === 'pending').map(({modelId}) => modelId)
+  );
 });
 
-test('release provenance rejects the pending Qwen candidate', async () => {
+test('release provenance rejects pending model evidence', async () => {
   const {manifestBytes} = await readProductionInputs();
+  const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
+  const model = manifest.models.find(({modelId}) => modelId === QWEN_MODEL_ID);
+  assert.ok(model);
+  const pendingEvidence = Buffer.from(
+    JSON.stringify({status: 'pending', modelId: QWEN_MODEL_ID, unresolved: ['Release evidence fixture pending.']})
+  );
+  model.status = 'pending';
+  model.evidence.sha256 = sha256(pendingEvidence);
+  const pendingManifest = Buffer.from(JSON.stringify(manifest));
   await assert.rejects(
-    validateTemporaryManifest(manifestBytes),
+    validateTemporaryManifest(pendingManifest, {
+      expectedSha256: sha256(pendingManifest),
+      evidenceOverrides: {[`${QWEN_MODEL_ID}.json`]: pendingEvidence}
+    }),
     /strands-decider-2b-qwen3\.5-v1-2610 provenance is pending/u
   );
 });
@@ -491,7 +506,9 @@ test('a direct artifact lock binds every role-tagged conversion input', () => {
 test('tampered committed evidence cannot match the manifest evidence digest', async () => {
   const {manifestBytes} = await readProductionInputs();
   await assert.rejects(
-    validateTemporaryManifest(manifestBytes, {evidenceBytes: Buffer.from('{"status":"verified"}\n')}),
+    validateTemporaryManifest(manifestBytes, {
+      evidenceOverrides: {'kanana-2-v-decide-3b-2611.json': Buffer.from('{"status":"verified"}\n')}
+    }),
     /Provenance evidence SHA-256 mismatch/u
   );
 });

@@ -2,7 +2,7 @@
 
 Run curated decision models in the browser with pinned TVM WebGPU assets.
 
-The current `main` API exposes the verified Kanana 2 V Decide model by ID:
+Load a model by its ID. Supported models are Kanana 2 V Decide (`kanana-2-v-decide-3b-2611`) and Strands Decider Qwen3.5 (`strands-decider-2b-qwen3.5-v1-2610`).
 
 ```ts
 import {loadDecisionModel} from 'web-decision';
