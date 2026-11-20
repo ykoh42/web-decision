@@ -26,6 +26,8 @@ import {
   collectReleaseEvidenceInputsForTestFixture,
   verifyReleaseArtifactsForTestFixture,
   verifyReleaseEvidence,
+  validateKananaCombinedPin,
+  verifyKananaCombinedReleaseEvidence,
   validateRuntimeAssetConfiguration
 } from './verify-release-evidence.ts';
 import {
@@ -1026,6 +1028,68 @@ test('pins the exact Kanana npm archive, static manifest, and TVM artifact set',
       localCandidate: true
     }),
     /pinned npm archive/u
+  );
+});
+
+test('requires separate Kanana combined candidate and release pin schemas', () => {
+  const pin = {schemaVersion: 1, packageVersion: '0.5.0', archiveSha256: 'a'.repeat(64)};
+  assert.deepEqual(validateKananaCombinedPin(pin, 'candidate'), pin);
+  const release = {...pin, playwrightReportSha256: 'b'.repeat(64), maxContextReportSha256: 'c'.repeat(64)};
+  assert.deepEqual(validateKananaCombinedPin(release, 'release'), release);
+  assert.throws(() => validateKananaCombinedPin(pin, 'release'), /Unexpected fields/u);
+  assert.throws(() => validateKananaCombinedPin(release, 'candidate'), /Unexpected fields/u);
+  assert.throws(
+    () => validateKananaCombinedPin({...pin, archiveSha256: 'invalid'}, 'candidate'),
+    /Invalid Kanana combined archiveSha256/u
+  );
+  assert.throws(
+    () => validateKananaCombinedPin({...release, maxContextReportSha256: null}, 'release'),
+    /Invalid Kanana combined maxContextReportSha256/u
+  );
+  for (const packageVersion of ['0.3.0', '0.4.0', '0.5.0-preview.1', '00.5.0']) {
+    assert.throws(() => validateKananaCombinedPin({...pin, packageVersion}, 'candidate'));
+  }
+});
+
+test('combined candidate collection cannot affect strict historical or combined release verification', async (t) => {
+  const fixture = await makeFixture();
+  const variable = 'WEB_DECISION_KANANA_COMBINED_CANDIDATE';
+  const previous = process.env[variable];
+  t.after(async () => {
+    if (previous === undefined) delete process.env[variable];
+    else process.env[variable] = previous;
+    await rm(fixture.root, {recursive: true, force: true});
+  });
+  const archive = await verifyArchiveInstall(fixture.archivePath, fixture.packageRoot);
+  const pinPath = join(fixture.root, 'kanana-candidate.json');
+  await writeFile(
+    pinPath,
+    JSON.stringify({
+      schemaVersion: 1,
+      packageVersion: archive.packageVersion,
+      archiveSha256: archive.archiveSha256
+    })
+  );
+  process.env[variable] = pinPath;
+  const paths = {archivePath: fixture.archivePath, installedPackagePath: fixture.packageRoot};
+  await assert.rejects(collectKananaReleaseEvidenceInputs(paths), /pinned npm archive/u);
+  await assert.rejects(
+    collectKananaReleaseEvidenceInputs({...paths, localCandidate: true}),
+    /missing its pinned manifest/u
+  );
+  const options = {
+    ...paths,
+    playwrightReportPath: join(fixture.root, 'unavailable-report.json'),
+    maxContextReportPath: join(fixture.root, 'unavailable-max-context.json'),
+    buildEvidencePath: join(fixture.root, 'unavailable-build-evidence.json')
+  };
+  await assert.rejects(
+    verifyKananaCombinedReleaseEvidence({...options, candidateConfigPath: pinPath}),
+    /missing its pinned manifest/u
+  );
+  await assert.rejects(
+    verifyKananaCombinedReleaseEvidence({...options, workspaceRoot: fixture.root}),
+    /kanana-combined-release\.json/u
   );
 });
 

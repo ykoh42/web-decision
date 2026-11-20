@@ -180,6 +180,7 @@ interface PublicCatalogDescriptor {
 interface CatalogArtifactLock {
   manifest: {
     sourcePath: string;
+    rawSha256?: string;
     canonicalSha256: string;
     files: Record<string, AssetMetadata>;
   };
@@ -1101,11 +1102,31 @@ export async function collectKananaReleaseEvidenceInputs({
   localCandidate?: boolean;
 }): Promise<KananaReleaseEvidenceInputs> {
   const root = resolve(workspaceRoot);
+  const candidatePath = localCandidate ? process.env.WEB_DECISION_KANANA_COMBINED_CANDIDATE : undefined;
+  if (candidatePath)
+    return collectKananaCombinedInputs(
+      archivePath,
+      installedPackagePath,
+      root,
+      await readKananaCombinedPin(root, candidatePath)
+    );
   const policy = localCandidate ? await loadCurrentKananaPolicy(root) : await loadTrustedKananaPolicy(root);
+  return collectKananaArchiveInputs(archivePath, installedPackagePath, policy);
+}
+
+async function collectKananaArchiveInputs(
+  archivePath: string,
+  installedPackagePath: string,
+  policy: KananaEvidencePolicy
+): Promise<KananaReleaseEvidenceInputs> {
   const archive = await verifyArchiveInstall(archivePath, installedPackagePath);
   assert.equal(archive.archiveSha256, policy.archive.sha256, 'Kanana browser tests require the pinned npm archive.');
   assert.equal(archive.packageName, policy.archive.packageName, 'Kanana archive package name differs from its pin.');
-  assert.equal(archive.packageVersion, policy.archive.packageVersion, 'Kanana browser tests require package 0.4.0.');
+  assert.equal(
+    archive.packageVersion,
+    policy.archive.packageVersion,
+    'Kanana browser tests require the pinned package version.'
+  );
   assert.ok(archive.archiveFiles.includes(policy.model.manifestPath), 'Kanana archive is missing its pinned manifest.');
   const manifestBytes = await readFile(join(archive.installedRoot, ...policy.model.manifestPath.split('/')));
   const validated = validateKananaManifestBytes(manifestBytes, policy);
@@ -1593,6 +1614,113 @@ interface KananaReleaseEvidenceOptions {
   workspaceRoot?: string;
 }
 
+const KANANA_COMBINED_RELEASE_PIN = 'scripts/release/kanana-combined-release.json';
+const QWEN35_RELEASE_MODEL_ID = 'strands-decider-2b-qwen3.5-v1-2610';
+const KANANA_COMBINED_MODEL_IDS = ['kanana-2-v-decide-3b-2611', QWEN35_RELEASE_MODEL_ID];
+
+interface KananaCombinedPin {
+  packageVersion: string;
+  archiveSha256: string;
+  playwrightReportSha256?: string;
+  maxContextReportSha256?: string;
+}
+
+export function validateKananaCombinedPin(input: unknown, mode: 'candidate' | 'release'): KananaCombinedPin {
+  fail(input !== null && typeof input === 'object' && !Array.isArray(input), 'Kanana combined pin must be an object.');
+  const pin = input as AnyRecord;
+  const keys = ['archiveSha256', 'packageVersion', 'schemaVersion'];
+  if (mode === 'release') keys.push('playwrightReportSha256', 'maxContextReportSha256');
+  assert.deepEqual(Object.keys(pin).sort(), keys.sort(), 'Unexpected fields in Kanana combined pin.');
+  assert.equal(pin.schemaVersion, 1, 'Unsupported Kanana combined pin schema.');
+  fail(
+    typeof pin.packageVersion === 'string' && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.test(pin.packageVersion),
+    'Kanana combined pin requires a stable package version.'
+  );
+  const [major, minor, patch] = pin.packageVersion.split('.').map(Number) as [number, number, number];
+  fail(major > 0 || minor > 4 || (minor === 4 && patch > 0), 'Kanana combined version must be newer than 0.4.0.');
+  for (const key of keys.filter((key) => key.endsWith('Sha256'))) {
+    fail(typeof pin[key] === 'string' && SHA256_PATTERN.test(pin[key]), `Invalid Kanana combined ${key}.`);
+  }
+  return pin as KananaCombinedPin;
+}
+
+async function readKananaCombinedPin(workspaceRoot: string, candidatePath?: string): Promise<KananaCombinedPin> {
+  const path = resolve(workspaceRoot, candidatePath ?? KANANA_COMBINED_RELEASE_PIN);
+  const info = await lstat(path);
+  fail(info.isFile() && !info.isSymbolicLink(), 'Kanana combined pin must be a regular JSON file.');
+  const bytes = await readFile(path);
+  if (candidatePath === undefined) {
+    const committed = execFileSync('git', ['show', `HEAD:${KANANA_COMBINED_RELEASE_PIN}`], {
+      cwd: workspaceRoot,
+      env: gitEnvironmentFor(workspaceRoot)
+    });
+    assert.deepEqual(bytes, committed, 'Kanana combined release pin must match its committed bytes.');
+  }
+  return validateKananaCombinedPin(
+    JSON.parse(bytes.toString('utf8')),
+    candidatePath === undefined ? 'release' : 'candidate'
+  );
+}
+
+async function assertKananaCombinedCatalog(
+  workspaceRoot: string,
+  archive: ArchiveInfo,
+  allowPending: boolean
+): Promise<void> {
+  const provenance = await assertCommittedPackageProvenance(workspaceRoot, {allowPending});
+  assert.deepEqual([...provenance.modelIds].sort(), KANANA_COMBINED_MODEL_IDS, 'Unexpected combined model provenance.');
+  assert.ok(
+    provenance.pendingModelIds.every((id) => id === QWEN35_RELEASE_MODEL_ID),
+    'Kanana provenance must be verified.'
+  );
+  const catalog = await loadInstalledCatalog(archive.installedRoot);
+  assert.deepEqual(
+    catalog.map(({modelId}) => modelId),
+    KANANA_COMBINED_MODEL_IDS,
+    'Unexpected combined package catalog.'
+  );
+  const lockPath = 'packages/web-decision/src/catalog/artifacts.lock.json';
+  const lock = JSON.parse(await readFile(resolve(workspaceRoot, lockPath), 'utf8')) as ArtifactLockFile;
+  for (const {modelId, manifestSha256, requiredFiles} of catalog) {
+    const manifest = lock.byModelId[modelId]?.manifest;
+    assert.ok(manifest, `Combined archive model has no artifact lock: ${modelId}`);
+    assert.equal(manifestSha256, manifest.canonicalSha256, `Combined archive manifest pin differs for ${modelId}.`);
+    assert.deepEqual(requiredFiles, ['manifest.json', ...Object.keys(manifest.files)].sort());
+    const path = normalizedRelativePath(manifest.sourcePath, `Combined archive manifest for ${modelId}`);
+    assert.ok(archive.archiveFiles.includes(path), `Combined archive omits the pinned manifest for ${modelId}.`);
+    const bytes = await readFile(resolve(archive.installedRoot, path));
+    assert.equal(sha256(bytes), manifest.rawSha256, `Combined archive raw manifest differs for ${modelId}.`);
+  }
+}
+
+async function collectKananaCombinedInputs(
+  archivePath: string,
+  installedPackagePath: string,
+  workspaceRoot: string,
+  pin: KananaCombinedPin
+): Promise<KananaReleaseEvidenceInputs> {
+  const legacyPolicy = await loadTrustedKananaPolicy(workspaceRoot);
+  const policy: KananaEvidencePolicy = {
+    ...legacyPolicy,
+    archive: {sha256: pin.archiveSha256, packageName: 'web-decision', packageVersion: pin.packageVersion}
+  };
+  const inputs = await collectKananaArchiveInputs(archivePath, installedPackagePath, policy);
+  assertCommittedCatalogSources(workspaceRoot);
+  await assertKananaCombinedCatalog(workspaceRoot, inputs.archive, pin.playwrightReportSha256 === undefined);
+  await assertCommittedKananaTestSources(workspaceRoot, policy);
+  const installedManifestDirectory = dirname(join(inputs.archive.installedRoot, inputs.manifest.path));
+  for (const [path, metadata] of Object.entries(inputs.manifest.files)) {
+    const bytes = await readFile(join(installedManifestDirectory, path));
+    assert.equal(bytes.byteLength, metadata.bytes, `Wrong Kanana packaged asset size: ${path}`);
+    assert.equal(sha256(bytes), metadata.sha256, `Wrong Kanana packaged asset digest: ${path}`);
+    if (path.endsWith('.wasm')) {
+      const runtime = await readFile(join(dirname(inputs.archive.bundlePath), path));
+      assert.deepEqual(runtime, bytes, `Wrong Kanana runtime Wasm bytes: ${path}`);
+    }
+  }
+  return inputs;
+}
+
 async function assertKananaExactPackageProvenance(
   workspaceRoot: string,
   inputs: KananaReleaseEvidenceInputs,
@@ -1636,6 +1764,53 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
   const provenance = await assertCommittedPackageProvenance(workspaceRoot);
   assert.deepEqual(provenance.modelIds, [policy.model.modelId], 'Kanana release provenance must contain only Kanana.');
   await assertCommittedKananaTestSources(workspaceRoot, policy);
+  const inputs = await collectKananaReleaseEvidenceInputs({
+    archivePath: options.archivePath,
+    installedPackagePath: options.installedPackagePath,
+    workspaceRoot
+  });
+  const {result, playwrightReportBytes, maxContextReportBytes} = await verifyKananaRun(options, inputs, workspaceRoot);
+  await assertKananaExactPackageProvenance(workspaceRoot, inputs, playwrightReportBytes, maxContextReportBytes);
+  return result;
+}
+
+export async function verifyKananaCombinedReleaseEvidence(
+  options: KananaReleaseEvidenceOptions & {candidateConfigPath?: string}
+): Promise<AnyRecord> {
+  const workspaceRoot = resolve(options.workspaceRoot ?? WORKSPACE_ROOT);
+  const {candidateConfigPath, archivePath, installedPackagePath} = options;
+  const pin = await readKananaCombinedPin(workspaceRoot, candidateConfigPath);
+  const inputs = await collectKananaCombinedInputs(archivePath, installedPackagePath, workspaceRoot, pin);
+  const {result, playwrightReportBytes, maxContextReportBytes} = await verifyKananaRun(options, inputs, workspaceRoot);
+  const playwrightReportSha256 = sha256(playwrightReportBytes);
+  const maxContextReportSha256 = sha256(maxContextReportBytes);
+  const approved = candidateConfigPath === undefined;
+  if (approved) {
+    assert.equal(
+      playwrightReportSha256,
+      pin.playwrightReportSha256,
+      'Combined Kanana browser report differs from its committed pin.'
+    );
+    assert.equal(
+      maxContextReportSha256,
+      pin.maxContextReportSha256,
+      'Combined Kanana max-context report differs from its committed pin.'
+    );
+    assert.deepEqual(
+      await readKananaCombinedPin(workspaceRoot),
+      pin,
+      'Combined Kanana release pin changed during verification.'
+    );
+  }
+  return {...result, playwrightReportSha256, maxContextReportSha256, approved};
+}
+
+async function verifyKananaRun(
+  options: KananaReleaseEvidenceOptions,
+  inputs: KananaReleaseEvidenceInputs,
+  workspaceRoot: string
+) {
+  const {policy} = inputs;
   const fixture = await readCommittedFixture(
     workspaceRoot,
     policy.referenceFixture.path,
@@ -1665,11 +1840,6 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
     'Kanana image fixture checkpoint pin differs from policy.'
   );
 
-  const inputs = await collectKananaReleaseEvidenceInputs({
-    archivePath: options.archivePath,
-    installedPackagePath: options.installedPackagePath,
-    workspaceRoot
-  });
   const buildEvidencePath = resolve(options.buildEvidencePath);
   const builds = await verifyKananaTvmBuildEvidence(
     buildEvidencePath,
@@ -1690,7 +1860,6 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
   };
   const browserResults = validateKananaPlaywrightReport(report, verificationContext);
   const maximumContextResults = validateKananaMaximumContextPlaywrightReport(maxContextReport, verificationContext);
-  await assertKananaExactPackageProvenance(workspaceRoot, inputs, playwrightReportBytes, maxContextReportBytes);
   const finalArchive = await verifyArchiveInstall(options.archivePath, options.installedPackagePath);
   assert.equal(finalArchive.archiveSha256, inputs.archive.archiveSha256, 'Kanana archive changed during verification.');
   assert.equal(
@@ -1709,17 +1878,21 @@ export async function verifyKananaReleaseEvidence(options: KananaReleaseEvidence
     'Kanana TVM build evidence changed during verification.'
   );
   return {
-    archiveSha256: inputs.archive.archiveSha256,
-    packageTreeSha256: inputs.archive.packageTreeSha256,
-    bundleSha256: inputs.archive.bundleSha256,
-    packageName: inputs.archive.packageName,
-    packageVersion: inputs.archive.packageVersion,
-    modelId: policy.model.modelId,
-    manifestSha256: inputs.manifest.manifestSha256,
-    artifacts: inputs.manifest.files,
-    builds,
-    browserResults,
-    maximumContextResults
+    playwrightReportBytes,
+    maxContextReportBytes,
+    result: {
+      archiveSha256: inputs.archive.archiveSha256,
+      packageTreeSha256: inputs.archive.packageTreeSha256,
+      bundleSha256: inputs.archive.bundleSha256,
+      packageName: inputs.archive.packageName,
+      packageVersion: inputs.archive.packageVersion,
+      modelId: policy.model.modelId,
+      manifestSha256: inputs.manifest.manifestSha256,
+      artifacts: inputs.manifest.files,
+      builds,
+      browserResults,
+      maximumContextResults
+    }
   };
 }
 
@@ -1894,11 +2067,27 @@ function parseKananaArguments(args: string[]): KananaReleaseEvidenceOptions {
 
 async function main() {
   const args = process.argv.slice(2);
-  const result =
-    args[0] === '--kanana'
-      ? await verifyKananaReleaseEvidence(parseKananaArguments(args.slice(1)))
-      : await verifyReleaseEvidence(parseArguments(args));
+  const result = await verifyCommandLine(args);
   console.log(JSON.stringify(result, null, 2));
+}
+
+function verifyCommandLine(args: string[]) {
+  switch (args[0]) {
+    case '--kanana':
+      return verifyKananaReleaseEvidence(parseKananaArguments(args.slice(1)));
+    case '--kanana-combined':
+      return verifyKananaCombinedReleaseEvidence(parseKananaArguments(args.slice(1)));
+    case '--kanana-combined-candidate': {
+      const candidateConfigPath = args[1];
+      fail(
+        candidateConfigPath && !candidateConfigPath.startsWith('--'),
+        'Kanana combined candidate pin path is required.'
+      );
+      return verifyKananaCombinedReleaseEvidence({...parseKananaArguments(args.slice(2)), candidateConfigPath});
+    }
+    default:
+      return verifyReleaseEvidence(parseArguments(args));
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
