@@ -68,15 +68,6 @@ async function requestVisionDevice(gpu: GPU | undefined, signal?: AbortSignal): 
   return requestGpuDevice(adapter, deviceDescriptor(adapter), signal);
 }
 
-function roundToBf16(values: Float32Array): Float32Array {
-  const words = new Uint32Array(values.buffer, values.byteOffset, values.length);
-  for (let index = 0; index < words.length; index++) {
-    const word = words[index]!;
-    words[index] = (word + 0x7fff + ((word >>> 16) & 1)) & 0xffff0000;
-  }
-  return values;
-}
-
 /** Fill the packaged graph cache while the native weights are prefetched separately. */
 export async function cacheMapika2bVisionAssets({
   cache,
@@ -118,11 +109,11 @@ export async function openMapika2bVision({
       const [embeddings] = await runner.run({
         imageCount: 1,
         imageGridThw: Int32Array.from(grid),
-        imageInput: {imageGridThw: [grid], pixelShape, pixelValues: roundToBf16(pixelValues)},
+        imageInput: {imageGridThw: [grid], pixelShape, pixelValues},
         visionGeometry: buildQwen35PerImageVisionGeometry([grid], VISION_GEOMETRY)
       });
       if (!embeddings) throw new WebDecisionError('INFERENCE_ERROR', 'TVM returned no Mapika vision features.');
-      return {grid, embeddings: roundToBf16(embeddings)};
+      return {grid, embeddings};
     },
     dispose: runner.dispose
   });
