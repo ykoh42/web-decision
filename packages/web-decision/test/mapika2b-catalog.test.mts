@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createModelArtifactLock, publicLoadOptionsForAdapter} from '../scripts/build-model-catalog.mts';
+import {readLoadOptions} from '../src/curated/load-options.ts';
+import type {ModelId} from '../src/catalog/types.generated.js';
 
 test('Mapika catalog recipe pins native checkpoints and packaged TVM artifacts', async () => {
   const model = {
@@ -39,5 +41,20 @@ test('Mapika catalog recipe pins native checkpoints and packaged TVM artifacts',
       description: {...model.description, checkpoint: {...model.description.checkpoint, revision: 'other'}}
     }),
     /differs from its immutable pin/u
+  );
+});
+
+test('Mapika model ID uses curated load options without an asset URL', () => {
+  const id = 'mapika-decider-2b-v12';
+  const isMapika = (value: unknown): value is ModelId => value === id;
+  const options = {[id]: publicLoadOptionsForAdapter('mapika2b')};
+  const request = {modelId: id, temperature: 1, limits: {maxRows: 4}, cache: true};
+  const parsed = readLoadOptions(request, isMapika, options);
+  assert.equal(parsed.modelId, id);
+  assert.equal(parsed.options.temperature, 1);
+  assert.deepEqual(parsed.options.limits, {maxRows: 4});
+  assert.throws(
+    () => readLoadOptions({...request, assetsUrl: 'https://example.com/'}, isMapika, options),
+    /Unsupported/u
   );
 });
