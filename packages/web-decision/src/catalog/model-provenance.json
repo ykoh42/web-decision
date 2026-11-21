@@ -33,7 +33,7 @@
       "artifactLockSha256": "ba06b5306d5a72ae2cf79307b46c30649cc040ca66b12dd5f2fabb285b11c390",
       "evidence": {
         "path": "src/catalog/provenance/mapika-decider-2b-v12.json",
-        "sha256": "fa3f9ec3976c40d5acef93755c674cf965118250861c43ce9d400e70c4c8e711"
+        "sha256": "450d06f79cfcdfa5e671b433ebad597a12b719642125b7d7174e357cac0ba12c"
       }
     }
   ]

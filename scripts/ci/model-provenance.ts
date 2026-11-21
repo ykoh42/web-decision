@@ -6,7 +6,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = '3370e43d5aa7d42ed497625f2c0e94eadb4a709d75d1315eade3db1b6edc1cba';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'a4a94a228eb7ef17a10a6b5dc90c197a1484efb18aadb6b367c950405b8630e0';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';

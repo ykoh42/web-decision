@@ -67,7 +67,24 @@
   ],
   "distributionScope": "The candidate fetches pinned weight ranges from the Mapika repository. Its npm archive carries compiled assets and their metadata. The training datasets are separate from the delivered artifacts and retain their source terms.",
   "unresolved": [
-    "Pin the conversion recipe, configuration, and toolchain against the final release artifact lock.",
-    "Record exact release package WebGPU evidence and include notices for the v1.10.0 reference code used by the v12 adapter."
-  ]
+    "Independently rebuild the final TVM assets from the pinned conversion recipe and toolchain.",
+    "Record final public-package WebGPU evidence and verify the v1.10.0 reference-code notices."
+  ],
+  "conversion": {
+    "repository": "https://github.com/apache/tvm",
+    "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+    "recipe": {
+      "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
+      "sha256": "c5d6290ccd359e627a1b906b0150b4e489134f79c6e086ca3393a4cabf6e0c71"
+    },
+    "config": {
+      "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
+      "sha256": "c5d6290ccd359e627a1b906b0150b4e489134f79c6e086ca3393a4cabf6e0c71"
+    },
+    "toolchain": {
+      "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
+      "sha256": "c5d6290ccd359e627a1b906b0150b4e489134f79c6e086ca3393a4cabf6e0c71"
+    },
+    "artifactLockSha256": "ba06b5306d5a72ae2cf79307b46c30649cc040ca66b12dd5f2fabb285b11c390"
+  }
 }
