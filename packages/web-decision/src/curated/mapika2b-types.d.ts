@@ -26,7 +26,8 @@ export interface Mapika2bSystemOneRequest {
   readonly state: Mapika2bValue;
   readonly questions: Mapika2bDictionary<Mapika2bQuestion>;
   readonly independent?: boolean;
-  readonly assets?: Mapika2bDictionary<Readonly<{type?: 'image'; format: 'png' | 'jpg' | 'jpeg'; data_base64: string}>>;
+  /** Image formats are checked case-insensitively against png, jpg and jpeg. */
+  readonly assets?: Mapika2bDictionary<Readonly<{type?: 'image'; format: string; data_base64: string}>>;
 }
 
 export interface Mapika2bLoadOptions {
