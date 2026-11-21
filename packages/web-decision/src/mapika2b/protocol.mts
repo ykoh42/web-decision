@@ -219,17 +219,27 @@ function renderChoice(instructions: string, criteria: unknown): RenderedQuestion
   };
 }
 
-function scoreOrder(key: string): number {
+function scoreOrder(key: unknown): number {
+  if (typeof key === 'number') return key;
+  if (typeof key === 'bigint' || typeof key === 'boolean') return Number(key);
+  const float = readKananaFloat(key);
+  if (float !== undefined) return float;
+  if (typeof key !== 'string') invalid('Score criteria map keys must be numbers.');
   const text = key.trim();
+  if (/^[+-]?(?:inf(?:inity)?|nan)$/iu.test(text)) {
+    if (/nan$/iu.test(text)) return Number.NaN;
+    return text.startsWith('-') ? -Infinity : Infinity;
+  }
   if (!/^[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?$/u.test(text))
     invalid('Score criteria map keys must be numbers.');
   return Number(text.replaceAll('_', ''));
 }
 
 function renderScore(instructions: string, criteria: unknown, isolated: boolean): RenderedQuestion {
+  const entries = criteria instanceof Map ? Array.from(Map.prototype.entries.call(criteria)) : null;
   const levels = Array.isArray(criteria)
     ? arrayItems(criteria)
-    : dataEntries(criteria, 'Score criteria')
+    : (entries ?? dataEntries(criteria, 'Score criteria'))
         .map(([key, value]) => ({order: scoreOrder(key), value}))
         .sort((left, right) => left.order - right.order)
         .map(({value}) => value);

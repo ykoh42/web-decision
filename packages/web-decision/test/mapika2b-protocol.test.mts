@@ -68,6 +68,37 @@ test('Noul criteria accept upstream boolean keys with string keys taking precede
   );
 });
 
+test('Score criteria accept upstream numeric map keys', () => {
+  const request = (criteria: unknown) => ({state: '', questions: {q: {type: 'score', instructions: 'Rank', criteria}}});
+  const numeric = new Map<unknown, unknown>([
+    [10, 'high'],
+    [1n, 'low']
+  ]);
+  assert.deepEqual(prepare(request(numeric)).rows, prepare(request({10: 'high', 1: 'low'})).rows);
+  assert.doesNotThrow(() =>
+    prepare(
+      request(
+        new Map([
+          ['-inf', 'low'],
+          ['inf', 'high']
+        ])
+      )
+    )
+  );
+  assert.throws(
+    () =>
+      prepare(
+        request(
+          new Map<unknown, string>([
+            [{}, 'invalid'],
+            [1, 'high']
+          ])
+        )
+      ),
+    /keys must be numbers/u
+  );
+});
+
 test('serving limits can be raised or lowered while invalid limit names are rejected', () => {
   const limits = resolveMapika2bLimits({maxStateTokens: 40_000, maxImages: 6});
   assert.equal(limits.maxStateTokens, 40_000);
