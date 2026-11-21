@@ -39,9 +39,13 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog retains pinned Kanana and Qwen TVM descriptors', () => {
-  assert.deepEqual(MODEL_IDS, ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610']);
-  assert.equal(MODEL_CATALOG.length, 2);
+test('catalog retains pinned TVM descriptors and keeps pending models private', () => {
+  assert.deepEqual(MODEL_IDS, [
+    'kanana-2-v-decide-3b-2611',
+    'strands-decider-2b-qwen3.5-v1-2610',
+    'mapika-decider-2b-v12'
+  ]);
+  assert.equal(MODEL_CATALOG.length, 3);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
   assert.equal(kanana, MODEL_CATALOG[0]);
@@ -91,6 +95,13 @@ test('catalog retains pinned Kanana and Qwen TVM descriptors', () => {
   ]);
   assert.equal(Object.hasOwn(qwen.description.features.imageChoice?.limits?.[0] ?? {}, 'max'), false);
   assert.equal(Object.hasOwn(qwen.description.assets, 'assetsUrl'), false);
+
+  const mapika = MODEL_CATALOG_BY_ID['mapika-decider-2b-v12'];
+  assert.equal(mapika, MODEL_CATALOG[2]);
+  assert.equal(mapika.description.adapter, 'mapika2b');
+  assert.equal(mapika.description.checkpoint.revision, '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3');
+  assert.equal(mapika.description.verification.currentBundleGpu, 'pending');
+  assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(mapika.modelId), false);
 });
 
 test('public generated catalog and model ID type include verified models only', async () => {
@@ -342,8 +353,8 @@ test('generated files are deterministic and the ModelId union follows the curate
   assert.ok(typeFile.includes(expectedIdType));
   const expectedTuple =
     'export type ModelIdTuple = readonly [' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(', ') + '];';
-  assert.ok(typeFile.includes(expectedTuple));
-  const adapterIds = [...new Set(MODEL_CATALOG.map(({description}) => description.adapter))].sort();
+  assert.ok(typeFile.replace(/\s+/g, '').includes(expectedTuple.replace(/\s+/g, '')));
+  const adapterIds = [...new Set(MODEL_CATALOG.map(({description}) => description.adapter))];
   assert.ok(
     typeFile.includes(
       'export type ModelAdapterId = ' + adapterIds.map((adapter) => "'" + adapter + "'").join(' | ') + ';'

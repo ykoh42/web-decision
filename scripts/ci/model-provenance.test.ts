@@ -82,7 +82,7 @@ test('the provenance manifest covers every locked curated model', async () => {
   const lockIds = Object.keys((artifactLock as {byModelId: Record<string, unknown>}).byModelId).sort();
   const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
   const manifestIds = manifest.models.map(({modelId}) => modelId).sort();
-  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', QWEN_MODEL_ID]);
+  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', 'mapika-decider-2b-v12', QWEN_MODEL_ID]);
   assert.deepEqual(manifestIds, catalogIds);
   assert.deepEqual(lockIds, catalogIds);
   assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256);

@@ -4,7 +4,7 @@
     {
       "modelId": "kanana-2-v-decide-3b-2611",
       "status": "verified",
-      "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0",
+      "artifactLockSha256": "ba06b5306d5a72ae2cf79307b46c30649cc040ca66b12dd5f2fabb285b11c390",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
         "sha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13"
@@ -17,10 +17,23 @@
     {
       "modelId": "strands-decider-2b-qwen3.5-v1-2610",
       "status": "verified",
-      "artifactLockSha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0",
+      "artifactLockSha256": "ba06b5306d5a72ae2cf79307b46c30649cc040ca66b12dd5f2fabb285b11c390",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json",
         "sha256": "345710faeb096a287db352dfbcff239933c7fa96e3236ffeb0d758db8535dfad"
+      },
+      "conversionLockEvidence": {
+        "path": "packages/web-decision/src/catalog/provenance/strands-qwen35-verified-artifact-lock.json",
+        "sha256": "501514044d29adfc3cea036414431ec60e63eb9c832209e532e79e515178f0e0"
+      }
+    },
+    {
+      "modelId": "mapika-decider-2b-v12",
+      "status": "pending",
+      "artifactLockSha256": "ba06b5306d5a72ae2cf79307b46c30649cc040ca66b12dd5f2fabb285b11c390",
+      "evidence": {
+        "path": "src/catalog/provenance/mapika-decider-2b-v12.json",
+        "sha256": "fa3f9ec3976c40d5acef93755c674cf965118250861c43ce9d400e70c4c8e711"
       }
     }
   ]

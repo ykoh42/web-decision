@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "modelId": "mapika-decider-2b-v12",
+  "status": "pending",
+  "sourceLineage": [
+    {
+      "role": "text",
+      "repository": "Mapika/decider-2b",
+      "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3",
+      "path": "model.safetensors",
+      "bytes": 3763692048,
+      "sha256": "1265b014ce710ef219eb137792705bc0e15a59f1c68460cf26394ae5416876e1"
+    },
+    {
+      "role": "vision",
+      "repository": "Mapika/decider-2b",
+      "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3",
+      "path": "vision/visual.safetensors",
+      "bytes": 662866152,
+      "sha256": "bf7a6edb1196c9478f63736079aef71d4b0faa98c3c37fcc09f0239cc53d1c97"
+    }
+  ],
+  "upstreamBase": {
+    "repository": "Qwen/Qwen3.5-2B-Base",
+    "licenseReferenceRevision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "scope": "The Mapika card identifies the Qwen base and states that the vision tower is unchanged. The Qwen revision pins the license evidence. Conversion inputs are the two Mapika files listed above."
+  },
+  "upstreamRuntime": {
+    "repository": "Mapika/decider",
+    "revision": "ab45f9147de7a2da974f68c77cc8ed60908b379c",
+    "version": "1.10.0"
+  },
+  "knownReferences": [
+    {
+      "url": "https://huggingface.co/Mapika/decider-2b/resolve/7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3/README.md",
+      "bytes": 9876,
+      "sha256": "ef48857e1de19444845090ed3253da6a9557ddfa98fa6434ca738948c7b84bbb",
+      "scope": "Identifies v12, declares Apache-2.0 for the weights, and lists terms for the training sources."
+    },
+    {
+      "url": "https://huggingface.co/Qwen/Qwen3.5-2B-Base/resolve/b1485b2fa6dfa1287294f269f5fb618e03d52d7c/LICENSE",
+      "bytes": 11343,
+      "sha256": "50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32",
+      "scope": "Qwen base Apache-2.0 license."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Mapika/decider/ab45f9147de7a2da974f68c77cc8ed60908b379c/LICENSE",
+      "bytes": 10745,
+      "sha256": "8489ebe7c8abe903fcdaace4080ef1660bba98ea44c8007923bfb91777945e37",
+      "scope": "Apache-2.0 license for the decider-ai reference code."
+    }
+  ],
+  "rights": [
+    {
+      "subject": "Mapika v12 model weights, including the Qwen base vision tower",
+      "license": "Apache-2.0 as declared by the pinned Mapika model card and Qwen base license",
+      "redistribution": "conditional",
+      "conditions": [
+        "Supply the license and applicable attribution notices for distributed derivatives.",
+        "Identify changed files and retain applicable source notices under Apache-2.0 Section 4."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/QWEN-APACHE-LICENSE.txt",
+        "sha256": "50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32"
+      }
+    }
+  ],
+  "distributionScope": "The candidate fetches pinned weight ranges from the Mapika repository. Its npm archive carries compiled assets and their metadata. The training datasets are separate from the delivered artifacts and retain their source terms.",
+  "unresolved": [
+    "Pin the conversion recipe, configuration, and toolchain against the final release artifact lock.",
+    "Record exact release package WebGPU evidence and include notices for the v1.10.0 reference code used by the v12 adapter."
+  ]
+}

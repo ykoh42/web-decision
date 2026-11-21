@@ -56,9 +56,18 @@ export interface Qwen35VisionFeatureRunnerOptions {
   readonly parameterTensors: ReadonlyMap<string, Tensor>;
 }
 
+export type Qwen35VisionImageInput = Pick<
+  Qwen35GraphInputRecord,
+  'imageCount' | 'imageInput' | 'imageGridThw' | 'visionGeometry'
+>;
+
 export interface Qwen35VisionFeatureRunner {
   /** Run each source-ordered image and return its features in float32 storage. */
   run(input: Qwen35GraphInputRecord, signal?: AbortSignal | null): Promise<readonly Float32Array[]>;
+}
+
+export interface Qwen35VisionImageRunner {
+  run(input: Qwen35VisionImageInput, signal?: AbortSignal | null): Promise<readonly Float32Array[]>;
 }
 
 type RuntimeTensor = Tensor;
@@ -232,7 +241,7 @@ function assertGeometry(
     invalid('image ' + imageIndex + ' geometry arrays differ from their declared shapes.');
 }
 
-function imageInputs(input: Qwen35GraphInputRecord, imageIndex: number, rowOffset: number): VisionInputs {
+function imageInputs(input: Qwen35VisionImageInput, imageIndex: number, rowOffset: number): VisionInputs {
   const image = input.imageInput;
   const geometry = input.visionGeometry[imageIndex]!;
   const patchRows = geometry.patchRows;
@@ -382,7 +391,7 @@ async function runImages(
   main: ReturnType<VirtualMachine['getFunction']>,
   argumentOrder: readonly Qwen35VisionArtifactArgument[],
   parameterTensors: ReadonlyMap<string, Tensor>,
-  input: Qwen35GraphInputRecord,
+  input: Qwen35VisionImageInput,
   patchRowsLimit: Readonly<{minimum: number; maximum: number}>,
   precision: Qwen35VisionActivationPrecision,
   signal?: AbortSignal | null
@@ -442,7 +451,7 @@ async function runImages(
   return Object.freeze(outputs);
 }
 
-export function createQwen35VisionFeatureRunner(options: Qwen35VisionFeatureRunnerOptions): Qwen35VisionFeatureRunner {
+export function createQwen35VisionFeatureRunner(options: Qwen35VisionFeatureRunnerOptions): Qwen35VisionImageRunner {
   const argumentOrder = assertArtifact(options.artifact);
   const precision = qwen35VisionActivationPrecision(options.artifact);
   assertParameterTensors(argumentOrder, options.parameterTensors);
@@ -452,7 +461,7 @@ export function createQwen35VisionFeatureRunner(options: Qwen35VisionFeatureRunn
   const main = virtualMachine.getFunction('main');
   let queued: Promise<unknown> = Promise.resolve();
   return Object.freeze({
-    run(input: Qwen35GraphInputRecord, signal?: AbortSignal | null) {
+    run(input: Qwen35VisionImageInput, signal?: AbortSignal | null) {
       const task = queued.then(() =>
         runImages(
           runtime,

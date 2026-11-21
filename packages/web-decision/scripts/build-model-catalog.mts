@@ -141,6 +141,19 @@ const qwen35ManifestPath = 'assets/qwen35/manifest.json';
 const qwen35Repository = 'StrandsAgents/strands-decider-2B-qwen3.5-v1-2610';
 const qwen35Revision = '216d1ccb46a9e9b036eb9187b248db98480f77d4';
 const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
+const mapika2bModelId = 'mapika-decider-2b-v12';
+const mapika2bRepository = 'Mapika/decider-2b';
+const mapika2bRevision = '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3';
+const mapika2bManifestPath = 'assets/mapika2b/manifest.json';
+const mapika2bManifestSha256 = '90095c0d11e21cfa6c5cc9c82a27ea272dac6164b63e258c243e07f5a0494b03';
+const mapika2bFiles = [
+  'text.wasm',
+  'text-bindings.json',
+  'source-inventory.json',
+  'vision/fixture.json',
+  'vision/weight-bindings.json',
+  'vision/qwen35-dynamic-vision.webgpu.wasm'
+] as const;
 const qwen35Files = [
   'pinned-word-assets-manifest.json',
   'source-range-inventory.json',
@@ -788,6 +801,79 @@ async function createQwen35ArtifactLock(model: CuratedModel): Promise<CatalogArt
   };
 }
 
+async function createMapika2bArtifactLock(model: CuratedModel): Promise<CatalogArtifactLock> {
+  failUnless(
+    model.modelId === mapika2bModelId &&
+      model.description.adapter === 'mapika2b' &&
+      model.description.checkpoint.repository === mapika2bRepository &&
+      model.description.checkpoint.revision === mapika2bRevision,
+    'Mapika catalog checkpoint differs from its immutable pin.'
+  );
+  const manifestFile = await readJson(path.join(packageRoot, mapika2bManifestPath));
+  const manifest = manifestFile.value;
+  failUnless(
+    sha256(manifestFile.bytes) === mapika2bManifestSha256 &&
+      isRecord(manifest) &&
+      manifest.format === 'web-decision-mapika2b-tvm-artifacts-v1' &&
+      manifest.modelId === mapika2bModelId &&
+      manifest.repository === mapika2bRepository &&
+      manifest.revision === mapika2bRevision &&
+      manifest.experimental === false &&
+      isRecord(manifest.files),
+    'Mapika package manifest differs from its immutable pin.'
+  );
+  failUnless(
+    JSON.stringify(Object.keys(manifest.files).sort()) === JSON.stringify([...mapika2bFiles].sort()),
+    'Mapika manifest file set differs from the pinned graph and source inventory.'
+  );
+  const files: Record<string, ManifestFile> = {};
+  const bundledRuntimeFiles: ModelArtifactLock['bundledRuntimeFiles'][number][] = [];
+  for (const name of mapika2bFiles) {
+    const expected = manifest.files[name];
+    failUnless(
+      isRecord(expected) && typeof expected.sha256 === 'string' && Number.isSafeInteger(expected.bytes),
+      'Mapika asset metadata is invalid: ' + name + '.'
+    );
+    const sourcePath = name.startsWith('vision/') ? `assets/qwen35/${name}` : `assets/mapika2b/${name}`;
+    const bytes = await readFile(path.join(packageRoot, sourcePath));
+    const digest = sha256(bytes);
+    failUnless(
+      expected.bytes === bytes.byteLength && expected.sha256 === digest,
+      'Mapika package asset differs from its pin: ' + name + '.'
+    );
+    files[name] = {bytes: bytes.byteLength, sha256: digest};
+    bundledRuntimeFiles.push({manifestName: name, sourcePath, bytes: bytes.byteLength, sha256: digest});
+  }
+  const upstreams = [
+    {
+      role: 'text',
+      sourcePath: 'model.safetensors',
+      sourceBytes: 3_763_692_048,
+      sourceSha256: '1265b014ce710ef219eb137792705bc0e15a59f1c68460cf26394ae5416876e1'
+    },
+    {
+      role: 'vision',
+      sourcePath: 'vision/visual.safetensors',
+      sourceBytes: 662_866_152,
+      sourceSha256: 'bf7a6edb1196c9478f63736079aef71d4b0faa98c3c37fcc09f0239cc53d1c97'
+    }
+  ].map((source) => ({...source, repository: mapika2bRepository, revision: mapika2bRevision}));
+  const canonicalBytes = canonicalManifestBytes(manifest);
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath: mapika2bManifestPath,
+      rawSha256: mapika2bManifestSha256,
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: false,
+      files
+    },
+    bundledRuntimeFiles,
+    upstreams
+  };
+}
+
 export async function createModelArtifactLock(
   model: CuratedModel,
   options: Readonly<{directKevArtifactDirectory?: string}> = {}
@@ -796,6 +882,7 @@ export async function createModelArtifactLock(
     return createKev06ArtifactLock(model, options.directKevArtifactDirectory ?? directKevArtifactDirectory);
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
   if (model.description.adapter === 'strands-qwen35') return createQwen35ArtifactLock(model);
+  if (model.description.adapter === 'mapika2b') return createMapika2bArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
@@ -941,6 +1028,7 @@ export function publicLoadOptionsForAdapter(adapter: string): readonly string[] 
   const commonOptions = ['modelId', 'cache', 'offline', 'signal', 'onProgress'];
   if (adapter === 'kev06') return [...commonOptions, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters'];
   if (adapter === 'kanana' || adapter === 'strands-qwen35') return commonOptions;
+  if (adapter === 'mapika2b') return [...commonOptions, 'temperature', 'temperatureByType', 'limits'];
   throw new Error('No public load options are defined for adapter ' + adapter + '.');
 }
 

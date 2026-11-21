@@ -1,0 +1,271 @@
+{
+  "format": "web-decision-mapika12-source-answers-v1",
+  "source": {
+    "repository": "Mapika/decider-2b",
+    "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3",
+    "deciderRevision": "ab45f9147de7a2da974f68c77cc8ed60908b379c",
+    "files": {
+      "decider_config.json": "bbe0f382362b23a5ab9115e23d01a1b0511bf334c9355092a3b4d2ea0ddb5e1d",
+      "config.json": "6cb8daca9fb653c61485ff7452fc068bacd5c27cbee659ecd24b47186b0d1b52",
+      "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+      "tokenizer_config.json": "171ecbe7ddae98d11840698f7df2b8d5b4722139db0f0620d3bbf429bd656250",
+      "vision/config.json": "1eb0581a3232412f874acbeb2725292a22be2feebdce04b15363f4255464c07e",
+      "vision/processor_config.json": "9ad79dcc3fc51f5eaa519b43adcb3ff5b748a5a0af959237ad7b68b710b9e041",
+      "vision/tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+      "vision/tokenizer_config.json": "171ecbe7ddae98d11840698f7df2b8d5b4722139db0f0620d3bbf429bd656250",
+      "model.safetensors": "1265b014ce710ef219eb137792705bc0e15a59f1c68460cf26394ae5416876e1",
+      "vision/visual.safetensors": "bf7a6edb1196c9478f63736079aef71d4b0faa98c3c37fcc09f0239cc53d1c97"
+    }
+  },
+  "versions": {
+    "torch": "2.8.0",
+    "transformers": "5.22.2",
+    "pillow": "13.0.0"
+  },
+  "execution": {
+    "backend": "pytorch",
+    "device": "cpu",
+    "dtype": "bfloat16"
+  },
+  "cases": [
+    {
+      "id": "typed-independent",
+      "result": {
+        "model": "decider-2b-v11",
+        "answers": {
+          "10": {
+            "type": "choice",
+            "choice": "10",
+            "confidence": 0.6703,
+            "x_p_max": 0.8352,
+            "certainty": 0.3543,
+            "probabilities": {
+              "10": 0.8352,
+              "2": 0.1648
+            }
+          },
+          "2": {
+            "type": "noul",
+            "noul": 1.0
+          },
+          "rating": {
+            "type": "score",
+            "score": 0.76,
+            "confidence": 0.0,
+            "x_p_max": 0.4152,
+            "certainty": 0.0579,
+            "legend": {
+              "0": "0: low",
+              "1": "1: medium",
+              "2": "2: urgent"
+            },
+            "probabilities": {
+              "0": 0.4152,
+              "1": 0.4105,
+              "2": 0.1743
+            },
+            "level_fit": {
+              "0": 0.4835,
+              "1": 0.478,
+              "2": 0.203
+            },
+            "fit_mass": 1.1644
+          }
+        },
+        "usage": {
+          "input_tokens": 299,
+          "output_tokens": 0
+        }
+      },
+      "rows": [
+        {
+          "logits": [
+            [
+              15.25,
+              11.25
+            ]
+          ],
+          "probabilities": [
+            [
+              0.8351696133613586,
+              0.16483038663864136
+            ]
+          ]
+        },
+        {
+          "logits": [
+            [
+              11.1875,
+              17.25
+            ]
+          ],
+          "probabilities": [
+            [
+              0.0,
+              1.0
+            ]
+          ]
+        },
+        {
+          "logits": [
+            [
+              13.0,
+              12.8125
+            ]
+          ],
+          "probabilities": [
+            [
+              0.516539990901947,
+              0.48346006870269775
+            ]
+          ]
+        },
+        {
+          "logits": [
+            [
+              13.0,
+              12.75
+            ]
+          ],
+          "probabilities": [
+            [
+              0.5220470428466797,
+              0.4779529571533203
+            ]
+          ]
+        },
+        {
+          "logits": [
+            [
+              14.625,
+              10.75
+            ]
+          ],
+          "probabilities": [
+            [
+              0.797025740146637,
+              0.20297424495220184
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "typed-packed",
+      "result": {
+        "model": "decider-2b-v11",
+        "answers": {
+          "10": {
+            "type": "choice",
+            "choice": "10",
+            "confidence": 0.6973,
+            "x_p_max": 0.8487,
+            "certainty": 0.3868,
+            "probabilities": {
+              "10": 0.8487,
+              "2": 0.1513
+            }
+          },
+          "2": {
+            "type": "noul",
+            "noul": 1.0
+          },
+          "rating": {
+            "type": "score",
+            "score": 0.83,
+            "confidence": 0.276,
+            "x_p_max": 0.5173,
+            "certainty": 0.0924,
+            "legend": {
+              "0": "0: low",
+              "1": "1: medium",
+              "2": "2: urgent"
+            },
+            "probabilities": {
+              "0": 0.3255,
+              "1": 0.5173,
+              "2": 0.1572
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 260,
+          "output_tokens": 0
+        }
+      },
+      "rows": [
+        {
+          "logits": [
+            [
+              15.4375,
+              11.1875
+            ],
+            [
+              10.5,
+              17.25
+            ],
+            [
+              12.9375,
+              14.25,
+              10.875
+            ]
+          ],
+          "probabilities": [
+            [
+              0.8486610651016235,
+              0.15133896470069885
+            ],
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.32550445199012756,
+              0.5173221826553345,
+              0.15717333555221558
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "image-single",
+      "result": {
+        "model": "decider-2b-v11",
+        "answers": {
+          "color": {
+            "type": "choice",
+            "choice": "red",
+            "confidence": 0.9368,
+            "x_p_max": 0.9684,
+            "certainty": 0.7977,
+            "probabilities": {
+              "red": 0.9684,
+              "blue": 0.0316
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 107,
+          "output_tokens": 0
+        }
+      },
+      "rows": [
+        {
+          "logits": [
+            [
+              16.0,
+              7.5625
+            ]
+          ],
+          "probabilities": [
+            [
+              0.9684132933616638,
+              0.03158676251769066
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

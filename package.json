@@ -48,7 +48,7 @@
     "verify:package": "pnpm build:package && pnpm check:package",
     "test:example": "node --import tsx scripts/ci/check-example.mts",
     "test:browser:strands-qwen2": "pnpm exec playwright test --config=playwright.config.ts tests/browser/strands-qwen2-real-webgpu.spec.ts",
-    "typecheck": "tsc --project tsconfig.strict.json",
+    "typecheck": "tsc --project tsconfig.strict.json && pnpm --filter web-decision typecheck:mapika2b && tsc --project tests/browser/tsconfig.mapika2b.json",
     "test:typescript-policy": "node --import tsx --test scripts/ci/typescript-policy.test.mts scripts/ci/tvm-boundary.test.mts",
     "check:javascript-policy": "node --import tsx scripts/ci/check-typescript-policy.mts",
     "check:model-provenance": "node --import tsx scripts/ci/check-model-provenance.mts",

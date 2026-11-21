@@ -66,7 +66,7 @@ async function defaultWasmUrl(): Promise<URL> {
   return new URL(asset.default, import.meta.url);
 }
 
-async function magickRuntime(wasm: MagickWasm | undefined): Promise<MagickModule> {
+export async function magickRuntime(wasm: MagickWasm | undefined): Promise<MagickModule> {
   if (!runtimePromise) {
     runtimePromise = (async () => {
       const magick = await import('@imagemagick/magick-wasm');

@@ -19,15 +19,18 @@ export interface Qwen35VisionWeightBinding {
   readonly conversion: 'exact-bf16-to-float32';
 }
 
-export interface Qwen35VisionWeightLoadOptions {
+type VisionWeightLoaderOptions = Readonly<{
   readonly runtime: Pick<Instance, 'empty'>;
   readonly device: DLDevice;
-  readonly source: Qwen35PinnedSource;
   readonly artifact: Qwen35VisionArtifact;
   readonly bindings: readonly Qwen35VisionWeightBinding[];
   readonly signal?: AbortSignal | null | undefined;
   readonly onProgress?: ((bytes: number) => void) | undefined;
-}
+}>;
+
+type ReadVisionWeight = (binding: Qwen35VisionWeightBinding, signal?: AbortSignal | null) => Promise<Uint8Array>;
+
+export type Qwen35VisionWeightLoadOptions = VisionWeightLoaderOptions & Readonly<{source: Qwen35PinnedSource}>;
 
 type RuntimeTensor = Tensor & Readonly<{shape: readonly number[]; dtype: string}>;
 
@@ -135,9 +138,17 @@ export async function materializeQwen35VisionSourceWeight(
 ): Promise<Uint8Array> {
   signal?.throwIfAborted();
   const tensor = sourceTensor(source, binding);
-  const raw = await source.readTensor('base', binding.sourceName, {signal: signal ?? undefined});
+  const raw = await source.readTensor('base', tensor.name, {signal: signal ?? undefined});
+  return widenVerifiedQwen35VisionWeight(raw, binding, signal);
+}
+
+async function widenVerifiedQwen35VisionWeight(
+  raw: Uint8Array,
+  binding: Qwen35VisionWeightBinding,
+  signal?: AbortSignal | null
+): Promise<Uint8Array> {
   signal?.throwIfAborted();
-  if (raw.byteLength !== tensor.sourceByteCount || (await sha256(raw)) !== binding.sourcePayloadSha256)
+  if (raw.byteLength !== binding.sourceByteCount || (await sha256(raw)) !== binding.sourcePayloadSha256)
     throw invalid('Qwen3.5 pinned vision tensor payload differs: ' + binding.sourceName + '.');
 
   const input = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
@@ -148,30 +159,52 @@ export async function materializeQwen35VisionSourceWeight(
   return output;
 }
 
-/** Upload all source-faithful BF16 vision parameters into the owning TVM scope. */
-export async function loadQwen35VisionParameterTensors({
+/** Upload the original, verified Qwen3.5 checkpoint vision parameters. */
+export function loadQwen35VisionParameterTensors({
+  source,
+  ...options
+}: Qwen35VisionWeightLoadOptions): Promise<ReadonlyMap<string, Tensor>> {
+  return loadQwen35VisionParameterTensorsFromSource({
+    ...options,
+    orderBindings(bindings) {
+      if (!source || typeof source.readTensor !== 'function' || !source.manifest)
+        throw invalid('Qwen3.5 vision weight loading requires the pinned Safetensors source.');
+      return orderQwen35SourceTensorReads(
+        source.manifest,
+        bindings.map((binding) => ({...binding, asset: 'base' as const}))
+      );
+    },
+    async readWeight(binding, signal) {
+      const tensor = sourceTensor(source, binding);
+      return source.readTensor('base', tensor.name, {signal: signal ?? undefined});
+    }
+  });
+}
+
+/** Verify the graph bindings and each native BF16 payload before uploading it. */
+export async function loadQwen35VisionParameterTensorsFromSource({
   runtime,
   device,
-  source,
   artifact,
   bindings,
   signal,
-  onProgress
-}: Qwen35VisionWeightLoadOptions): Promise<ReadonlyMap<string, Tensor>> {
+  onProgress,
+  orderBindings = (sourceBindings) => sourceBindings,
+  readWeight
+}: VisionWeightLoaderOptions &
+  Readonly<{
+    orderBindings?: (bindings: readonly Qwen35VisionWeightBinding[]) => readonly Qwen35VisionWeightBinding[];
+    readWeight: ReadVisionWeight;
+  }>): Promise<ReadonlyMap<string, Tensor>> {
   signal?.throwIfAborted();
   await verifyBindings(artifact, bindings);
   signal?.throwIfAborted();
-  if (!source || typeof source.readTensor !== 'function' || !source.manifest)
-    throw invalid('Qwen3.5 vision weight loading requires the pinned Safetensors source.');
 
-  const sourceOrder = orderQwen35SourceTensorReads(
-    source.manifest,
-    bindings.map((binding) => ({...binding, asset: 'base' as const}))
-  );
   const loaded = new Map<string, Tensor>();
-  for (const binding of sourceOrder) {
+  for (const binding of orderBindings(bindings)) {
     signal?.throwIfAborted();
-    const bytes = await materializeQwen35VisionSourceWeight(source, binding, signal);
+    const raw = await readWeight(binding, signal);
+    const bytes = await widenVerifiedQwen35VisionWeight(raw, binding, signal);
     const tensor = runtime.empty([...binding.shape], 'float32', device) as RuntimeTensor;
     if (tensor.dtype !== 'float32' || !Array.isArray(tensor.shape) || !sameShape(tensor.shape, binding.shape))
       throw invalid('Qwen3.5 TVM vision parameter has an unexpected shape or dtype: ' + binding.targetName + '.');

@@ -4,23 +4,31 @@ import type {DLDevice, Tensor, TVMImportObject, TVMLibraryProvider, VirtualMachi
 import {verifyPinnedQwen35VisionArtifacts} from './qwen35-vision-contract.mts';
 import type {Qwen35VisionArtifacts} from './qwen35-vision-contract.mts';
 import {createQwen35VisionFeatureRunner} from './qwen35-vision-runner.mts';
-import type {Qwen35VisionFeatureRunner} from './qwen35-vision-runner.mts';
-import {loadQwen35VisionParameterTensors} from './qwen35-vision-weights.mts';
+import type {Qwen35VisionFeatureRunner, Qwen35VisionImageRunner} from './qwen35-vision-runner.mts';
+import {
+  loadQwen35VisionParameterTensors,
+  loadQwen35VisionParameterTensorsFromSource,
+  type Qwen35VisionWeightLoadOptions
+} from './qwen35-vision-weights.mts';
 
 export interface Qwen35VisionRuntimeRunner extends Qwen35VisionFeatureRunner {
   /** Release the TVM instance scope and its resident vision weights. */
   dispose(): Promise<void>;
 }
 
-export interface CreateQwen35VisionRuntimeRunnerOptions {
+type Qwen35VisionImageRuntimeRunner = Qwen35VisionImageRunner & Pick<Qwen35VisionRuntimeRunner, 'dispose'>;
+
+type VisionRuntimeRunnerOptions = Readonly<{
   readonly tvmjs: Qwen35VisionTvmJs;
   readonly gpuDevice: GPUDevice;
-  readonly source: Qwen35PinnedSource;
   readonly artifacts: Qwen35VisionArtifacts;
   readonly signal?: AbortSignal | null | undefined;
   readonly onProgress?: ((bytes: number) => void) | undefined;
   readonly logger?: ((message: string) => void) | undefined;
-}
+}>;
+
+export type CreateQwen35VisionRuntimeRunnerOptions = VisionRuntimeRunnerOptions &
+  Readonly<{source: Qwen35PinnedSource}>;
 
 export interface Qwen35VisionRuntime {
   initWebGPU(device: GPUDevice): unknown;
@@ -42,16 +50,31 @@ export interface Qwen35VisionTvmJs {
   createPolyfillWASI(): TVMLibraryProvider;
 }
 
-/** Instantiate the pinned vision graph and take ownership of its dedicated GPU device. */
-export async function createQwen35VisionRuntimeRunner({
-  tvmjs,
-  gpuDevice,
+export function createQwen35VisionRuntimeRunner({
   source,
-  artifacts,
-  signal,
-  onProgress,
-  logger = () => {}
+  ...options
 }: CreateQwen35VisionRuntimeRunnerOptions): Promise<Qwen35VisionRuntimeRunner> {
+  return openQwen35VisionRuntime(options, (weights) => loadQwen35VisionParameterTensors({...weights, source}));
+}
+
+export function createQwen35VisionRuntimeRunnerFromSource({
+  readWeight,
+  ...options
+}: VisionRuntimeRunnerOptions &
+  Pick<
+    Parameters<typeof loadQwen35VisionParameterTensorsFromSource>[0],
+    'readWeight'
+  >): Promise<Qwen35VisionImageRuntimeRunner> {
+  return openQwen35VisionRuntime(options, (weights) =>
+    loadQwen35VisionParameterTensorsFromSource({...weights, readWeight})
+  );
+}
+
+/** Instantiate the pinned vision graph and take ownership of its dedicated GPU device. */
+async function openQwen35VisionRuntime(
+  {tvmjs, gpuDevice, artifacts, signal, onProgress, logger = () => {}}: VisionRuntimeRunnerOptions,
+  loadParameters: (options: Omit<Qwen35VisionWeightLoadOptions, 'source'>) => Promise<ReadonlyMap<string, Tensor>>
+): Promise<Qwen35VisionImageRuntimeRunner> {
   let runtime: Qwen35VisionRuntime | undefined;
   let device: DLDevice | undefined;
   let ownerScopeOpen = false;
@@ -66,10 +89,9 @@ export async function createQwen35VisionRuntimeRunner({
     ownerScopeOpen = true;
     device = runtime.webgpu();
 
-    const parameterTensors = await loadQwen35VisionParameterTensors({
+    const parameterTensors = await loadParameters({
       runtime,
       device,
-      source,
       artifact: artifacts.artifact,
       bindings: artifacts.bindings,
       signal,
@@ -85,7 +107,7 @@ export async function createQwen35VisionRuntimeRunner({
     let disposed = false;
     let queue: Promise<unknown> = Promise.resolve();
     let disposal: Promise<void> | undefined;
-    function run(input: Parameters<Qwen35VisionFeatureRunner['run']>[0], runSignal?: AbortSignal | null) {
+    function run(input: Parameters<Qwen35VisionImageRunner['run']>[0], runSignal?: AbortSignal | null) {
       if (disposed)
         return Promise.reject(new WebDecisionError('SESSION_CLOSED', 'Qwen3.5 vision runtime is disposed.'));
       const task = queue.then(() => featureRunner.run(input, runSignal));

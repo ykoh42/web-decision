@@ -1,6 +1,10 @@
-export type ModelId = 'kanana-2-v-decide-3b-2611' | 'strands-decider-2b-qwen3.5-v1-2610';
-export type ModelIdTuple = readonly ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610'];
-export type ModelAdapterId = 'kanana' | 'strands-qwen35';
+export type ModelId = 'kanana-2-v-decide-3b-2611' | 'strands-decider-2b-qwen3.5-v1-2610' | 'mapika-decider-2b-v12';
+export type ModelIdTuple = readonly [
+  'kanana-2-v-decide-3b-2611',
+  'strands-decider-2b-qwen3.5-v1-2610',
+  'mapika-decider-2b-v12'
+];
+export type ModelAdapterId = 'kanana' | 'strands-qwen35' | 'mapika2b';
 export interface CatalogModelLimit {
   readonly resource: 'tokens' | 'options' | 'questions' | 'images';
   readonly scope: 'state' | 'question' | 'request';

@@ -1,0 +1,33 @@
+{
+  "format": "web-decision-mapika2b-tvm-artifacts-v1",
+  "modelId": "mapika-decider-2b-v12",
+  "repository": "Mapika/decider-2b",
+  "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3",
+  "experimental": false,
+  "files": {
+    "text.wasm": {
+      "bytes": 5053519,
+      "sha256": "95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2"
+    },
+    "text-bindings.json": {
+      "bytes": 26768,
+      "sha256": "af19172e2396b40141804a2414c44172caa46b12e464640e5731428f9c93ba1c"
+    },
+    "source-inventory.json": {
+      "bytes": 237949,
+      "sha256": "151295ce4b89e7dc049e1fb7420fda52670772cf391c27fc741e90182f617a60"
+    },
+    "vision/fixture.json": {
+      "bytes": 336938,
+      "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+    },
+    "vision/weight-bindings.json": {
+      "bytes": 104081,
+      "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+    },
+    "vision/qwen35-dynamic-vision.webgpu.wasm": {
+      "bytes": 4316202,
+      "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+    }
+  }
+}

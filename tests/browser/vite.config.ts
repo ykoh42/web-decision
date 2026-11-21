@@ -22,6 +22,17 @@ const webDecisionBundle = process.env.WEB_DECISION_INSTALLED_BUNDLE
 const packageConsumerRoot = process.env.WEB_DECISION_INSTALLED_BUNDLE
   ? realpathSync(resolve(dirname(webDecisionBundle), '../../..'))
   : null;
+const mapikaCandidateGpu = process.env.WEB_DECISION_MAPIKA2B_GPU === '1';
+const mapikaCandidateBundle = process.env.WEB_DECISION_MAPIKA2B_INSTALLED_BUNDLE
+  ? realpathSync(resolve(process.env.WEB_DECISION_MAPIKA2B_INSTALLED_BUNDLE))
+  : null;
+const mapikaCandidateConsumer = mapikaCandidateBundle
+  ? realpathSync(resolve(dirname(mapikaCandidateBundle), '../../..'))
+  : null;
+const candidateTvmRoot =
+  mapikaCandidateGpu && !mapikaCandidateBundle
+    ? realpathSync(resolve(workspace, '.toolchains/apache-tvm-src/web/src'))
+    : null;
 const port = Number(process.env.WEB_DECISION_BROWSER_PORT || 41773);
 const contentTypes = new Map([
   ['.bin', 'application/octet-stream'],
@@ -63,21 +74,30 @@ export default defineConfig({
   resolve: {
     alias: {
       '@huggingface/tokenizers': realpathSync(
-        fileURLToPath(
-          new URL(
-            '../../packages/web-decision/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs',
-            import.meta.url
-          )
+        resolve(
+          mapikaCandidateConsumer ?? resolve(workspace, 'packages/web-decision'),
+          'node_modules/@huggingface/tokenizers/dist/tokenizers.mjs'
         )
       ),
-      'web-decision': webDecisionBundle
+      'web-decision': webDecisionBundle,
+      'mapika2b-qa-candidate':
+        mapikaCandidateBundle ??
+        fileURLToPath(new URL('../../scripts/mapika/webgpu-candidate-entry.mts', import.meta.url))
     }
   },
   server: {
     host: '127.0.0.1',
     port,
     strictPort: true,
-    fs: {allow: [workspace, ...(packageConsumerRoot ? [packageConsumerRoot] : [])]}
+    ...(mapikaCandidateGpu ? {hmr: false} : {}),
+    fs: {
+      allow: [
+        workspace,
+        ...(packageConsumerRoot ? [packageConsumerRoot] : []),
+        ...(candidateTvmRoot ? [candidateTvmRoot] : []),
+        ...(mapikaCandidateConsumer ? [mapikaCandidateConsumer] : [])
+      ]
+    }
   },
   plugins: [
     {

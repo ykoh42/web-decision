@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.curated.json",
+  "include": [
+    "src/kanana/magick-wasm-url.d.ts",
+    "src/runtime/tvm-source.d.ts",
+    "src/strands/qwen35-r13-asset-url.d.ts",
+    "src/mapika2b/**/*.mts",
+    "src/mapika2b/**/*.d.ts",
+    "src/curated/adapters/mapika2b.ts",
+    "src/curated/mapika2b-types.d.ts",
+    "test/mapika2b-*.test.mts"
+  ]
+}
