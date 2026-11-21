@@ -47,7 +47,7 @@ async function runDecision(model: LoadedDecisionModel) {
   if (options.some((option) => !option.trim())) throw new Error('Each option line must contain text.');
 
   const criteria = Object.fromEntries(options.map((option, index) => [`option-${index}`, option]));
-  const answer = await model.decide({
+  const answer = await model.systemOne({
     state,
     questions: {decision: {type: 'choice', instructions, criteria}}
   });
