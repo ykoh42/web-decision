@@ -208,18 +208,18 @@
       "schemaVersion": 1,
       "manifest": {
         "sourcePath": "assets/mapika2b/manifest.json",
-        "rawSha256": "90095c0d11e21cfa6c5cc9c82a27ea272dac6164b63e258c243e07f5a0494b03",
-        "canonicalSha256": "5d9f4bb587bb78cd6e935d5d1f5a0b7d0c2bd0e3cb08380144979d454d594a01",
+        "rawSha256": "da2f6c24bfa545d92b7658081913e47b39ad7cfaee5880c84f411fed0b7de561",
+        "canonicalSha256": "7f9d47b14426d7f7dea6cf9955e1d40f9a8a89fb6f564da1b39403a6a831d93a",
         "canonicalBytes": 915,
         "experimental": false,
         "files": {
           "text.wasm": {
-            "bytes": 5053519,
-            "sha256": "95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2"
+            "bytes": 4915210,
+            "sha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
           },
           "text-bindings.json": {
             "bytes": 26768,
-            "sha256": "af19172e2396b40141804a2414c44172caa46b12e464640e5731428f9c93ba1c"
+            "sha256": "0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7"
           },
           "source-inventory.json": {
             "bytes": 237949,
@@ -243,14 +243,14 @@
         {
           "manifestName": "text.wasm",
           "sourcePath": "assets/mapika2b/text.wasm",
-          "bytes": 5053519,
-          "sha256": "95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2"
+          "bytes": 4915210,
+          "sha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
         },
         {
           "manifestName": "text-bindings.json",
           "sourcePath": "assets/mapika2b/text-bindings.json",
           "bytes": 26768,
-          "sha256": "af19172e2396b40141804a2414c44172caa46b12e464640e5731428f9c93ba1c"
+          "sha256": "0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7"
         },
         {
           "manifestName": "source-inventory.json",

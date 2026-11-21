@@ -11,6 +11,7 @@ import {
 import {
   summarizeMapikaAnswerParity,
   summarizeMapikaLogits,
+  mapikaReferenceMismatches,
   type AcceptedMapikaCase,
   type MapikaAnswerReference,
   type MapikaBrowserResult,
@@ -93,7 +94,18 @@ function recordCase(item: MapikaReferenceCase, observed: MapikaBrowserResult, of
   assertFixture(item, observed);
   if (observed.status === 'rejected') return {...observed, id: item.id, expectedStatus: item.status};
   const exactAnswer = official ? isDeepStrictEqual(observed.result, official.result) : null;
-  if (official) expect.soft(observed.result, `${item.id}: pinned BF16 answers`).toEqual(official.result);
+  const logitDelta = official
+    ? summarizeMapikaLogits(
+        observed.logits,
+        official.rows.map(({logits}) => logits)
+      )
+    : null;
+  if (official) {
+    expect
+      .soft(mapikaReferenceMismatches(observed.result, official.result), `${item.id}: reference outputs`)
+      .toEqual([]);
+    expect.soft(logitDelta?.maxAbs, `${item.id}: maximum FP32 logit error`).toBeLessThanOrEqual(0.001);
+  }
   return {
     id: item.id,
     status: observed.status,
@@ -103,12 +115,7 @@ function recordCase(item: MapikaReferenceCase, observed: MapikaBrowserResult, of
     exactAnswer,
     answerParity: official ? summarizeMapikaAnswerParity(observed.result, official.result) : null,
     logits: observed.logits,
-    logitDelta: official
-      ? summarizeMapikaLogits(
-          observed.logits,
-          official.rows.map(({logits}) => logits)
-        )
-      : null
+    logitDelta
   };
 }
 
@@ -127,7 +134,8 @@ test('Mapika 2B v12 native TVM WebGPU matches the pinned decision oracle', async
   if (!archive && !process.env.WEB_DECISION_PUBLIC_ASSET_ROOT)
     throw new Error('WEB_DECISION_PUBLIC_ASSET_ROOT must contain the Mapika text artifacts.');
   const prepared = process.env.WEB_DECISION_MAPIKA2B_PREPARED_ORACLE ?? new URL('reference-prepared.json', oracle);
-  const answerReference = process.env.WEB_DECISION_MAPIKA2B_ANSWER_ORACLE ?? new URL('reference-answers.json', oracle);
+  const answerReference =
+    process.env.WEB_DECISION_MAPIKA2B_ANSWER_ORACLE ?? new URL('reference-fp32-answers.json', oracle);
   const [fixture, answers] = await Promise.all([
     readOracle<MapikaReferenceCase>(prepared),
     readOracle<MapikaAnswerReference>(answerReference)

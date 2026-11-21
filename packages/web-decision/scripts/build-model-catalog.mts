@@ -145,7 +145,7 @@ const mapika2bModelId = 'mapika-decider-2b-v12';
 const mapika2bRepository = 'Mapika/decider-2b';
 const mapika2bRevision = '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3';
 const mapika2bManifestPath = 'assets/mapika2b/manifest.json';
-const mapika2bManifestSha256 = '90095c0d11e21cfa6c5cc9c82a27ea272dac6164b63e258c243e07f5a0494b03';
+const mapika2bManifestSha256 = 'da2f6c24bfa545d92b7658081913e47b39ad7cfaee5880c84f411fed0b7de561';
 const mapika2bFiles = [
   'text.wasm',
   'text-bindings.json',

@@ -297,12 +297,13 @@ def run_case(case, config, tokenizer, processor, model, reader):
     return result
 
 
-def load_models(snapshot, needs_vision):
+def load_models(snapshot, needs_vision, dtype_name):
     import torch
     from decider.model import DecisionModel
     from decider.vision_reader import VisionReader
 
-    model = DecisionModel(str(snapshot), dtype=torch.bfloat16, grad_ckpt=False).eval()
+    dtype = {"bfloat16": torch.bfloat16, "float32": torch.float32}[dtype_name]
+    model = DecisionModel(str(snapshot), dtype=dtype, grad_ckpt=False).eval()
     if not needs_vision:
         return model, None
     engine = SimpleNamespace(
@@ -311,7 +312,7 @@ def load_models(snapshot, needs_vision):
         dev="cpu",
         W=model.lm.lm_head.weight[model.letters].detach(),
     )
-    return model, VisionReader(engine, str(snapshot), dtype=torch.bfloat16)
+    return model, VisionReader(engine, str(snapshot), dtype=dtype)
 
 
 def parse_arguments():
@@ -323,6 +324,7 @@ def parse_arguments():
         "--stage", choices=("render", "prepare", "infer"), default="prepare"
     )
     parser.add_argument("--case", action="append", default=[])
+    parser.add_argument("--dtype", choices=("bfloat16", "float32"), default="bfloat16")
     args = parser.parse_args()
     if args.stage == "infer" and not args.case:
         parser.error("--stage infer requires explicit --case selection")
@@ -363,7 +365,7 @@ def main():
                 snapshot / "vision", local_files_only=True
             ).image_processor
     if args.stage == "infer":
-        model, reader = load_models(snapshot, needs_vision)
+        model, reader = load_models(snapshot, needs_vision, args.dtype)
     report = {
         "format": "web-decision-mapika12-source-reference-v1",
         "stage": args.stage,
@@ -379,7 +381,7 @@ def main():
         }
         if tokenizer is not None
         else {},
-        "execution": {"backend": "pytorch", "device": "cpu", "dtype": "bfloat16"}
+        "execution": {"backend": "pytorch", "device": "cpu", "dtype": args.dtype}
         if model is not None
         else None,
         "cases": [

@@ -4,8 +4,8 @@ import {parseJson, readVerifiedAsset, type AssetCache, type AssetFileMetadata} f
 import {WebDecisionError} from '../kev.js';
 import type {Mapika2bTextBinding} from './text-runtime.mjs';
 
-const wasmPin = {bytes: 5_053_519, sha256: '95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2'};
-const bindingsPin = {bytes: 26_768, sha256: 'af19172e2396b40141804a2414c44172caa46b12e464640e5731428f9c93ba1c'};
+const wasmPin = {bytes: 4_915_210, sha256: 'da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4'};
+const bindingsPin = {bytes: 26_768, sha256: '0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7'};
 
 interface AssetOptions {
   readonly cache?: AssetCache | null | undefined;

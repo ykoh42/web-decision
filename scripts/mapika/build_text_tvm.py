@@ -1,4 +1,4 @@
-"""Build Mapika 2B v12's BF16 decoder and letter readout for TVM WebGPU."""
+"""Build Mapika 2B v12's native-weight FP32 decoder for TVM WebGPU."""
 
 from __future__ import annotations
 
@@ -175,7 +175,7 @@ def graph_bindings(parameters, qwen, inventory):
 def build(output: Path) -> None:
     sys.path.insert(0, str(QWEN_BUILD_DIR))
     import tvm
-    from build_gdn_prefix_candidate import bind_chunk_count, candidate_script
+    from build_gdn_prefix_candidate import bind_chunk_count, candidate_script, fp32_activations
     from qwen35_gdn_cumulative_decay import qwen35_gdn_cumsum64
     from qwen35_tvm_build import (
         export_tvmjs,
@@ -198,7 +198,9 @@ def build(output: Path) -> None:
     if tvm.__version__ != "0.27.0.post1":
         raise ValueError("Use the pinned TVM Python compiler")
     source, metadata = load_compiler_input("text", tvm, relax)
-    reusable = bind_chunk_count(candidate_script(source, qwen35_gdn_cumsum64.script()))
+    reusable = bind_chunk_count(
+        fp32_activations(candidate_script(source, qwen35_gdn_cumsum64.script()))
+    )
     program, parameters = mapika_text_script(reusable)
     bindings = graph_bindings(
         parameters,
@@ -241,7 +243,7 @@ def build(output: Path) -> None:
         "wasmSha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
         "inputs": [param.name for param in mod["main"].params[:5]],
         "externalParameters": ["letter_weights", *parameters],
-        "activationPrecision": "bfloat16",
+        "activationPrecision": "float32",
         "letterCount": LETTER_COUNT,
         "maxPositionEmbeddings": MAX_POSITION_EMBEDDINGS,
     }

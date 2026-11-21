@@ -87,7 +87,7 @@ function tensors(reference: ReferenceAnswer): Float32Array[] {
 }
 
 const snapshot = process.env.WEB_DECISION_MAPIKA2B_SNAPSHOT;
-test('matches the pinned Mapika oracle token IDs, slot metadata and BF16 readout', {skip: !snapshot}, async () => {
+test('matches the pinned Mapika oracle token IDs, slot metadata and readout', {skip: !snapshot}, async () => {
   const preparedFile =
     process.env.WEB_DECISION_MAPIKA2B_PREPARED_ORACLE ?? new URL('reference-prepared.json', oracleRoot);
   const answersFile = process.env.WEB_DECISION_MAPIKA2B_ANSWER_ORACLE ?? new URL('reference-answers.json', oracleRoot);

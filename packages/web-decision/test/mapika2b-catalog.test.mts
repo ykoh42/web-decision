@@ -12,10 +12,10 @@ test('Mapika catalog recipe pins native checkpoints and packaged TVM artifacts',
   } as Parameters<typeof createModelArtifactLock>[0];
   const lock = await createModelArtifactLock(model);
   assert.equal(lock.manifest.sourcePath, 'assets/mapika2b/manifest.json');
-  assert.equal(lock.manifest.rawSha256, '90095c0d11e21cfa6c5cc9c82a27ea272dac6164b63e258c243e07f5a0494b03');
+  assert.equal(lock.manifest.rawSha256, 'da2f6c24bfa545d92b7658081913e47b39ad7cfaee5880c84f411fed0b7de561');
   assert.equal(
     lock.manifest.files['text.wasm']?.sha256,
-    '95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2'
+    'da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4'
   );
   assert.deepEqual(
     lock.upstreams?.map(({role}) => role),

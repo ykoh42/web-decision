@@ -185,7 +185,7 @@
       "modelId": "mapika-decider-2b-v12",
       "description": {
         "adapter": "mapika2b",
-        "precision": "BF16 source weights, BF16-rounded FP32 text and FP32 vision compute",
+        "precision": "BF16 source weights and FP32 text and vision compute",
         "checkpoint": {
           "repository": "Mapika/decider-2b",
           "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3"

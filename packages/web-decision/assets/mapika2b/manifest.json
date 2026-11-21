@@ -6,12 +6,12 @@
   "experimental": false,
   "files": {
     "text.wasm": {
-      "bytes": 5053519,
-      "sha256": "95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2"
+      "bytes": 4915210,
+      "sha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
     },
     "text-bindings.json": {
       "bytes": 26768,
-      "sha256": "af19172e2396b40141804a2414c44172caa46b12e464640e5731428f9c93ba1c"
+      "sha256": "0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7"
     },
     "source-inventory.json": {
       "bytes": 237949,

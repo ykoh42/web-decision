@@ -144,3 +144,31 @@ export function summarizeMapikaAnswerParity(actual: Mapika2bResult, official: Ma
   }
   return matches;
 }
+
+/** Compare exact model structure and decisions, allowing one four-decimal output step. */
+export function mapikaReferenceMismatches(actual: unknown, expected: unknown): string[] {
+  const mismatches: string[] = [];
+  function compare(left: unknown, right: unknown, path: readonly string[]): void {
+    if (typeof right === 'number' && typeof left === 'number') {
+      const exact = path[0] === 'usage' || (path[0] === 'answers' && path.length === 3 && path[2] === 'score');
+      const tolerance = exact ? 0 : 0.0001 + Number.EPSILON;
+      if (!Number.isFinite(left) || !Number.isFinite(right) || Math.abs(left - right) > tolerance)
+        mismatches.push(path.join('.'));
+      return;
+    }
+    if (right && left && typeof right === 'object' && typeof left === 'object') {
+      const actualKeys = Object.keys(left).sort();
+      const expectedKeys = Object.keys(right).sort();
+      if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
+        mismatches.push(path.join('.') + ' keys');
+        return;
+      }
+      for (const key of expectedKeys)
+        compare((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key], [...path, key]);
+      return;
+    }
+    if (left !== right) mismatches.push(path.join('.'));
+  }
+  compare(actual, expected, []);
+  return mismatches;
+}

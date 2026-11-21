@@ -3,7 +3,7 @@
   "recipe": [
     {
       "path": "scripts/mapika/build_text_tvm.py",
-      "sha256": "6ca239c8dc1c7e73f19d56a0e2e8bd14f9d524e1e9b626491b38609cbbf8c51a"
+      "sha256": "cdcee84ef0efdaddf2b4ef8f71f6573f6368665b429e6dc0017efdda4b25731a"
     },
     {
       "path": "scripts/mapika/vision-reuse.mts",
@@ -52,8 +52,8 @@
     }
   },
   "observedTextBuild": {
-    "generatedScriptSha256": "2c92d8baa010bf08aadc81ce63a07774d01178e6c1b9c2d6cb420100b0f58829",
-    "wasmSha256": "95e6bea454ee9d5dbbe40e2e84523d53077f7f1fa285f609c0e5422146b40bb2"
+    "generatedScriptSha256": "3ab1118403df60dff11db5615f65669874efa3906559e1848a677fdfb3c90116",
+    "wasmSha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
   },
   "onnxImportOrExportUsed": false,
   "notes": "Text conversion uses repository-owned native TVM lowering. Vision uses the previously built Qwen3.5 graph and verifies the Mapika vision tensors against its bindings. Final release requires an independent rebuild from these pinned inputs."
