@@ -22,7 +22,7 @@ node --import tsx scripts/release/mapika-release-evidence.mts \
   "$WEB_DECISION_MAPIKA2B_PUBLIC_REPORT" /release/mapika-tvm/build-evidence.json
 ```
 
-This gate checks the committed catalog and exact archive, both independent WASM rebuilds, seven text and image reference cases, and cached offline parity. The first load contacts the pinned Hugging Face checkpoint and writes about 4.5 GB to the browser profile. The Mapika gate covers only Mapika. Collect same-archive GPU evidence for the other included models before publishing.
+This gate checks the committed catalog and exact archive, both independent WASM rebuilds, seven text and image reference cases, and cached offline parity. It records that the first text result precedes any vision weight requests and that `prepareOffline()` completes the full cache separately. The browser reads from the pinned Hugging Face checkpoint and writes about 4.5 GB to the test profile by the end of preparation. The Mapika gate covers only Mapika. Collect same-archive GPU evidence for the other included models before publishing.
 
 The expected model IDs and artifact digests come from the committed `packages/web-decision/src/catalog/model-spec.json` and `artifacts.lock.json`. The gate checks that the model spec, artifact lock, and pinned provenance manifest have the same non-empty ID set, that each manifest digest and static manifest path match the lock, and that the built and installed public APIs (`listModels()` and `describeModel(id)`) match those committed inputs. It does not read the legacy model registry. The source API is built from `src/curated/index.ts`; the verifier imports its built `dist/index.js` so the CLI also runs on Node 20, which cannot execute TypeScript source directly.
 

@@ -43,7 +43,9 @@ The TVM graphs ship with the package. The loader fetches the pinned weight range
 
 The models require WebGPU. The catalog describes model-specific limits and the release record identifies the browser and hardware used for exact-package verification.
 
-Mapika uses about 4.5 GB of browser storage when all weights are cached. Check `model.cacheStatus` after loading to see whether the browser accepted the full cache. Its `systemOne()` accepts the pinned Decider request format, including `choice`, `score`, `noul`, and PNG or JPEG images.
+Mapika loads the text runner first. It fetches embedding ranges and image assets as requests need them, and caches verified downloads by default. Its `systemOne()` accepts the pinned Decider request format, including `choice`, `score`, `noul`, and PNG or JPEG images.
+
+To prepare Mapika for offline use, call `await model.prepareOffline({signal, onProgress})` while online. Both options are optional. A complete model cache uses about 4.5 GB of browser storage. Check `model.cacheStatus` for `'complete'`, then pass `offline: true` when loading the model offline.
 
 ## Kanana model terms
 

@@ -5,7 +5,6 @@ import {
   warmMapika2bPackagedCode
 } from 'mapika2b-qa-candidate';
 import {MAPIKA2B_MAX_OPTIONS} from '../../packages/web-decision/src/mapika2b/contract.mts';
-import type {createMapika2bSession} from '../../packages/web-decision/src/mapika2b/session.mts';
 import type {Mapika2bTextBinding} from '../../packages/web-decision/src/mapika2b/text-runtime.mts';
 import {
   MAPIKA2B_TEST_CACHE,
@@ -20,7 +19,7 @@ interface CompiledTextManifest {
 }
 
 type CandidateArtifacts = Parameters<typeof loadMapika2bCandidate>[0]['artifacts'];
-let session: ReturnType<typeof createMapika2bSession> | undefined;
+let session: Awaited<ReturnType<typeof loadMapika2bCandidate>> | undefined;
 
 async function fetchArtifact(path: string, cache: Cache | null, mode: MapikaCacheMode): Promise<Response> {
   const url = new URL(path, location.href);
@@ -63,6 +62,7 @@ const harness: MapikaBrowserHarness = {
       onProgress: (event: (typeof progress)[number]) => progress.push(event)
     });
     try {
+      if (cacheMode === 'fill') await model.prepareOffline();
       return {result: await model.systemOne(requestFromMapikaFixture(item)), progress};
     } finally {
       await model.dispose();
@@ -73,7 +73,14 @@ const harness: MapikaBrowserHarness = {
     if (session) throw new Error('Mapika candidate is already loaded.');
     const cache = cacheMode === 'none' ? null : await caches.open(MAPIKA2B_TEST_CACHE);
     const artifacts = await loadArtifacts(installedArchive, cache, cacheMode);
-    session = await loadMapika2bCandidate({artifacts, cache, offline: cacheMode === 'offline'});
+    const loaded = await loadMapika2bCandidate({artifacts, cache, offline: cacheMode === 'offline'});
+    try {
+      if (cacheMode === 'fill') await loaded.prepareOffline();
+    } catch (cause) {
+      await loaded.dispose();
+      throw cause;
+    }
+    session = loaded;
     return {wasmSha256: artifacts.textWasmSha256};
   },
 

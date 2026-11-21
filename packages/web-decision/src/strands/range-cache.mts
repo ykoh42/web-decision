@@ -204,6 +204,31 @@ export class RangeCacheTransaction {
     this.#signal?.removeEventListener('abort', this.#onAbort);
   }
 
+  async #matchesMarker(signal: AbortSignal | null | undefined): Promise<boolean> {
+    const response = await waitForAbort(
+      () => this.#cache!.match(this.#markerUrl),
+      signal,
+      (value) => cancelBody(value?.body)
+    );
+    if (!response) return false;
+    const marker = (await readMarker(response, signal)) as OfflineMarker | null;
+    return (
+      !!marker && Object.keys(marker).length === 2 && marker.format === 1 && marker.markerId === this.#marker.markerId
+    );
+  }
+
+  async #assertOfflineMarker(signal: AbortSignal | null | undefined): Promise<void> {
+    let marked;
+    try {
+      marked = await this.#matchesMarker(signal);
+    } catch (cause) {
+      signal?.throwIfAborted();
+      throw new WebDecisionError('ASSET_LOAD_FAILED', 'Could not read the offline completion marker.', {cause});
+    }
+    if (!marked)
+      throw new WebDecisionError('ASSET_LOAD_FAILED', 'The complete verified model is not available offline.');
+  }
+
   async open(): Promise<void> {
     this.#signal?.throwIfAborted();
     this.#assertOpen();
@@ -211,31 +236,7 @@ export class RangeCacheTransaction {
     try {
       combined.signal?.throwIfAborted();
       if (this.#ready) return;
-      if (this.#offline) {
-        let marker: OfflineMarker | null | undefined;
-        try {
-          const response = await waitForAbort(
-            () => this.#cache!.match(this.#markerUrl),
-            combined.signal,
-            (value) => cancelBody(value?.body)
-          );
-          if (combined.signal?.aborted) {
-            cancelBody(response?.body);
-            combined.signal.throwIfAborted();
-          }
-          if (response) marker = (await readMarker(response, combined.signal)) as OfflineMarker;
-        } catch (cause) {
-          combined.signal?.throwIfAborted();
-          throw new WebDecisionError('ASSET_LOAD_FAILED', 'Could not read the offline completion marker.', {cause});
-        }
-        if (
-          !marker ||
-          Object.keys(marker).length !== 2 ||
-          marker.format !== 1 ||
-          marker.markerId !== this.#marker.markerId
-        )
-          throw new WebDecisionError('ASSET_LOAD_FAILED', 'The complete verified model is not available offline.');
-      }
+      if (this.#offline) await this.#assertOfflineMarker(combined.signal);
       combined.signal?.throwIfAborted();
       this.#assertOpen();
       this.#ready = true;
@@ -296,6 +297,59 @@ export class RangeCacheTransaction {
     const url = new URL('/.web-decision-cache/sha256/', assetUrl(this.#base, spec.path));
     url.searchParams.set('digest', spec.sha256);
     return url.href;
+  }
+
+  #invalidateMissingRange(key: string): void {
+    this.#cached.delete(key);
+    const resident = this.#memory.get(key);
+    if (resident) this.#memory.set(key, {...resident, cachedByHash: false});
+  }
+
+  async #hasCachedRanges(signal?: AbortSignal | null): Promise<boolean> {
+    const cache = this.#cache!;
+    let complete = true;
+    if ('keys' in cache && typeof cache.keys === 'function') {
+      const requests = await waitForAbort(() => (cache as AssetCache & Pick<Cache, 'keys'>).keys(), signal);
+      const keys = new Set(requests.map(({url}) => url));
+      for (const [key, spec] of this.#specs) {
+        if (keys.has(this.#cacheKey(spec))) continue;
+        this.#invalidateMissingRange(key);
+        complete = false;
+      }
+      return complete;
+    }
+    for (const [key, spec] of this.#specs) {
+      const response = await waitForAbort(
+        () => cache.match(this.#cacheKey(spec)),
+        signal,
+        (value) => cancelBody(value?.body)
+      );
+      if (response) cancelBody(response.body);
+      else {
+        this.#invalidateMissingRange(key);
+        complete = false;
+      }
+    }
+    return complete;
+  }
+
+  /** Check a prior verified commit and detect evicted ranges without reopening their bodies. */
+  async hasCommittedRanges({signal}: RangeCacheReadOptions = {}): Promise<boolean> {
+    this.#signal?.throwIfAborted();
+    this.#assertOpen();
+    if (!this.#ready || !this.#sealed) throw invalid('The range transaction was not sealed.');
+    const combined = combineSignals(this.#signal, signal, this.#disposeController.signal);
+    try {
+      combined.signal?.throwIfAborted();
+      return (
+        !!this.#cache && (await this.#matchesMarker(combined.signal)) && (await this.#hasCachedRanges(combined.signal))
+      );
+    } catch {
+      combined.signal?.throwIfAborted();
+      return false;
+    } finally {
+      combined.close();
+    }
   }
 
   /** Stop using the load-only signal while keeping the verified source transaction open. */
@@ -364,24 +418,8 @@ export class RangeCacheTransaction {
       combined.signal?.throwIfAborted();
       if (!this.#ready || !this.#sealed) throw invalid('The range transaction was not sealed.');
       if (this.#offline || !this.#cache || [...this.#required].some((key) => !this.#cached.has(key))) return false;
-      for (const key of this.#required) {
-        const spec = this.#specs.get(key);
-        if (!spec) return false;
-        let response: Response | null | undefined;
-        try {
-          response = await waitForAbort(
-            () => this.#cache!.match(this.#cacheKey(spec)),
-            combined.signal,
-            (value) => cancelBody(value?.body)
-          );
-        } catch {
-          combined.signal?.throwIfAborted();
-          return false;
-        }
-        if (!response) return false;
-        cancelBody(response.body);
-      }
       try {
+        if (!(await this.#hasCachedRanges(combined.signal))) return false;
         await commitCachedManifest(this.#cache, this.#markerUrl, this.#marker, combined.signal);
       } catch {
         combined.signal?.throwIfAborted();

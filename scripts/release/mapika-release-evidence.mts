@@ -21,6 +21,13 @@ const referencePins = {
   preparedSha256: 'fef0db786ff7dbd327f01cb2e7ff84448aa24231a34b2d43493d0350987734b7',
   answersSha256: 'd42c03efc1d317032868df8e6fbb88c5fe87fa1a5fb0863dd6bbadc4bdb53c7a'
 };
+const upstreams = artifactLock.byModelId[modelId].upstreams;
+
+function checkpointBytes(role: 'text' | 'vision'): number {
+  const pinned = upstreams.find((entry) => entry.role === role);
+  assert.ok(pinned, `Unpinned Mapika ${role} checkpoint.`);
+  return pinned.sourceBytes;
+}
 
 function assertAdapter(value: unknown, requiredLimits: Readonly<Record<string, number>>): void {
   const adapter = record(value, 'Mapika WebGPU adapter is missing.');
@@ -42,6 +49,60 @@ function assertResults(value: unknown, source: MapikaReference<MapikaAnswerRefer
   }
 }
 
+function readRangeCounts(value: unknown, label: string) {
+  const counts = record(value, `Missing Mapika range counts at ${label}.`);
+  const number = (key: string) => {
+    const item = counts[key];
+    assert.ok(typeof item === 'number' && Number.isSafeInteger(item) && item >= 0, `Invalid ${label}.${key}.`);
+    return item;
+  };
+  const textBytes = number('textBytes');
+  const visionBytes = number('visionBytes');
+  const requestedBytes = number('requestedBytes');
+  assert.equal(requestedBytes, textBytes + visionBytes, `Mapika range bytes disagree at ${label}.`);
+  return {
+    textBytes,
+    visionBytes,
+    requestedBytes,
+    textRanges: number('textRanges'),
+    visionRanges: number('visionRanges')
+  };
+}
+
+function assertProgressiveLoad(value: unknown): void {
+  const steps = record(value, 'Missing progressive Mapika load evidence.');
+  const loaded = readRangeCounts(steps.afterLoad, 'load');
+  const text = readRangeCounts(steps.afterFirstText, 'first text');
+  const image = readRangeCounts(steps.afterFirstImage, 'first image');
+  const before = readRangeCounts(steps.beforePrepare, 'before offline preparation');
+  const after = readRangeCounts(steps.afterPrepare, 'after offline preparation');
+  assert.equal(steps.fullCheckpointBytes, checkpointBytes('text') + checkpointBytes('vision'));
+  assert.deepEqual(steps.unboundedWeightRequests, [], 'Mapika requested an unbounded weight file.');
+  assert.equal(steps.cacheStatusAfterLoad, 'incomplete');
+  assert.equal(steps.cacheStatusBeforePrepare, 'incomplete');
+  assert.ok(loaded.textRanges > 0 && loaded.textBytes > 0, 'Cold Mapika load must read text weights.');
+  assert.equal(
+    loaded.visionRanges + loaded.visionBytes + text.visionRanges + text.visionBytes,
+    0,
+    'Mapika requested vision weights before the first image.'
+  );
+  assert.ok(
+    text.textBytes < checkpointBytes('text'),
+    'Mapika fetched the full text checkpoint before the first result.'
+  );
+  assert.ok(
+    image.visionRanges > 0 && image.visionBytes > 0,
+    'First Mapika image did not exercise lazy vision loading.'
+  );
+  assert.ok(
+    loaded.requestedBytes <= text.requestedBytes &&
+      text.requestedBytes <= image.requestedBytes &&
+      image.requestedBytes <= before.requestedBytes &&
+      before.requestedBytes < after.requestedBytes,
+    'Mapika request counts must show a separate offline preparation phase.'
+  );
+}
+
 export function assertMapikaReleaseRecord(
   report: unknown,
   archive: ArchiveInfo,
@@ -58,6 +119,7 @@ export function assertMapikaReleaseRecord(
   assert.equal(record(data.browser, 'Missing Mapika browser evidence.').name, 'chromium');
   assert.equal(record(data.hardware, 'Missing Mapika hardware evidence.').status, 'Hardware accelerated');
   assertAdapter(data.adapter, requiredLimits);
+  assertProgressiveLoad(data.progressive);
   assertResults(data.results, source);
   assert.equal(data.modelCacheStatus, 'complete');
   const offline = record(data.offline, 'Missing Mapika offline evidence.');

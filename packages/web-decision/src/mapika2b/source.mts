@@ -56,6 +56,7 @@ export interface Mapika2bSource {
     options?: RangeCacheReadOptions
   ): Promise<Uint16Array<ArrayBuffer>>;
   prefetchRequiredRanges(options?: PrefetchOptions): Promise<void>;
+  hasCommittedRanges(options?: RangeCacheReadOptions): Promise<boolean>;
   commit(options?: RangeCacheReadOptions): Promise<boolean>;
   finishLoading(): void;
   dispose(): void;
@@ -163,17 +164,14 @@ function sourceReader(
   const {vocabulary, width, rowsPerRange} = embeddingTable(embedding, rangeBytes);
 
   async function verifyHeader(id: AssetId, options: RangeCacheReadOptions): Promise<void> {
+    options.signal?.throwIfAborted();
     const prior = headers.get(id);
     if (prior) return waitForAbort(() => prior, options.signal);
     const plan = plans[id];
-    const pending = transaction.read(base, plan.header, options).then(({bytes}) => checkHeader(bytes, plan));
+    const pending = transaction.read(base, plan.header).then(({bytes}) => checkHeader(bytes, plan));
     headers.set(id, pending);
-    try {
-      await pending;
-    } catch (cause) {
-      headers.delete(id);
-      throw cause;
-    }
+    void pending.catch(() => headers.delete(id));
+    await waitForAbort(() => pending, options.signal);
   }
 
   async function readTensor(id: AssetId, name: string, options: RangeCacheReadOptions = {}) {
@@ -239,6 +237,7 @@ function sourceReader(
         for (const spec of group) options.onProgress?.(spec.length);
       }
     },
+    hasCommittedRanges: (options?: RangeCacheReadOptions) => transaction.hasCommittedRanges(options),
     commit: (options?: RangeCacheReadOptions) => transaction.commit(options),
     finishLoading: () => transaction.detachSignal(),
     dispose() {

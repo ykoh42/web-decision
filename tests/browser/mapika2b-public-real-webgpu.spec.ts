@@ -3,7 +3,8 @@ import {mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {chromium, expect, test as base, type BrowserContext} from '@playwright/test';
+import {chromium, expect, test as base, type BrowserContext, type Page} from '@playwright/test';
+import sourceInventory from '../../packages/web-decision/assets/mapika2b/source-inventory.json' with {type: 'json'};
 import {verifyArchiveInstall} from '../../scripts/release/verify-release-evidence.ts';
 import {archiveIdentity, cleanSourceCommit} from '../../scripts/release/curated-gpu-evidence.mts';
 import type {Mapika2bResult} from '../../packages/web-decision/src/mapika2b/readout.mts';
@@ -46,7 +47,20 @@ const test = base.extend({
   }
 });
 
-async function runPublicModel({id, inputs, offline}: {id: string; inputs: AcceptedMapikaCase[]; offline: boolean}) {
+type LoadMilestone = 'afterLoad' | 'afterFirstText' | 'afterFirstImage' | 'beforePrepare' | 'afterPrepare';
+type ModelProgress = {phase?: string; loadedBytes: number; totalBytes: number};
+
+async function runPublicModel({
+  id,
+  inputs,
+  offline,
+  prepare = 'none'
+}: {
+  id: string;
+  inputs: AcceptedMapikaCase[];
+  offline: boolean;
+  prepare?: 'none' | 'complete' | 'recover';
+}) {
   const api = window.webDecision as unknown as {
     listModels(): readonly {modelId: string}[];
     describeModel(id: string): {modelId: string};
@@ -54,10 +68,11 @@ async function runPublicModel({id, inputs, offline}: {id: string; inputs: Accept
       modelId: string;
       cache: boolean;
       offline: boolean;
-      onProgress: (progress: {phase?: string; loadedBytes: number; totalBytes: number}) => void;
+      onProgress: (progress: ModelProgress) => void;
     }): Promise<{
       modelId: string;
       cacheStatus: 'complete' | 'incomplete' | 'disabled' | 'unavailable';
+      prepareOffline(options?: {onProgress?: (progress: ModelProgress) => void}): Promise<void>;
       systemOne(request: unknown): Promise<Mapika2bResult>;
       dispose(): Promise<void>;
     }>;
@@ -65,40 +80,133 @@ async function runPublicModel({id, inputs, offline}: {id: string; inputs: Accept
   if (!api.listModels().some((item) => item.modelId === id) || api.describeModel(id).modelId !== id)
     throw new Error('The public catalog does not expose Mapika.');
   const progress: Record<string, {loadedBytes: number; totalBytes: number}> = {};
+  const onProgress = (event: ModelProgress) => {
+    progress[event.phase ?? 'unknown'] = {loadedBytes: event.loadedBytes, totalBytes: event.totalBytes};
+  };
+  const {mapikaLoadMilestone} = window as Window & {mapikaLoadMilestone?: (stage: LoadMilestone) => Promise<void>};
   const start = performance.now();
-  const model = await api.loadDecisionModel({
-    modelId: id,
-    cache: true,
-    offline,
-    onProgress(event) {
-      progress[event.phase ?? 'unknown'] = {loadedBytes: event.loadedBytes, totalBytes: event.totalBytes};
-    }
-  });
+  const model = await api.loadDecisionModel({modelId: id, cache: true, offline, onProgress});
   const loadMs = performance.now() - start;
+  const cacheStatusAfterLoad = model.cacheStatus;
+
+  function referenceRequest(input: AcceptedMapikaCase) {
+    const questions = new Map(
+      input.questionIndex.map(([name]) => {
+        const question = {...input.request.questions[name]!};
+        const criteria = question.criteria;
+        const rendered = input.renderedQuestions[name]!;
+        if (rendered.type === 'choice' && criteria && typeof criteria === 'object' && !Array.isArray(criteria)) {
+          const values = criteria as Record<string, unknown>;
+          question.criteria = new Map(rendered.names.map((option) => [String(option), values[String(option)]]));
+        }
+        return [name, question];
+      })
+    );
+    return {...input.request, questions};
+  }
+
+  async function runCase(input: AcceptedMapikaCase) {
+    const startedInference = performance.now();
+    const response = await model.systemOne(referenceRequest(input));
+    const elapsedMs = performance.now() - startedInference;
+    return {result: JSON.parse(JSON.stringify(response)) as Mapika2bResult, elapsedMs};
+  }
+
+  async function prepareCache() {
+    const startedPreparation = performance.now();
+    try {
+      await model.prepareOffline({onProgress});
+      return {elapsedMs: performance.now() - startedPreparation, failure: null};
+    } catch (cause) {
+      if (prepare === 'complete') throw cause;
+      return {
+        elapsedMs: performance.now() - startedPreparation,
+        failure: {code: (cause as {code?: unknown})?.code, message: String(cause)}
+      };
+    }
+  }
+
   try {
+    await mapikaLoadMilestone?.('afterLoad');
     const results = [];
     const inferenceMs = [];
-    for (const input of inputs) {
-      const questions = new Map(
-        input.questionIndex.map(([name]) => {
-          const question = {...input.request.questions[name]!};
-          const criteria = question.criteria;
-          const rendered = input.renderedQuestions[name]!;
-          if (rendered.type === 'choice' && criteria && typeof criteria === 'object' && !Array.isArray(criteria)) {
-            const values = criteria as Record<string, unknown>;
-            question.criteria = new Map(rendered.names.map((option) => [String(option), values[String(option)]]));
-          }
-          return [name, question];
-        })
-      );
-      const startedInference = performance.now();
-      results.push(JSON.parse(JSON.stringify(await model.systemOne({...input.request, questions}))) as Mapika2bResult);
-      inferenceMs.push(performance.now() - startedInference);
+    let firstTextMs: number | null = null;
+    const firstImageIndex = inputs.findIndex(({request}) => Object.keys(request.assets ?? {}).length > 0);
+    for (const [index, input] of inputs.entries()) {
+      const result = await runCase(input);
+      results.push(result.result);
+      inferenceMs.push(result.elapsedMs);
+      if (index === 0 && index !== firstImageIndex) {
+        firstTextMs = performance.now() - start;
+        await mapikaLoadMilestone?.('afterFirstText');
+      }
+      if (index === firstImageIndex) await mapikaLoadMilestone?.('afterFirstImage');
     }
-    return {modelId: model.modelId, cacheStatus: model.cacheStatus, results, progress, timings: {loadMs, inferenceMs}};
+    const cacheStatusBeforePrepare = model.cacheStatus;
+    await mapikaLoadMilestone?.('beforePrepare');
+    const preparation = prepare === 'none' ? null : await prepareCache();
+    await mapikaLoadMilestone?.('afterPrepare');
+    const recovery = prepare === 'recover' && inputs[0] ? await runCase(inputs[0]) : null;
+    return {
+      modelId: model.modelId,
+      cacheStatus: model.cacheStatus,
+      cacheStatusAfterLoad,
+      cacheStatusBeforePrepare,
+      results,
+      progress,
+      preparation,
+      recovery,
+      timings: {
+        loadMs,
+        firstTextMs,
+        firstImageMs: inferenceMs[firstImageIndex] ?? null,
+        prepareOfflineMs: preparation?.elapsedMs ?? null,
+        inferenceMs
+      }
+    };
   } finally {
     await model.dispose();
   }
+}
+
+type WeightDownloads = {
+  textRanges: number;
+  visionRanges: number;
+  textBytes: number;
+  visionBytes: number;
+  requestedBytes: number;
+};
+
+async function trackWeightDownloads(page: Page) {
+  const prefix = new URL(`https://huggingface.co/${MAPIKA2B_REPOSITORY}/resolve/${MAPIKA2B_REVISION}/`);
+  const totals = {textRanges: 0, visionRanges: 0, textBytes: 0, visionBytes: 0, requestedBytes: 0};
+  const milestones: Partial<Record<LoadMilestone, WeightDownloads>> = {};
+  const unboundedWeightRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || !url.href.startsWith(prefix.href)) return;
+    const file = url.pathname.slice(prefix.pathname.length);
+    const {text, vision} = sourceInventory.weights;
+    if (file !== text.file && file !== vision.file) return;
+    const range = /^bytes=(\d+)-(\d+)$/u.exec(request.headers().range ?? '');
+    if (!range || Number(range[2]) < Number(range[1])) {
+      unboundedWeightRequests.push(file);
+      return;
+    }
+    const bytes = Number(range[2]) - Number(range[1]) + 1;
+    if (file === text.file) {
+      totals.textRanges++;
+      totals.textBytes += bytes;
+    } else {
+      totals.visionRanges++;
+      totals.visionBytes += bytes;
+    }
+    totals.requestedBytes += bytes;
+  });
+  await page.exposeFunction('mapikaLoadMilestone', (stage: LoadMilestone) => {
+    milestones[stage] = {...totals};
+  });
+  return {milestones, unboundedWeightRequests};
 }
 
 test('the installed public package loads Mapika by model ID and matches the source', async ({
@@ -152,14 +260,41 @@ test('the installed public package loads Mapika by model ID and matches the sour
   });
   const hardware = await readHardwareReport(page);
   expect(hardware.status).toBe('Hardware accelerated');
+  const {milestones, unboundedWeightRequests} = await trackWeightDownloads(page);
   await page.goto('/');
   await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
   const adapter = await readAdapter(page);
   expect(adapter?.isFallbackAdapter).toBe(false);
   const inputs = cases.map(({input}) => input);
-  const observed = await page.evaluate(runPublicModel, {id: modelId, inputs, offline: false});
+  const observed = await page.evaluate(runPublicModel, {
+    id: modelId,
+    inputs,
+    offline: false,
+    prepare: 'complete' as const
+  });
+  const fullCheckpointBytes = sourceInventory.weights.text.bytes + sourceInventory.weights.vision.bytes;
+  const progressive = {
+    ...milestones,
+    unboundedWeightRequests,
+    cacheStatusAfterLoad: observed.cacheStatusAfterLoad,
+    cacheStatusBeforePrepare: observed.cacheStatusBeforePrepare,
+    fullCheckpointBytes
+  };
+  expect(progressive.unboundedWeightRequests).toEqual([]);
+  expect(progressive.afterLoad?.visionRanges).toBe(0);
+  expect(progressive.afterLoad?.textRanges).toBeGreaterThan(0);
+  expect(progressive.afterFirstText?.visionRanges).toBe(0);
+  expect(progressive.afterFirstText?.requestedBytes).toBeLessThan(sourceInventory.weights.text.bytes);
+  expect(progressive.afterFirstImage?.visionRanges).toBeGreaterThan(0);
+  expect(progressive.afterPrepare?.requestedBytes).toBeGreaterThan(progressive.beforePrepare?.requestedBytes ?? 0);
+  expect(observed.cacheStatusAfterLoad).toBe('incomplete');
+  expect(observed.cacheStatusBeforePrepare).toBe('incomplete');
   expect(observed.modelId).toBe(modelId);
   expect(observed.cacheStatus).toBe('complete');
+  expect(observed.progress['upstream-source']).toEqual({
+    loadedBytes: fullCheckpointBytes,
+    totalBytes: fullCheckpointBytes
+  });
   for (const [index, item] of cases.entries())
     expect(mapikaReferenceMismatches(observed.results[index], item.expected), item.id).toEqual([]);
   const cacheStatus = await page.evaluate(async () => {
@@ -203,6 +338,10 @@ test('the installed public package loads Mapika by model ID and matches the sour
     expect(offline.modelId).toBe(observed.modelId);
     expect(offline.cacheStatus).toBe('complete');
     expect(offline.results).toEqual(observed.results);
+    const warm = await fresh.evaluate(runPublicModel, {id: modelId, inputs: inputs.slice(0, 1), offline: false});
+    expect(warm.cacheStatusAfterLoad).toBe('complete');
+    expect(warm.results).toEqual(observed.results.slice(0, 1));
+    expect(blocked).toEqual([]);
   } finally {
     await fresh.close();
   }
@@ -224,6 +363,7 @@ test('the installed public package loads Mapika by model ID and matches the sour
     results: observed.results,
     modelCacheStatus: observed.cacheStatus,
     cacheStatus,
+    progressive,
     progress: observed.progress,
     timings: observed.timings,
     offline: {cacheStatus: offline.cacheStatus, results: offline.results, blockedRequests: blocked, bootstrapModules}
@@ -268,8 +408,16 @@ test('the public package reports incomplete cache when storage rejects writes', 
   await page.goto('/');
   await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
   expect((await readAdapter(page))?.isFallbackAdapter).toBe(false);
-  const online = await page.evaluate(runPublicModel, {id: modelId, inputs: [input], offline: false});
+  const online = await page.evaluate(runPublicModel, {
+    id: modelId,
+    inputs: [input],
+    offline: false,
+    prepare: 'recover' as const
+  });
+  expect(online.cacheStatusAfterLoad).toBe('incomplete');
   expect(online.cacheStatus).toBe('incomplete');
+  expect(online.preparation?.failure?.code).toBe('ASSET_LOAD_FAILED');
+  expect(online.recovery?.result).toEqual(online.results[0]);
   expect(mapikaReferenceMismatches(online.results[0], expected.result)).toEqual([]);
   const failure = await page.evaluate(async (id) => {
     try {
@@ -291,6 +439,8 @@ test('the public package reports incomplete cache when storage rejects writes', 
     archiveSha256: archive.archiveSha256,
     status: online.cacheStatus,
     result: online.results[0],
+    preparationFailure: online.preparation?.failure,
+    onlineRecoveryResult: online.recovery?.result,
     offlineFailure: failure
   });
   if (process.env.WEB_DECISION_MAPIKA2B_QUOTA_REPORT)

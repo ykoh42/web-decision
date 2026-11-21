@@ -1,6 +1,6 @@
 import {Tokenizer} from '@huggingface/tokenizers';
 import {requestGpuAdapter, requestGpuDevice} from '../abortable-gpu-device.js';
-import {parseJson, readVerifiedAsset, sha256, waitForAbort, type AssetCache} from '../assets.js';
+import {parseJson, readVerifiedAsset, sha256, waitForAbort, type ReadVerifiedAssetOptions} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {watchLoadDeviceLoss} from '../load-device-loss.js';
 import {assertLoadActive, cleanupFailedLoad, trackRuntime} from '../runtime-lifecycle.js';
@@ -16,6 +16,7 @@ import {
   type Mapika2bLimits,
   type Mapika2bTemperatureOptions
 } from './contract.mjs';
+import {createOfflinePreparation} from './offline-preparation.mjs';
 import {createMapika2bLabels, resolveMapika2bLimits, resolveMapika2bTemperatures} from './protocol.mjs';
 import {assembleMapika2bTextRow, createMapika2bSession} from './session.mjs';
 import {openPinnedMapika2bSource, type Mapika2bSource, type Mapika2bSourceOpenOptions} from './source.mjs';
@@ -32,7 +33,8 @@ const tokenizerAsset = {
 
 interface Mapika2bCandidateOptions extends Mapika2bSourceOpenOptions, Mapika2bTemperatureOptions {
   readonly onProgress?: ((progress: ModelProgress) => void) | undefined;
-  readonly onCacheStatus?: ((cached: boolean) => void) | undefined;
+  readonly packagedAssetsCached?: boolean | undefined;
+  readonly preparePackagedAssets?: ((options: {signal: AbortSignal}) => Promise<boolean>) | undefined;
   readonly limits?: Partial<Mapika2bLimits> | undefined;
   readonly artifacts: {
     readonly textWasm: Uint8Array;
@@ -41,20 +43,33 @@ interface Mapika2bCandidateOptions extends Mapika2bSourceOpenOptions, Mapika2bTe
   };
 }
 
+function readTokenizerAssets(options: ReadVerifiedAssetOptions) {
+  return Promise.all([
+    readVerifiedAsset(base, tokenizerAsset, 'tokenizer.json', options),
+    readVerifiedAsset(base, tokenizerAsset, 'tokenizer_config.json', options)
+  ]);
+}
+
 async function readCandidate(options: Mapika2bCandidateOptions) {
   options.signal?.throwIfAborted();
   const {textWasm, textWasmSha256, textBindings} = options.artifacts;
   const wasm = Uint8Array.from(textWasm);
   const bindings = textBindings.map(({name, shape}) => ({name, shape: [...shape]}));
-  const [tokenizerBytes, tokenizerConfig, digest] = await Promise.all([
-    readVerifiedAsset(base, tokenizerAsset, 'tokenizer.json', options),
-    readVerifiedAsset(base, tokenizerAsset, 'tokenizer_config.json', options),
+  let tokenizerCached = true;
+  const [[tokenizerBytes, tokenizerConfig], digest] = await Promise.all([
+    readTokenizerAssets({
+      ...options,
+      onCacheStatus(cached) {
+        tokenizerCached &&= cached;
+      }
+    }),
     waitForAbort(() => sha256(wasm), options.signal)
   ]);
   if (digest !== textWasmSha256) throw new WebDecisionError('INVALID_ASSET', 'Mapika 2B v12 text WASM hash differs.');
   return {
     wasm: wasm.buffer,
     bindings,
+    tokenizerCached,
     tokenizer: new Tokenizer(
       parseJson(tokenizerBytes, 'tokenizer.json') as object,
       parseJson(tokenizerConfig, 'tokenizer_config.json') as object
@@ -75,20 +90,66 @@ async function requestTextDevice(signal?: AbortSignal | null): Promise<GPUDevice
   );
 }
 
-async function cacheModelSource(
+async function hasPreparedCache(
   source: Mapika2bSource,
-  cache: AssetCache,
-  signal: AbortSignal,
-  onProgress?: (progress: ModelProgress) => void,
-  onCacheStatus?: (cached: boolean) => void
+  tokenizerCached: boolean,
+  {cache, packagedAssetsCached, signal}: Mapika2bCandidateOptions
 ): Promise<boolean> {
-  await cacheMapika2bVisionAssets({cache, signal, onCacheStatus});
+  if (!cache || !tokenizerCached || packagedAssetsCached === false || !(await source.hasCommittedRanges({signal})))
+    return false;
+  let cached = true;
+  try {
+    await cacheMapika2bVisionAssets({
+      cache,
+      offline: true,
+      signal,
+      onCacheStatus(value) {
+        cached &&= value;
+      }
+    });
+    return cached;
+  } catch (cause) {
+    signal?.throwIfAborted();
+    if (cause instanceof WebDecisionError && cause.code === 'ASSET_LOAD_FAILED') return false;
+    throw cause;
+  }
+}
+
+async function prepareStaticAssets(options: Mapika2bCandidateOptions, signal: AbortSignal): Promise<boolean> {
+  let cached = true;
+  const assetOptions = {
+    cache: options.cache,
+    offline: options.offline,
+    signal,
+    onCacheStatus(value: boolean) {
+      cached &&= value;
+    }
+  };
+  const [packaged] = await Promise.all([
+    options.preparePackagedAssets?.({signal}),
+    readTokenizerAssets(assetOptions),
+    cacheMapika2bVisionAssets(assetOptions)
+  ]);
+  return packaged !== false && cached;
+}
+
+async function prepareModelCache(
+  source: Mapika2bSource,
+  options: Mapika2bCandidateOptions,
+  signal: AbortSignal,
+  onProgress: (progress: ModelProgress) => void
+): Promise<void> {
+  const failed = () => new WebDecisionError('ASSET_LOAD_FAILED', 'Mapika assets could not be saved for offline use.');
+  if (!options.cache) throw new WebDecisionError('ASSET_LOAD_FAILED', 'The Mapika cache is unavailable.');
+  if (!(await prepareStaticAssets(options, signal))) throw failed();
+  if (await source.hasCommittedRanges({signal})) return;
+  if (options.offline) throw failed();
   let loadedBytes = 0;
   await source.prefetchRequiredRanges({
     signal,
     onProgress(bytes) {
       loadedBytes += bytes;
-      onProgress?.({
+      onProgress({
         loadedBytes,
         totalBytes: source.requiredRangeBytes,
         fraction: loadedBytes / source.requiredRangeBytes,
@@ -96,7 +157,7 @@ async function cacheModelSource(
       });
     }
   });
-  return source.commit({signal});
+  if (!(await source.commit({signal}))) throw failed();
 }
 
 async function initText(
@@ -146,35 +207,11 @@ async function initText(
         options.onProgress?.({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes, phase: 'model-assets'});
       }
     );
-    let cacheComplete = false;
-    if (options.cache && !options.offline)
-      cacheComplete = await cacheModelSource(
-        source,
-        options.cache,
-        watch.signal,
-        options.onProgress,
-        options.onCacheStatus
-      );
-    else if (options.cache && options.offline) {
-      try {
-        await cacheMapika2bVisionAssets({
-          cache: options.cache,
-          offline: true,
-          signal: watch.signal,
-          onCacheStatus: options.onCacheStatus
-        });
-        cacheComplete = true;
-      } catch (cause) {
-        watch.signal.throwIfAborted();
-        if (!(cause instanceof WebDecisionError) || cause.code !== 'ASSET_LOAD_FAILED') throw cause;
-        options.onCacheStatus?.(false);
-      }
-    }
     watch.signal.throwIfAborted();
     assertLoadActive(lifecycle);
     if (uncaptured.length) throw new Error(uncaptured[0]);
     watch.close();
-    return {runtime, gpu, device, main, parameters, lifecycle, uncaptured, cacheComplete, dispose};
+    return {runtime, gpu, device, main, parameters, lifecycle, uncaptured, dispose};
   } catch (cause) {
     dispose();
     throw cause;
@@ -190,6 +227,10 @@ export async function loadMapika2bCandidate(options: Mapika2bCandidateOptions) {
     const limits = resolveMapika2bLimits(options.limits);
     const candidate = await readCandidate(options);
     const weights = (source = await openPinnedMapika2bSource(options));
+    const cached = await hasPreparedCache(weights, candidate.tokenizerCached, options);
+    const preparation = createOfflinePreparation(cached, (signal, onProgress) =>
+      prepareModelCache(weights, options, signal, onProgress)
+    );
     const gpu = await requestTextDevice(options.signal);
     const textRunner = (text = await initText(gpu, weights, candidate, options));
     weights.finishLoading();
@@ -219,7 +260,17 @@ export async function loadMapika2bCandidate(options: Mapika2bCandidateOptions) {
         }
       }
     });
-    return Object.freeze({...session, cacheComplete: textRunner.cacheComplete});
+    return Object.freeze({
+      ...session,
+      get cacheComplete() {
+        return preparation.complete;
+      },
+      prepareOffline: preparation.prepareOffline,
+      dispose() {
+        preparation.dispose();
+        return session.dispose();
+      }
+    });
   } catch (cause) {
     text?.dispose();
     source?.dispose();

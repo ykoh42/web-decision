@@ -73,7 +73,11 @@ test('reads constructor getters in order and commits only after all verified ran
   ]);
   const entries = new Map<string, Response>();
   let failSecondWrite = true;
-  const cache: AssetCache = {
+  const cache: AssetCache & Pick<Cache, 'keys'> = {
+    async keys() {
+      events.push('cache.keys');
+      return [...entries.keys()].map((key) => new Request(key));
+    },
     async match(key) {
       events.push(`cache.match:${new URL(key).searchParams.get('digest')}`);
       return entries.get(key)?.clone() ?? null;
@@ -162,6 +166,17 @@ test('reads constructor getters in order and commits only after all verified ran
     events.filter((event) => event.startsWith('fetch:')),
     ['fetch:first.bin', 'fetch:second.bin']
   );
+
+  const reopened = new RangeCacheTransaction(options);
+  await reopened.open();
+  reopened.require([first, second]);
+  reopened.seal();
+  events.length = 0;
+  assert.equal(await reopened.hasCommittedRanges(), true);
+  assert.deepEqual(events, ['cache.match:null', 'cache.keys']);
+  const firstKey = [...entries.keys()].find((key) => new URL(key).searchParams.get('digest') === first.sha256)!;
+  entries.delete(firstKey);
+  assert.equal(await reopened.hasCommittedRanges(), false);
 });
 
 test('serves a resident verified snapshot after the cache entry is replaced or deleted', async (t) => {
@@ -203,6 +218,10 @@ test('serves a resident verified snapshot after the cache entry is replaced or d
   assert.deepEqual(new Uint8Array((await transaction.read(BASE, spec)).bytes), bytes);
   assert.equal(fetches, 1, 'the verified in-memory snapshot avoids another fetch');
   assert.equal(await transaction.commit(), false, 'a missing CacheStorage entry cannot complete offline caching');
+  assert.equal(transaction.isCached(spec), false);
+  assert.equal((await transaction.read(BASE, spec)).cachedByHash, true);
+  assert.equal(fetches, 1, 'the verified snapshot can repair the missing entry');
+  assert.equal(await transaction.commit(), true);
 });
 
 test('failed rereads clear prior cache verification before a completion marker can be committed', async (t) => {

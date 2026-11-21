@@ -72,7 +72,7 @@
   "releaseEvidenceInputs": [
     {
       "path": "tests/browser/mapika2b-public-real-webgpu.spec.ts",
-      "sha256": "f1c9dea81bc80e862a1dc5c3d0935623b82697d256bca31ee2cd21a1f81b3c23"
+      "sha256": "6444d0ede6bc62fcec0a56807061efc06231692408b27a0a9e249190ead5f3a0"
     },
     {
       "path": "tests/browser/mapika2b-evidence.mts",

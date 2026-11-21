@@ -75,11 +75,18 @@ export interface Mapika2bSystemOneResult {
   readonly usage: Readonly<{input_tokens: number; output_tokens: 0}>;
 }
 
+export interface Mapika2bPrepareOfflineOptions {
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: ModelProgress) => void;
+}
+
 export interface Mapika2bDecisionModel<Id extends string = string> {
   readonly modelId: Id;
   readonly description: Omit<ModelDescription, 'modelId'> & Readonly<{modelId: Id}>;
-  /** Cache state when loading finished. Browser storage can be evicted later. */
+  /** Last known state of the full model cache. Browser storage can be evicted later. */
   readonly cacheStatus: 'complete' | 'incomplete' | 'disabled' | 'unavailable';
+  /** Cache the remaining verified model assets for offline use. */
+  prepareOffline(options?: Mapika2bPrepareOfflineOptions): Promise<void>;
   systemOne(request: Mapika2bSystemOneRequest): Promise<Mapika2bSystemOneResult>;
   dispose(): Promise<void>;
 }

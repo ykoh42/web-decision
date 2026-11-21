@@ -40,24 +40,42 @@ export async function loadModel(rawOptions: object, description: ModelDescriptio
     throw new WebDecisionError('INVALID_ASSET', 'Mapika adapter received a different model descriptor.');
   const options = validateOptions(rawOptions);
   const cache = await openAssetCache(options.cache !== false, options.signal);
-  let assetCacheComplete = true;
-  const assetOptions = {
-    cache,
-    offline: options.offline ?? false,
-    signal: options.signal,
-    onCacheStatus(cached: boolean) {
-      if (!cached) assetCacheComplete = false;
-    }
-  };
-  const artifacts = await openPackagedMapika2bText(assetOptions);
+  const offline = options.offline ?? false;
+  async function readPackagedAssets(signal?: AbortSignal) {
+    let complete = true;
+    const artifacts = await openPackagedMapika2bText({
+      cache,
+      offline,
+      signal,
+      onCacheStatus(cached) {
+        complete &&= cached;
+      }
+    });
+    return {artifacts, complete};
+  }
+  const {artifacts, complete: packagedAssetsCached} = await readPackagedAssets(options.signal);
   const session = await loadMapika2bCandidate({
-    ...assetOptions,
+    cache,
+    offline,
+    signal: options.signal,
     artifacts,
+    packagedAssetsCached,
+    async preparePackagedAssets({signal}) {
+      return (await readPackagedAssets(signal)).complete;
+    },
     ...(options.onProgress ? {onProgress: options.onProgress} : {}),
     ...(options.limits === undefined ? {} : {limits: options.limits}),
     ...(options.temperature === undefined ? {} : {temperature: options.temperature}),
     ...(options.temperatureByType === undefined ? {} : {temperatureByType: options.temperatureByType})
   });
-  const cacheStatus = modelCacheStatus(options.cache, !!cache, session.cacheComplete && assetCacheComplete);
-  return {modelId: MODEL_ID, description, cacheStatus, systemOne: session.systemOne, dispose: session.dispose};
+  return {
+    modelId: MODEL_ID,
+    description,
+    get cacheStatus() {
+      return modelCacheStatus(options.cache, !!cache, session.cacheComplete);
+    },
+    prepareOffline: session.prepareOffline,
+    systemOne: session.systemOne,
+    dispose: session.dispose
+  };
 }
