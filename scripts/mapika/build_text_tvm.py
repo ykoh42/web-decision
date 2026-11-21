@@ -175,7 +175,11 @@ def graph_bindings(parameters, qwen, inventory):
 def build(output: Path) -> None:
     sys.path.insert(0, str(QWEN_BUILD_DIR))
     import tvm
-    from build_gdn_prefix_candidate import bind_chunk_count, candidate_script, fp32_activations
+    from build_gdn_prefix_candidate import (
+        bind_chunk_count,
+        candidate_script,
+        fp32_activations,
+    )
     from qwen35_gdn_cumulative_decay import qwen35_gdn_cumsum64
     from qwen35_tvm_build import (
         export_tvmjs,

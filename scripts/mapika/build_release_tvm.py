@@ -8,15 +8,10 @@ import json
 import sys
 from pathlib import Path
 
+from build_text_tvm import MODEL_REVISION
+from build_text_tvm import build as build_text
+
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts/kanana"))
-sys.path.insert(0, str(ROOT / "scripts/strands/qwen35"))
-
-from build_evidence import collect_native_tvm  # noqa: E402
-from build_fp32_vision_webgpu import build as build_vision  # noqa: E402
-from build_text_tvm import MODEL_REVISION  # noqa: E402
-from build_text_tvm import build as build_text  # noqa: E402
-
 MODEL_ID = "mapika-decider-2b-v12"
 ASSETS = ROOT / "packages/web-decision/assets/mapika2b"
 
@@ -63,6 +58,11 @@ def build(output: Path) -> None:
     output = output.resolve()
     if output.exists() and any(output.iterdir()):
         raise ValueError("The build evidence output directory must be empty")
+    sys.path.insert(0, str(ROOT / "scripts/kanana"))
+    sys.path.insert(0, str(ROOT / "scripts/strands/qwen35"))
+    from build_evidence import collect_native_tvm
+    from build_fp32_vision_webgpu import build as build_vision
+
     environment = collect_native_tvm(ROOT)
     build_text(output / "text")
     build_vision(output / "vision")

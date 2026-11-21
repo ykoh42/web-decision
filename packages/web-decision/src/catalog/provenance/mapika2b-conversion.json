@@ -3,7 +3,7 @@
   "recipe": [
     {
       "path": "scripts/mapika/build_text_tvm.py",
-      "sha256": "cdcee84ef0efdaddf2b4ef8f71f6573f6368665b429e6dc0017efdda4b25731a"
+      "sha256": "cfe0a108858b3d8b7b6131a686a8691dd5b31b11b19fa3b35e355cef66220b33"
     },
     {
       "path": "scripts/mapika/vision-reuse.mts",
@@ -27,7 +27,7 @@
     },
     {
       "path": "scripts/mapika/build_release_tvm.py",
-      "sha256": "4ade1500c8d5731af0a01d8927219a39327a16000e34d040b4423769a9561952"
+      "sha256": "55b53117905dfab57f52a6c74431174098d124e785b47283d9622550505b8286"
     },
     {
       "path": "scripts/strands/qwen35/build_fp32_vision_webgpu.py",
