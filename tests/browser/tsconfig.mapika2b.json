@@ -6,6 +6,7 @@
     "../../packages/web-decision/src/mapika2b/image-codec-asset-url.d.ts",
     "../../packages/web-decision/src/runtime/tvm-source.d.ts",
     "../../packages/web-decision/src/strands/qwen35-r13-asset-url.d.ts",
+    "harness.ts",
     "mapika2b-candidate-alias.d.mts",
     "mapika2b-curated-real-webgpu.spec.ts",
     "mapika2b-evidence.mts",
@@ -13,6 +14,7 @@
     "mapika2b-hardware.mts",
     "mapika2b-installed.mts",
     "mapika2b-offline-real-webgpu.spec.ts",
+    "mapika2b-public-real-webgpu.spec.ts",
     "mapika2b-real-webgpu.spec.ts",
     "mapika2b-snapshot.mts",
     "mapika2b-webgpu-harness.ts"
