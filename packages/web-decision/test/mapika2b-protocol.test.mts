@@ -37,6 +37,37 @@ const choice = {instructions: 'Which queue?', criteria: ['billing', 'technical']
 const noul = {type: 'bool', criteria: {true: 'a refund is needed', false: 'no refund needed'}};
 const score = {type: 'score', instructions: 'How urgent?', criteria: {10: '2: urgent', 1: 'low'}};
 
+test('Noul criteria accept upstream boolean keys with string keys taking precedence', () => {
+  const booleanKeys = new Map<unknown, unknown>([
+    [false, 'no refund'],
+    [true, 'refund']
+  ]);
+  const strings = {false: 'no refund', true: 'refund'};
+  const request = (criteria: unknown) => ({state: '', questions: {q: {type: 'noul', criteria}}});
+  assert.deepEqual(prepare(request(booleanKeys)).rows[0]!.inputIds, prepare(request(strings)).rows[0]!.inputIds);
+  booleanKeys.set('true', 'replacement');
+  assert.deepEqual(
+    prepare(request(booleanKeys)).rows[0]!.inputIds,
+    prepare(request({false: 'no refund', true: 'replacement'})).rows[0]!.inputIds
+  );
+  booleanKeys.set(3, 'ignored');
+  assert.deepEqual(
+    prepare(request(booleanKeys)).rows[0]!.inputIds,
+    prepare(request({false: 'no refund', true: 'replacement'})).rows[0]!.inputIds
+  );
+  assert.deepEqual(
+    prepare(
+      request(
+        new Map<unknown, unknown>([
+          [0, 'no refund'],
+          [1n, 'refund']
+        ])
+      )
+    ).rows[0]!.inputIds,
+    prepare(request(strings)).rows[0]!.inputIds
+  );
+});
+
 test('serving limits can be raised or lowered while invalid limit names are rejected', () => {
   const limits = resolveMapika2bLimits({maxStateTokens: 40_000, maxImages: 6});
   assert.equal(limits.maxStateTokens, 40_000);

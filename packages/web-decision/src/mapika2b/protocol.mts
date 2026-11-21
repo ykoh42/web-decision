@@ -240,9 +240,20 @@ function renderScore(instructions: string, criteria: unknown, isolated: boolean)
 }
 
 function renderNoul(instructions: unknown, criteria: unknown): RenderedQuestion {
-  const options = new Map(criteria == null ? [] : dataEntries(criteria, 'Noul criteria'));
-  const no = options.get('false');
-  const yes = options.get('true');
+  const entries =
+    criteria instanceof Map
+      ? Array.from(Map.prototype.entries.call(criteria))
+      : criteria == null
+        ? []
+        : dataEntries(criteria, 'Noul criteria');
+  const options = new Map<unknown, unknown>(entries);
+  const criterion = (name: string, value: boolean) => {
+    for (const key of [name, value, Number(value), BigInt(Number(value))])
+      if (options.has(key)) return options.get(key);
+    return undefined;
+  };
+  const no = criterion('false', false);
+  const yes = criterion('true', true);
   if (isAbsent(instructions) && isAbsent(no) && isAbsent(yes))
     invalid('A Noul question without instructions must describe true or false.');
   return {

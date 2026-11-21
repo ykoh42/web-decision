@@ -17,7 +17,7 @@ export type Mapika2bQuestion = Readonly<{
   type?: 'choice' | 'score' | 'noul' | 'bool';
   instructions?: Mapika2bValue;
   question?: Mapika2bValue;
-  criteria?: Mapika2bValue;
+  criteria?: Mapika2bValue | ReadonlyMap<unknown, Mapika2bValue>;
   options?: Mapika2bValue;
   isolated?: boolean;
 }>;
