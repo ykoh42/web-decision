@@ -7,6 +7,7 @@ const packageBundle = fileURLToPath(new URL('../../packages/web-decision/dist/in
 
 export default defineConfig({
   root: browserRoot,
+  optimizeDeps: {noDiscovery: true, include: []},
   resolve: {alias: {'web-decision': packageBundle}},
   server: {
     host: '127.0.0.1',

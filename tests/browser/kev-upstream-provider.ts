@@ -7,7 +7,7 @@ import {
   readVerifiedAsset as readVerifiedAssetFromSource,
   sha256 as sha256FromSource
 } from '../../packages/web-decision/src/assets.js';
-import {loadDecisionModel} from 'web-decision';
+import {listModels, loadDecisionModel} from 'web-decision';
 
 declare global {
   interface Window {
@@ -241,7 +241,11 @@ function errorCode(value: unknown): string | undefined {
   return typeof value.code === 'string' ? value.code : undefined;
 }
 
-async function expectUnsupportedWebGpu(navigatorValue: unknown, scenario: string): Promise<void> {
+async function expectRejectedBeforeFetch(
+  navigatorValue: unknown,
+  scenario: string,
+  expectedCode: string
+): Promise<void> {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   if (originalNavigator && !originalNavigator.configurable)
     throw new Error('The browser cannot replace navigator for this test.');
@@ -261,8 +265,8 @@ async function expectUnsupportedWebGpu(navigatorValue: unknown, scenario: string
       result = cause;
     }
     const code = errorCode(result);
-    if (code !== 'UNSUPPORTED_ENVIRONMENT')
-      throw new Error(`${scenario}: expected UNSUPPORTED_ENVIRONMENT, received ${code ?? String(result)}.`);
+    if (code !== expectedCode)
+      throw new Error(`${scenario}: expected ${expectedCode}, received ${code ?? String(result)}.`);
     if (fetchCalls !== 0) throw new Error(`${scenario}: fetch began before environment rejection.`);
   } finally {
     globalThis.fetch = originalFetch;
@@ -272,8 +276,10 @@ async function expectUnsupportedWebGpu(navigatorValue: unknown, scenario: string
 }
 
 async function verifyEnvironmentRejection(): Promise<void> {
-  await expectUnsupportedWebGpu(undefined, 'Missing navigator');
-  await expectUnsupportedWebGpu({}, 'Missing navigator.gpu');
+  const publicKev = listModels().some(({modelId}) => modelId === 'kev-0.6b-q4f16');
+  const expectedCode = publicKev ? 'UNSUPPORTED_ENVIRONMENT' : 'INVALID_INPUT';
+  await expectRejectedBeforeFetch(undefined, 'Missing navigator', expectedCode);
+  await expectRejectedBeforeFetch({}, 'Missing navigator.gpu', expectedCode);
 }
 
 async function verifyExactUnboundedReadAndProgress(): Promise<void> {
@@ -523,7 +529,7 @@ async function run(): Promise<void> {
     checks: {
       missingContentLengthAcceptedWithExactBound: true,
       bundledDataUrlDecodedWithoutConnectFetch: true,
-      missingNavigatorAndNavigatorGpuReturnUnsupportedEnvironment: true,
+      missingWebGpuOrUncuratedIdRejectedBeforeFetch: true,
       oversizedSourceRejectedWithoutCacheWrite: true,
       sourceHashMismatchRejectedWithoutCacheWrite: true,
       wrongContentLengthRejectedWithoutCacheWrite: true,
