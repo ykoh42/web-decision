@@ -1,9 +1,9 @@
-type AssetReader<T> = (name: string, signal: AbortSignal) => T | PromiseLike<T>;
+type AssetReader<Key, T> = (key: Key, signal: AbortSignal) => T | PromiseLike<T>;
 
 /** Read the initial model files together, cancelling siblings on first failure. */
-export async function readAssetBatch<T>(
-  names: readonly string[],
-  read: AssetReader<T>,
+export async function readAssetBatch<Key, T>(
+  keys: readonly Key[],
+  read: AssetReader<Key, T>,
   signal?: AbortSignal | null
 ): Promise<Awaited<T>[]> {
   signal?.throwIfAborted();
@@ -15,11 +15,11 @@ export async function readAssetBatch<T>(
   let firstFailure: unknown;
   try {
     const values = await Promise.all(
-      names.map((name) =>
+      keys.map((key) =>
         Promise.resolve()
           .then(() => {
             controller.signal.throwIfAborted();
-            return read(name, controller.signal);
+            return read(key, controller.signal);
           })
           .catch((cause: unknown) => {
             if (!failed) {

@@ -11,6 +11,7 @@ import type {Mapika2bSource} from './source.mts';
 
 const WORKSPACE_BYTES = 1024 ** 3;
 const WORKGROUP_STORAGE_BYTES = 8 * 1024;
+const WEIGHT_READ_AHEAD = {maxBytes: 32 * 1024 ** 2, maxRequests: 8} as const;
 const VISION_GEOMETRY = Object.freeze({
   numPositionEmbeddings: 2304,
   spatialMergeSize: MAPIKA2B_VISION.mergeSize,
@@ -105,6 +106,7 @@ export async function openMapika2bVision({
     gpuDevice,
     artifacts,
     signal,
+    readAhead: WEIGHT_READ_AHEAD,
     readWeight: ({sourceName}, readSignal) => source.readTensor('vision', sourceName, {signal: readSignal})
   });
 

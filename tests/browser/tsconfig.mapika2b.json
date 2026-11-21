@@ -11,6 +11,7 @@
     "mapika2b-curated-real-webgpu.spec.ts",
     "mapika2b-evidence.mts",
     "mapika2b-evidence.test.mts",
+    "mapika2b-first-image-benchmark.spec.ts",
     "mapika2b-hardware.mts",
     "mapika2b-installed.mts",
     "mapika2b-offline-real-webgpu.spec.ts",

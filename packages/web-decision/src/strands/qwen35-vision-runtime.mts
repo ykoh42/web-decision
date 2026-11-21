@@ -8,6 +8,7 @@ import type {Qwen35VisionFeatureRunner, Qwen35VisionImageRunner} from './qwen35-
 import {
   loadQwen35VisionParameterTensors,
   loadQwen35VisionParameterTensorsFromSource,
+  type Qwen35VisionSourceWeightLoadOptions,
   type Qwen35VisionWeightLoadOptions
 } from './qwen35-vision-weights.mts';
 
@@ -59,14 +60,12 @@ export function createQwen35VisionRuntimeRunner({
 
 export function createQwen35VisionRuntimeRunnerFromSource({
   readWeight,
+  readAhead,
   ...options
 }: VisionRuntimeRunnerOptions &
-  Pick<
-    Parameters<typeof loadQwen35VisionParameterTensorsFromSource>[0],
-    'readWeight'
-  >): Promise<Qwen35VisionImageRuntimeRunner> {
+  Pick<Qwen35VisionSourceWeightLoadOptions, 'readWeight' | 'readAhead'>): Promise<Qwen35VisionImageRuntimeRunner> {
   return openQwen35VisionRuntime(options, (weights) =>
-    loadQwen35VisionParameterTensorsFromSource({...weights, readWeight})
+    loadQwen35VisionParameterTensorsFromSource({...weights, readWeight, readAhead})
   );
 }
 

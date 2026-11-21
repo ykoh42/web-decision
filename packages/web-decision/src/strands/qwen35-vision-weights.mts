@@ -1,3 +1,4 @@
+import {readAssetBatch} from '../asset-batch.js';
 import {sha256} from '../assets.js';
 import type {DLDevice, Instance, Tensor} from '../runtime/tvm-types.js';
 import {WebDecisionError} from '../kev.js';
@@ -29,6 +30,15 @@ type VisionWeightLoaderOptions = Readonly<{
 }>;
 
 type ReadVisionWeight = (binding: Qwen35VisionWeightBinding, signal?: AbortSignal | null) => Promise<Uint8Array>;
+
+type VisionReadAhead = Readonly<{maxBytes: number; maxRequests: number}>;
+
+export type Qwen35VisionSourceWeightLoadOptions = VisionWeightLoaderOptions &
+  Readonly<{
+    orderBindings?: (bindings: readonly Qwen35VisionWeightBinding[]) => readonly Qwen35VisionWeightBinding[];
+    readWeight: ReadVisionWeight;
+    readAhead?: VisionReadAhead | undefined;
+  }>;
 
 export type Qwen35VisionWeightLoadOptions = VisionWeightLoaderOptions & Readonly<{source: Qwen35PinnedSource}>;
 
@@ -181,6 +191,27 @@ export function loadQwen35VisionParameterTensors({
   });
 }
 
+function* weightBatches(
+  bindings: readonly Qwen35VisionWeightBinding[],
+  {maxBytes, maxRequests}: VisionReadAhead = {maxBytes: Number.MAX_SAFE_INTEGER, maxRequests: 1}
+): Generator<readonly Qwen35VisionWeightBinding[]> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || !Number.isSafeInteger(maxRequests) || maxRequests < 1)
+    throw invalid('Qwen3.5 vision read-ahead requires positive byte and request limits.');
+
+  let batch: Qwen35VisionWeightBinding[] = [];
+  let bytes = 0;
+  for (const binding of bindings) {
+    if (batch.length && (batch.length === maxRequests || bytes + binding.sourceByteCount > maxBytes)) {
+      yield batch;
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(binding);
+    bytes += binding.sourceByteCount;
+  }
+  if (batch.length) yield batch;
+}
+
 /** Verify the graph bindings and each native BF16 payload before uploading it. */
 export async function loadQwen35VisionParameterTensorsFromSource({
   runtime,
@@ -190,29 +221,29 @@ export async function loadQwen35VisionParameterTensorsFromSource({
   signal,
   onProgress,
   orderBindings = (sourceBindings) => sourceBindings,
-  readWeight
-}: VisionWeightLoaderOptions &
-  Readonly<{
-    orderBindings?: (bindings: readonly Qwen35VisionWeightBinding[]) => readonly Qwen35VisionWeightBinding[];
-    readWeight: ReadVisionWeight;
-  }>): Promise<ReadonlyMap<string, Tensor>> {
+  readWeight,
+  readAhead
+}: Qwen35VisionSourceWeightLoadOptions): Promise<ReadonlyMap<string, Tensor>> {
   signal?.throwIfAborted();
   await verifyBindings(artifact, bindings);
   signal?.throwIfAborted();
 
   const loaded = new Map<string, Tensor>();
-  for (const binding of orderBindings(bindings)) {
+  for (const batch of weightBatches(orderBindings(bindings), readAhead)) {
     signal?.throwIfAborted();
-    const raw = await readWeight(binding, signal);
-    const bytes = await widenVerifiedQwen35VisionWeight(raw, binding, signal);
-    const tensor = runtime.empty([...binding.shape], 'float32', device) as RuntimeTensor;
-    if (tensor.dtype !== 'float32' || !Array.isArray(tensor.shape) || !sameShape(tensor.shape, binding.shape))
-      throw invalid('Qwen3.5 TVM vision parameter has an unexpected shape or dtype: ' + binding.targetName + '.');
-    tensor.copyFromRawBytes(bytes);
-    await device.sync();
-    signal?.throwIfAborted();
-    loaded.set(binding.targetName, tensor);
-    onProgress?.(bytes.byteLength);
+    const payloads =
+      batch.length === 1 ? [await readWeight(batch[0]!, signal)] : await readAssetBatch(batch, readWeight, signal);
+    for (const [index, binding] of batch.entries()) {
+      const bytes = await widenVerifiedQwen35VisionWeight(payloads[index]!, binding, signal);
+      const tensor = runtime.empty([...binding.shape], 'float32', device) as RuntimeTensor;
+      if (tensor.dtype !== 'float32' || !Array.isArray(tensor.shape) || !sameShape(tensor.shape, binding.shape))
+        throw invalid('Qwen3.5 TVM vision parameter has an unexpected shape or dtype: ' + binding.targetName + '.');
+      tensor.copyFromRawBytes(bytes);
+      await device.sync();
+      signal?.throwIfAborted();
+      loaded.set(binding.targetName, tensor);
+      onProgress?.(bytes.byteLength);
+    }
   }
   const parameters = new Map<string, Tensor>();
   for (const {targetName} of bindings) {

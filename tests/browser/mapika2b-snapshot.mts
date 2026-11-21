@@ -1,11 +1,14 @@
 import {open} from 'node:fs/promises';
 import {join} from 'node:path';
+import {setTimeout} from 'node:timers/promises';
 import type {Page, Route} from '@playwright/test';
 import {MAPIKA2B_REPOSITORY, MAPIKA2B_REVISION} from '../../packages/web-decision/src/mapika2b/contract.mts';
 
 const source = `https://huggingface.co/${MAPIKA2B_REPOSITORY}/resolve/${MAPIKA2B_REVISION}/`;
 const maxRangeBytes = 8 * 1024 * 1024;
-const weightFiles = ['model.safetensors', 'vision/visual.safetensors'];
+const visionWeights = 'vision/visual.safetensors';
+const visionPath = new URL(visionWeights, source).pathname;
+const weightFiles = ['model.safetensors', visionWeights];
 const corsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'range',
@@ -43,9 +46,14 @@ async function serveRange(route: Route, filePath: string, bytes: string): Promis
   }
 }
 
-export async function routeMapikaSnapshot(page: Page, root: string, log: (message: string) => void): Promise<void> {
+export async function routeMapikaSnapshot(
+  page: Page,
+  root: string,
+  log: (message: string) => void,
+  {visionDelayMs = 0, liveVision = false}: {visionDelayMs?: number; liveVision?: boolean} = {}
+): Promise<void> {
   await page.route(
-    (url) => url.href.startsWith(source),
+    (url) => url.href.startsWith(source) && (!liveVision || url.pathname !== visionPath),
     async (route) => {
       const key = new URL(route.request().url()).pathname.slice(new URL(source).pathname.length);
       if (!key.split('/').every((piece) => /^[\w-]+\.(?:json|safetensors)$|^vision$/.test(piece))) {
@@ -60,6 +68,7 @@ export async function routeMapikaSnapshot(page: Page, root: string, log: (messag
       const range = route.request().headers().range;
       try {
         if (range) {
+          if (visionDelayMs && key === visionWeights) await setTimeout(visionDelayMs);
           await serveRange(route, path, range);
         } else if (weightFiles.includes(key)) {
           throw new Error('The candidate requested an entire Mapika checkpoint instead of a verified range.');
