@@ -275,6 +275,52 @@ test('failed rereads clear prior cache verification before a completion marker c
   assert.equal(entries.has(new URL('strands-offline-complete-v1.json', BASE).href), false);
 });
 
+test('a failed overlapping range read preserves cache verification from a successful read', async (t) => {
+  const bytes = Uint8Array.of(1, 2, 3, 4);
+  const spec = rangeSpec('shared.bin', bytes);
+  const entries = new Map<string, Response>();
+  const cache: AssetCache = {
+    async match(key) {
+      return entries.get(key)?.clone();
+    },
+    async put(key, response) {
+      entries.set(key, response.clone());
+    }
+  };
+
+  let signalFirstFetchStarted!: () => void;
+  const firstFetchStarted = new Promise<void>((resolve) => {
+    signalFirstFetchStarted = resolve;
+  });
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', () => {
+    if (++fetchCount === 1) {
+      signalFirstFetchStarted();
+      return new Promise<Response>(() => {});
+    }
+    return new Response(bytes, {
+      status: 206,
+      headers: {'content-range': 'bytes 0-3/4', 'content-length': '4'}
+    });
+  });
+
+  const transaction = new RangeCacheTransaction({base: BASE, cache, markerId: 'shared-range'});
+  t.after(() => transaction.dispose());
+  await transaction.open();
+  transaction.require([spec]);
+  transaction.seal();
+
+  const abandoned = new AbortController();
+  const firstRead = transaction.read(BASE, spec, {signal: abandoned.signal});
+  await firstFetchStarted;
+  assert.equal((await transaction.read(BASE, spec)).cachedByHash, true);
+  abandoned.abort();
+  await assert.rejects(firstRead, {name: 'AbortError'});
+
+  assert.equal(transaction.isCached(spec), true);
+  assert.equal(await transaction.commit(), true);
+});
+
 test('removes both combined-signal listeners and cancels a late response after abort', async (t) => {
   const events: string[] = [];
   const transactionController = new AbortController();

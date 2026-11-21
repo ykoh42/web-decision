@@ -148,7 +148,7 @@ export class RangeCacheTransaction {
   #markerUrl: string;
   #required = new Set<string>();
   #specs = new Map<string, RangeCacheSpec>();
-  #read = new Set<string>();
+  #readVersions = new Map<string, number>();
   #cached = new Set<string>();
   #uncached = new Set<string>();
   #memory = new Map<string, RangeCacheReadResult>();
@@ -198,7 +198,7 @@ export class RangeCacheTransaction {
     this.#memory.clear();
     this.#required.clear();
     this.#specs.clear();
-    this.#read.clear();
+    this.#readVersions.clear();
     this.#cached.clear();
     this.#uncached.clear();
     this.#signal?.removeEventListener('abort', this.#onAbort);
@@ -264,7 +264,7 @@ export class RangeCacheTransaction {
   }
 
   hasRead(spec: RangeCacheSpec): boolean {
-    return !this.#disposed && this.#read.has(keyOf(spec));
+    return !this.#disposed && this.#readVersions.has(keyOf(spec));
   }
 
   isCached(spec: RangeCacheSpec): boolean {
@@ -282,7 +282,7 @@ export class RangeCacheTransaction {
   }
 
   #record(key: string, result: RangeCacheReadResult): void {
-    this.#read.add(key);
+    this.#readVersions.set(key, (this.#readVersions.get(key) ?? 0) + 1);
     if (result.cachedByHash) {
       this.#cached.add(key);
       this.#uncached.delete(key);
@@ -390,6 +390,7 @@ export class RangeCacheTransaction {
         this.#record(key, result);
         return {bytes: result.bytes.slice(0), cachedByHash: result.cachedByHash};
       }
+      const readVersion = this.#readVersions.get(key);
       try {
         const result = await readVerifiedRange(base, spec, {
           cache: this.#cache,
@@ -401,8 +402,11 @@ export class RangeCacheTransaction {
         this.#record(key, result);
         return result;
       } catch (cause) {
-        this.#cached.delete(key);
-        this.#uncached.delete(key);
+        // A successful overlapping read may have refreshed this range.
+        if (this.#readVersions.get(key) === readVersion) {
+          this.#cached.delete(key);
+          this.#uncached.delete(key);
+        }
         throw cause;
       }
     } finally {
