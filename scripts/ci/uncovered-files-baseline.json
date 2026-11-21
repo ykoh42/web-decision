@@ -1,1 +1,16 @@
-["browser-only-ws.ts","curated/adapters/kanana.ts","kanana/artifacts.ts","kanana/encoded-image.ts","kanana/magick-image.ts","kanana/tvm-webgpu.ts"]
+[
+  "browser-only-ws.ts",
+  "curated/adapters/kanana.ts",
+  "curated/adapters/kev06.ts",
+  "deberta-single-preview-entry.ts",
+  "deberta-single-preview-registry.mts",
+  "kanana/artifacts.ts",
+  "kanana/encoded-image.ts",
+  "kanana/magick-image.ts",
+  "kanana/tvm-webgpu.ts",
+  "kev-deberta-preview-entry.ts",
+  "kev-deberta-reflexes-preview-entry.ts",
+  "kev-preview-entry.ts",
+  "tinydecide-preview-entry.ts",
+  "tinydecide-preview-registry.ts"
+]
