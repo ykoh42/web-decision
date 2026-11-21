@@ -5,6 +5,7 @@ import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs';
 import {basename, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {APPROVED_MODEL_IDS} from '../../packages/web-decision/src/catalog/public-catalog.generated.ts';
+import {MAGICK, MOZJPEG} from '../../packages/web-decision/src/mapika2b/image-codec-pins.mts';
 import {hasQuotedAssetKey} from './asset-key.ts';
 import {checkConsumerTypes} from './check-types.mts';
 import {findPackedContentIssues} from './packed-content.ts';
@@ -15,6 +16,7 @@ const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4
 const kananaModelId = 'kanana-2-v-decide-3b-2611';
 const kananaManifestSha256 = 'd4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5';
 const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
+const mapikaModelId = 'mapika-decider-2b-v12';
 const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
 const kananaRequiredNotice =
   'Kanana is licensed in accordance with the Kanana Open License Agreement. Copyright © KAKAO Corp. All Rights Reserved.';
@@ -30,6 +32,14 @@ type BundledArtifactLock = Readonly<{
   bundledRuntimeFiles: readonly LockedModelAsset[];
 }>;
 type PackArchive = Readonly<{filename: string; files: readonly Readonly<{path: string}>[]}>;
+
+const mapikaLicensePins = {
+  'MAPIKA-APACHE-LICENSE.txt': '8489ebe7c8abe903fcdaace4080ef1660bba98ea44c8007923bfb91777945e37',
+  'MAGICK-WASM-LICENSE': 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30',
+  'MAGICK-WASM-NOTICE': '253997f509bd6a2397b4cb33a4e6ecd671feec8c09117b03fd698e6e824e2e68',
+  'JSQUASH-JPEG-LICENSE': '8c3690b09c168f196446cf5904332023bbc15eb92b6a7cee470ac829e6a65d20'
+};
+const mapikaPackageFiles = [...Object.keys(mapikaLicensePins), 'MAPIKA-NOTICE', 'src/curated/mapika2b-types.d.ts'];
 
 const stableAssetInputs: readonly AssetInput[] = [
   ['model.wasm', 'assets/kev06-stable/model.wasm'],
@@ -207,7 +217,7 @@ function runInstalledApiSmoke(
   qwen35Manifest?: BundledArtifactLock['manifest']
 ): void {
   const approvedModelIds = new Set<string>(APPROVED_MODEL_IDS);
-  const unavailableCandidateIds = [stableKevModelId, kananaModelId, qwen35ModelId].filter(
+  const unavailableCandidateIds = [stableKevModelId, ...Object.keys(readArtifactLocks())].filter(
     (modelId) => !approvedModelIds.has(modelId)
   );
   const smokeTest = [
@@ -359,11 +369,15 @@ function listDistFiles(directory: string): string[] {
     .sort();
 }
 
-function readBundledArtifactLock(modelId: string): BundledArtifactLock {
+function readArtifactLocks(): Readonly<Record<string, BundledArtifactLock>> {
   const lock = JSON.parse(readFileSync(join(pkg, 'src/catalog/artifacts.lock.json'), 'utf8')) as {
     byModelId: Readonly<Record<string, BundledArtifactLock>>;
   };
-  const artifact = lock.byModelId[modelId];
+  return lock.byModelId;
+}
+
+function readBundledArtifactLock(modelId: string): BundledArtifactLock {
+  const artifact = readArtifactLocks()[modelId];
   assert.ok(artifact, 'Missing artifact lock for ' + modelId + '.');
   return artifact;
 }
@@ -472,30 +486,68 @@ function verifyPackageInventory(
   packageFiles: readonly string[],
   distDirectory: string,
   distFiles: readonly string[],
-  kananaApproved: boolean,
-  qwen35?: BundledArtifactLock
+  modelIds: ReadonlySet<string>
 ): void {
+  const qwen35 = modelIds.has(qwen35ModelId) ? readBundledArtifactLock(qwen35ModelId) : undefined;
+  const mapika = modelIds.has(mapikaModelId) ? readBundledArtifactLock(mapikaModelId) : undefined;
   const assetFiles = [
-    ...(kananaApproved && qwen35 ? verifyCanonicalAssets(readBundledArtifactLock(kananaModelId)) : []),
-    ...(qwen35 ? verifyCanonicalAssets(qwen35) : [])
+    ...new Set(
+      [...modelIds]
+        .filter((id) => id !== stableKevModelId && (id !== kananaModelId || qwen35))
+        .flatMap((id) => verifyCanonicalAssets(readBundledArtifactLock(id)))
+    )
   ];
   const files = [
     ...packagedSourceFiles,
     ...(qwen35 ? qwen35PackageFiles : []),
+    ...(mapika ? mapikaPackageFiles : []),
     ...assetFiles,
     ...distFiles.map((name) => 'dist/' + name),
     'package.json'
   ];
   assert.deepEqual(packageFiles, files.sort());
   const wasm = [
-    ...(kananaApproved ? kananaWasmFiles.map((name) => 'dist/' + name) : []),
+    ...(modelIds.has(kananaModelId) ? kananaWasmFiles.map((name) => 'dist/' + name) : []),
     ...(qwen35 ? verifyQwen35Artifacts(distDirectory, distFiles, qwen35) : []),
+    ...(mapika ? verifyMapikaArtifacts(distDirectory, mapika) : []),
     ...assetFiles.filter((name) => name.endsWith('.wasm'))
   ];
   assert.deepEqual(
     packageFiles.filter((file) => file.endsWith('.wasm')),
     wasm.sort()
   );
+}
+
+function verifyMapikaArtifacts(distDirectory: string, {bundledRuntimeFiles}: BundledArtifactLock): string[] {
+  const emitted = bundledRuntimeFiles.filter(({manifestName}) =>
+    ['text.wasm', 'text-bindings.json'].includes(manifestName)
+  );
+  assert.equal(emitted.length, 2, 'Mapika text graph and bindings must be pinned.');
+  const runtime = [
+    ...emitted,
+    {manifestName: 'magick.wasm', ...MAGICK},
+    {manifestName: 'mozjpeg_dec.wasm', ...MOZJPEG}
+  ];
+  for (const pin of runtime) {
+    assert.ok(
+      matchesAsset(join(distDirectory, pin.manifestName), pin),
+      `Mapika runtime asset differs: ${pin.manifestName}`
+    );
+  }
+  for (const [name, sha256] of Object.entries(mapikaLicensePins)) {
+    assert.equal(
+      createHash('sha256')
+        .update(readFileSync(join(pkg, name)))
+        .digest('hex'),
+      sha256,
+      name
+    );
+  }
+  const notice = readFileSync(join(pkg, 'MAPIKA-NOTICE'), 'utf8');
+  assert.match(notice, /ab45f9147de7a2da974f68c77cc8ed60908b379c/u);
+  return runtime
+    .filter(({manifestName}) => manifestName.endsWith('.wasm'))
+    .map(({manifestName}) => `dist/${manifestName}`);
 }
 
 function selectArchive(packedPath: string, requestedPath?: string): string {
@@ -577,7 +629,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
     verifyKananaLicenseNotice();
   }
   if (qwen35) verifyQwen35LicenseNotice();
-  verifyPackageInventory(packageFiles, distDirectory, distFiles, kananaApproved, qwen35);
+  verifyPackageInventory(packageFiles, distDirectory, distFiles, approvedModelIds);
   if (!approvedModelIds.has(qwen35ModelId)) {
     assert.ok(
       packageFiles.every((file) => !file.startsWith('dist/') || !/qwen35|strands-qwen/iu.test(file)),

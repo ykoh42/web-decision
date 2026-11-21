@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {APPROVED_MODEL_IDS} from '../../packages/web-decision/src/catalog/public-catalog.generated.ts';
+import artifactLock from '../../packages/web-decision/src/catalog/artifacts.lock.json' with {type: 'json'};
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(import.meta.url);
@@ -23,14 +24,15 @@ export function checkConsumerTypes(consumer: string, typescriptCompiler = compil
   for (const [name, modelId] of [
     ['consumer.ts', 'kev-0.6b-q4f16'],
     ['kanana-consumer.ts', 'kanana-2-v-decide-3b-2611'],
-    ['strands-qwen35-consumer.ts', 'strands-decider-2b-qwen3.5-v1-2610']
+    ['strands-qwen35-consumer.ts', 'strands-decider-2b-qwen3.5-v1-2610'],
+    ['mapika2b-consumer.ts', 'mapika-decider-2b-v12']
   ] as const) {
     const destination = join(consumer, name);
     if (APPROVED_MODEL_IDS.includes(modelId as (typeof APPROVED_MODEL_IDS)[number]))
       copyFileSync(join(fixture, name), destination);
     else writeFileSync(destination, 'export {};\n');
   }
-  const pendingModelIds = ['kev-0.6b-q4f16', 'kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610'].filter(
+  const pendingModelIds = [...new Set(['kev-0.6b-q4f16', ...Object.keys(artifactLock.byModelId)])].filter(
     (modelId) => !APPROVED_MODEL_IDS.includes(modelId as (typeof APPROVED_MODEL_IDS)[number])
   );
   const pendingChecks = pendingModelIds.map(

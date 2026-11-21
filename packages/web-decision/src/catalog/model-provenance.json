@@ -29,11 +29,11 @@
     },
     {
       "modelId": "mapika-decider-2b-v12",
-      "status": "pending",
+      "status": "verified",
       "artifactLockSha256": "fe363005fc0e1f7914b7699564d61ff55fd1dd66b6ec6218444201c48afcbfae",
       "evidence": {
         "path": "src/catalog/provenance/mapika-decider-2b-v12.json",
-        "sha256": "c67cf6ffb092f8a05231c2b0d76675682546d21c9991c350b81785d4dc307065"
+        "sha256": "1695859c99768262ad22848a5fd8c0d8c5b79c1f2e6f79ccd477db8b4b71c6ed"
       }
     }
   ]

@@ -15,5 +15,9 @@ ab45f9147de7a2da974f68c77cc8ed60908b379c.
 Source: https://github.com/Mapika/decider
 License: Apache License, Version 2.0
 Copyright 2026 Mark Marosi
+The pinned upstream code license is included as MAPIKA-APACHE-LICENSE.txt.
 
 The adapter has been adapted for TypeScript, TVM, and WebGPU.
+
+Image decoding includes jSquash JPEG 1.6.0 and Magick WASM 0.0.46.
+See JSQUASH-JPEG-LICENSE, MAGICK-WASM-LICENSE, and MAGICK-WASM-NOTICE.

@@ -433,7 +433,7 @@ function decodeJpegRgb(image: ImageData): DecodedImage {
 }
 
 async function defaultMagickWasm(): Promise<URL> {
-  const asset = await import('@imagemagick/magick-wasm/magick.wasm?url');
+  const asset = await import('@imagemagick/magick-wasm/magick.wasm?url&no-inline');
   return new URL(asset.default, import.meta.url);
 }
 

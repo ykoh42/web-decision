@@ -1,11 +1,8 @@
 import {readVerifiedAsset, type AssetFileMetadata} from '../assets.js';
+import {MAGICK, MOZJPEG} from './image-codec-pins.mts';
 import type {OpenMapika2bVisionOptions} from './vision-runtime.mts';
 
 type CodecAssetOptions = Pick<OpenMapika2bVisionOptions, 'cache' | 'offline' | 'signal' | 'onCacheStatus'>;
-
-// Locked browser decoder artifacts from @jsquash/jpeg 1.6.0 and @imagemagick/magick-wasm 0.0.46.
-const MOZJPEG = {bytes: 166_470, sha256: 'a7c4b12169817e779ff4af137981393ae924944e167ad1bd95747c9199162d3e'};
-const MAGICK = {bytes: 15_488_888, sha256: '9d4d47d8cce4317c8dd2c05a57d896d71d99af454ac5d2ab51b43058cee417ae'};
 
 function readCodec(url: string, metadata: AssetFileMetadata, options: CodecAssetOptions): Promise<ArrayBuffer> {
   const asset = new URL(url, import.meta.url);

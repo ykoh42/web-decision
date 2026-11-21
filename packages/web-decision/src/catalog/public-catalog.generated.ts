@@ -209,6 +209,97 @@ const catalog = [
           'The private 0.0.0-qwen35-candidate npm archive passed TVM WebGPU text and image parity, six accepted and three rejected boundary cases, a three-row batch at 4,096 tokens, and six offline cases with zero network attempts. Online model assets were served from a local hash-verified Hugging Face snapshot.'
       }
     }
+  },
+  {
+    modelId: 'mapika-decider-2b-v12',
+    description: {
+      adapter: 'mapika2b',
+      precision: 'BF16 source weights and FP32 text and vision compute',
+      checkpoint: {
+        repository: 'Mapika/decider-2b',
+        revision: '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3'
+      },
+      assets: {
+        integrity: 'pinned-manifest',
+        location: 'package-and-pinned-upstream',
+        additionalFiles:
+          'The pinned TVM graphs are packaged. Native text and vision checkpoint ranges load from the immutable upstream revision.',
+        requiredFiles: [
+          'manifest.json',
+          'text.wasm',
+          'text-bindings.json',
+          'source-inventory.json',
+          'vision/fixture.json',
+          'vision/weight-bindings.json',
+          'vision/qwen35-dynamic-vision.webgpu.wasm'
+        ],
+        manifestSha256: '7f9d47b14426d7f7dea6cf9955e1d40f9a8a89fb6f564da1b39403a6a831d93a'
+      },
+      licenses: {
+        project: 'Apache-2.0',
+        modelTerms: 'Apache-2.0 as declared by the pinned Mapika model card and Qwen base license',
+        modelCard: 'https://huggingface.co/Mapika/decider-2b/tree/7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3'
+      },
+      backend: {
+        name: 'tvm-webgpu',
+        requiredFeatures: [],
+        requiredLimits: {
+          maxBufferSize: 1073741824,
+          maxStorageBufferBindingSize: 1073741824,
+          maxComputeWorkgroupStorageSize: 8192
+        },
+        requiresNonFallbackAdapter: false
+      },
+      features: {
+        textChoice: {
+          status: 'implemented',
+          abstention: 'not-implemented',
+          limits: [
+            {
+              resource: 'tokens',
+              scope: 'state',
+              defaultMax: 32768,
+              description: 'Default state-token limit can be configured.'
+            },
+            {
+              resource: 'options',
+              scope: 'question',
+              min: 2,
+              max: 255
+            }
+          ],
+          handling: 'source-faithful-system-one',
+          tokenCount: 'source-input-token-usage',
+          score: {
+            basis: 'ordered-levels',
+            temperatureAppliedBy: 'decoder',
+            calibration: 'not-guaranteed'
+          }
+        },
+        typedTextQuestionTypes: ['choice', 'noul', 'score'],
+        imageChoice: {
+          status: 'implemented',
+          limits: [
+            {
+              resource: 'images',
+              scope: 'request',
+              defaultMax: 4,
+              description: 'Default image limit can be configured.'
+            }
+          ]
+        },
+        rating: {
+          status: 'not-implemented'
+        }
+      },
+      verification: {
+        currentBundleGpu: 'see-release-evidence',
+        currentBundleCpuWasm: 'not-applicable',
+        currentBundleJavascript: 'not-applicable',
+        priorEvidence:
+          'On M4 Pro Chromium WebGPU, seven text and image cases matched the pinned FP32 reference. A 32,904-token smoke test completed. Long-input latency and device requirements vary.'
+      }
+    }
   }
 ] as unknown as readonly PublicCatalogEntry[];
 export const APPROVED_MODEL_IDS = Object.freeze(catalog.map(({modelId}) => modelId));

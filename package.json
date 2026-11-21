@@ -55,7 +55,7 @@
     "check:model-provenance:main": "node --import tsx scripts/ci/check-model-provenance.mts --allow-pending",
     "check:typescript": "pnpm run typecheck && pnpm run test:typescript-policy && pnpm run check:javascript-policy",
     "check:typescript:complete": "pnpm run typecheck && pnpm run test:typescript-policy && node --import tsx scripts/ci/check-typescript-policy.mts --require-complete",
-    "test:quality:release": "node --import tsx --test scripts/release/verify-release-evidence.test.ts scripts/release/tvm-build-evidence.test.ts scripts/release/runtime-build.test.ts scripts/release/qwen35-deferred-gates.test.mts scripts/release/strands-qwen35-release-evidence.test.ts tests/browser/kev06-release-evidence.test.ts",
+    "test:quality:release": "node --import tsx --test scripts/release/verify-release-evidence.test.ts scripts/release/tvm-build-evidence.test.ts scripts/release/runtime-build.test.ts scripts/release/qwen35-deferred-gates.test.mts scripts/release/strands-qwen35-release-evidence.test.ts scripts/release/mapika-release-evidence.test.mts tests/browser/kev06-release-evidence.test.ts",
     "test:quality:provenance": "node --import tsx --test scripts/ci/model-provenance.test.ts",
     "check:complexity:complete": "node --import tsx scripts/ci/check_cognitive_complexity.mts && node --import tsx scripts/ci/check_cognitive_complexity_completion.mts"
   },

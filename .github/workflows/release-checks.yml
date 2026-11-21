@@ -9,7 +9,7 @@ on:
         description: Release version to verify when running this workflow from its matching release tag
         required: true
         type: choice
-        options: ['0.1.0', '0.2.0', '0.3.0', '0.4.0', '0.5.0']
+        options: ['0.1.0', '0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0']
 
 permissions:
   contents: read
@@ -57,7 +57,7 @@ jobs:
           fi
           case "$version" in
             0.1.0|0.2.0|0.3.0) workspace_package=false ;;
-            0.4.0|0.5.0) workspace_package=true ;;
+            0.4.0|0.5.0|0.6.0) workspace_package=true ;;
             *) echo "Unsupported release version: $version" >&2; exit 1 ;;
           esac
           printf 'version=%s\nworkspace_package=%s\n' "$version" "$workspace_package" >> "$GITHUB_OUTPUT"
@@ -88,7 +88,7 @@ jobs:
           .toolchains/emsdk/emsdk install 4.0.23
           .toolchains/emsdk/emsdk activate 4.0.23 --embedded
           source .toolchains/emsdk/emsdk_env.sh
-          if [[ "$RELEASE_VERSION" == "0.5.0" ]]; then
+          if [[ "$RELEASE_VERSION" != "0.4.0" ]]; then
             make -C .toolchains/apache-tvm-src/web -f Makefile \
               -f "$GITHUB_WORKSPACE/scripts/tvm-browser-runtime.mk" \
               -j4 src/tvmjs_runtime_wasi.js
@@ -114,7 +114,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [[ "$RELEASE_VERSION" == "0.4.0" || "$RELEASE_VERSION" == "0.5.0" ]]; then
+          if [[ "$RELEASE_VERSION" == "0.6.0" ]]; then
+            script="test:types:current"
+          elif [[ "$RELEASE_VERSION" == "0.4.0" || "$RELEASE_VERSION" == "0.5.0" ]]; then
             script="test:types:$RELEASE_VERSION"
           else
             script="test:types:0.3.0"
@@ -124,7 +126,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+          if [[ "$RELEASE_VERSION" == "0.6.0" ]]; then
+            script="test"
+          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
             script="test:release"
           else
             script="test:release:$RELEASE_VERSION"
@@ -137,7 +141,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+          if [[ "$RELEASE_VERSION" == "0.6.0" ]]; then
+            script="build:package"
+          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
             script="build:release"
           else
             script="build:release:$RELEASE_VERSION"
@@ -147,17 +153,22 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
+          if [[ "$RELEASE_VERSION" == "0.6.0" ]]; then
+            npm pack --ignore-scripts ./packages/web-decision
+            exit 0
+          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
             script="pack:release"
           else
             script="pack:release:$RELEASE_VERSION"
           fi
           pnpm run "$script"
       - name: Verify packed release archive
-        if: steps.release.outputs.version == '0.5.0'
-        run: pnpm run check:package "$GITHUB_WORKSPACE/web-decision-0.5.0.tgz"
+        if: steps.release.outputs.version == '0.5.0' || steps.release.outputs.version == '0.6.0'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: pnpm run check:package "$GITHUB_WORKSPACE/web-decision-$RELEASE_VERSION.tgz"
       - name: Audit the packed runtime dependency
-        if: matrix.node == '24.0.0' && steps.release.outputs.version != '0.5.0'
+        if: matrix.node == '24.0.0' && steps.release.outputs.version != '0.5.0' && steps.release.outputs.version != '0.6.0'
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |

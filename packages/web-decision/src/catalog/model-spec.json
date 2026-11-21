@@ -197,7 +197,7 @@
         },
         "licenses": {
           "project": "Apache-2.0",
-          "modelTerms": "Apache-2.0 as declared by the pinned model card",
+          "modelTerms": "Apache-2.0 as declared by the pinned Mapika model card and Qwen base license",
           "modelCard": "https://huggingface.co/Mapika/decider-2b/tree/7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3"
         },
         "backend": {
@@ -257,10 +257,10 @@
           }
         },
         "verification": {
-          "currentBundleGpu": "pending",
+          "currentBundleGpu": "see-release-evidence",
           "currentBundleCpuWasm": "not-applicable",
           "currentBundleJavascript": "not-applicable",
-          "priorEvidence": "Private candidate was tested on Apple M4 Pro WebGPU. Final public-package and maximum-length evidence is pending."
+          "priorEvidence": "On M4 Pro Chromium WebGPU, seven text and image cases matched the pinned FP32 reference. A 32,904-token smoke test completed. Long-input latency and device requirements vary."
         }
       }
     }

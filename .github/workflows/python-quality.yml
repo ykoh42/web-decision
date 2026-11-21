@@ -82,6 +82,7 @@ jobs:
             scripts/ci/test_python_complexity_completion.py \
             scripts/ci/test_python_quality.py \
             scripts/ci/test_workflow_syntax.py \
+            scripts/mapika/test_build_release_tvm.py \
             scripts/test_safe_output.py
       - name: Enforce Python complexity completion
         run: uv run --locked --no-sync --only-group quality python scripts/ci/check_python_complexity_completion.py

@@ -62,7 +62,7 @@ function assertFormatSupported(format: ImageFormat): asserts format is DecodedIm
 }
 
 async function defaultWasmUrl(): Promise<URL> {
-  const asset = await import('@imagemagick/magick-wasm/magick.wasm?url');
+  const asset = await import('@imagemagick/magick-wasm/magick.wasm?url&no-inline');
   return new URL(asset.default, import.meta.url);
 }
 

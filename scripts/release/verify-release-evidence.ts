@@ -1668,7 +1668,13 @@ async function assertKananaCombinedCatalog(
   allowPending: boolean
 ): Promise<void> {
   const provenance = await assertCommittedPackageProvenance(workspaceRoot, {allowPending});
-  assert.deepEqual([...provenance.modelIds].sort(), KANANA_COMBINED_MODEL_IDS, 'Unexpected combined model provenance.');
+  const modelIds = [...provenance.modelIds].sort();
+  if (allowPending) {
+    for (const id of KANANA_COMBINED_MODEL_IDS)
+      assert.ok(modelIds.includes(id), `Combined candidate is missing model provenance for ${id}.`);
+  } else {
+    assert.deepEqual(modelIds, KANANA_COMBINED_MODEL_IDS, 'Unexpected combined model provenance.');
+  }
   assert.ok(
     provenance.pendingModelIds.every((id) => id === QWEN35_RELEASE_MODEL_ID),
     'Kanana provenance must be verified.'
@@ -1676,7 +1682,7 @@ async function assertKananaCombinedCatalog(
   const catalog = await loadInstalledCatalog(archive.installedRoot);
   assert.deepEqual(
     catalog.map(({modelId}) => modelId),
-    KANANA_COMBINED_MODEL_IDS,
+    modelIds,
     'Unexpected combined package catalog.'
   );
   const lockPath = 'packages/web-decision/src/catalog/artifacts.lock.json';

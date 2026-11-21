@@ -1,6 +1,6 @@
 {
   "name": "web-decision",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Curated browser-local decision models running on TVM",
   "type": "module",
   "exports": {
@@ -47,7 +47,17 @@
     "assets/qwen35/r19/qwen35-text-pointer.webgpu.wasm",
     "assets/qwen35/vision/fixture.json",
     "assets/qwen35/vision/weight-bindings.json",
-    "assets/qwen35/vision/qwen35-dynamic-vision.webgpu.wasm"
+    "assets/qwen35/vision/qwen35-dynamic-vision.webgpu.wasm",
+    "src/curated/mapika2b-types.d.ts",
+    "MAPIKA-NOTICE",
+    "MAPIKA-APACHE-LICENSE.txt",
+    "MAGICK-WASM-LICENSE",
+    "MAGICK-WASM-NOTICE",
+    "JSQUASH-JPEG-LICENSE",
+    "assets/mapika2b/manifest.json",
+    "assets/mapika2b/text.wasm",
+    "assets/mapika2b/text-bindings.json",
+    "assets/mapika2b/source-inventory.json"
   ],
   "sideEffects": false,
   "scripts": {

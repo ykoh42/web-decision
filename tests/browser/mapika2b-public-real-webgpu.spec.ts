@@ -2,8 +2,10 @@ import {createHash} from 'node:crypto';
 import {mkdtemp, readFile, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {chromium, expect, test as base, type BrowserContext} from '@playwright/test';
 import {verifyArchiveInstall} from '../../scripts/release/verify-release-evidence.ts';
+import {archiveIdentity, cleanSourceCommit} from '../../scripts/release/curated-gpu-evidence.mts';
 import type {Mapika2bResult} from '../../packages/web-decision/src/mapika2b/readout.mts';
 import {
   MAPIKA2B_DECIDER_REVISION,
@@ -12,6 +14,7 @@ import {
 } from '../../packages/web-decision/src/mapika2b/contract.mts';
 import {
   mapikaReferenceMismatches,
+  mapikaReleaseCases,
   type AcceptedMapikaCase,
   type MapikaAnswerReference,
   type MapikaReference
@@ -62,6 +65,7 @@ async function runPublicModel({id, inputs, offline}: {id: string; inputs: Accept
   if (!api.listModels().some((item) => item.modelId === id) || api.describeModel(id).modelId !== id)
     throw new Error('The public catalog does not expose Mapika.');
   const progress: Record<string, {loadedBytes: number; totalBytes: number}> = {};
+  const start = performance.now();
   const model = await api.loadDecisionModel({
     modelId: id,
     cache: true,
@@ -70,8 +74,10 @@ async function runPublicModel({id, inputs, offline}: {id: string; inputs: Accept
       progress[event.phase ?? 'unknown'] = {loadedBytes: event.loadedBytes, totalBytes: event.totalBytes};
     }
   });
+  const loadMs = performance.now() - start;
   try {
     const results = [];
+    const inferenceMs = [];
     for (const input of inputs) {
       const questions = new Map(
         input.questionIndex.map(([name]) => {
@@ -85,9 +91,11 @@ async function runPublicModel({id, inputs, offline}: {id: string; inputs: Accept
           return [name, question];
         })
       );
+      const startedInference = performance.now();
       results.push(JSON.parse(JSON.stringify(await model.systemOne({...input.request, questions}))) as Mapika2bResult);
+      inferenceMs.push(performance.now() - startedInference);
     }
-    return {modelId: model.modelId, cacheStatus: model.cacheStatus, results, progress};
+    return {modelId: model.modelId, cacheStatus: model.cacheStatus, results, progress, timings: {loadMs, inferenceMs}};
   } finally {
     await model.dispose();
   }
@@ -117,13 +125,17 @@ test('the installed public package loads Mapika by model ID and matches the sour
       revision: MAPIKA2B_REVISION,
       deciderRevision: MAPIKA2B_DECIDER_REVISION
     });
-  const cases = ['typed-packed', 'image-single'].map((id) => {
+  const cases = mapikaReleaseCases.map((id) => {
     const input = prepared.cases.find((item) => item.id === id);
     const expected = answers.cases.find((item) => item.id === id);
     if (!input || !expected) throw new Error('Missing public Mapika reference case: ' + id);
     return {id, input, expected: expected.result};
   });
   const snapshot = process.env.WEB_DECISION_MAPIKA2B_SNAPSHOT;
+  const release = process.env.WEB_DECISION_MAPIKA2B_RELEASE_GPU === '1';
+  if (release && snapshot) throw new Error('Release GPU evidence requires the live pinned checkpoint.');
+  const sourceRoot = fileURLToPath(new URL('../../', import.meta.url));
+  const sourceCommit = release ? cleanSourceCommit(sourceRoot) : null;
   if (snapshot) await routeMapikaSnapshot(page, snapshot, () => {});
   await page.addInitScript(() => {
     const cacheWindow = window as Window & {mapikaCacheErrors?: string[]};
@@ -194,14 +206,12 @@ test('the installed public package loads Mapika by model ID and matches the sour
   } finally {
     await fresh.close();
   }
+  if (release) expect(cleanSourceCommit(sourceRoot)).toBe(sourceCommit);
   const evidence = JSON.stringify({
-    archive: {
-      sha256: archive.archiveSha256,
-      packageTreeSha256: archive.packageTreeSha256,
-      bundleSha256: archive.bundleSha256,
-      packageName: archive.packageName,
-      packageVersion: archive.packageVersion
-    },
+    schemaVersion: 1,
+    sourceCommit,
+    source: snapshot ? 'local-snapshot' : 'pinned-upstream',
+    archive: archiveIdentity(archive),
     references: {
       preparedSha256: createHash('sha256').update(preparedBytes).digest('hex'),
       answersSha256: createHash('sha256').update(answerBytes).digest('hex')
@@ -210,10 +220,12 @@ test('the installed public package loads Mapika by model ID and matches the sour
     hardware,
     adapter,
     modelId,
+    cases: cases.map(({id}) => id),
     results: observed.results,
     modelCacheStatus: observed.cacheStatus,
     cacheStatus,
     progress: observed.progress,
+    timings: observed.timings,
     offline: {cacheStatus: offline.cacheStatus, results: offline.results, blockedRequests: blocked, bootstrapModules}
   });
   if (process.env.WEB_DECISION_MAPIKA2B_PUBLIC_REPORT)

@@ -24,6 +24,18 @@
     {
       "path": "scripts/strands/qwen35/qwen35_vm_shape_order.py",
       "sha256": "7fb6d5b810cd8d045aad81e695a0124990b3352950edbcb7160d2dd979ea27c8"
+    },
+    {
+      "path": "scripts/mapika/build_release_tvm.py",
+      "sha256": "4ade1500c8d5731af0a01d8927219a39327a16000e34d040b4423769a9561952"
+    },
+    {
+      "path": "scripts/strands/qwen35/build_fp32_vision_webgpu.py",
+      "sha256": "1795f51c336541572aba03f5c53156f247f3a1419dacf139242905fd644ef3fd"
+    },
+    {
+      "path": "scripts/kanana/build_evidence.py",
+      "sha256": "b14a11cdfe775ec2fb6811188b9d8231a9c04efcab432fe1b3e3b399e653a39a"
     }
   ],
   "config": [
@@ -56,5 +68,31 @@
     "wasmSha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
   },
   "onnxImportOrExportUsed": false,
-  "notes": "Text conversion uses repository-owned native TVM lowering. Vision uses the previously built Qwen3.5 graph and verifies the Mapika vision tensors against its bindings. Final release requires an independent rebuild from these pinned inputs."
+  "notes": "The native TVM conversion independently rebuilt both modules to the artifact lock byte digests. Vision reuses the Qwen3.5 graph after verifying its bindings against the Mapika vision tensors.",
+  "releaseEvidenceInputs": [
+    {
+      "path": "tests/browser/mapika2b-public-real-webgpu.spec.ts",
+      "sha256": "f1c9dea81bc80e862a1dc5c3d0935623b82697d256bca31ee2cd21a1f81b3c23"
+    },
+    {
+      "path": "tests/browser/mapika2b-evidence.mts",
+      "sha256": "d1a2d570cf843a1cd8b3d5138de4b4fc28433198af506f3c576734365c8e8bb3"
+    },
+    {
+      "path": "tests/browser/mapika2b-hardware.mts",
+      "sha256": "deca15b73fe589cad1561d30e5a7564ff5950ca2d6c63e895f527f2878aacc6a"
+    },
+    {
+      "path": "tests/browser/vite.config.ts",
+      "sha256": "cc45deecb79bfd0079020d6f56ccb5b033f10b46dbc9bfc14fb7bf11b8f4ddaf"
+    },
+    {
+      "path": "playwright.config.ts",
+      "sha256": "93d447c57975005605f9b5257688dcde3442e96aedc1f177235ee89e3225551d"
+    },
+    {
+      "path": "scripts/release/curated-gpu-evidence.mts",
+      "sha256": "8bc661664111c832d49c06b872fcdaaddffb285b6ef965859e4ecb3db4d4f490"
+    }
+  ]
 }

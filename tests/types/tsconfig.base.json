@@ -14,5 +14,12 @@
     "skipLibCheck": false,
     "types": []
   },
-  "files": ["public-api-consumer.ts", "consumer.ts", "kanana-consumer.ts", "strands-qwen35-consumer.ts", "pending-model-ids.ts"]
+  "files": [
+    "public-api-consumer.ts",
+    "consumer.ts",
+    "kanana-consumer.ts",
+    "strands-qwen35-consumer.ts",
+    "mapika2b-consumer.ts",
+    "pending-model-ids.ts"
+  ]
 }

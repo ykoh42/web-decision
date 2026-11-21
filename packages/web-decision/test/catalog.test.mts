@@ -39,7 +39,7 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog retains pinned TVM descriptors and keeps pending models private', () => {
+test('catalog retains pinned TVM descriptors and includes curated Mapika', () => {
   assert.deepEqual(MODEL_IDS, [
     'kanana-2-v-decide-3b-2611',
     'strands-decider-2b-qwen3.5-v1-2610',
@@ -100,8 +100,8 @@ test('catalog retains pinned TVM descriptors and keeps pending models private', 
   assert.equal(mapika, MODEL_CATALOG[2]);
   assert.equal(mapika.description.adapter, 'mapika2b');
   assert.equal(mapika.description.checkpoint.revision, '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3');
-  assert.equal(mapika.description.verification.currentBundleGpu, 'pending');
-  assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(mapika.modelId), false);
+  assert.equal(mapika.description.verification.currentBundleGpu, 'see-release-evidence');
+  assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(mapika.modelId), true);
 });
 
 test('public generated catalog and model ID type include verified models only', async () => {
@@ -119,8 +119,11 @@ test('public generated catalog and model ID type include verified models only', 
   );
 
   const publicTypeFile = await readFile(packageFile('src/curated/public-model-id.generated.d.ts'), 'utf8');
-  const modelType = approvedIds.length ? approvedIds.map((modelId) => "'" + modelId + "'").join(' | ') : 'never';
-  assert.equal(publicTypeFile, 'export type PublicModelId = ' + modelType + ';\n');
+  assert.match(publicTypeFile, /^export type PublicModelId =/u);
+  assert.deepEqual(
+    [...publicTypeFile.matchAll(/'([^']+)'/gu)].map((match) => match[1]),
+    approvedIds
+  );
 });
 
 test('catalog rejects empty, duplicate, non-TVM, and unimplemented adapter entries', async () => {

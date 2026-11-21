@@ -4,6 +4,26 @@ The gate connects a candidate npm archive, the package installed by the browser 
 
 Before collecting evidence, run `pnpm run check:model-provenance`. The verifier independently applies the same fail-closed check to the committed model spec, artifact lock, provenance manifest, and evidence files. The manifest has a source-code-pinned SHA-256; changing only a model status cannot approve it. Every entry must match the complete public model ID set and exact artifact-lock bytes. The verifier accepts only the canonical `packages/web-decision` source root, so the explicitly synthetic release-test fixture cannot be used for a release. A `pending` record produces an error that names the unresolved lineage or rights.
 
+## Mapika exact-package GPU evidence
+
+From a clean checkout, build and pack once. Install that tarball in a clean consumer and record its absolute paths using `WEB_DECISION_RELEASE_ARCHIVE`, `WEB_DECISION_RELEASE_PACKAGE_DIR`, and `WEB_DECISION_INSTALLED_BUNDLE`. Set `WEB_DECISION_MAPIKA2B_PUBLIC_REPORT` to a JSON path outside the checkout. Leave `WEB_DECISION_MAPIKA2B_SNAPSHOT` unset for release verification.
+
+```sh
+WEB_DECISION_REAL_GPU=1 WEB_DECISION_BROWSER_CHANNEL=chrome \
+  WEB_DECISION_MAPIKA2B_PUBLIC_GPU=1 WEB_DECISION_MAPIKA2B_RELEASE_GPU=1 \
+  pnpm exec playwright test tests/browser/mapika2b-public-real-webgpu.spec.ts \
+  --grep 'loads Mapika by model ID'
+
+# With the pinned native TVM Python compiler and Emscripten installed:
+python scripts/mapika/build_release_tvm.py --output-dir /release/mapika-tvm
+
+node --import tsx scripts/release/mapika-release-evidence.mts \
+  "$WEB_DECISION_RELEASE_ARCHIVE" "$WEB_DECISION_RELEASE_PACKAGE_DIR" \
+  "$WEB_DECISION_MAPIKA2B_PUBLIC_REPORT" /release/mapika-tvm/build-evidence.json
+```
+
+This gate checks the committed catalog and exact archive, both independent WASM rebuilds, seven text and image reference cases, and cached offline parity. The first load contacts the pinned Hugging Face checkpoint and writes about 4.5 GB to the browser profile. The Mapika gate covers only Mapika. Collect same-archive GPU evidence for the other included models before publishing.
+
 The expected model IDs and artifact digests come from the committed `packages/web-decision/src/catalog/model-spec.json` and `artifacts.lock.json`. The gate checks that the model spec, artifact lock, and pinned provenance manifest have the same non-empty ID set, that each manifest digest and static manifest path match the lock, and that the built and installed public APIs (`listModels()` and `describeModel(id)`) match those committed inputs. It does not read the legacy model registry. The source API is built from `src/curated/index.ts`; the verifier imports its built `dist/index.js` so the CLI also runs on Node 20, which cannot execute TypeScript source directly.
 
 The provenance gate checks committed evidence hashes and binds any declared upstream source to the artifact lock. It does not independently authenticate the reviewer, verify remote source claims, or prove that the reviewed documents are true; those remain human review responsibilities.

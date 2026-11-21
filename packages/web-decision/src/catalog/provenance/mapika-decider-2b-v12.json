@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "modelId": "mapika-decider-2b-v12",
-  "status": "pending",
+  "status": "verified",
   "sourceLineage": [
     {
       "role": "text",
@@ -63,27 +63,35 @@
         "path": "packages/web-decision/QWEN-APACHE-LICENSE.txt",
         "sha256": "50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32"
       }
+    },
+    {
+      "subject": "Mapika decider-ai v1.10.0 request rendering and result formatting adapted for web-decision",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Include the pinned upstream license and name the source revision and adaptations in MAPIKA-NOTICE."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/MAPIKA-APACHE-LICENSE.txt",
+        "sha256": "8489ebe7c8abe903fcdaace4080ef1660bba98ea44c8007923bfb91777945e37"
+      }
     }
   ],
   "distributionScope": "The candidate fetches pinned weight ranges from the Mapika repository. Its npm archive carries compiled assets and their metadata. The training datasets are separate from the delivered artifacts and retain their source terms.",
-  "unresolved": [
-    "Independently rebuild the final TVM assets from the pinned conversion recipe and toolchain.",
-    "Record final public-package WebGPU evidence and verify the v1.10.0 reference-code notices."
-  ],
   "conversion": {
     "repository": "https://github.com/apache/tvm",
     "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
     "recipe": {
       "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
-      "sha256": "ab1b2cefbd96356f2fa88a50bd16216808e1997decf08c9215379510e5a7a7ff"
+      "sha256": "4ebd17342ce8e98baa0a8089115388377b2772e48375a9c92b77b6e73aef17e6"
     },
     "config": {
       "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
-      "sha256": "ab1b2cefbd96356f2fa88a50bd16216808e1997decf08c9215379510e5a7a7ff"
+      "sha256": "4ebd17342ce8e98baa0a8089115388377b2772e48375a9c92b77b6e73aef17e6"
     },
     "toolchain": {
       "path": "packages/web-decision/src/catalog/provenance/mapika2b-conversion.json",
-      "sha256": "ab1b2cefbd96356f2fa88a50bd16216808e1997decf08c9215379510e5a7a7ff"
+      "sha256": "4ebd17342ce8e98baa0a8089115388377b2772e48375a9c92b77b6e73aef17e6"
     },
     "artifactLockSha256": "fe363005fc0e1f7914b7699564d61ff55fd1dd66b6ec6218444201c48afcbfae"
   }

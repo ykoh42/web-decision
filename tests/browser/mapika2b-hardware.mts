@@ -31,6 +31,7 @@ type CandidateAdapter = {
   readonly limits: {
     readonly maxBufferSize: number;
     readonly maxStorageBufferBindingSize: number;
+    readonly maxComputeWorkgroupStorageSize: number;
   };
 };
 
@@ -42,7 +43,16 @@ export async function readAdapter(page: Page) {
     const adapter = await gpu?.requestAdapter({powerPreference: 'high-performance'});
     if (!adapter) return null;
     const {vendor, architecture, device, description, isFallbackAdapter} = adapter.info;
-    const {maxBufferSize, maxStorageBufferBindingSize} = adapter.limits;
-    return {vendor, architecture, device, description, isFallbackAdapter, maxBufferSize, maxStorageBufferBindingSize};
+    const {maxBufferSize, maxStorageBufferBindingSize, maxComputeWorkgroupStorageSize} = adapter.limits;
+    return {
+      vendor,
+      architecture,
+      device,
+      description,
+      isFallbackAdapter,
+      maxBufferSize,
+      maxStorageBufferBindingSize,
+      maxComputeWorkgroupStorageSize
+    };
   });
 }

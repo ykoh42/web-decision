@@ -57,6 +57,16 @@ export interface MapikaReference<T> {
   readonly cases: readonly T[];
 }
 
+export const mapikaReleaseCases = [
+  'typed-packed',
+  'typed-independent',
+  'score-limit',
+  'choice-limit',
+  'choice-narrow-wide',
+  'image-repeated',
+  'image-single'
+] as const;
+
 export type MapikaBrowserResult =
   | {
       readonly status: 'accepted';

@@ -6,6 +6,7 @@
 | --- | --- |
 | Kanana 2 V Decide 3B | `kanana-2-v-decide-3b-2611` |
 | Strands Decider 2B Qwen3.5 | `strands-decider-2b-qwen3.5-v1-2610` |
+| Mapika Decider 2B v12 | `mapika-decider-2b-v12` |
 
 `listModels()` returns the models in the installed package. `describeModel(modelId)` shows the pinned checkpoint, input limits, and verification metadata.
 
@@ -41,6 +42,8 @@ For JSON state and criteria, safe integer `number` values other than negative ze
 The TVM graphs ship with the package. The loader fetches the pinned weight ranges required by the graphs, and decision inputs remain local. Use `cache: true` to save verified model assets and `offline: true` to use cached assets. Available storage and browser quotas determine what the browser can save. The application also needs to make its own code and pages available offline.
 
 The models require WebGPU. The catalog describes model-specific limits and the release record identifies the browser and hardware used for exact-package verification.
+
+Mapika uses about 4.5 GB of browser storage when all weights are cached. Check `model.cacheStatus` after loading to see whether the browser accepted the full cache. Its `systemOne()` accepts the pinned Decider request format, including `choice`, `score`, `noul`, and PNG or JPEG images.
 
 ## Kanana model terms
 

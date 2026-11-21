@@ -6,5 +6,6 @@ type ModelAdapterModule = Readonly<{
 
 export const APPROVED_ADAPTER_LOADERS: Readonly<Record<string, () => Promise<ModelAdapterModule>>> = Object.freeze({
   kanana: () => import('../curated/adapters/kanana.ts'),
+  mapika2b: () => import('../curated/adapters/mapika2b.ts'),
   'strands-qwen35': () => import('../curated/adapters/strands-qwen35.ts')
 });

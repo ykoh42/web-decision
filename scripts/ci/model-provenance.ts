@@ -6,7 +6,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = '029f0459ca7dd1215b94530060861905869427d6a761737f4925927a9029efdc';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = 'e2ce0a1c5db72b2ed71658c9e3167ea043bac0075af00b4d33501c3f8274fb57';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';
@@ -310,6 +310,7 @@ export async function validateCommittedEvidenceReference(
       path.startsWith('packages/web-decision/src/catalog/provenance/') ||
       [
         'packages/web-decision/KANANA-OPEN-LICENSE.txt',
+        'packages/web-decision/MAPIKA-APACHE-LICENSE.txt',
         'packages/web-decision/QWEN-APACHE-LICENSE.txt',
         'packages/web-decision/STRANDS-QWEN35-LICENSE.md'
       ].includes(path),
