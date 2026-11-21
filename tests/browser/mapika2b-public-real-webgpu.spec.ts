@@ -20,9 +20,33 @@ import {routeMapikaSnapshot} from './mapika2b-snapshot.mts';
 
 const modelId = 'mapika-decider-2b-v12';
 
+async function runPublicModel({id, inputs, offline}: {id: string; inputs: unknown[]; offline: boolean}) {
+  const api = window.webDecision as unknown as {
+    listModels(): readonly {modelId: string}[];
+    describeModel(id: string): {modelId: string};
+    loadDecisionModel(options: {modelId: string; cache: boolean; offline: boolean}): Promise<{
+      modelId: string;
+      systemOne(request: unknown): Promise<Mapika2bResult>;
+      dispose(): Promise<void>;
+    }>;
+  };
+  if (!api.listModels().some((item) => item.modelId === id) || api.describeModel(id).modelId !== id)
+    throw new Error('The public catalog does not expose Mapika.');
+  const model = await api.loadDecisionModel({modelId: id, cache: true, offline});
+  try {
+    const results = [];
+    for (const input of inputs)
+      results.push(JSON.parse(JSON.stringify(await model.systemOne(input))) as Mapika2bResult);
+    return {modelId: model.modelId, results};
+  } finally {
+    await model.dispose();
+  }
+}
+
 test('the installed public package loads Mapika by model ID and matches the source', async ({
   page,
-  browser
+  browser,
+  context
 }, testInfo) => {
   test.skip(process.env.WEB_DECISION_MAPIKA2B_PUBLIC_GPU !== '1', 'Enable the installed public package GPU test.');
   test.skip(testInfo.project.name !== 'chromium', 'This test requires Chromium WebGPU.');
@@ -58,34 +82,34 @@ test('the installed public package loads Mapika by model ID and matches the sour
   await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
   const adapter = await readAdapter(page);
   expect(adapter?.isFallbackAdapter).toBe(false);
-  const observed = await page.evaluate(
-    async ({id, inputs}) => {
-      const api = window.webDecision as unknown as {
-        listModels(): readonly {modelId: string}[];
-        describeModel(id: string): {modelId: string};
-        loadDecisionModel(options: {modelId: string; cache: boolean}): Promise<{
-          modelId: string;
-          systemOne(request: unknown): Promise<Mapika2bResult>;
-          dispose(): Promise<void>;
-        }>;
-      };
-      if (!api.listModels().some((item) => item.modelId === id) || api.describeModel(id).modelId !== id)
-        throw new Error('The public catalog does not expose Mapika.');
-      const model = await api.loadDecisionModel({modelId: id, cache: false});
-      try {
-        const results = [];
-        for (const input of inputs)
-          results.push(JSON.parse(JSON.stringify(await model.systemOne(input))) as Mapika2bResult);
-        return {modelId: model.modelId, results};
-      } finally {
-        await model.dispose();
-      }
-    },
-    {id: modelId, inputs: cases.map(({request}) => request)}
-  );
+  const inputs = cases.map(({request}) => request);
+  const observed = await page.evaluate(runPublicModel, {id: modelId, inputs, offline: false});
   expect(observed.modelId).toBe(modelId);
   for (const [index, item] of cases.entries())
     expect(mapikaReferenceMismatches(observed.results[index], item.expected), item.id).toEqual([]);
+  const fresh = await context.newPage();
+  const blocked: string[] = [];
+  const bootstrapModules: string[] = [];
+  let offline;
+  try {
+    await fresh.goto('/');
+    await fresh.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
+    const origin = new URL(fresh.url()).origin;
+    await fresh.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.origin === origin && /\.(?:m?js)$/u.test(url.pathname)) {
+        bootstrapModules.push(url.pathname);
+        return route.continue();
+      }
+      blocked.push(url.origin + url.pathname);
+      return route.abort();
+    });
+    offline = await fresh.evaluate(runPublicModel, {id: modelId, inputs, offline: true});
+    expect(blocked).toEqual([]);
+    expect(offline).toEqual(observed);
+  } finally {
+    await fresh.close();
+  }
   await testInfo.attach('mapika-public-evidence.json', {
     body: JSON.stringify({
       archive: {
@@ -103,7 +127,8 @@ test('the installed public package loads Mapika by model ID and matches the sour
       hardware,
       adapter,
       modelId,
-      results: observed.results
+      results: observed.results,
+      offline: {results: offline.results, blockedRequests: blocked, bootstrapModules}
     }),
     contentType: 'application/json'
   });
