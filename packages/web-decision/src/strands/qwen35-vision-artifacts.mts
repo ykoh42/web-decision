@@ -34,6 +34,7 @@ export interface OpenQwen35VisionArtifactOptions {
   readonly offline?: boolean | undefined;
   readonly signal?: AbortSignal | null | undefined;
   readonly onBytes?: ((bytes: number) => void) | undefined;
+  readonly onCacheStatus?: ((cached: boolean) => void) | undefined;
 }
 
 function invalid(message: string): WebDecisionError {
@@ -168,12 +169,13 @@ export async function openPinnedQwen35VisionArtifacts({
   cache,
   offline = false,
   signal,
-  onBytes
+  onBytes,
+  onCacheStatus
 }: OpenQwen35VisionArtifactOptions = {}): Promise<Qwen35VisionArtifacts> {
   if (typeof offline !== 'boolean')
     throw new WebDecisionError('INVALID_INPUT', 'Invalid Qwen3.5 vision artifact options.');
   signal?.throwIfAborted();
-  const options = {cache, offline, signal, onBytes};
+  const options = {cache, offline, signal, onBytes, onCacheStatus};
   const [fixtureBytes, wasmBytes, bindingBytes] = await Promise.all([
     readAsset(fixtureUrl, 'fixture.json', QWEN35_VISION_FIXTURE_PIN, options),
     readAsset(wasmUrl, 'qwen35-dynamic-vision.webgpu.wasm', QWEN35_VISION_WASM_PIN, options),

@@ -41,6 +41,19 @@ test(
       const artifacts = await packaged.openPackagedMapika2bText();
       assert.equal(artifacts.textWasm.byteLength, graph.byteLength);
       assert.equal(artifacts.textBindings.length, 319);
+      const statuses: boolean[] = [];
+      await packaged.openPackagedMapika2bText({
+        cache: {
+          async match() {
+            return undefined;
+          },
+          async put() {
+            throw new DOMException('Quota exceeded', 'QuotaExceededError');
+          }
+        },
+        onCacheStatus: (cached) => statuses.push(cached)
+      });
+      assert.deepEqual(statuses, [false, false]);
       corrupt = true;
       await assert.rejects(packaged.openPackagedMapika2bText(), /integrity check failed/iu);
     } finally {

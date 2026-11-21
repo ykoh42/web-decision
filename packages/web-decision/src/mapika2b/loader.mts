@@ -32,6 +32,7 @@ const tokenizerAsset = {
 
 interface Mapika2bCandidateOptions extends Mapika2bSourceOpenOptions, Mapika2bTemperatureOptions {
   readonly onProgress?: ((progress: ModelProgress) => void) | undefined;
+  readonly onCacheStatus?: ((cached: boolean) => void) | undefined;
   readonly limits?: Partial<Mapika2bLimits> | undefined;
   readonly artifacts: {
     readonly textWasm: Uint8Array;
@@ -78,9 +79,10 @@ async function cacheModelSource(
   source: Mapika2bSource,
   cache: AssetCache,
   signal: AbortSignal,
-  onProgress?: (progress: ModelProgress) => void
-): Promise<void> {
-  await cacheMapika2bVisionAssets({cache, signal});
+  onProgress?: (progress: ModelProgress) => void,
+  onCacheStatus?: (cached: boolean) => void
+): Promise<boolean> {
+  await cacheMapika2bVisionAssets({cache, signal, onCacheStatus});
   let loadedBytes = 0;
   await source.prefetchRequiredRanges({
     signal,
@@ -94,7 +96,7 @@ async function cacheModelSource(
       });
     }
   });
-  await source.commit({signal});
+  return source.commit({signal});
 }
 
 async function initText(
@@ -144,13 +146,35 @@ async function initText(
         options.onProgress?.({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes, phase: 'model-assets'});
       }
     );
+    let cacheComplete = false;
     if (options.cache && !options.offline)
-      await cacheModelSource(source, options.cache, watch.signal, options.onProgress);
+      cacheComplete = await cacheModelSource(
+        source,
+        options.cache,
+        watch.signal,
+        options.onProgress,
+        options.onCacheStatus
+      );
+    else if (options.cache && options.offline) {
+      try {
+        await cacheMapika2bVisionAssets({
+          cache: options.cache,
+          offline: true,
+          signal: watch.signal,
+          onCacheStatus: options.onCacheStatus
+        });
+        cacheComplete = true;
+      } catch (cause) {
+        watch.signal.throwIfAborted();
+        if (!(cause instanceof WebDecisionError) || cause.code !== 'ASSET_LOAD_FAILED') throw cause;
+        options.onCacheStatus?.(false);
+      }
+    }
     watch.signal.throwIfAborted();
     assertLoadActive(lifecycle);
     if (uncaptured.length) throw new Error(uncaptured[0]);
     watch.close();
-    return {runtime, gpu, device, main, parameters, lifecycle, uncaptured, dispose};
+    return {runtime, gpu, device, main, parameters, lifecycle, uncaptured, cacheComplete, dispose};
   } catch (cause) {
     dispose();
     throw cause;
@@ -171,7 +195,7 @@ export async function loadMapika2bCandidate(options: Mapika2bCandidateOptions) {
     weights.finishLoading();
     const {cache, offline} = options;
     let vision: ReturnType<typeof openMapika2bVision> | undefined;
-    return createMapika2bSession({
+    const session = createMapika2bSession({
       tokenizer: candidate.tokenizer,
       temperatures,
       limits,
@@ -195,6 +219,7 @@ export async function loadMapika2bCandidate(options: Mapika2bCandidateOptions) {
         }
       }
     });
+    return Object.freeze({...session, cacheComplete: textRunner.cacheComplete});
   } catch (cause) {
     text?.dispose();
     source?.dispose();

@@ -200,3 +200,25 @@ test('a failed concurrent prefetch cannot commit and can be retried', async (t) 
   t.after(() => offline.dispose());
   assert.deepEqual(await offline.readEmbeddingRows([0]), Uint16Array.of(10, 11, 12, 13));
 });
+
+test('storage quota failure keeps online reads usable without marking offline data complete', async (t) => {
+  const assets = fixture();
+  rangeTransport(t, assets);
+  const cache: AssetCache = {
+    async match() {
+      return undefined;
+    },
+    async put() {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    }
+  };
+  const source = await openMapika2bSourceFromInventory(assets.inventory, assets.sha, base, {cache});
+  t.after(() => source.dispose());
+  await source.prefetchRequiredRanges();
+  assert.equal(await source.commit(), false);
+  assert.deepEqual(await source.readEmbeddingRows([0]), Uint16Array.of(10, 11, 12, 13));
+  await assert.rejects(
+    openMapika2bSourceFromInventory(assets.inventory, assets.sha, base, {cache, offline: true}),
+    /complete verified model/u
+  );
+});

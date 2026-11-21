@@ -15,10 +15,7 @@ interface MapikaOptions extends Mapika2bTemperatureOptions {
   readonly limits?: Partial<Mapika2bLimits>;
 }
 
-/** Load the pinned Mapika graph and checkpoint through the curated model interface. */
-export async function loadModel(rawOptions: object, description: ModelDescription) {
-  if (description.modelId !== MODEL_ID)
-    throw new WebDecisionError('INVALID_ASSET', 'Mapika adapter received a different model descriptor.');
+function validateOptions(rawOptions: object): MapikaOptions {
   const options = rawOptions as MapikaOptions;
   if (options.cache !== undefined && typeof options.cache !== 'boolean')
     throw new WebDecisionError('INVALID_INPUT', 'cache must be a boolean.');
@@ -28,8 +25,30 @@ export async function loadModel(rawOptions: object, description: ModelDescriptio
     throw new WebDecisionError('INVALID_INPUT', 'offline requires the model cache.');
   if (options.onProgress !== undefined && typeof options.onProgress !== 'function')
     throw new WebDecisionError('INVALID_INPUT', 'onProgress must be a function.');
+  return options;
+}
+
+function modelCacheStatus(enabled: boolean | undefined, available: boolean, complete: boolean) {
+  if (enabled === false) return 'disabled';
+  if (!available) return 'unavailable';
+  return complete ? 'complete' : 'incomplete';
+}
+
+/** Load the pinned Mapika graph and checkpoint through the curated model interface. */
+export async function loadModel(rawOptions: object, description: ModelDescription) {
+  if (description.modelId !== MODEL_ID)
+    throw new WebDecisionError('INVALID_ASSET', 'Mapika adapter received a different model descriptor.');
+  const options = validateOptions(rawOptions);
   const cache = await openAssetCache(options.cache !== false, options.signal);
-  const assetOptions = {cache, offline: options.offline ?? false, signal: options.signal};
+  let assetCacheComplete = true;
+  const assetOptions = {
+    cache,
+    offline: options.offline ?? false,
+    signal: options.signal,
+    onCacheStatus(cached: boolean) {
+      if (!cached) assetCacheComplete = false;
+    }
+  };
   const artifacts = await openPackagedMapika2bText(assetOptions);
   const session = await loadMapika2bCandidate({
     ...assetOptions,
@@ -39,5 +58,6 @@ export async function loadModel(rawOptions: object, description: ModelDescriptio
     ...(options.temperature === undefined ? {} : {temperature: options.temperature}),
     ...(options.temperatureByType === undefined ? {} : {temperatureByType: options.temperatureByType})
   });
-  return {modelId: MODEL_ID, description, systemOne: session.systemOne, dispose: session.dispose};
+  const cacheStatus = modelCacheStatus(options.cache, !!cache, session.cacheComplete && assetCacheComplete);
+  return {modelId: MODEL_ID, description, cacheStatus, systemOne: session.systemOne, dispose: session.dispose};
 }

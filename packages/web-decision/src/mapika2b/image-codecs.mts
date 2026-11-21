@@ -1,7 +1,7 @@
 import {readVerifiedAsset, type AssetFileMetadata} from '../assets.js';
 import type {OpenMapika2bVisionOptions} from './vision-runtime.mts';
 
-type CodecAssetOptions = Pick<OpenMapika2bVisionOptions, 'cache' | 'offline' | 'signal'>;
+type CodecAssetOptions = Pick<OpenMapika2bVisionOptions, 'cache' | 'offline' | 'signal' | 'onCacheStatus'>;
 
 // Locked browser decoder artifacts from @jsquash/jpeg 1.6.0 and @imagemagick/magick-wasm 0.0.46.
 const MOZJPEG = {bytes: 166_470, sha256: 'a7c4b12169817e779ff4af137981393ae924944e167ad1bd95747c9199162d3e'};

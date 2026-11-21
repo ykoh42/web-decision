@@ -22,6 +22,7 @@ export interface OpenMapika2bVisionOptions {
   readonly cache?: AssetCache | null | undefined;
   readonly offline?: boolean | undefined;
   readonly signal?: AbortSignal | null | undefined;
+  readonly onCacheStatus?: ((cached: boolean) => void) | undefined;
 }
 
 export interface Mapika2bVision {
@@ -71,11 +72,16 @@ async function requestVisionDevice(gpu: GPU | undefined, signal?: AbortSignal): 
 /** Fill the packaged graph cache while the native weights are prefetched separately. */
 export async function cacheMapika2bVisionAssets({
   cache,
-  signal
-}: Pick<OpenMapika2bVisionOptions, 'cache' | 'signal'>): Promise<void> {
+  offline,
+  signal,
+  onCacheStatus
+}: Pick<OpenMapika2bVisionOptions, 'cache' | 'offline' | 'signal' | 'onCacheStatus'>): Promise<void> {
   signal?.throwIfAborted();
   const {openPinnedQwen35VisionArtifacts} = await import('../strands/qwen35-vision-artifacts.mts');
-  await Promise.all([openPinnedQwen35VisionArtifacts({cache, signal}), cacheMapika2bImageCodecs({cache, signal})]);
+  await Promise.all([
+    openPinnedQwen35VisionArtifacts({cache, offline, signal, onCacheStatus}),
+    cacheMapika2bImageCodecs({cache, offline, signal, onCacheStatus})
+  ]);
 }
 
 /** Run the identical pinned Qwen3.5 visual tower with Mapika's image processor and checkpoint. */

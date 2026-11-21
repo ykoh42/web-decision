@@ -11,6 +11,7 @@ interface AssetOptions {
   readonly cache?: AssetCache | null | undefined;
   readonly offline?: boolean | undefined;
   readonly signal?: AbortSignal | null | undefined;
+  readonly onCacheStatus?: ((cached: boolean) => void) | undefined;
 }
 
 function readPackagedAsset(url: string, pin: AssetFileMetadata, options: AssetOptions): Promise<ArrayBuffer> {

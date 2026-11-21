@@ -78,6 +78,8 @@ export interface Mapika2bSystemOneResult {
 export interface Mapika2bDecisionModel<Id extends string = string> {
   readonly modelId: Id;
   readonly description: Omit<ModelDescription, 'modelId'> & Readonly<{modelId: Id}>;
+  /** Cache state when loading finished. Browser storage can be evicted later. */
+  readonly cacheStatus: 'complete' | 'incomplete' | 'disabled' | 'unavailable';
   systemOne(request: Mapika2bSystemOneRequest): Promise<Mapika2bSystemOneResult>;
   dispose(): Promise<void>;
 }
