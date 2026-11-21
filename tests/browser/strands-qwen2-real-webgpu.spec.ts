@@ -253,7 +253,19 @@ async function inspectExactQwenPackage() {
   const visionArtifactsSource = visionArtifactsChunk.toString('utf8');
   expect(adapterSource).toContain(basename(visionArtifactsChunkPath));
   expect(visionArtifactsSource).toContain('openPinnedQwen35VisionArtifacts');
-  const mainCallSites = assertQwen35TvmMainCallSites(adapterSource, adapterSource, tvmRuntimeChunk.toString('utf8'));
+  const sharedVisionChunk = packageEvidence.archive.archiveFiles.find((path) =>
+    /^dist\/qwen35-vision-runtime-[^/]+\.js$/u.test(path)
+  );
+  let visionRunnerSource = adapterSource;
+  if (sharedVisionChunk) {
+    expect(adapterSource).toContain(basename(sharedVisionChunk));
+    visionRunnerSource = await readFile(resolve(packageEvidence.installedRoot, sharedVisionChunk), 'utf8');
+  }
+  const mainCallSites = assertQwen35TvmMainCallSites(
+    adapterSource,
+    visionRunnerSource,
+    tvmRuntimeChunk.toString('utf8')
+  );
   return {packageEvidence, installedBundle, installedBundleSha256, mainCallSites};
 }
 
