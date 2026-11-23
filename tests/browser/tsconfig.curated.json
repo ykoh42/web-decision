@@ -24,6 +24,7 @@
   "files": [
     "../../packages/web-decision/src/runtime/tvm-source.d.ts",
     "harness.ts",
+    "gemma-v2-public-real-webgpu.spec.ts",
     "curated-harness.spec.ts",
     "kanana-curated-real-webgpu.spec.ts",
     "kanana-curated-offline-text-real-webgpu.spec.ts",

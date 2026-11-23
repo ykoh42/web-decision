@@ -28,6 +28,30 @@ The expected model IDs and artifact digests come from the committed `packages/we
 
 The provenance gate checks committed evidence hashes and binds any declared upstream source to the artifact lock. It does not independently authenticate the reviewer, verify remote source claims, or prove that the reviewed documents are true; those remain human review responsibilities.
 
+## Gemma 4 v2 exact-package evidence preparation
+
+The public producer requires a clean source checkout and an installed combined archive with verified provenance. It records the archive, source, graph response, physical hardware, live checkpoint range, six CPU-reference cases, image recovery, and offline inference. The official subset includes rows 0–299 and 430–489 and excludes rows 300–429. The producer embeds both the record and the code probabilities in the Playwright JSON report.
+
+With the release archive installed in a clean consumer and the exact upstream `golden_vectors.jsonl` available, run the producer with the paths set below. Save the JSON report outside the checkout.
+
+```bash
+WEB_DECISION_REAL_GPU=1 \
+WEB_DECISION_BROWSER_NAME=chromium \
+WEB_DECISION_GEMMA_V2_PUBLIC_EVIDENCE=1 \
+WEB_DECISION_RELEASE_ARCHIVE="$archive" \
+WEB_DECISION_RELEASE_ARCHIVE_SHA256="$archive_sha256" \
+WEB_DECISION_INSTALLED_BUNDLE="$installed_package/dist/index.js" \
+WEB_DECISION_GEMMA_V2_OFFICIAL_GOLDEN="$golden" \
+PLAYWRIGHT_JSON_OUTPUT_NAME="$playwright_json" \
+pnpm exec playwright test --config=playwright.config.ts --reporter=json \
+  tests/browser/gemma-v2-public-real-webgpu.spec.ts
+
+node --import tsx scripts/release/strands-gemma4-v2-release-evidence.mts \
+  "$archive" "$installed_package" "$playwright_json" "$tvm_build_evidence" "$golden"
+```
+
+System One exposes four-decimal probabilities. The verifier recomputes the pinned upstream thresholds on the recorded public responses and reports differences for the six exact CPU cases. Release approval remains pending evidence for the underlying raw code probabilities from that same combined archive.
+
 ## Kanana exact-package GPU evidence
 
 The Kanana gate is separate from the Kev matrix and accepts only the npm-packed `web-decision@0.4.0` archive pinned in [release-evidence-policy.json](./release-evidence-policy.json). The policy binds the archive SHA-256, Kanana static manifest, checkpoint revision and digest, all five manifest file hashes, and the text and image reference fixtures. The text test checks its recorded TVM WebGPU output against the pinned Python/PyTorch fixture. The image test checks the selected option and probabilities against its pinned Python/PyTorch fixture. Every record carries the installed archive and entrypoint digests, exact text and vision Wasm hashes, the `navigator.gpu.requestAdapter().info` observation, adapter features and limits, and the model output. The policy pins the source hashes of all four GPU test files and their evidence helpers; release verification requires those files to match committed `HEAD` bytes.
