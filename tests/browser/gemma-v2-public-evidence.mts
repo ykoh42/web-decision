@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type {RawGemmaFrame} from './gemma-v2-raw-capture.mjs';
 import {sha256} from '../../scripts/release/curated-gpu-evidence.mjs';
 import {
   GEMMA_V2_OFFICIAL_GOLDEN_SHA256,
@@ -21,7 +22,10 @@ type GoldenRequest = {
   state_ids: number[];
   questions: Record<string, {codes: string[]; question_ids: number[]}>;
 };
-type PublicAnswer = {type: 'noul'; noul: number} | {type: 'choice' | 'score'; probabilities: Record<string, number>};
+type PublicAnswer =
+  | {type: 'noul'; noul: number}
+  | {type: 'choice'; choice: string; probabilities: Record<string, number>}
+  | {type: 'score'; probabilities: Record<string, number>};
 export type PublicGemmaV2Result = {
   model: string;
   answers: Record<string, PublicAnswer>;
@@ -64,11 +68,36 @@ function codeProbabilities(question: Question, answer: PublicAnswer) {
   return [(10_000 - Math.round(answer.noul * 10_000)) / 10_000, answer.noul];
 }
 
-export function gemmaV2PublicCodeRow(line: number, golden: GoldenRequest, result: PublicGemmaV2Result) {
+function compareRawToPublic(answer: PublicAnswer, reported: number[], frame: RawGemmaFrame): number[] {
+  const raw = frame.probabilities;
+  assert.equal(raw.length, frame.options.length);
+  // This only checks four-decimal public serialization against the same scorer frame.
+  // The upstream conformance thresholds apply to the raw array without adjustment.
+  const roundingBound = 0.00005 + 2 * Number.EPSILON;
+  if (answer.type === 'noul') assert.ok(Math.abs(raw[1]! - answer.noul) <= roundingBound);
+  else {
+    assert.ok(raw.every((value, index) => Math.abs(value - reported[index]!) <= roundingBound));
+    if (answer.type === 'choice') assert.equal(answer.choice, frame.options[raw.indexOf(Math.max(...raw))]);
+  }
+  return raw;
+}
+
+export function gemmaV2PublicCodeRow(
+  line: number,
+  golden: GoldenRequest,
+  result: PublicGemmaV2Result,
+  rawFrames?: readonly RawGemmaFrame[]
+) {
   const questions = Object.entries(golden.request.questions);
   const names = questions.map(([name]) => name);
   assert.deepEqual(Object.keys(golden.questions), names, 'Official question order differs.');
   assert.deepEqual(Object.keys(result.answers), names, 'Public question order differs.');
+  if (rawFrames)
+    assert.deepEqual(
+      rawFrames.map(({name}) => name),
+      names,
+      'Raw Gemma question identities differ.'
+    );
   const inputTokens = Object.values(golden.questions).reduce(
     (total, {question_ids}) => total + question_ids.length,
     golden.state_ids.length
@@ -77,11 +106,17 @@ export function gemmaV2PublicCodeRow(line: number, golden: GoldenRequest, result
   return {
     line,
     questions: Object.fromEntries(
-      questions.map(([name, question]) => {
+      questions.map(([name, question], index) => {
         const {codes} = golden.questions[name]!;
         const answer = result.answers[name];
         assert.ok(answer);
-        const probabilities = codeProbabilities(question, answer);
+        const reported = codeProbabilities(question, answer);
+        const raw = rawFrames?.[index];
+        if (raw) {
+          assert.deepEqual(raw.options, labels(question), 'Raw Gemma scorer option order differs.');
+          assert.deepEqual(raw.codes, codes, 'Raw Gemma scorer code order differs.');
+        }
+        const probabilities = raw ? compareRawToPublic(answer, reported, raw) : reported;
         assert.equal(probabilities.length, codes.length);
         assert.ok(probabilities.every((value) => Number.isFinite(value) && value >= 0 && value <= 1));
         return [name, {codes, probabilities}];

@@ -168,7 +168,7 @@ test('public Gemma vectors preserve ordered labels and count all question tokens
     model: 'strands-decider-e2b-gemma4-v2-2611',
     usage: {input_tokens: 7, output_tokens: 3},
     answers: {
-      topic: {type: 'choice' as const, probabilities: {red: 0.8, blue: 0.2}},
+      topic: {type: 'choice' as const, choice: 'red', probabilities: {red: 0.8, blue: 0.2}},
       accepted: {type: 'noul' as const, noul: 0.9999},
       urgency: {type: 'score' as const, probabilities: {'0': 0.6, '1': 0.4}}
     }
@@ -186,7 +186,7 @@ test('public Gemma vectors preserve ordered labels and count all question tokens
     () =>
       gemmaV2PublicCodeRow(3, golden, {
         ...observed,
-        answers: {...observed.answers, topic: {type: 'choice', probabilities: {blue: 0.2, red: 0.8}}}
+        answers: {...observed.answers, topic: {type: 'choice', choice: 'red', probabilities: {blue: 0.2, red: 0.8}}}
       }),
     /labels or order differ/u
   );

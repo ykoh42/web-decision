@@ -50,7 +50,7 @@ node --import tsx scripts/release/strands-gemma4-v2-release-evidence.mts \
   "$archive" "$installed_package" "$playwright_json" "$tvm_build_evidence" "$golden"
 ```
 
-System One exposes four-decimal probabilities. The verifier recomputes the pinned upstream thresholds on the recorded public responses and reports differences for the six exact CPU cases. Release approval remains pending evidence for the underlying raw code probabilities from that same combined archive.
+Add `WEB_DECISION_GEMMA_V2_RAW_CAPTURE=1` to observe unrounded values in the installed scorer with Chromium’s debugger. This mode serves archive JavaScript and the pinned tokenizer without development-server transforms. It fails if Chromium parses different bytes, moves the exact scorer breakpoint, or records a different set of questions. The verifier recomputes the upstream thresholds and the six CPU-reference differences. Release approval remains pending review of the exact combined run.
 
 ## Kanana exact-package GPU evidence
 

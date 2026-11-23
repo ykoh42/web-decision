@@ -17,6 +17,8 @@ import {
   GEMMA_V2_CPU_REFERENCE_SHA256,
   validateGemmaV2CpuReferences
 } from '../../scripts/release/strands-gemma4-v2-source-reference.mjs';
+import {routeGemmaExactArchive, verifyGemmaArchiveResources} from './gemma-v2-exact-archive-page.mjs';
+import {findGemmaV2ScorerPin, gemmaV2RawProbabilityEncoding, openGemmaV2RawCapture} from './gemma-v2-raw-capture.mjs';
 import {collectHardwareEvidence} from './kev06-release-evidence.ts';
 import {readAdapter, readHardwareReport} from './mapika2b-hardware.mts';
 import {
@@ -146,6 +148,11 @@ async function checkOffline(page: Page, reference: CpuCase, expected: PublicGemm
   return {cacheStatus: 'complete', blockedRequests, result: result.answers[reference.questionName]};
 }
 
+function requiredConfiguredBaseURL(baseURL: string | undefined): string {
+  if (!baseURL) throw new Error('The Gemma public evidence test needs a configured base URL.');
+  return baseURL;
+}
+
 function isPinnedRangeResponse(response: Response): boolean {
   if (response.status() !== 206) return false;
   let request = response.request();
@@ -156,6 +163,28 @@ function isPinnedRangeResponse(response: Response): boolean {
     request = source;
   }
 }
+
+type CorpusRequests = ReturnType<typeof readGemmaV2PublicGoldenRequests>;
+type RawCapture = Awaited<ReturnType<typeof openGemmaV2RawCapture>>;
+
+async function collectCorpus(page: Page, requests: CorpusRequests, raw?: RawCapture) {
+  const vectors: string[] = [];
+  try {
+    for (const {line, golden} of requests) {
+      const invoke = () => callSystemOne(page, golden.request);
+      const observed = raw
+        ? await raw.capture(Object.keys(golden.questions), invoke)
+        : {result: await invoke(), frames: undefined};
+      expect(observed.result.model).toBe(modelId);
+      vectors.push(JSON.stringify(gemmaV2PublicCodeRow(line, golden, observed.result, observed.frames)));
+    }
+    return {bytes: Buffer.from(vectors.join('\n') + '\n'), rawEvidence: raw?.evidence()};
+  } finally {
+    await raw?.close();
+  }
+}
+
+test.use({serviceWorkers: 'block'});
 
 test(gemmaV2PublicTitle, async ({page, browser}, info) => {
   test.skip(process.env.WEB_DECISION_GEMMA_V2_PUBLIC_EVIDENCE !== '1', 'Enable exact public Gemma v2 evidence.');
@@ -176,7 +205,17 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
   expect(hardware.status).toBe('Hardware accelerated');
   expect(hardware.renderer).toBeTruthy();
   const host = collectHardwareEvidence();
-  await page.goto('/');
+  const rawMode = process.env.WEB_DECISION_GEMMA_V2_RAW_CAPTURE === '1';
+  const origin = new URL(requiredConfiguredBaseURL(info.project.use.baseURL)).origin;
+  const exactPage = rawMode
+    ? await routeGemmaExactArchive(
+        page.context(),
+        origin,
+        verified.archive.installedRoot,
+        verified.archive.archiveFiles
+      )
+    : undefined;
+  await page.goto(exactPage?.url() ?? '/');
   await page.waitForFunction(() => typeof window.webDecision?.loadDecisionModel === 'function');
   const adapter = await readAdapter(page);
   expect(adapter?.isFallbackAdapter).toBe(false);
@@ -198,13 +237,11 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
     expect(sha256(await receivedGraph.body())).toBe(graphPin.sha256);
     expect(receivedUpstream.request().headers().range).toMatch(/^bytes=\d+-\d+$/u);
 
-    const vectors: string[] = [];
-    for (const {line, golden} of requests) {
-      const result = await callSystemOne(page, golden.request);
-      expect(result.model).toBe(modelId);
-      vectors.push(JSON.stringify(gemmaV2PublicCodeRow(line, golden, result)));
-    }
-    const vectorBytes = Buffer.from(vectors.join('\n') + '\n');
+    const scorer = exactPage
+      ? await findGemmaV2ScorerPin(verified.archive.installedRoot, verified.archive.archiveFiles)
+      : undefined;
+    const raw = scorer && exactPage ? await openGemmaV2RawCapture(page, exactPage.url(scorer.path), scorer) : undefined;
+    const {bytes: vectorBytes, rawEvidence} = await collectCorpus(page, requests, raw);
     const metrics = inspectGemma4V2Conformance(golden, vectorBytes, {
       bytes: selection,
       sha256: GEMMA_V2_OFFICIAL_SUBSET_SHA256
@@ -222,6 +259,15 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
       [cpuPath, GEMMA_V2_CPU_REFERENCE_SHA256]
     ] as const)
       expect(sha256(await readFile(path))).toBe(hash);
+    const transport = exactPage?.evidence();
+    if (rawEvidence && transport) {
+      expect(transport.tokenizerServed).toBe(true);
+      await verifyGemmaArchiveResources(after.archive.installedRoot, after.archive.archiveFiles, transport.served, [
+        'dist/index.js',
+        rawEvidence.path,
+        'dist/gemma4-v2/graph.wasm'
+      ]);
+    }
     const report = {
       schemaVersion: 1,
       modelId,
@@ -243,7 +289,11 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
       offline,
       recovery: 'passed',
       cleanup: 'passed',
-      conformance: {probabilityEncoding: gemmaV2PublicProbabilityEncoding, ...metrics}
+      conformance: {
+        probabilityEncoding: rawEvidence ? gemmaV2RawProbabilityEncoding : gemmaV2PublicProbabilityEncoding,
+        ...metrics
+      },
+      ...(rawEvidence && transport ? {rawCapture: {...rawEvidence, ...transport}} : {})
     };
     await info.attach(gemmaV2PublicVectorsAttachment, {body: vectorBytes, contentType: 'application/x-ndjson'});
     await info.attach(gemmaV2PublicRunAttachment, {body: JSON.stringify(report), contentType: 'application/json'});
