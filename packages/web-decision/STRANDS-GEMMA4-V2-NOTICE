@@ -1,0 +1,21 @@
+Strands Decider v2 E2B
+
+Derived from google/gemma-4-E2B-it, revision 3e22461f65e89153144f8adb70e3b8c2cc9845a7, under the Apache License 2.0
+(https://ai.google.dev/gemma/docs/gemma_4_license).
+
+Modifications: the text decoder was fine-tuned, and a decision readout of 255 rows, one per
+answer code, takes the place of the generation output layer; it started from the tied
+output-embedding rows of those codes. Every layer reads the prompt with the decision
+interface's prefix-bidirectional attention. Every other part of the base model, its image
+and audio input layers where it has them, is the base model's, unchanged.
+
+Gemma is a trademark of Google LLC. No affiliation with or endorsement by Google is implied.
+
+web-decision adapts the Strands decision protocol for browser inference and builds
+model-specific TVM WebGPU graphs and score tables. The pinned model weights are
+retrieved separately from the Strands Agents Hugging Face repository. The Apache
+License 2.0 text is included in STRANDS-GEMMA4-V2-LICENSE.
+
+Model and source revisions:
+https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v2-2611/tree/a5f32ea1bffe2e91c25c0c641d444e8115e28212
+https://github.com/strands-labs/strands-decider/tree/c3c845782095b31d438963ac2afcdfe41b49f757

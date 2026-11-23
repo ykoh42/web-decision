@@ -33,6 +33,10 @@ id_ed25519*
 **/*.onnx
 **/*.onnx_data
 **/*.bin
+# Pinned Gemma v2 preprocessing and scoring assets are required by model tests.
+!packages/web-decision/assets/strands-gemma4-v2/local.bin
+!packages/web-decision/assets/strands-gemma4-v2/global.bin
+!packages/web-decision/assets/strands-gemma4-v2/scoring.bin
 **/*.safetensors
 **/*.gguf
 **/*.pth
