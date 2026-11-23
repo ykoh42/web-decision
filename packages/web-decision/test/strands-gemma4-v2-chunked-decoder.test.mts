@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {runGemma4V2ChunkedDecoder} from '../src/strands/gemma4-v2-chunked-decoder.mjs';
 
-function setup(options: {shared?: boolean; abortAtSync?: number; failAtSync?: number} = {}) {
+function setup(options: {queryTiles?: boolean; shared?: boolean; abortAtSync?: number; failAtSync?: number} = {}) {
   const scopes: Array<Set<FakeTensor>> = [];
   const tensors: FakeTensor[] = [];
   const calls: Array<{name: string; args: unknown[]}> = [];
@@ -71,6 +71,14 @@ function setup(options: {shared?: boolean; abortAtSync?: number; failAtSync?: nu
             : tuple([hidden, new FakeTensor([1, 1, 7, 256]), new FakeTensor([1, 1, 7, 256])]);
         }
         if (name === 'unpack') return tuple(Array.from({length: 8}, (_, index) => new FakeTensor([index + 1])));
+        if (name === 'queryWeights')
+          return tuple(Array.from({length: options.shared ? 5 : 8}, (_, index) => new FakeTensor([index + 10])));
+        if (name === 'queryKv') return tuple([new FakeTensor([1, 1, 7, 256]), new FakeTensor([1, 1, 7, 256])]);
+        if (name === 'queryRope') {
+          const length = (args[3] as FakeTensor).shape[1]!;
+          return tuple([new FakeTensor([1, length, 256]), new FakeTensor([1, length, 256])]);
+        }
+        if (name === 'queryChunk') return new FakeTensor((args[0] as FakeTensor).shape.slice());
         if (name === 'slice') {
           const offset = (args[2] as FakeTensor).data as Int32Array;
           offsets.push(offset[0]!);
@@ -88,7 +96,23 @@ function setup(options: {shared?: boolean; abortAtSync?: number; failAtSync?: nu
     runtime,
     device,
     vm,
-    graphs: {attention: 'attention', unpack: 'unpack', tail: 'tail', slice: 'slice', concat: 'concat'},
+    graphs: {
+      attention: 'attention',
+      unpack: 'unpack',
+      tail: 'tail',
+      slice: 'slice',
+      concat: 'concat',
+      ...(options.queryTiles
+        ? {
+            query: {
+              weights: 'queryWeights',
+              chunk: 'queryChunk',
+              rope: 'queryRope',
+              ...(options.shared ? {} : {kv: 'queryKv'})
+            }
+          }
+        : {})
+    },
     signal: abort.signal
   };
   const cache = options.shared ? [tensor([1, 1, 7, 256]), tensor([1, 1, 7, 256])] : [];
@@ -98,6 +122,7 @@ function setup(options: {shared?: boolean; abortAtSync?: number; failAtSync?: nu
     cosine: tensor([1]),
     sine: tensor([1]),
     split: tensor([1], 'int32'),
+    prefixTokens: 4,
     valid: tensor([1, 7], 'int32'),
     scale: tensor([1]),
     cache,
@@ -225,5 +250,46 @@ test('one-token and full-length chunks preserve every requested token', async ()
     );
     assert.deepEqual(output.hidden.shape, [1, 7, 1536]);
     output.hidden.dispose();
+  }
+});
+
+test('query tiles retain full K/V, use absolute offsets and reuse the decoded weights', async () => {
+  for (const shared of [false, true]) {
+    const state = setup({queryTiles: true, shared});
+    const output = await runGemma4V2ChunkedDecoder(state.context as never, state.input as never);
+    const named = (name: string) => state.calls.filter((call) => call.name === name);
+    assert.equal(named('attention').length, 0);
+    assert.equal(named('queryWeights').length, 1);
+    assert.equal(named('queryKv').length, shared ? 0 : 1);
+    assert.equal(named('queryRope').length, 3);
+    assert.equal(named('unpack').length, 1);
+    assert.deepEqual(state.offsets, [0, 3, 6]);
+    const calls = named('queryChunk');
+    assert.deepEqual(
+      calls.map(({args}) => (args[0] as {shape: number[]}).shape[1]),
+      [3, 3, 1]
+    );
+    assert.deepEqual(
+      calls.map(({args}) => [...(args[4] as {data: Int32Array}).data]),
+      [
+        [4, 0],
+        [4, 3],
+        [4, 6]
+      ]
+    );
+    for (const {args} of calls) {
+      assert.equal(args[3], state.input.valid);
+      assert.equal(args[5], shared ? state.input.cache[0] : output.key);
+      assert.equal(args[6], shared ? state.input.cache[1] : output.value);
+      assert.deepEqual(args.slice(7), calls[0]!.args.slice(7));
+    }
+    assert.equal(state.scopes.length, 0);
+    assert.equal(
+      shared ? state.input.cache.every((tensor) => !tensor.disposed) : Boolean(output.key && output.value),
+      true
+    );
+    output.hidden.dispose();
+    output.key?.dispose();
+    output.value?.dispose();
   }
 });

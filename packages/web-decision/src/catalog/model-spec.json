@@ -288,8 +288,8 @@
           "name": "tvm-webgpu",
           "requiredFeatures": [],
           "requiredLimits": {
-            "maxBufferSize": 536870912,
-            "maxStorageBufferBindingSize": 536870912
+            "maxBufferSize": 201326592,
+            "maxStorageBufferBindingSize": 201326592
           },
           "requiresNonFallbackAdapter": true
         },
@@ -327,7 +327,7 @@
           }
         },
         "verification": {
-          "currentBundleGpu": "see-release-evidence",
+          "currentBundleGpu": "pending-exact-archive-verification",
           "currentBundleCpuWasm": "not-applicable",
           "currentBundleJavascript": "not-applicable"
         }

@@ -335,10 +335,9 @@ test('rejects distinct inference and offline image preparers', async () => {
   );
 });
 
-test('the public loader path opens the experimental Gemma model from its model ID alone', async () => {
+test('the Gemma adapter opens the model from its curated ID alone', async () => {
   const {createDecisionModelLoader} = await import('../src/curated/load-decision-model.ts');
   const {createGemma4V2CuratedAdapter} = await import('../src/curated/adapters/strands-gemma4-v2.mjs');
-  const {listModels, loadDecisionModel} = await import('../src/curated/index.ts');
   const fixtures = assets();
   let sourceClosed = false;
   let runnerClosed = false;
@@ -370,31 +369,23 @@ test('the public loader path opens the experimental Gemma model from its model I
     async () => null
   );
   const description = {modelId: GEMMA4_V2_MODEL};
-  const experimentalLoadDecisionModel = createDecisionModelLoader({
+  const loadFixtureModel = createDecisionModelLoader({
     isModelId: (value): value is typeof GEMMA4_V2_MODEL => value === GEMMA4_V2_MODEL,
     describe: () => description,
     loaderDescription: () => description,
     loadAdapter: () => async () => adapter,
     approvedLoadOptions: {[GEMMA4_V2_MODEL]: ['maxLength']}
   });
-  const model = await experimentalLoadDecisionModel({modelId: GEMMA4_V2_MODEL, maxLength: 65536});
+  const model = await loadFixtureModel({modelId: GEMMA4_V2_MODEL, maxLength: 65536});
   assert.equal(model.modelId, GEMMA4_V2_MODEL);
   assert.equal(model.description, description);
   const result = await model.systemOne({state: 'hello', questions: {q: {instructions: 'yes?'}}});
   assert.equal(result.answers.q?.type, 'noul');
   assert.equal(called, 1);
-  await assert.rejects(
-    experimentalLoadDecisionModel({modelId: GEMMA4_V2_MODEL, assetsUrl: 'https://example.test'}),
-    /unsupported/i
-  );
+  await assert.rejects(loadFixtureModel({modelId: GEMMA4_V2_MODEL, assetsUrl: 'https://example.test'}), /unsupported/i);
   await model.dispose();
   assert.equal(sourceClosed, true);
   assert.equal(runnerClosed, true);
-  assert.equal(
-    listModels().some((entry) => (entry.modelId as string) === GEMMA4_V2_MODEL),
-    false
-  );
-  await assert.rejects(loadDecisionModel({modelId: GEMMA4_V2_MODEL}), /unsupported/i);
 });
 
 test('curated adapter rejects invalid load-time maxLength before opening the cache', async () => {

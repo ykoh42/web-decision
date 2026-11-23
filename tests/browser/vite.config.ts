@@ -68,6 +68,7 @@ const serveTinyDecideAsset = serveModelAsset(tinyDecideAssets);
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   publicDir: publicAssetsRoot,
+  cacheDir: resolve(workspace, '.scratch-vite-cache'),
   // Use the fresh workspace build by default, or an explicit installed package
   // copy for package-consumer browser checks.
   optimizeDeps: {noDiscovery: true, include: []},

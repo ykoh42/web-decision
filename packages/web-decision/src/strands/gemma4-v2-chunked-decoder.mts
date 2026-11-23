@@ -5,7 +5,21 @@ type OwnedTensor = Tensor & {dispose(): void};
 type ScopedRuntime = Instance & {detachFromCurrentScope<T extends OwnedTensor>(value: T): T};
 type Tuple = {size(): number; get(index: number): OwnedTensor};
 
-type GraphNames = Readonly<{attention: string; unpack: string; tail: string; slice: string; concat: string}>;
+type QueryGraphs = Readonly<{weights: string; chunk: string; rope: string; kv?: string}>;
+type GraphNames = Readonly<{
+  attention: string;
+  unpack: string;
+  tail: string;
+  slice: string;
+  concat: string;
+  query?: QueryGraphs;
+}>;
+type QueryExecution = Readonly<{
+  graphs: QueryGraphs;
+  cache: readonly Tensor[];
+  weights: readonly Tensor[];
+  prefixTokens: number;
+}>;
 export type Gemma4V2ChunkPlan = Readonly<{
   tokens: number;
   chunkTokens: number;
@@ -16,6 +30,7 @@ export type Gemma4V2ChunkedDecoderInput = Readonly<{
   cosine: Tensor;
   sine: Tensor;
   split: Tensor;
+  prefixTokens?: number;
   valid: Tensor;
   scale: Tensor;
   cache: readonly Tensor[];
@@ -122,13 +137,67 @@ function decodedWeights(context: Context, input: Gemma4V2ChunkedDecoderInput): O
   return [1, 2, 3, 0, 4, 5, 6, 7].map((index) => tuple.get(index));
 }
 
+function prepareQuery(context: Context, input: Gemma4V2ChunkedDecoderInput, graphs: QueryGraphs): QueryExecution {
+  const prefixTokens = input.prefixTokens;
+  if (
+    prefixTokens === undefined ||
+    !Number.isSafeInteger(prefixTokens) ||
+    prefixTokens < 0 ||
+    prefixTokens > input.plan.tokens
+  )
+    throw new RangeError('Invalid Gemma 4 prefix length for query tiling.');
+  const prepared = context.vm.getFunction(graphs.weights)(...input.attentionWeights) as Tuple;
+  const expected = input.cache.length ? 5 : 8;
+  if (prepared.size() !== expected) throw new Error('Unexpected Gemma 4 attention weights.');
+  const weights = Array.from({length: 5}, (_, index) => prepared.get(index));
+  if (input.cache.length) return {graphs, cache: input.cache, weights, prefixTokens};
+  if (!graphs.kv) throw new Error('Missing Gemma 4 K/V preparation graph.');
+  const kv = context.vm.getFunction(graphs.kv)(
+    input.hidden,
+    input.cosine,
+    input.sine,
+    prepared.get(5),
+    prepared.get(6),
+    prepared.get(7),
+    weights[3]
+  ) as Tuple;
+  if (kv.size() !== 2) throw new Error('Unexpected Gemma 4 K/V preparation output.');
+  return {graphs, cache: [kv.get(0), kv.get(1)], weights, prefixTokens};
+}
+
+function queryChunk(
+  context: Context,
+  input: Gemma4V2ChunkedDecoderInput,
+  query: QueryExecution,
+  hidden: Tensor,
+  offset: Tensor,
+  template: Tensor,
+  start: number
+): Tensor {
+  const rope = context.vm.getFunction(query.graphs.rope)(input.cosine, input.sine, offset, template) as Tuple;
+  if (rope.size() !== 2) throw new Error('Unexpected Gemma 4 RoPE slice.');
+  const metadata = context.runtime
+    .empty([2], 'int32', context.device)
+    .copyFrom(new Int32Array([query.prefixTokens, start]));
+  return context.vm.getFunction(query.graphs.chunk)(
+    hidden,
+    rope.get(0),
+    rope.get(1),
+    input.valid,
+    metadata,
+    ...query.cache,
+    ...query.weights
+  ) as Tensor;
+}
+
 async function makeChunk(
   context: Context,
   input: Gemma4V2ChunkedDecoderInput,
   owned: Set<OwnedTensor>,
   hidden: Tensor,
   weights: readonly Tensor[],
-  start: number
+  start: number,
+  query?: QueryExecution
 ): Promise<OwnedTensor> {
   const length = Math.min(input.plan.chunkTokens, input.plan.tokens - start);
   return scoped(context, () => {
@@ -136,8 +205,10 @@ async function makeChunk(
     const template = context.runtime.empty([1, length, 1], 'float32', context.device);
     const pair = context.vm.getFunction(context.graphs.slice)(hidden, input.perLayer, offset, template) as Tuple;
     if (pair.size() !== 2) throw new Error('Unexpected Gemma 4 chunk slice.');
+    const hiddenChunk = pair.get(0);
+    const attended = query ? queryChunk(context, input, query, hiddenChunk, offset, template, start) : hiddenChunk;
     const output = context.vm.getFunction(context.graphs.tail)(
-      pair.get(0),
+      attended,
       pair.get(1),
       input.scale,
       ...weights
@@ -189,19 +260,20 @@ export async function runGemma4V2ChunkedDecoder(
   try {
     const result = await withGemma4V2Cleanup(
       async () => {
-        const attended = attention(context, input);
+        const query = context.graphs.query ? prepareQuery(context, input, context.graphs.query) : undefined;
+        const attended = query ? {hidden: input.hidden} : attention(context, input);
         const weights = decodedWeights(context, input);
         const chunks: OwnedTensor[] = [];
         for (let start = 0; start < input.plan.tokens; start += input.plan.chunkTokens)
-          chunks.push(await makeChunk(context, input, owned, attended.hidden, weights, start));
+          chunks.push(await makeChunk(context, input, owned, attended.hidden, weights, start, query));
         const hidden = await joinChunks(context, owned, chunks);
         if (hidden.shape.join(',') !== `1,${input.plan.tokens},1536`)
           throw new Error('Unexpected Gemma 4 assembled output.');
         context.signal?.throwIfAborted();
         retained.add(hidden);
         if (!input.retainKeyValues) return {hidden};
-        const key = detach(context.runtime, owned, attended.tuple!.get(1));
-        const value = detach(context.runtime, owned, attended.tuple!.get(2));
+        const key = detach(context.runtime, owned, query ? (query.cache[0] as OwnedTensor) : attended.tuple!.get(1));
+        const value = detach(context.runtime, owned, query ? (query.cache[1] as OwnedTensor) : attended.tuple!.get(2));
         retained.add(key);
         retained.add(value);
         return {hidden, key, value};

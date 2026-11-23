@@ -116,6 +116,7 @@ interface DecoderInputs {
   readonly ids: Tensor;
   readonly norm: Tensor;
   readonly split: Tensor;
+  readonly prefixTokens: number;
   readonly valid: Tensor;
   readonly localCos: Tensor;
   readonly localSin: Tensor;
@@ -170,6 +171,7 @@ async function runSplitLayer(
       cosine: global ? context.fullCos : context.localCos,
       sine: global ? context.fullSin : context.localSin,
       split: context.split,
+      prefixTokens: context.prefixTokens,
       valid: context.valid,
       scale,
       weights,
@@ -377,6 +379,7 @@ async function runInference(
         ids,
         norm,
         split,
+        prefixTokens: input.stateIds.length,
         valid,
         localCos,
         localSin,

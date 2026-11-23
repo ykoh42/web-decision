@@ -1,6 +1,9 @@
 import {createPolyfillWASI, instantiate} from '../../packages/web-decision/src/runtime/tvm.generated.mjs';
 import {createGemma4V2Runner} from '../../packages/web-decision/src/strands/gemma4-v2-runner.mts';
-import {transposedSplitGraphs} from '../../packages/web-decision/src/strands/gemma4-v2-split-adapter.mts';
+import {
+  queryTiledSplitGraphs,
+  transposedSplitGraphs
+} from '../../packages/web-decision/src/strands/gemma4-v2-split-adapter.mts';
 import {finishGemma4V2Answer} from '../../packages/web-decision/src/strands/gemma4-v2-scoring.mts';
 import {openGemma4V2SourceFromInventory} from '../../packages/web-decision/src/strands/gemma4-v2-source.mts';
 import inventory from '../../packages/web-decision/assets/strands-gemma4-v2/source-inventory.json' with {type: 'json'};
@@ -14,6 +17,7 @@ type Input = {
   mode: 'both' | 'baseline' | 'split';
   hostReadout: boolean;
   captureHidden?: boolean;
+  queryTiles?: boolean;
 };
 declare global {
   interface Window {
@@ -74,7 +78,11 @@ function trackBuffers(device: GPUDevice) {
   };
 }
 
-function trackLayers(underlyingVm: VirtualMachine, capture?: ReturnType<typeof captureLastHiddenRows>) {
+function trackLayers(
+  underlyingVm: VirtualMachine,
+  queryTiles: boolean,
+  capture?: ReturnType<typeof captureLastHiddenRows>
+) {
   let layers = 0;
   return {
     vm: {
@@ -82,7 +90,11 @@ function trackLayers(underlyingVm: VirtualMachine, capture?: ReturnType<typeof c
         const fn = underlyingVm.getFunction(name);
         if (typeof fn !== 'function') return fn;
         return (...args: unknown[]) => {
-          if (/^(?:split(?:0|4|15|19)attn|layer(?:0|4|15|19))_packed_main$/u.test(name)) {
+          if (
+            queryTiles
+              ? name === 'ple_packed_main'
+              : /^(?:split(?:0|4|15|19)attn|layer(?:0|4|15|19))_packed_main$/u.test(name)
+          ) {
             capture?.queue(layers === 0 ? 'embedding' : `layer${layers - 1}`, args[0] as Tensor);
             layers++;
           }
@@ -138,8 +150,16 @@ function answerPhase<T extends {logits: number[] | null}>(phase: T | undefined) 
   return {...phase, answer: phase.logits ? finishGemma4V2Answer(question, phase.logits, scoring) : null};
 }
 
-window.runGemma4LongRamp = async ({state, question, chunkTokens, mode, hostReadout, captureHidden}) => {
-  if (captureHidden && (mode !== 'split' || !hostReadout || state.length + question.length > 1024))
+window.runGemma4LongRamp = async ({
+  state,
+  question,
+  chunkTokens,
+  mode,
+  hostReadout,
+  captureHidden,
+  queryTiles = false
+}) => {
+  if (captureHidden && (queryTiles || mode !== 'split' || !hostReadout || state.length + question.length > 1024))
     throw new Error('Hidden capture requires one split host-readout run of at most 1024 tokens.');
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter || adapter.info.isFallbackAdapter !== false) throw new Error('Physical WebGPU adapter required');
@@ -169,7 +189,7 @@ window.runGemma4LongRamp = async ({state, question, chunkTokens, mode, hostReado
     scoped = true;
     const device = runtime.webgpu();
     const capture = captureHidden ? captureLastHiddenRows(runtime as never, device) : undefined;
-    const layers = trackLayers(runtime.createVirtualMachine(device), capture);
+    const layers = trackLayers(runtime.createVirtualMachine(device), queryTiles, capture);
     const base = {
       runtime: runtime as never,
       device,
@@ -197,7 +217,14 @@ window.runGemma4LongRamp = async ({state, question, chunkTokens, mode, hostReado
       try {
         const runner = await createGemma4V2Runner({
           ...base,
-          ...(split ? {splitExecution: {graphs: transposedSplitGraphs(), chunkTokens}} : {})
+          ...(split || queryTiles
+            ? {
+                splitExecution: {
+                  graphs: split && queryTiles ? queryTiledSplitGraphs() : transposedSplitGraphs(),
+                  chunkTokens
+                }
+              }
+            : {})
         } as never);
         try {
           result = await runner.run({stateIds: state, questionIds: question, images: [], imageSpans: []});
@@ -243,6 +270,7 @@ window.runGemma4LongRamp = async ({state, question, chunkTokens, mode, hostReado
           : `single ${mode} phase`,
       tokens: state.length + question.length,
       hostReadout,
+      queryTiles,
       stateTokens: state.length,
       questionTokens: question.length,
       chunkTokens,

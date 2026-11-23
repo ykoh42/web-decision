@@ -7,8 +7,8 @@
   "experimental": false,
   "files": {
     "graph.wasm": {
-      "bytes": 5504091,
-      "sha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86"
+      "bytes": 5975888,
+      "sha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46"
     },
     "local.bin": {
       "bytes": 512,

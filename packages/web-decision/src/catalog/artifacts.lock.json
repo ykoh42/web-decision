@@ -300,14 +300,14 @@
       "schemaVersion": 1,
       "manifest": {
         "sourcePath": "assets/strands-gemma4-v2/manifest.json",
-        "rawSha256": "ec01a0e831d7329cc282a4a7e9015e2f9be8cc63800171caee958dc24b104a75",
-        "canonicalSha256": "44abf31975515754143ae97556d3ce002f19b91fcce3c73fbd663e768e2ae249",
+        "rawSha256": "1928234c2bb44e6e4c0a7eea9353f4a3735a252f9ea0f3bc1b28c921f17892ed",
+        "canonicalSha256": "f55c9fe5d530e591e10dec16301b4b2c724605b49543dc688c7bc0ca8ca28b7d",
         "canonicalBytes": 1050,
         "experimental": false,
         "files": {
           "graph.wasm": {
-            "bytes": 5504091,
-            "sha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86"
+            "bytes": 5975888,
+            "sha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46"
           },
           "local.bin": {
             "bytes": 512,
@@ -339,8 +339,8 @@
         {
           "manifestName": "graph.wasm",
           "sourcePath": "assets/strands-gemma4-v2/graph.wasm",
-          "bytes": 5504091,
-          "sha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86"
+          "bytes": 5975888,
+          "sha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46"
         },
         {
           "manifestName": "local.bin",

@@ -6,18 +6,18 @@ import {
   type Gemma4V2GraphAsset,
   type Gemma4V2GraphAssets
 } from './gemma4-v2-runner-factory.mjs';
-import {transposedSplitGraphs} from './gemma4-v2-split-adapter.mjs';
+import {queryTiledSplitGraphs} from './gemma4-v2-split-adapter.mjs';
 
 interface Gemma4V2RuntimeAssets extends Gemma4V2GraphAssets {
   readonly scoring: Gemma4V2GraphAsset;
 }
 
-/** Internal until the complete graph has been verified and its artifact metadata pinned. */
+/** Bind the packaged query-tiled graph to the pinned model runtime. */
 export function loadGemma4V2Runtime(options: Gemma4V2LoaderOptions, assets: Gemma4V2RuntimeAssets) {
   if (!assets?.scoring) throw new WebDecisionError('INVALID_ASSET', 'A pinned Gemma 4 v2 scoring asset is required.');
   const createRunner = createGemma4V2RunnerFactory({
     assets: {...assets, hostReadout: true},
-    splitExecution: {graphs: transposedSplitGraphs(), chunkTokens: 256},
+    splitExecution: {graphs: queryTiledSplitGraphs(), chunkTokens: 256},
     createImageInserter: ({runtime, device, vm, source, signal}) =>
       createGemma4V2ImageInserter(runtime, device, vm, source, signal)
   });

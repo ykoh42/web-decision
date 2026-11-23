@@ -10,6 +10,5 @@ export const APPROVED_MODEL_LOAD_OPTIONS: Readonly<Record<string, readonly strin
     'temperature',
     'temperatureByType',
     'limits'
-  ],
-  'strands-decider-e2b-gemma4-v2-2611': ['modelId', 'cache', 'offline', 'signal', 'onProgress', 'maxLength']
+  ]
 });

@@ -7,7 +7,7 @@ import {resolve} from 'node:path';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const target = resolve(root, 'packages/web-decision/assets/strands-gemma4-v2');
 const expected = {
-  'graph.wasm': {bytes: 5504091, sha256: 'd59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86'},
+  'graph.wasm': {bytes: 5975888, sha256: '09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46'},
   'local.bin': {bytes: 512, sha256: 'cc63341a0ac42a60b986ed638fd0d45b838b72fabeffec059c463eac4ed9ea15'},
   'global.bin': {bytes: 1024, sha256: '71a80d617056a8be95eeeb385ebcc01c7fb2c73d5430a8ce862ed6c94179d076'},
   'scoring.bin': {bytes: 746272, sha256: '8976812e52bc591dee1a1b891d427b16eb0bf641ea61299a518276d35e6da3ad'},

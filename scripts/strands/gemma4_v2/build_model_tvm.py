@@ -297,6 +297,8 @@ def build(args):
     from concat_ir import build as build_concat
     from model_partition import partition_model
     from per_layer_ir import build_per_layer_ir
+    from query_families import build as build_query_family
+    from query_rope_slice import build as build_query_rope_slice
     from readout_ir import build as build_readout
     from rotary_ir import build as build_rope
     from slice_ir import build as build_slice
@@ -355,6 +357,11 @@ def build(args):
                 (f"split{index}optimized_tail", tail),
             )
         )
+    for index in (0, 4, 15, 19):
+        modules.extend(build_query_family(args.checkpoint, index))
+    modules.extend(
+        (f"query_rope{width}", build_query_rope_slice(width)) for width in (256, 512)
+    )
     modules.extend((("split_slice", build_slice()), ("split_concat", build_concat())))
     module = link_modules(modules)
     print(f"Combined {len(module.functions)} TVM functions", flush=True)

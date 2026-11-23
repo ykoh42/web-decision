@@ -59,15 +59,7 @@
     "assets/mapika2b/manifest.json",
     "assets/mapika2b/text.wasm",
     "assets/mapika2b/text-bindings.json",
-    "assets/mapika2b/source-inventory.json",
-    "assets/strands-gemma4-v2/manifest.json",
-    "assets/strands-gemma4-v2/graph.wasm",
-    "assets/strands-gemma4-v2/local.bin",
-    "assets/strands-gemma4-v2/global.bin",
-    "assets/strands-gemma4-v2/scoring.bin",
-    "assets/strands-gemma4-v2/source-inventory.json",
-    "assets/strands-gemma4-v2/decoder-bindings.json",
-    "assets/strands-gemma4-v2/vision-bindings.json"
+    "assets/mapika2b/source-inventory.json"
   ],
   "sideEffects": false,
   "scripts": {

@@ -53,6 +53,39 @@ test('checks both attention buffer limits before running the TVM graph', async (
   lifecycle.close();
 });
 
+test('the tiled decoder checks the largest unpacked matrix and full hidden buffer', async () => {
+  const {guardGemma4V2Runner, watchGemma4V2Device} = await import('../src/strands/gemma4-v2-gpu-errors.mjs');
+  const lifecycle = watchGemma4V2Device({lost: new Promise(() => {})});
+  const runner = {
+    async run() {
+      return [7];
+    },
+    releaseCachedMemory() {},
+    dispose() {}
+  };
+  for (const [tokens, bytes] of [
+    [3, 75_497_472],
+    [32_768, 201_326_592],
+    [131_072, 805_306_368]
+  ] as const) {
+    const input = {stateIds: Array<number>(tokens - 1).fill(2), questionIds: [4], imageSpans: [], images: []};
+    for (const [maxBufferSize, maxStorageBufferBindingSize] of [
+      [bytes - 4, bytes],
+      [bytes, bytes - 4]
+    ]) {
+      const gpu = device([], {maxBufferSize, maxStorageBufferBindingSize});
+      await assert.rejects(guardGemma4V2Runner(gpu.device, lifecycle, runner, true).run(input), {
+        code: 'DEVICE_RESOURCE_LIMIT',
+        message: new RegExp(`${bytes}-byte`, 'u')
+      });
+      assert.deepEqual(gpu.pushed, []);
+    }
+    const gpu = device([], {maxBufferSize: bytes, maxStorageBufferBindingSize: bytes});
+    assert.deepEqual(await guardGemma4V2Runner(gpu.device, lifecycle, runner, true).run(input), [7]);
+  }
+  lifecycle.close();
+});
+
 test('rejects attention allocations outside the TVM WebGPU runtime signed range', async () => {
   const {guardGemma4V2Runner, watchGemma4V2Device} = await import('../src/strands/gemma4-v2-gpu-errors.mjs');
   const lifecycle = watchGemma4V2Device({lost: new Promise(() => {})});

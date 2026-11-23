@@ -4,7 +4,7 @@
     {
       "modelId": "kanana-2-v-decide-3b-2611",
       "status": "verified",
-      "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+      "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544",
       "evidence": {
         "path": "src/catalog/provenance/kanana-2-v-decide-3b-2611.json",
         "sha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13"
@@ -17,7 +17,7 @@
     {
       "modelId": "strands-decider-2b-qwen3.5-v1-2610",
       "status": "verified",
-      "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+      "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-2b-qwen3.5-v1-2610.json",
         "sha256": "345710faeb096a287db352dfbcff239933c7fa96e3236ffeb0d758db8535dfad"
@@ -30,7 +30,7 @@
     {
       "modelId": "mapika-decider-2b-v12",
       "status": "verified",
-      "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+      "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544",
       "evidence": {
         "path": "src/catalog/provenance/mapika-decider-2b-v12.json",
         "sha256": "f0a2e8b9b7592b6f0878c2231f3be515324c3cc367c0b9b61d7f5cd064f8d58a"
@@ -42,11 +42,11 @@
     },
     {
       "modelId": "strands-decider-e2b-gemma4-v2-2611",
-      "status": "verified",
-      "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+      "status": "pending",
+      "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-e2b-gemma4-v2-2611.json",
-        "sha256": "7a55cbb265d5a0cbf141c761d87e2bd485a8891984233ef071aaf1c699062b14"
+        "sha256": "bf4b6195a5178430db247653781fd7c44c2c594925ee23130a97ab701135659d"
       }
     }
   ]

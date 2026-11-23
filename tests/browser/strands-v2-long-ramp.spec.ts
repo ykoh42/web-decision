@@ -125,7 +125,8 @@ test('experimental 35-layer split runner preserves a requested long input', asyn
       chunkTokens,
       mode,
       hostReadout,
-      captureHidden: hiddenPath !== undefined
+      captureHidden: hiddenPath !== undefined,
+      queryTiles: process.env.WEB_DECISION_LONG_QUERY_TILES === '1'
     };
     const result = (await page.evaluate((input) => window.runGemma4LongRamp(input), request)) as {
       tokens: number;

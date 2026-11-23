@@ -5,19 +5,28 @@ import type {Gemma4V2OwnedRunner} from './gemma4-v2-session.mjs';
 // The pinned TVM JS FFI reads the WebGPU allocator's int64 argument as a signed int32.
 const TVM_WEBGPU_MAX_ALLOCATION_BYTES = 0x7fffffff;
 
-function assertAttentionBufferLimit(limits: GPUSupportedLimits, tokens: number): void {
-  // Full attention binds FP32 query and output tensors of shape [1, tokens, 8, 512].
-  const bytes = tokens * 8 * 512 * Float32Array.BYTES_PER_ELEMENT;
+const TEXT_HIDDEN_WIDTH = 1536;
+const LARGEST_TILED_UNPACKED_MATRIX_ROWS = 12288;
+
+function assertAttentionBufferLimit(limits: GPUSupportedLimits, tokens: number, queryTiled: boolean): void {
+  // Tiled attention allocates at most 256 query rows. The full hidden/concat tensor
+  // is [1, tokens, 1536], K/V and rotary tables have width up to 512, and the largest
+  // independently unpacked weight tensor is [12288, 1536]. All are FP32.
+  const elements = queryTiled
+    ? Math.max(tokens, LARGEST_TILED_UNPACKED_MATRIX_ROWS) * TEXT_HIDDEN_WIDTH
+    : tokens * 8 * 512;
+  const bytes = elements * Float32Array.BYTES_PER_ELEMENT;
+  const path = queryTiled ? 'tiled decoder' : 'full attention';
   if (bytes > TVM_WEBGPU_MAX_ALLOCATION_BYTES)
     throw new WebDecisionError(
       'DEVICE_RESOURCE_LIMIT',
-      `Gemma 4 v2 full attention for ${tokens} tokens requires a ${bytes}-byte allocation. The pinned TVM WebGPU runtime supports signed 32-bit allocation sizes.`
+      `Gemma 4 v2 ${path} for ${tokens} tokens requires a ${bytes}-byte allocation. The pinned TVM WebGPU runtime supports signed 32-bit allocation sizes.`
     );
   const {maxBufferSize, maxStorageBufferBindingSize} = limits;
   if (bytes > Math.min(maxBufferSize, maxStorageBufferBindingSize))
     throw new WebDecisionError(
       'DEVICE_RESOURCE_LIMIT',
-      `Gemma 4 v2 full attention for ${tokens} tokens requires a ${bytes}-byte WebGPU buffer and storage binding. This device provides ${maxBufferSize} and ${maxStorageBufferBindingSize} bytes, respectively.`
+      `Gemma 4 v2 ${path} for ${tokens} tokens requires a ${bytes}-byte WebGPU buffer and storage binding. This device provides ${maxBufferSize} and ${maxStorageBufferBindingSize} bytes, respectively.`
     );
 }
 
@@ -143,7 +152,8 @@ export function combineGemma4V2Signals(device: AbortSignal, caller?: AbortSignal
 export function guardGemma4V2Runner(
   device: GPUDevice,
   lifecycle: ReturnType<typeof watchGemma4V2Device>,
-  runner: Gemma4V2OwnedRunner
+  runner: Gemma4V2OwnedRunner,
+  queryTiled = false
 ): Gemma4V2OwnedRunner {
   return {
     async run(input, caller) {
@@ -152,7 +162,7 @@ export function guardGemma4V2Runner(
         throw new WebDecisionError('INFERENCE_ERROR', 'The GPU device was lost.', {cause: lifecycle.cause});
       const tokens = input.stateIds.length + input.questionIds.length;
       assertGemma4V2CompiledContext(tokens);
-      assertAttentionBufferLimit(device.limits, tokens);
+      assertAttentionBufferLimit(device.limits, tokens, queryTiled);
       const combined = combineGemma4V2Signals(lifecycle.signal, caller);
       try {
         const result = await withGemma4V2GpuErrors(device, () => runner.run(input, combined.signal));

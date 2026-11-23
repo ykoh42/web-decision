@@ -123,7 +123,9 @@ export function createGemma4V2RunnerFactory(options: Gemma4V2RunnerFactoryOption
       });
       signal?.throwIfAborted();
       assertDeviceActive();
-      return guardGemma4V2Runner(device, lifecycle, runner);
+      const graphs = options.splitExecution?.graphs;
+      const queryTiled = graphs !== undefined && Object.values(graphs).every((graph) => graph.query !== undefined);
+      return guardGemma4V2Runner(device, lifecycle, runner, queryTiled);
     } catch (error) {
       lifecycle.close();
       try {

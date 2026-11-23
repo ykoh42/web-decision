@@ -880,7 +880,7 @@ async function createGemma4V2ArtifactLock(model: CuratedModel): Promise<CatalogA
   const revision = 'a5f32ea1bffe2e91c25c0c641d444e8115e28212';
   const weightSha256 = '593a28a67754653c7ffffff80a5186f18966cc6262c2f4f097414c187e5fd48c';
   const manifestPath = 'assets/strands-gemma4-v2/manifest.json';
-  const manifestHash = 'ec01a0e831d7329cc282a4a7e9015e2f9be8cc63800171caee958dc24b104a75';
+  const manifestHash = '1928234c2bb44e6e4c0a7eea9353f4a3735a252f9ea0f3bc1b28c921f17892ed';
   const names = [
     'graph.wasm',
     'local.bin',

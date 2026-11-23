@@ -18,6 +18,20 @@ export function transposedSplitGraphs(): Readonly<Record<Family, Graphs>> {
   });
   return {0: graph(0), 4: graph(4), 15: graph(15), 19: graph(19)};
 }
+export function queryTiledSplitGraphs(): Readonly<Record<Family, Graphs>> {
+  const base = transposedSplitGraphs();
+  const graph = (family: Family): Graphs => ({
+    ...base[family],
+    query: {
+      weights: `query${family}_weights_main`,
+      chunk: `query${family}_chunk_main`,
+      rope: `query_rope${family % 5 === 4 ? 512 : 256}_main`,
+      ...(family < 15 ? {kv: `query${family}_kv_main`} : {})
+    }
+  });
+  return {0: graph(0), 4: graph(4), 15: graph(15), 19: graph(19)};
+}
+
 const tailNames = [
   'pre_feedforward_layernorm.weight',
   'mlp.gate_proj.weight',

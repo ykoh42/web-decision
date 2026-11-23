@@ -165,9 +165,9 @@ def partial_relax(source, name):
     )
 
 
-def partition_model(module, name):
+def partition_model(module, name, *, preserve_tir=False):
     source = partition_script(module, name)
-    if name == "main":
+    if name == "main" and not preserve_tir:
         result = tvm.script.from_source(source)
     else:
         result = attach_relax(
