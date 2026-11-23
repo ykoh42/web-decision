@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recipeRevision": "814542fe9647d89550bd9d71efe89a82c5826b69",
+  "recipeRevision": "357bca62ad383c8af25ad1ed852d2565d8df69b1",
   "recipe": [
     {
       "path": "scripts/ci/git_environment.py",
@@ -16,7 +16,7 @@
     },
     {
       "path": "scripts/strands/gemma4_v2/build_model_tvm.py",
-      "sha256": "36196e455f339e0a4b1a768b82226d72a08938ece152d5efd6d1d9a78a8bb469"
+      "sha256": "bd99dfe1e2b5579f14cf97db76e833c75756be680817b1b7dad2da5c195cf9bb"
     },
     {
       "path": "scripts/strands/gemma4_v2/build_source_inventory.py",
@@ -84,7 +84,7 @@
     },
     {
       "path": "scripts/strands/gemma4_v2/model_partition.py",
-      "sha256": "0ed5d945edfb8131f8f4035664185d5244433d4c7ff307cf1b00504d3da73ba8"
+      "sha256": "a7cbbd5ca2f5d86ce9286bc880f3e8eb44779ec4fdb2ca3c50726172fa2f3bcb"
     },
     {
       "path": "scripts/strands/gemma4_v2/packed_parameters.py",
@@ -141,6 +141,18 @@
     {
       "path": "scripts/strands/gemma4_v2/protocol_boundary_reference.py",
       "sha256": "68f085862ae4c12277566eac7d526a896e4026323e020e0b6c4c3495f97e35a2"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/query_attention_tir.py",
+      "sha256": "f9225b2d0180404164ef8420127e001a8fb0a7963d25811c20e739dc0a0f17b7"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/query_families.py",
+      "sha256": "eceabc9e03fad602f902aff74de9bfe07467bcf17d3c92bc5b031c7b88a84d7e"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/query_rope_slice.py",
+      "sha256": "e0c341d81c9e420b90f4af46576d8240ee806ad5c4d63d2d3d791b8c38b5898a"
     },
     {
       "path": "scripts/strands/gemma4_v2/readout_ir.py",
@@ -266,7 +278,7 @@
   "config": [
     {
       "path": "packages/web-decision/assets/strands-gemma4-v2/manifest.json",
-      "sha256": "ec01a0e831d7329cc282a4a7e9015e2f9be8cc63800171caee958dc24b104a75"
+      "sha256": "1928234c2bb44e6e4c0a7eea9353f4a3735a252f9ea0f3bc1b28c921f17892ed"
     },
     {
       "path": "packages/web-decision/assets/strands-gemma4-v2/source-inventory.json",
@@ -292,15 +304,19 @@
   },
   "nativeBuild": {
     "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-native-build.json",
-    "sha256": "614d2f915428265f8fc28d0591bf2a9c72b5d6fd77e9d0466624c5a0fba1eb23"
+    "sha256": "1cbe60bc0e52498385a5df1c2a81415f69e37818929021ebbec57f0dd386b25c"
   },
   "cleanBuildCount": 2,
-  "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+  "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544",
   "artifact": {
     "path": "assets/strands-gemma4-v2/graph.wasm",
-    "bytes": 5504091,
-    "sha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86"
+    "bytes": 5975888,
+    "sha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46"
   },
   "onnxImportOrExportUsed": false,
-  "scope": "Two separate native CPU builds from the committed recipe produced byte-identical TVM WebGPU modules. Browser inference and release approval are tracked by the separate exact-archive gate."
+  "scope": "Two separate CPU native builds from clean, identical conversion recipes produced byte-identical tiled TVM WebGPU modules. Browser inference and release approval are tracked by the exact-archive gate.",
+  "nativeReplay": {
+    "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-native-replay.json",
+    "sha256": "90bc29aa3023f7bcbe77d84ce3735b9e64f5ccf8acb6a70f228551511c31babd"
+  }
 }

@@ -5,8 +5,8 @@
   "status": "success",
   "target": "webgpu / wasm32",
   "wasm": "layer.wasm",
-  "wasmBytes": 5504091,
-  "wasmSha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86",
+  "wasmBytes": 5975888,
+  "wasmSha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46",
   "tvmVersion": "0.27.0.post1",
   "embeddedBuildRoot": false,
   "repository": "StrandsAgents/strands-decider-E2B-gemma4-v2-2611",
@@ -20,11 +20,11 @@
   "buildEnvironment": {
     "repository": {
       "before": {
-        "head": "814542fe9647d89550bd9d71efe89a82c5826b69",
+        "head": "357bca62ad383c8af25ad1ed852d2565d8df69b1",
         "dirty": false
       },
       "after": {
-        "head": "814542fe9647d89550bd9d71efe89a82c5826b69",
+        "head": "357bca62ad383c8af25ad1ed852d2565d8df69b1",
         "dirty": false
       }
     },

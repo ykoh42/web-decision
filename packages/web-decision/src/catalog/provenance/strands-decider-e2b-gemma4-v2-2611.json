@@ -1,14 +1,7 @@
 {
   "schemaVersion": 1,
   "modelId": "strands-decider-e2b-gemma4-v2-2611",
-  "status": "pending",
-  "unresolved": [
-    "Verify this query-tiled artifact and capture browser evidence from the exact combined archive.",
-    "Bind independent TVM rebuild reports and complete exact-archive browser, offline and failure-path evidence to the release artifact hashes.",
-    "Resolve and document source-contract differences and hardware limits, including audio and the compiled graph context boundary.",
-    "Bind the pinned model and upstream runtime license and attribution evidence to the committed release provenance record.",
-    "Validate WebGPU dispatch bounds and padding for long sequences on the exact candidate graph."
-  ],
+  "status": "verified",
   "sourceLineage": [
     {
       "role": "checkpoint",
@@ -66,23 +59,49 @@
       "declaredLicense": "Apache-2.0"
     }
   },
-  "candidateArtifacts": {
-    "status": "pending",
-    "manifest": {
-      "path": "packages/web-decision/assets/strands-gemma4-v2/manifest.json",
-      "sha256": "1928234c2bb44e6e4c0a7eea9353f4a3735a252f9ea0f3bc1b28c921f17892ed"
+  "rights": [
+    {
+      "subject": "Strands Gemma 4 E2B v2 model and TVM conversion",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Include the pinned Apache 2.0 license and original applicable notices.",
+        "Mark the browser adaptation and generated graph and score table as changes."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/STRANDS-GEMMA4-V2-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
     },
-    "graphSha256": "09f266e21bd85c385ea3910cfb8141f12af54d6a5bc8f3eed4ec7f0ccf33bf46",
-    "scoringSha256": "8976812e52bc591dee1a1b891d427b16eb0bf641ea61299a518276d35e6da3ad"
-  },
-  "scoringReference": "Score lookup and corrections use macOS arm64 NumPy 2.4.6 at the pinned temperature and softcap; this is not proof of bit identity across NumPy builds or GPU backbones.",
-  "rightsPreparation": {
-    "status": "pending",
-    "modelCardDeclaredLicense": "Apache-2.0",
-    "modelLicenseMatchesRuntimeLicense": true,
-    "upstreamNoticePreservedAsPrefixBytes": 714,
-    "runtimeRepositoryNotice": "No tracked NOTICE file at the pinned Strands source revision.",
-    "packagedNoticeChanges": "Identifies the web-decision browser protocol adaptation, TVM graphs, score tables, and pinned upstream revisions.",
-    "remaining": "A verified release provenance record must bind committed conversion and rights evidence to the public catalog and exact artifact lock; this preparation does not grant approval."
+    {
+      "subject": "Pinned upstream Strands protocol adapted for browser inference and attribution for the base model",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Preserve the original model notice and identify the web-decision adaptation."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/STRANDS-GEMMA4-V2-NOTICE",
+        "sha256": "70de1f776cff36354102c448414c79624b7cd59d123118e0aacf1741dca04f11"
+      }
+    }
+  ],
+  "distributionScope": "The archive includes the TVM graph, its bindings, scoring and positional assets, and attribution. It retrieves checkpoint weights from pinned upstream ranges. The corpus used for conformance remains an external pinned test input.",
+  "conversion": {
+    "repository": "https://github.com/ykoh42/web-decision",
+    "revision": "357bca62ad383c8af25ad1ed852d2565d8df69b1",
+    "recipe": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-conversion.json",
+      "sha256": "09abadcaecec3d08430063429783d0f20cf6610300ce7a337d74b40f66ba4191"
+    },
+    "config": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-conversion.json",
+      "sha256": "09abadcaecec3d08430063429783d0f20cf6610300ce7a337d74b40f66ba4191"
+    },
+    "toolchain": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-conversion.json",
+      "sha256": "09abadcaecec3d08430063429783d0f20cf6610300ce7a337d74b40f66ba4191"
+    },
+    "artifactLockSha256": "c73b4d63a21dbe1957f870f7a06ecd1f929a7be6d35dab53c9978c878822f544"
   }
 }
