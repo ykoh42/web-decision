@@ -16,6 +16,7 @@ const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4
 const kananaModelId = 'kanana-2-v-decide-3b-2611';
 const kananaManifestSha256 = 'd4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5';
 const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
+const gemma4V2ModelId = 'strands-decider-e2b-gemma4-v2-2611';
 const mapikaModelId = 'mapika-decider-2b-v12';
 const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
 const kananaRequiredNotice =
@@ -60,6 +61,8 @@ const packagedSourceFiles = [
   'VITE-LICENSE.md',
   'TVM-LICENSE',
   'TVM-NOTICE',
+  'STRANDS-GEMMA4-V2-LICENSE',
+  'STRANDS-GEMMA4-V2-NOTICE',
   'README.md',
   'src/curated/public-index.d.ts',
   'src/curated/public-types.d.ts',
@@ -418,6 +421,27 @@ function verifyQwen35Artifacts(
   return wasm;
 }
 
+function verifyGemma4V2Artifacts(
+  distDirectory: string,
+  distFiles: readonly string[],
+  {bundledRuntimeFiles}: BundledArtifactLock
+): string[] {
+  const emitted = bundledRuntimeFiles.filter(({manifestName}) => !manifestName.endsWith('.json'));
+  const expected = emitted.map(({manifestName}) => 'gemma4-v2/' + manifestName).sort();
+  assert.deepEqual(
+    distFiles.filter((name) => name.startsWith('gemma4-v2/')),
+    expected
+  );
+  for (const pin of emitted) {
+    const name = 'gemma4-v2/' + pin.manifestName;
+    assert.ok(
+      matchesAsset(join(distDirectory, name), pin),
+      'Bundled Gemma v2 asset differs from its lock: ' + name + '.'
+    );
+  }
+  return expected.filter((name) => name.endsWith('.wasm')).map((name) => 'dist/' + name);
+}
+
 function verifyKananaArtifacts(distDirectory: string, distFiles: readonly string[]): void {
   const sourceDirectory = join(pkg, 'assets/kanana');
   const manifest = JSON.parse(readFileSync(join(sourceDirectory, 'manifest.json'), 'utf8')) as {
@@ -482,6 +506,27 @@ function verifyQwen35LicenseNotice(): void {
   }
 }
 
+function verifyGemma4V2LicenseNotice(): void {
+  const license = readFileSync(join(pkg, 'STRANDS-GEMMA4-V2-LICENSE'));
+  assert.equal(license.byteLength, 11_358, 'The pinned Gemma v2 license size changed.');
+  assert.equal(
+    createHash('sha256').update(license).digest('hex'),
+    'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30',
+    'The pinned Gemma v2 license changed.'
+  );
+  const notice = readFileSync(join(pkg, 'STRANDS-GEMMA4-V2-NOTICE'));
+  assert.equal(
+    createHash('sha256').update(notice.subarray(0, 714)).digest('hex'),
+    '85012916fa1247d58cdbf786496c3e6c86ed0e0ce7c86125d3075a0e6fb43cac',
+    'The original pinned Gemma v2 upstream notice changed.'
+  );
+  assert.equal(
+    createHash('sha256').update(notice).digest('hex'),
+    '70de1f776cff36354102c448414c79624b7cd59d123118e0aacf1741dca04f11',
+    'The packaged Gemma v2 attribution changed.'
+  );
+}
+
 function verifyPackageInventory(
   packageFiles: readonly string[],
   distDirectory: string,
@@ -489,7 +534,13 @@ function verifyPackageInventory(
   modelIds: ReadonlySet<string>
 ): void {
   const qwen35 = modelIds.has(qwen35ModelId) ? readBundledArtifactLock(qwen35ModelId) : undefined;
+  const gemma4V2 = modelIds.has(gemma4V2ModelId) ? readBundledArtifactLock(gemma4V2ModelId) : undefined;
   const mapika = modelIds.has(mapikaModelId) ? readBundledArtifactLock(mapikaModelId) : undefined;
+  if (!gemma4V2)
+    assert.ok(
+      !distFiles.some((name) => name.startsWith('gemma4-v2/')),
+      'Unapproved Gemma v2 must not emit runtime files.'
+    );
   const assetFiles = [
     ...new Set(
       [...modelIds]
@@ -510,6 +561,7 @@ function verifyPackageInventory(
     ...(modelIds.has(kananaModelId) ? kananaWasmFiles.map((name) => 'dist/' + name) : []),
     ...(qwen35 ? verifyQwen35Artifacts(distDirectory, distFiles, qwen35) : []),
     ...(mapika ? verifyMapikaArtifacts(distDirectory, mapika) : []),
+    ...(gemma4V2 ? verifyGemma4V2Artifacts(distDirectory, distFiles, gemma4V2) : []),
     ...assetFiles.filter((name) => name.endsWith('.wasm'))
   ];
   assert.deepEqual(
@@ -629,6 +681,7 @@ withTemporaryDirectories((makeTempDirectory: (prefix: string) => string) => {
     verifyKananaLicenseNotice();
   }
   if (qwen35) verifyQwen35LicenseNotice();
+  verifyGemma4V2LicenseNotice();
   verifyPackageInventory(packageFiles, distDirectory, distFiles, approvedModelIds);
   if (!approvedModelIds.has(qwen35ModelId)) {
     assert.ok(

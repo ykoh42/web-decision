@@ -1,4 +1,5 @@
-import type {CatalogModelDescription, ModelId} from './types.generated.js';
+import type {CatalogModelDescription} from './types.generated.js';
+import type {PublicModelId as ModelId} from '../curated/public-model-id.generated.js';
 
 type PublicCatalogEntry = Readonly<{modelId: ModelId; description: CatalogModelDescription}>;
 

@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "byModelId": {
+    "kanana-2-v-decide-3b-2611": {
+      "schemaVersion": 1,
+      "manifest": {
+        "sourcePath": "assets/kanana/manifest.json",
+        "rawSha256": "6ad86479bd30e9913ea5d4a1d5d17342d2bdd39d1b091af2156aaf4d87a35839",
+        "canonicalSha256": "d4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5",
+        "canonicalBytes": 1706,
+        "experimental": false,
+        "files": {
+          "kanana-text-model.wasm": {
+            "bytes": 4208785,
+            "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
+          },
+          "text-weight-manifest.json": {
+            "bytes": 102978,
+            "sha256": "77e08b6da97ecff6ffdbc576c2afb7b614197e9f7d292e5229472379f6d36fed"
+          },
+          "kanana-vision-model.wasm": {
+            "bytes": 4414887,
+            "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
+          },
+          "vision-weight-manifest.json": {
+            "bytes": 100018,
+            "sha256": "622ff1e944d3e41557e3a2a14bb071f8c3ce7ec13c291afdfcb60f0102dfc384"
+          },
+          "safetensors-range-manifest.json": {
+            "bytes": 632507,
+            "sha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+          }
+        }
+      },
+      "bundledRuntimeFiles": [
+        {
+          "manifestName": "kanana-text-model.wasm",
+          "sourcePath": "assets/kanana/kanana-text-model.wasm",
+          "bytes": 4208785,
+          "sha256": "2d0d43eb8496fcb9b8150acaad73e623fbc9495ad4c74dce76dd49d2768b4799"
+        },
+        {
+          "manifestName": "text-weight-manifest.json",
+          "sourcePath": "assets/kanana/text-weight-manifest.json",
+          "bytes": 102978,
+          "sha256": "77e08b6da97ecff6ffdbc576c2afb7b614197e9f7d292e5229472379f6d36fed"
+        },
+        {
+          "manifestName": "kanana-vision-model.wasm",
+          "sourcePath": "assets/kanana/kanana-vision-model.wasm",
+          "bytes": 4414887,
+          "sha256": "2b1eb0b01392e0ed813a480c9028874a16e07155e0f74da9dca6f4304fb4412d"
+        },
+        {
+          "manifestName": "vision-weight-manifest.json",
+          "sourcePath": "assets/kanana/vision-weight-manifest.json",
+          "bytes": 100018,
+          "sha256": "622ff1e944d3e41557e3a2a14bb071f8c3ce7ec13c291afdfcb60f0102dfc384"
+        },
+        {
+          "manifestName": "safetensors-range-manifest.json",
+          "sourcePath": "assets/kanana/safetensors-range-manifest.json",
+          "bytes": 632507,
+          "sha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+        }
+      ],
+      "upstream": {
+        "repository": "kakaocorp/kanana-2-v-decide-3b-2611",
+        "revision": "12820d654ed9789a0f7f48daeee1703c3483c464",
+        "sourcePath": "model.safetensors",
+        "sourceBytes": 7330945212,
+        "sourceSha256": "528930fa261b31ed1f47eecbe7d08efd2e226207508124ae186e1a65dbbbda3b",
+        "rangeManifestPath": "assets/kanana/safetensors-range-manifest.json",
+        "rangeManifestSha256": "c224cbc81790654472387052c5ee9470510f3aa5b5cdf82443bd4e7248931d8b"
+      }
+    },
+    "strands-decider-2b-qwen3.5-v1-2610": {
+      "schemaVersion": 1,
+      "manifest": {
+        "sourcePath": "assets/qwen35/manifest.json",
+        "rawSha256": "bd82f84848af64de4b345fe4bdc980eca2b3c1a4f2b539251f06b73766c90830",
+        "canonicalSha256": "6fba62427036712893a527264ed0c5f21ca16bf17644e30d827d2163320eb20e",
+        "canonicalBytes": 1346,
+        "experimental": false,
+        "files": {
+          "pinned-word-assets-manifest.json": {
+            "bytes": 761512,
+            "sha256": "54256df07cde4990833d232acac1d6962d3945f1ccdd1957ff1a6fab773dac69"
+          },
+          "source-range-inventory.json": {
+            "bytes": 66164,
+            "sha256": "63f1106e10da5973d9e5c8ba58ec00e53d33fc61672b14cf0c3d767c3aa42f8e"
+          },
+          "r19/manifest.json": {
+            "bytes": 2114,
+            "sha256": "6aa54189a087d199338ffe271e0469c9b719110ebac2363d637d2159419d7157"
+          },
+          "r19/fixture.json": {
+            "bytes": 202061,
+            "sha256": "7989413cb90ce9f60d01d25a8a96ad86a4ab74212e234d8f650e7ad3a891e7a9"
+          },
+          "r19/weight-bindings.json": {
+            "bytes": 392846,
+            "sha256": "03604675d3bdbf6f8a7cef7dcc372c0626a0f4d0b9964ec06b200dc5918d5526"
+          },
+          "r19/qwen35-text-pointer.webgpu.wasm": {
+            "bytes": 5772332,
+            "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3"
+          },
+          "vision/fixture.json": {
+            "bytes": 336938,
+            "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+          },
+          "vision/weight-bindings.json": {
+            "bytes": 104081,
+            "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+          },
+          "vision/qwen35-dynamic-vision.webgpu.wasm": {
+            "bytes": 4316202,
+            "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+          }
+        }
+      },
+      "bundledRuntimeFiles": [
+        {
+          "manifestName": "pinned-word-assets-manifest.json",
+          "sourcePath": "assets/qwen35/pinned-word-assets-manifest.json",
+          "bytes": 761512,
+          "sha256": "54256df07cde4990833d232acac1d6962d3945f1ccdd1957ff1a6fab773dac69"
+        },
+        {
+          "manifestName": "source-range-inventory.json",
+          "sourcePath": "assets/qwen35/source-range-inventory.json",
+          "bytes": 66164,
+          "sha256": "63f1106e10da5973d9e5c8ba58ec00e53d33fc61672b14cf0c3d767c3aa42f8e"
+        },
+        {
+          "manifestName": "r19/manifest.json",
+          "sourcePath": "assets/qwen35/r19/manifest.json",
+          "bytes": 2114,
+          "sha256": "6aa54189a087d199338ffe271e0469c9b719110ebac2363d637d2159419d7157"
+        },
+        {
+          "manifestName": "r19/fixture.json",
+          "sourcePath": "assets/qwen35/r19/fixture.json",
+          "bytes": 202061,
+          "sha256": "7989413cb90ce9f60d01d25a8a96ad86a4ab74212e234d8f650e7ad3a891e7a9"
+        },
+        {
+          "manifestName": "r19/weight-bindings.json",
+          "sourcePath": "assets/qwen35/r19/weight-bindings.json",
+          "bytes": 392846,
+          "sha256": "03604675d3bdbf6f8a7cef7dcc372c0626a0f4d0b9964ec06b200dc5918d5526"
+        },
+        {
+          "manifestName": "r19/qwen35-text-pointer.webgpu.wasm",
+          "sourcePath": "assets/qwen35/r19/qwen35-text-pointer.webgpu.wasm",
+          "bytes": 5772332,
+          "sha256": "cbad94d32d5839215646e711be9adc8cdf98797beab663e1c2c90e929f3dade3"
+        },
+        {
+          "manifestName": "vision/fixture.json",
+          "sourcePath": "assets/qwen35/vision/fixture.json",
+          "bytes": 336938,
+          "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+        },
+        {
+          "manifestName": "vision/weight-bindings.json",
+          "sourcePath": "assets/qwen35/vision/weight-bindings.json",
+          "bytes": 104081,
+          "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+        },
+        {
+          "manifestName": "vision/qwen35-dynamic-vision.webgpu.wasm",
+          "sourcePath": "assets/qwen35/vision/qwen35-dynamic-vision.webgpu.wasm",
+          "bytes": 4316202,
+          "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+        }
+      ],
+      "upstreams": [
+        {
+          "role": "base",
+          "repository": "Qwen/Qwen3.5-2B-Base",
+          "revision": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+          "sourcePath": "model.safetensors-00001-of-00001.safetensors",
+          "sourceBytes": 4548221488,
+          "sourceSha256": "928acbf11878c32185bbd863514d191769285065ab9ea14fbfe431303f5fdf2d"
+        },
+        {
+          "role": "lora",
+          "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+          "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+          "sourcePath": "lora/adapter_model.safetensors",
+          "sourceBytes": 201878888,
+          "sourceSha256": "ae1d0cd1ac3edec6df0a519a3ad18f1c382099032d493f8f98c96a80cfebb4c7"
+        },
+        {
+          "role": "head",
+          "repository": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+          "revision": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+          "sourcePath": "head.safetensors",
+          "sourceBytes": 12605928,
+          "sourceSha256": "ace56742545b505e6fae34ada85c8edbeedb23ba8974d8680aebe0380d6083a1"
+        }
+      ]
+    },
+    "mapika-decider-2b-v12": {
+      "schemaVersion": 1,
+      "manifest": {
+        "sourcePath": "assets/mapika2b/manifest.json",
+        "rawSha256": "da2f6c24bfa545d92b7658081913e47b39ad7cfaee5880c84f411fed0b7de561",
+        "canonicalSha256": "7f9d47b14426d7f7dea6cf9955e1d40f9a8a89fb6f564da1b39403a6a831d93a",
+        "canonicalBytes": 915,
+        "experimental": false,
+        "files": {
+          "text.wasm": {
+            "bytes": 4915210,
+            "sha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
+          },
+          "text-bindings.json": {
+            "bytes": 26768,
+            "sha256": "0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7"
+          },
+          "source-inventory.json": {
+            "bytes": 237949,
+            "sha256": "151295ce4b89e7dc049e1fb7420fda52670772cf391c27fc741e90182f617a60"
+          },
+          "vision/fixture.json": {
+            "bytes": 336938,
+            "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+          },
+          "vision/weight-bindings.json": {
+            "bytes": 104081,
+            "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+          },
+          "vision/qwen35-dynamic-vision.webgpu.wasm": {
+            "bytes": 4316202,
+            "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+          }
+        }
+      },
+      "bundledRuntimeFiles": [
+        {
+          "manifestName": "text.wasm",
+          "sourcePath": "assets/mapika2b/text.wasm",
+          "bytes": 4915210,
+          "sha256": "da20aa80a0dd0cb8b4e1c58ce6a0f313ffb5f82675e610be18dcc5805cfe70d4"
+        },
+        {
+          "manifestName": "text-bindings.json",
+          "sourcePath": "assets/mapika2b/text-bindings.json",
+          "bytes": 26768,
+          "sha256": "0e9c2076ea327a49f78be0c6098531c007cf414839920b80897a5e419f4ce6f7"
+        },
+        {
+          "manifestName": "source-inventory.json",
+          "sourcePath": "assets/mapika2b/source-inventory.json",
+          "bytes": 237949,
+          "sha256": "151295ce4b89e7dc049e1fb7420fda52670772cf391c27fc741e90182f617a60"
+        },
+        {
+          "manifestName": "vision/fixture.json",
+          "sourcePath": "assets/qwen35/vision/fixture.json",
+          "bytes": 336938,
+          "sha256": "aea3326f3d06b1e813b93e662a28b72c44f02b7030dd5328f4e71c4164418ede"
+        },
+        {
+          "manifestName": "vision/weight-bindings.json",
+          "sourcePath": "assets/qwen35/vision/weight-bindings.json",
+          "bytes": 104081,
+          "sha256": "340b604c8db09219cfb2aa79b2e930da1c5d1a0f07972263787f26a2c63dd60a"
+        },
+        {
+          "manifestName": "vision/qwen35-dynamic-vision.webgpu.wasm",
+          "sourcePath": "assets/qwen35/vision/qwen35-dynamic-vision.webgpu.wasm",
+          "bytes": 4316202,
+          "sha256": "4fa14d07c05c881ef3134fbdf16925e856401fb9608fcee2054d2b6d7aa10ec0"
+        }
+      ],
+      "upstreams": [
+        {
+          "role": "text",
+          "sourcePath": "model.safetensors",
+          "sourceBytes": 3763692048,
+          "sourceSha256": "1265b014ce710ef219eb137792705bc0e15a59f1c68460cf26394ae5416876e1",
+          "repository": "Mapika/decider-2b",
+          "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3"
+        },
+        {
+          "role": "vision",
+          "sourcePath": "vision/visual.safetensors",
+          "sourceBytes": 662866152,
+          "sourceSha256": "bf7a6edb1196c9478f63736079aef71d4b0faa98c3c37fcc09f0239cc53d1c97",
+          "repository": "Mapika/decider-2b",
+          "revision": "7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3"
+        }
+      ]
+    }
+  }
+}

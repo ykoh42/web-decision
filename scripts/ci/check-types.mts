@@ -25,7 +25,8 @@ export function checkConsumerTypes(consumer: string, typescriptCompiler = compil
     ['consumer.ts', 'kev-0.6b-q4f16'],
     ['kanana-consumer.ts', 'kanana-2-v-decide-3b-2611'],
     ['strands-qwen35-consumer.ts', 'strands-decider-2b-qwen3.5-v1-2610'],
-    ['mapika2b-consumer.ts', 'mapika-decider-2b-v12']
+    ['mapika2b-consumer.ts', 'mapika-decider-2b-v12'],
+    ['strands-gemma4-v2-consumer.ts', 'strands-decider-e2b-gemma4-v2-2611']
   ] as const) {
     const destination = join(consumer, name);
     if (APPROVED_MODEL_IDS.includes(modelId as (typeof APPROVED_MODEL_IDS)[number]))

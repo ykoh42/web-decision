@@ -39,13 +39,14 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog retains pinned TVM descriptors and includes curated Mapika', () => {
+test('catalog retains pinned TVM descriptors including pending Gemma', () => {
   assert.deepEqual(MODEL_IDS, [
     'kanana-2-v-decide-3b-2611',
     'strands-decider-2b-qwen3.5-v1-2610',
-    'mapika-decider-2b-v12'
+    'mapika-decider-2b-v12',
+    'strands-decider-e2b-gemma4-v2-2611'
   ]);
-  assert.equal(MODEL_CATALOG.length, 3);
+  assert.equal(MODEL_CATALOG.length, 4);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
   assert.equal(kanana, MODEL_CATALOG[0]);
@@ -102,6 +103,13 @@ test('catalog retains pinned TVM descriptors and includes curated Mapika', () =>
   assert.equal(mapika.description.checkpoint.revision, '7614a6c7ea5a047aa7d7bcfb1a0015469381c3e3');
   assert.equal(mapika.description.verification.currentBundleGpu, 'see-release-evidence');
   assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(mapika.modelId), true);
+
+  const gemma = MODEL_CATALOG_BY_ID['strands-decider-e2b-gemma4-v2-2611'];
+  assert.equal(gemma, MODEL_CATALOG[3]);
+  assert.equal(gemma.description.backend.name, 'tvm-webgpu');
+  assert.equal(gemma.description.features.imageChoice?.status, 'implemented');
+  assert.equal(gemma.artifacts.manifest.experimental, false);
+  assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(gemma.modelId), false);
 });
 
 test('public generated catalog and model ID type include verified models only', async () => {
@@ -352,8 +360,12 @@ test('artifact locks hash packaged manifests, runtime files, and model ranges', 
 
 test('generated files are deterministic and the ModelId union follows the curated spec', async () => {
   const typeFile = await readFile(packageFile('src/catalog/types.generated.d.ts'), 'utf8');
-  const expectedIdType = 'export type ModelId = ' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(' | ') + ';';
-  assert.ok(typeFile.includes(expectedIdType));
+  const idUnion = /^export type ModelId =([^;]+);/mu.exec(typeFile)?.[1];
+  assert.ok(idUnion);
+  assert.deepEqual(
+    [...idUnion.matchAll(/'([^']+)'/gu)].map((match) => match[1]),
+    MODEL_IDS
+  );
   const expectedTuple =
     'export type ModelIdTuple = readonly [' + MODEL_IDS.map((modelId) => "'" + modelId + "'").join(', ') + '];';
   assert.ok(typeFile.replace(/\s+/g, '').includes(expectedTuple.replace(/\s+/g, '')));

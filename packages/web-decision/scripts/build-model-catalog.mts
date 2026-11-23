@@ -874,6 +874,99 @@ async function createMapika2bArtifactLock(model: CuratedModel): Promise<CatalogA
   };
 }
 
+async function createGemma4V2ArtifactLock(model: CuratedModel): Promise<CatalogArtifactLock> {
+  const modelId = 'strands-decider-e2b-gemma4-v2-2611';
+  const repository = 'StrandsAgents/strands-decider-E2B-gemma4-v2-2611';
+  const revision = 'a5f32ea1bffe2e91c25c0c641d444e8115e28212';
+  const weightSha256 = '593a28a67754653c7ffffff80a5186f18966cc6262c2f4f097414c187e5fd48c';
+  const manifestPath = 'assets/strands-gemma4-v2/manifest.json';
+  const manifestHash = 'ec01a0e831d7329cc282a4a7e9015e2f9be8cc63800171caee958dc24b104a75';
+  const names = [
+    'graph.wasm',
+    'local.bin',
+    'global.bin',
+    'scoring.bin',
+    'source-inventory.json',
+    'decoder-bindings.json',
+    'vision-bindings.json'
+  ];
+  failUnless(
+    model.modelId === modelId &&
+      model.description.adapter === 'strands-gemma4-v2' &&
+      model.description.checkpoint.repository === repository &&
+      model.description.checkpoint.revision === revision &&
+      model.description.checkpoint.weightSha256 === weightSha256,
+    'Gemma v2 catalog checkpoint differs from its immutable pin.'
+  );
+  const manifestFile = await readJson(path.join(packageRoot, manifestPath));
+  const manifest = manifestFile.value;
+  failUnless(
+    sha256(manifestFile.bytes) === manifestHash &&
+      isRecord(manifest) &&
+      manifest.format === 'web-decision-strands-gemma4-v2-tvm-artifacts-v1' &&
+      manifest.modelId === modelId &&
+      manifest.repository === repository &&
+      manifest.revision === revision &&
+      manifest.backend === 'tvm-webgpu' &&
+      manifest.experimental === false &&
+      isRecord(manifest.files),
+    'Gemma v2 manifest differs from its immutable pin.'
+  );
+  failUnless(
+    JSON.stringify(Object.keys(manifest.files).sort()) === JSON.stringify([...names].sort()),
+    'Gemma v2 manifest file set differs from its pinned inventory.'
+  );
+  const files: Record<string, ManifestFile> = {};
+  const bundledRuntimeFiles: ModelArtifactLock['bundledRuntimeFiles'][number][] = [];
+  for (const name of names) {
+    const expected = manifest.files[name];
+    failUnless(
+      isRecord(expected) && typeof expected.sha256 === 'string' && Number.isSafeInteger(expected.bytes),
+      'Invalid Gemma v2 asset metadata: ' + name + '.'
+    );
+    const sourcePath = `assets/strands-gemma4-v2/${name}`;
+    const bytes = await readFile(path.join(packageRoot, sourcePath));
+    const digest = sha256(bytes);
+    failUnless(
+      expected.bytes === bytes.byteLength && expected.sha256 === digest,
+      'Gemma v2 asset differs from its pin: ' + name + '.'
+    );
+    files[name] = {bytes: bytes.byteLength, sha256: digest};
+    bundledRuntimeFiles.push({manifestName: name, sourcePath, bytes: bytes.byteLength, sha256: digest});
+  }
+  const canonicalBytes = canonicalManifestBytes(manifest);
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath: manifestPath,
+      rawSha256: manifestHash,
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: false,
+      files
+    },
+    bundledRuntimeFiles,
+    upstreams: [
+      {
+        role: 'checkpoint',
+        repository,
+        revision,
+        sourcePath: 'model.safetensors',
+        sourceBytes: 10246621918,
+        sourceSha256: weightSha256
+      },
+      {
+        role: 'readout',
+        repository,
+        revision,
+        sourcePath: 'readout.safetensors',
+        sourceBytes: 783472,
+        sourceSha256: '37b3f1c4670f1afb78007624e3ec2a2f55503d9b78602216e2f29a4cfb5111f6'
+      }
+    ]
+  };
+}
+
 export async function createModelArtifactLock(
   model: CuratedModel,
   options: Readonly<{directKevArtifactDirectory?: string}> = {}
@@ -883,6 +976,7 @@ export async function createModelArtifactLock(
   if (model.description.adapter === 'kanana') return createKananaArtifactLock(model);
   if (model.description.adapter === 'strands-qwen35') return createQwen35ArtifactLock(model);
   if (model.description.adapter === 'mapika2b') return createMapika2bArtifactLock(model);
+  if (model.description.adapter === 'strands-gemma4-v2') return createGemma4V2ArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
@@ -980,7 +1074,8 @@ function renderPublicCatalogModule(models: readonly CuratedModel[], artifactLock
       }
     };
   });
-  return `import type {CatalogModelDescription, ModelId} from './types.generated.js';
+  return `import type {CatalogModelDescription} from './types.generated.js';
+import type {PublicModelId as ModelId} from '../curated/public-model-id.generated.js';
 
 type PublicCatalogEntry = Readonly<{modelId: ModelId; description: CatalogModelDescription}>;
 
@@ -1029,6 +1124,7 @@ export function publicLoadOptionsForAdapter(adapter: string): readonly string[] 
   if (adapter === 'kev06') return [...commonOptions, 'maxPrefetchBytes', 'maxInputTokens', 'maxInputCharacters'];
   if (adapter === 'kanana' || adapter === 'strands-qwen35') return commonOptions;
   if (adapter === 'mapika2b') return [...commonOptions, 'temperature', 'temperatureByType', 'limits'];
+  if (adapter === 'strands-gemma4-v2') return [...commonOptions, 'maxLength'];
   throw new Error('No public load options are defined for adapter ' + adapter + '.');
 }
 
@@ -1217,6 +1313,11 @@ async function main(): Promise<void> {
   const approvedModelIds = new Set(provenance.modelIds.filter((modelId) => !pendingModelIds.has(modelId)));
   const approvedModels = models.filter(({modelId}) => approvedModelIds.has(modelId));
   failUnless(approvedModels.length === approvedModelIds.size, 'Approved provenance references an unknown model.');
+  for (const model of approvedModels)
+    failUnless(
+      artifactLock.byModelId[model.modelId]?.manifest.experimental === false,
+      'Approved models must not use experimental artifacts: ' + model.modelId + '.'
+    );
   const types = renderTypeFiles(models);
   const outputs: readonly (readonly [string, string])[] = [
     [path.join(catalogRoot, 'artifacts.lock.json'), renderJson(artifactLock)],

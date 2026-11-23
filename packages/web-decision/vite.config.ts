@@ -85,6 +85,7 @@ export default defineConfig({
       output: {
         assetFileNames(assetInfo) {
           const sourcePath = assetInfo.originalFileName?.replaceAll('\\', '/') ?? '';
+          if (sourcePath.includes('assets/strands-gemma4-v2/')) return 'gemma4-v2/[name].[ext]';
           return sourcePath.includes('assets/qwen35/') ? 'qwen35/[hash]/[name].[ext]' : '[name].[ext]';
         }
       }

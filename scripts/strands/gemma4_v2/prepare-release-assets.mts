@@ -1,0 +1,59 @@
+import {createHash} from 'node:crypto';
+import {mkdir, readFile, realpath, writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
+
+// This prepares a pending artifact set; it does not enable or approve the public model.
+const root = fileURLToPath(new URL('../../../', import.meta.url));
+const target = resolve(root, 'packages/web-decision/assets/strands-gemma4-v2');
+const expected = {
+  'graph.wasm': {bytes: 5504091, sha256: 'd59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86'},
+  'local.bin': {bytes: 512, sha256: 'cc63341a0ac42a60b986ed638fd0d45b838b72fabeffec059c463eac4ed9ea15'},
+  'global.bin': {bytes: 1024, sha256: '71a80d617056a8be95eeeb385ebcc01c7fb2c73d5430a8ce862ed6c94179d076'},
+  'scoring.bin': {bytes: 746272, sha256: '8976812e52bc591dee1a1b891d427b16eb0bf641ea61299a518276d35e6da3ad'},
+  'source-inventory.json': {bytes: 1067697, sha256: 'c4c1f9ca91d272d88f2559dd186fa0d37e878fa70d378c44a20de978179366aa'},
+  'decoder-bindings.json': {bytes: 71540, sha256: 'd559f57f95338b9b90429b61baf367f5e8a18b186013ec377c6e9aeb253d951c'},
+  'vision-bindings.json': {bytes: 122912, sha256: '23255ad23212dc2d286ed58d2a09deed429b0aac2895536699a4ddb41be2616f'}
+};
+const [graph, independentGraph, positions] = process.argv.slice(2);
+if (!graph || !independentGraph || !positions)
+  throw new Error('Usage: prepare-release-assets.mts <graph> <independent-graph> <positions-directory>');
+if ((await realpath(graph)) === (await realpath(independentGraph)))
+  throw new Error('Use distinct independently rebuilt graph files.');
+const paths = {
+  'graph.wasm': graph,
+  'local.bin': resolve(positions, 'local.bin'),
+  'global.bin': resolve(positions, 'global.bin'),
+  'scoring.bin': resolve(target, 'scoring.bin'),
+  'source-inventory.json': resolve(target, 'source-inventory.json'),
+  'decoder-bindings.json': resolve(target, 'decoder-bindings.json'),
+  'vision-bindings.json': resolve(target, 'vision-bindings.json')
+};
+async function verified(path: string, pin: {bytes: number; sha256: string}): Promise<Buffer> {
+  const data = await readFile(path);
+  if (data.length !== pin.bytes || createHash('sha256').update(data).digest('hex') !== pin.sha256)
+    throw new Error(`Asset differs from its pinned reference: ${path}`);
+  return data;
+}
+const entries = await Promise.all(
+  Object.entries(paths).map(
+    async ([name, path]) => [name, await verified(path, expected[name as keyof typeof expected])] as const
+  )
+);
+await verified(independentGraph, expected['graph.wasm']);
+await mkdir(target, {recursive: true});
+for (const [name, data] of entries) await writeFile(resolve(target, name), data);
+const files = Object.fromEntries(
+  entries.map(([name, data]) => [name, {bytes: data.length, sha256: createHash('sha256').update(data).digest('hex')}])
+);
+const manifest = {
+  format: 'web-decision-strands-gemma4-v2-tvm-artifacts-v1',
+  modelId: 'strands-decider-e2b-gemma4-v2-2611',
+  repository: 'StrandsAgents/strands-decider-E2B-gemma4-v2-2611',
+  revision: 'a5f32ea1bffe2e91c25c0c641d444e8115e28212',
+  backend: 'tvm-webgpu',
+  experimental: false,
+  files
+};
+await writeFile(resolve(target, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+console.log(`Prepared pending Gemma v2 artifacts in ${target}`);

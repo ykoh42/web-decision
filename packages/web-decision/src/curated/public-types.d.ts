@@ -74,7 +74,16 @@ export type StrandsQwen35ModelId = Extract<ModelId, 'strands-decider-2b-qwen3.5-
 export type StrandsQwen35LoadOptions = StrandsQwen35CandidateLoadOptions & Readonly<{modelId: StrandsQwen35ModelId}>;
 export type Mapika2bModelId = Extract<ModelId, 'mapika-decider-2b-v12'>;
 export type Mapika2bCuratedLoadOptions = Mapika2bLoadOptions & Readonly<{modelId: Mapika2bModelId}>;
-export type LoadOptions = KananaLoadOptions | StrandsQwen35LoadOptions | Mapika2bCuratedLoadOptions;
+export type StrandsGemma4V2ModelId = Extract<ModelId, 'strands-decider-e2b-gemma4-v2-2611'>;
+export interface StrandsGemma4V2LoadOptions extends Omit<CommonLoadOptions, 'modelId'> {
+  readonly modelId: StrandsGemma4V2ModelId;
+  readonly maxLength?: number;
+}
+export type LoadOptions =
+  | KananaLoadOptions
+  | StrandsQwen35LoadOptions
+  | Mapika2bCuratedLoadOptions
+  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2LoadOptions);
 export type * from './mapika2b-types.js';
 
 export interface ModelDescription {
@@ -216,16 +225,72 @@ export interface KananaDecisionModel {
 }
 
 export type StrandsQwen35DecisionModel = StrandsQwen35LoadedCandidateModel<StrandsQwen35ModelId>;
+export type StrandsGemma4V2Content =
+  | string
+  | Readonly<Record<string, unknown>>
+  | ReadonlyMap<string, unknown>
+  | readonly unknown[];
+export type StrandsGemma4V2Dictionary<T> = Readonly<Record<string, T>> | ReadonlyMap<string, T>;
+export interface StrandsGemma4V2Question {
+  readonly type?: 'choice' | 'noul' | 'score';
+  readonly instructions: StrandsGemma4V2Content;
+  readonly criteria?: StrandsGemma4V2Dictionary<StrandsGemma4V2Content | null> | readonly string[] | null;
+}
+
+export interface StrandsGemma4V2SystemOneRequest {
+  readonly model?: string;
+  readonly state?: StrandsGemma4V2Content;
+  readonly questions: StrandsGemma4V2Dictionary<StrandsGemma4V2Question>;
+  readonly images?: readonly string[];
+}
+
+export interface StrandsGemma4V2SystemOneOptions {
+  readonly signal?: AbortSignal | null;
+  readonly maxLength?: number;
+}
+
+export type StrandsGemma4V2SystemOneAnswer =
+  | Readonly<{type: 'noul'; noul: number}>
+  | Readonly<{type: 'choice'; choice: string; probabilities: Readonly<Record<string, number>>; confidence: number}>
+  | Readonly<{
+      type: 'score';
+      score: number;
+      legend: Readonly<Record<string, StrandsGemma4V2Content | null>>;
+      probabilities: Readonly<Record<string, number>>;
+      confidence: number;
+    }>;
+
+export interface StrandsGemma4V2SystemOneResult {
+  readonly model: StrandsGemma4V2ModelId;
+  readonly answers: Readonly<Record<string, StrandsGemma4V2SystemOneAnswer>>;
+  readonly usage: Readonly<{input_tokens: number; output_tokens: number}>;
+}
+
+export interface StrandsGemma4V2DecisionModel {
+  readonly modelId: StrandsGemma4V2ModelId;
+  readonly description: ModelDescription;
+  systemOne(
+    request: StrandsGemma4V2SystemOneRequest,
+    options?: StrandsGemma4V2SystemOneOptions | null
+  ): Promise<StrandsGemma4V2SystemOneResult>;
+  releaseCachedMemory(): Promise<void>;
+  prepareOffline(options?: {signal?: AbortSignal; onProgress?: (progress: ModelProgress) => void}): Promise<void>;
+  isOfflineReady(signal?: AbortSignal | null): Promise<boolean>;
+  dispose(): Promise<void>;
+}
+
 export type LoadedDecisionModel =
   | KananaDecisionModel
   | (StrandsQwen35ModelId extends never ? never : StrandsQwen35DecisionModel)
-  | (Mapika2bModelId extends never ? never : Mapika2bDecisionModel<Mapika2bModelId>);
+  | (Mapika2bModelId extends never ? never : Mapika2bDecisionModel<Mapika2bModelId>)
+  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2DecisionModel);
 
 export function listModels(): readonly ModelDescription[];
 export function describeModel(modelId: ModelId): ModelDescription;
 export function loadDecisionModel(options: KananaLoadOptions): Promise<KananaDecisionModel>;
 export function loadDecisionModel(options: StrandsQwen35LoadOptions): Promise<StrandsQwen35DecisionModel>;
 export function loadDecisionModel(options: Mapika2bCuratedLoadOptions): Promise<Mapika2bDecisionModel<Mapika2bModelId>>;
+export function loadDecisionModel(options: StrandsGemma4V2LoadOptions): Promise<StrandsGemma4V2DecisionModel>;
 export function loadDecisionModel(options: LoadOptions): Promise<LoadedDecisionModel>;
 export function loadDecisionModel(options: CommonLoadOptions): Promise<LoadedDecisionModel>;
 export function clearModelCache(): Promise<boolean>;

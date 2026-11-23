@@ -21,6 +21,7 @@ const PACKAGE_ROOT = join(WORKSPACE_ROOT, 'packages/web-decision');
 const MODEL_SPEC_PATH = join(PACKAGE_ROOT, 'src/catalog/model-spec.json');
 const ARTIFACT_LOCK_PATH = join(PACKAGE_ROOT, 'src/catalog/artifacts.lock.json');
 const TEST_EVIDENCE_PATH = join(WORKSPACE_ROOT, 'scripts/release/fixtures/model-provenance-test-fixture.json');
+const GEMMA_V2_MODEL_ID = 'strands-decider-e2b-gemma4-v2-2611';
 const QWEN_MODEL_ID = 'strands-decider-2b-qwen3.5-v1-2610';
 type ModelProvenanceRecord = {modelId: string; status: string; evidence: {path: string; sha256: string}};
 
@@ -82,7 +83,12 @@ test('the provenance manifest covers every locked curated model', async () => {
   const lockIds = Object.keys((artifactLock as {byModelId: Record<string, unknown>}).byModelId).sort();
   const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
   const manifestIds = manifest.models.map(({modelId}) => modelId).sort();
-  assert.deepEqual(catalogIds, ['kanana-2-v-decide-3b-2611', 'mapika-decider-2b-v12', QWEN_MODEL_ID]);
+  assert.deepEqual(catalogIds, [
+    'kanana-2-v-decide-3b-2611',
+    'mapika-decider-2b-v12',
+    QWEN_MODEL_ID,
+    GEMMA_V2_MODEL_ID
+  ]);
   assert.deepEqual(manifestIds, catalogIds);
   assert.deepEqual(lockIds, catalogIds);
   assert.equal(sha256(manifestBytes), MODEL_PROVENANCE_MANIFEST_SHA256);
@@ -90,6 +96,30 @@ test('the provenance manifest covers every locked curated model', async () => {
   assert.deepEqual(
     result.pendingModelIds,
     manifest.models.filter(({status}) => status === 'pending').map(({modelId}) => modelId)
+  );
+});
+
+test('the pending Gemma lock passes main provenance and fails release provenance', async () => {
+  const {manifestBytes} = await readProductionInputs();
+  const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
+  assert.equal(manifest.models.find(({modelId}) => modelId === GEMMA_V2_MODEL_ID)?.status, 'pending');
+  assert.deepEqual((await validateTemporaryManifest(manifestBytes, {allowPending: true})).pendingModelIds, [
+    GEMMA_V2_MODEL_ID
+  ]);
+  await assert.rejects(
+    validateTemporaryManifest(manifestBytes),
+    /strands-decider-e2b-gemma4-v2-2611 provenance is pending/u
+  );
+});
+
+test('a locked Gemma model without a provenance entry fails closed', async () => {
+  const inputs = await readProductionInputs();
+  const manifest = JSON.parse(inputs.manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
+  manifest.models = manifest.models.filter(({modelId}) => modelId !== GEMMA_V2_MODEL_ID);
+  const incomplete = Buffer.from(JSON.stringify(manifest));
+  await assert.rejects(
+    validateTemporaryManifest(incomplete, {expectedSha256: sha256(incomplete), allowPending: true}),
+    /Provenance model IDs must exactly match/u
   );
 });
 
@@ -293,6 +323,40 @@ test('verified provenance requires immutable lineage, pinned conversion, and exp
   });
   assert.deepEqual(checked.modelIds, [modelId]);
   assert.equal(checked.artifactLockSha256, artifactLockSha256);
+
+  // Gemma's packaged license and notice can be pinned as exact, hashed evidence.
+  for (const name of ['STRANDS-GEMMA4-V2-LICENSE', 'STRANDS-GEMMA4-V2-NOTICE']) {
+    const rightsPath = `packages/web-decision/${name}`;
+    const rightsBytes = Buffer.from(`test ${name}`);
+    await mkdir(join(temporaryRoot, 'packages/web-decision'), {recursive: true});
+    await writeFile(join(temporaryRoot, rightsPath), rightsBytes);
+    const candidate = structuredClone(verifiedEvidence);
+    candidate.rights[0]!.evidence = {path: rightsPath, sha256: sha256(rightsBytes)};
+    const candidateBytes = Buffer.from(`${JSON.stringify(candidate, null, 2)}\n`);
+    await writeFile(join(provenanceRoot, `${modelId}.json`), candidateBytes);
+    const candidateManifest = JSON.parse(manifestBytes.toString('utf8')) as {
+      models: Array<{evidence: {sha256: string}}>;
+    };
+    candidateManifest.models[0]!.evidence.sha256 = sha256(candidateBytes);
+    const candidateManifestBytes = Buffer.from(JSON.stringify(candidateManifest));
+    const validate = () =>
+      validateModelProvenance({
+        packageRoot,
+        workspaceRoot: temporaryRoot,
+        modelSpec: verifiedSpec,
+        artifactLock,
+        artifactLockBytes,
+        manifestBytes: candidateManifestBytes,
+        expectedManifestSha256: sha256(candidateManifestBytes),
+        expectedEvidenceRoot: MODEL_PROVENANCE_EVIDENCE_ROOT,
+        allowTestFixture: false,
+        requireCommitted: false
+      });
+    await validate();
+    await writeFile(join(temporaryRoot, rightsPath), 'tampered');
+    await assert.rejects(validate(), /SHA-256 mismatch/u);
+  }
+  await writeFile(join(provenanceRoot, `${modelId}.json`), evidenceBytes);
 
   // Run the historical-lock checks before mutating this shared fixture.
   {
