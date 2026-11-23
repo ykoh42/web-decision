@@ -27,7 +27,11 @@ import {
   verifyReleaseArtifactsForTestFixture,
   verifyReleaseEvidence,
   validateKananaCombinedPin,
+  assertKananaCurrentModelIds,
+  assertKananaCurrentCatalogIds,
+  bindKananaArchivePolicy,
   verifyKananaCombinedReleaseEvidence,
+  verifyKananaCurrentReleaseEvidence,
   validateRuntimeAssetConfiguration
 } from './verify-release-evidence.ts';
 import {
@@ -1051,13 +1055,40 @@ test('requires separate Kanana combined candidate and release pin schemas', () =
   }
 });
 
+test('current Kanana archive binding preserves every legacy model and test requirement', () => {
+  const legacy = validateKananaEvidencePolicy(POLICY.kanana);
+  const oldArchive = {...legacy.archive};
+  const bound = bindKananaArchivePolicy(legacy, {packageVersion: '0.6.0', archiveSha256: 'a'.repeat(64)});
+  assert.deepEqual({...bound, archive: oldArchive}, legacy);
+  assert.deepEqual(legacy.archive, oldArchive);
+  assert.deepEqual(bound.archive, {packageName: 'web-decision', packageVersion: '0.6.0', sha256: 'a'.repeat(64)});
+});
+
+test('the current archive requires all existing models with verified provenance', () => {
+  const required = ['kanana-2-v-decide-3b-2611', 'strands-decider-2b-qwen3.5-v1-2610', 'mapika-decider-2b-v12'];
+  assert.doesNotThrow(() => assertKananaCurrentModelIds(required, []));
+  const four = [...required, 'strands-decider-e2b-gemma4-v2-2611'];
+  assert.doesNotThrow(() => assertKananaCurrentCatalogIds(four, [], [...four].reverse()));
+  assert.throws(() => assertKananaCurrentCatalogIds(four, [], required), /catalog differs/u);
+  assert.throws(() => assertKananaCurrentCatalogIds(required, [], four), /catalog differs/u);
+  assert.throws(() => assertKananaCurrentCatalogIds(four, [four[3]!], four), /must be verified/u);
+  assert.throws(() => assertKananaCurrentModelIds(required.slice(0, 2), []), /missing model provenance/u);
+  assert.throws(() => assertKananaCurrentModelIds([...required, required[0]!], []), /duplicate model/u);
+  assert.throws(() => assertKananaCurrentModelIds(required, [required[1]!]), /must be verified/u);
+});
+
 test('combined candidate collection cannot affect strict historical or combined release verification', async (t) => {
   const fixture = await makeFixture();
   const variable = 'WEB_DECISION_KANANA_COMBINED_CANDIDATE';
+  const currentVariable = 'WEB_DECISION_KANANA_CURRENT_CANDIDATE';
   const previous = process.env[variable];
+  const previousCurrent = process.env[currentVariable];
+  delete process.env[currentVariable];
   t.after(async () => {
     if (previous === undefined) delete process.env[variable];
     else process.env[variable] = previous;
+    if (previousCurrent === undefined) delete process.env[currentVariable];
+    else process.env[currentVariable] = previousCurrent;
     await rm(fixture.root, {recursive: true, force: true});
   });
   const archive = await verifyArchiveInstall(fixture.archivePath, fixture.packageRoot);
@@ -1090,6 +1121,33 @@ test('combined candidate collection cannot affect strict historical or combined 
   await assert.rejects(
     verifyKananaCombinedReleaseEvidence({...options, workspaceRoot: fixture.root}),
     /kanana-combined-release\.json/u
+  );
+  await assert.rejects(
+    verifyKananaCurrentReleaseEvidence({...options, workspaceRoot: fixture.root}),
+    /kanana-current-release\.json/u
+  );
+  await assert.rejects(
+    verifyKananaCurrentReleaseEvidence({...options, candidateConfigPath: pinPath}),
+    /missing its pinned manifest/u
+  );
+  const wrongPinPath = join(fixture.root, 'wrong-candidate.json');
+  await writeFile(
+    wrongPinPath,
+    JSON.stringify({schemaVersion: 1, packageVersion: archive.packageVersion, archiveSha256: '0'.repeat(64)})
+  );
+  await assert.rejects(
+    verifyKananaCurrentReleaseEvidence({...options, candidateConfigPath: wrongPinPath}),
+    /pinned npm archive/u
+  );
+  process.env[currentVariable] = pinPath;
+  await assert.rejects(
+    collectKananaReleaseEvidenceInputs({...paths, localCandidate: true}),
+    /only one Kanana candidate/u
+  );
+  delete process.env[variable];
+  await assert.rejects(
+    collectKananaReleaseEvidenceInputs({...paths, localCandidate: true}),
+    /missing its pinned manifest/u
   );
 });
 

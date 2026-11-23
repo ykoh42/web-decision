@@ -1,4 +1,5 @@
 import {decode as decodePng} from 'fast-png';
+import {unzlibSync} from 'fflate';
 import decodeJpeg from '@jsquash/jpeg/decode.js';
 import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
 import {packKananaImagePatches, resizePillowBicubic} from '../kanana/image-processing.ts';
@@ -19,7 +20,15 @@ const trimPythonWhitespaceStart = new RegExp(`^${PYTHON_WHITESPACE}+`, 'u');
 const trimPythonWhitespaceEnd = new RegExp(`${PYTHON_WHITESPACE}+$`, 'u');
 
 type ImageFormat = 'png' | 'jpeg' | 'gif' | 'webp';
-type ImageHeader = Readonly<{format: ImageFormat; width: number; height: number; components?: number}>;
+type GifFrame = Readonly<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: readonly [number, number, number];
+  preserveTransparentRgb: boolean;
+}>;
+type ImageHeader = Readonly<{format: ImageFormat; width: number; height: number; components?: number; gif?: GifFrame}>;
 type DecodedImage = Readonly<{width: number; height: number; rgb: Uint8Array}>;
 type MagickModule = typeof import('@imagemagick/magick-wasm');
 type MagickWasm = URL | ByteArray | WebAssembly.Module;
@@ -80,6 +89,60 @@ function hasAscii(bytes: Uint8Array, offset: number, text: string): boolean {
   return true;
 }
 
+function tiffOrientationValue(bytes: Uint8Array, entry: number, origin: number, little: boolean): number | undefined {
+  const type = readU16(bytes, entry + 2, little);
+  const count = readU32(bytes, entry + 4, little);
+  const sizes: Readonly<Record<number, number>> = {
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 4,
+    5: 8,
+    6: 1,
+    7: 1,
+    8: 2,
+    9: 4,
+    10: 8,
+    11: 4,
+    12: 8,
+    13: 4,
+    16: 8
+  };
+  const size = sizes[type];
+  if (!size || count === 0) return undefined;
+  const total = count * size;
+  const position = total <= 4 ? entry + 8 : origin + readU32(bytes, entry + 8, little);
+  if (position < 0 || total > bytes.length - position) return undefined;
+  // Pillow exposes BYTE, ASCII and UNDEFINED as byte or string values, not numeric orientations.
+  if (type === 1 || type === 2 || type === 7) return 1;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  switch (type) {
+    case 3:
+      return view.getUint16(position, little);
+    case 4:
+    case 13:
+      return view.getUint32(position, little);
+    case 5:
+      return view.getUint32(position, little) / view.getUint32(position + 4, little);
+    case 6:
+      return view.getInt8(position);
+    case 8:
+      return view.getInt16(position, little);
+    case 9:
+      return view.getInt32(position, little);
+    case 10:
+      return view.getInt32(position, little) / view.getInt32(position + 4, little);
+    case 11:
+      return view.getFloat32(position, little);
+    case 12:
+      return view.getFloat64(position, little);
+    case 16:
+      return Number(view.getBigUint64(position, little));
+    default:
+      return undefined;
+  }
+}
+
 function tiffOrientation(bytes: Uint8Array): number | undefined {
   const offset = hasAscii(bytes, 0, 'Exif\0\0') ? 6 : 0;
   if (offset + 8 > bytes.length) throw new TypeError('Image EXIF header is truncated.');
@@ -92,19 +155,14 @@ function tiffOrientation(bytes: Uint8Array): number | undefined {
     const entry = directory + 2 + index * 12;
     const tag = readU16(bytes, entry, little);
     if (tag !== 0x0112) continue;
-    const type = readU16(bytes, entry + 2, little);
-    const count = readU32(bytes, entry + 4, little);
-    if (type !== 3 || count < 1) throw new TypeError('Image EXIF orientation field is invalid.');
-    const value =
-      count === 1
-        ? readU16(bytes, entry + 8, little)
-        : readU16(bytes, offset + readU32(bytes, entry + 8, little), little);
-    if (value < 1 || value > 8) throw new TypeError('Image EXIF orientation must be between 1 and 8.');
-    return value;
+    const value = tiffOrientationValue(bytes, entry, offset, little);
+    if (value === undefined) return undefined;
+    return Number.isInteger(value) && value >= 1 && value <= 8 ? value : 1;
   }
   return undefined;
 }
 
+const PNG_METADATA_LIMIT = 1024 * 1024;
 const PNG_XMP = 'XML:com.adobe.xmp';
 const PNG_RAW_EXIF = 'Raw profile type exif';
 type PngTextChunk = {type: string; data: Uint8Array};
@@ -123,7 +181,16 @@ async function readPngText(chunk: PngTextChunk | undefined): Promise<string> {
     if (data[0] === 0) return decoder.decode(data.subarray(start));
     if (data[1] !== 0) return '';
   }
-  const compressed = new Blob([data.slice(start)]).stream();
+  // Keep the amount of output buffered by any single transform bounded as well.
+  const compressed = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    pull(controller) {
+      if (start >= data.length) controller.close();
+      else {
+        controller.enqueue(data.slice(start, start + 1024));
+        start += 1024;
+      }
+    }
+  });
   const reader = compressed.pipeThrough(new DecompressionStream('deflate')).getReader();
   let size = 0;
   let text = '';
@@ -131,12 +198,119 @@ async function readPngText(chunk: PngTextChunk | undefined): Promise<string> {
     const {done, value} = await reader.read();
     if (done) return text + decoder.decode();
     size += value.byteLength;
-    if (size > 1024 * 1024) {
-      await reader.cancel();
+    if (size > PNG_METADATA_LIMIT) {
+      await reader.cancel().catch(() => {});
       throw new RangeError('PNG text exceeds the Pillow decompression limit of 1 MiB.');
     }
     text += decoder.decode(value, {stream: true});
   }
+}
+
+function* pngChunks(bytes: Uint8Array) {
+  for (let offset = 8; offset + 12 <= bytes.length;) {
+    const length = readU32(bytes, offset);
+    const payload = offset + 8;
+    const end = payload + length + 4;
+    if (end > bytes.length) throw new TypeError('PNG chunk is truncated.');
+    const type = String.fromCharCode(...bytes.subarray(offset + 4, payload));
+    yield {type, data: bytes.subarray(payload, payload + length)};
+    if (type === 'IEND') return;
+    offset = end;
+  }
+  throw new TypeError('PNG has no complete IEND chunk.');
+}
+
+const PNG_SINGLETON_CHUNKS = new Set(['IHDR', 'PLTE', 'tRNS', 'iCCP']);
+const PNG_CHANNELS: Readonly<Partial<Record<number, number>>> = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4};
+const PNG_SCANLINE_PASS = [[0, 0, 1, 1]] as const;
+const PNG_ADAM7_PASSES = [
+  [0, 0, 8, 8],
+  [4, 0, 8, 8],
+  [0, 4, 4, 8],
+  [2, 0, 4, 4],
+  [0, 2, 2, 4],
+  [1, 0, 2, 2],
+  [0, 1, 1, 2]
+] as const;
+
+function pngFilteredSize(bytes: Uint8Array, {width, height}: ImageHeader): number {
+  const depth = bytes[24] ?? 0;
+  const channels = PNG_CHANNELS[bytes[25] ?? -1];
+  if (!channels || ![1, 2, 4, 8, 16].includes(depth) || (depth < 8 && channels !== 1))
+    throw new TypeError('PNG has an unsupported channel layout or bit depth.');
+  const interlace = bytes[28];
+  if (interlace !== 0 && interlace !== 1) throw new TypeError('PNG has an unsupported interlace method.');
+  const passes = interlace === 1 ? PNG_ADAM7_PASSES : PNG_SCANLINE_PASS;
+  let size = 0;
+  for (const [x, y, stepX, stepY] of passes) {
+    const columns = Math.ceil((width - x) / stepX);
+    const rows = Math.ceil((height - y) / stepY);
+    // Each non-empty scanline is byte-aligned and starts with a filter byte.
+    if (columns > 0 && rows > 0) size += rows * (1 + Math.ceil((columns * channels * depth) / 8));
+  }
+  return size;
+}
+
+function boundedPngInflatedSize(data: Uint8Array, limit: number, message: string): number {
+  // fflate truncates output to the buffer size. The extra byte detects overflow.
+  let size: number;
+  try {
+    size = unzlibSync(data, {out: new Uint8Array(limit + 1)}).length;
+  } catch (error) {
+    if (error instanceof RangeError) throw new RangeError(message, {cause: error});
+    throw error;
+  }
+  if (size > limit) throw new RangeError(message);
+  return size;
+}
+
+function validatePngChunk(type: string, data: Uint8Array, seen: Set<string>): void {
+  if (PNG_SINGLETON_CHUNKS.has(type)) {
+    if (seen.has(type)) throw new TypeError(`PNG has more than one ${type} chunk.`);
+    seen.add(type);
+  }
+  if ((type === 'PLTE' && data.length > 768) || (type === 'tRNS' && data.length > 256))
+    throw new TypeError('PNG palette or transparency chunk exceeds its maximum size.');
+  if (type !== 'iCCP') return;
+  const nameEnd = data.indexOf(0);
+  if (nameEnd < 1 || nameEnd > 79 || data[nameEnd + 1] !== 0) throw new TypeError('PNG ICC profile header is invalid.');
+  boundedPngInflatedSize(
+    data.subarray(nameEnd + 2),
+    PNG_METADATA_LIMIT,
+    'PNG ICC profile exceeds the Pillow decompression limit of 1 MiB.'
+  );
+}
+
+function pngImageData(bytes: Uint8Array): Uint8Array {
+  let first: Uint8Array = new Uint8Array(0);
+  let size = 0;
+  const seen = new Set<string>();
+  for (const {type, data} of pngChunks(bytes)) {
+    if (type !== 'IDAT') validatePngChunk(type, data, seen);
+    else {
+      if (size === 0) first = data;
+      size += data.length;
+    }
+  }
+  if (size === first.length) return first;
+  const combined = new Uint8Array(size);
+  let position = 0;
+  for (const {type, data} of pngChunks(bytes)) {
+    if (type !== 'IDAT') continue;
+    combined.set(data, position);
+    position += data.length;
+  }
+  return combined;
+}
+
+function validatePngImageData(bytes: Uint8Array, header: ImageHeader): void {
+  const expected = pngFilteredSize(bytes, header);
+  const actual = boundedPngInflatedSize(
+    pngImageData(bytes),
+    expected,
+    'PNG decompressed data exceeds the size of its declared scanlines.'
+  );
+  if (actual !== expected) throw new TypeError('PNG decoder returned incomplete scanline data.');
 }
 
 function rawProfileExif(text: string): Uint8Array | undefined {
@@ -157,21 +331,12 @@ function xmpOrientation(text: string): number {
 async function pngOrientation(bytes: Uint8Array): Promise<number> {
   let exif: Uint8Array | undefined;
   const text = new Map<string, PngTextChunk>();
-  let offset = 8;
-  while (offset + 12 <= bytes.length) {
-    const length = readU32(bytes, offset);
-    const payload = offset + 8;
-    const next = payload + length + 4;
-    if (next > bytes.length) throw new TypeError('PNG chunk is truncated.');
-    const type = String.fromCharCode(...bytes.subarray(offset + 4, payload));
-    const data = bytes.subarray(payload, payload + length);
-    if (type === 'IEND') break;
+  for (const {type, data} of pngChunks(bytes)) {
     if (type === 'eXIf') exif = data;
     if (['tEXt', 'zTXt', 'iTXt'].includes(type)) {
       const keyword = [PNG_RAW_EXIF, PNG_XMP].find((name) => hasAscii(data, 0, name + '\0'));
       if (keyword) text.set(keyword, {type, data: data.subarray(keyword.length + 1)});
     }
-    offset = next;
   }
   // Pillow uses the raw profile only when native EXIF is absent, then consults XMP for a missing orientation tag.
   exif ??= rawProfileExif(await readPngText(text.get(PNG_RAW_EXIF)));
@@ -202,7 +367,8 @@ function readJpegFrame(bytes: Uint8Array, offset: number, length: number): JpegF
 
 function jpegHeader(bytes: Uint8Array): JpegFrame & {orientation: number} {
   let offset = 2;
-  let orientation = 1;
+  let orientation: number | undefined;
+  let xmp = '';
   let frame: JpegFrame | undefined;
   while (offset < bytes.length) {
     offset = jpegMarkerOffset(bytes, offset);
@@ -212,12 +378,14 @@ function jpegHeader(bytes: Uint8Array): JpegFrame & {orientation: number} {
     const length = readU16(bytes, offset);
     if (length < 2 || offset + length > bytes.length) throw new TypeError('JPEG segment is truncated.');
     if (marker === 0xe1 && hasAscii(bytes, offset + 2, 'Exif\0\0'))
-      orientation = tiffOrientation(bytes.subarray(offset + 2, offset + length)) ?? 1;
+      orientation = tiffOrientation(bytes.subarray(offset + 2, offset + length));
+    else if (marker === 0xe1 && hasAscii(bytes, offset + 2, 'http://ns.adobe.com/xap/1.0/\0'))
+      xmp = new TextDecoder().decode(bytes.subarray(offset + 31, offset + length));
     if (JPEG_FRAME_MARKERS.includes(marker)) frame = readJpegFrame(bytes, offset, length);
     offset += length;
   }
   if (!frame) throw new TypeError('JPEG has no supported frame header.');
-  return {...frame, orientation};
+  return {...frame, orientation: orientation ?? xmpOrientation(xmp)};
 }
 
 function webpHeader(bytes: Uint8Array): {width: number; height: number; orientation: number} {
@@ -225,7 +393,8 @@ function webpHeader(bytes: Uint8Array): {width: number; height: number; orientat
   const end = Math.min(bytes.length, 8 + readU32(bytes, 4, true));
   let offset = 12;
   let dimensions: {width: number; height: number} | undefined;
-  let orientation = 1;
+  let orientation: number | undefined;
+  let xmp = '';
   while (offset + 8 <= end) {
     const length = readU32(bytes, offset + 4, true);
     const payload = offset + 8;
@@ -250,12 +419,88 @@ function webpHeader(bytes: Uint8Array): {width: number; height: number; orientat
         height: 1 + ((bits1 & 0xc0) >> 6) + (bits2 << 2) + ((bits3 & 0x0f) << 10)
       };
     } else if (hasAscii(bytes, offset, 'EXIF')) {
-      orientation = tiffOrientation(bytes.subarray(payload, payload + length)) ?? 1;
+      orientation = tiffOrientation(bytes.subarray(payload, payload + length));
+    } else if (hasAscii(bytes, offset, 'XMP ')) {
+      xmp = new TextDecoder().decode(bytes.subarray(payload, payload + length));
     }
     offset = payload + length + (length & 1);
   }
   if (!dimensions) throw new TypeError('WebP has no supported image frame.');
-  return {...dimensions, orientation};
+  return {...dimensions, orientation: orientation ?? xmpOrientation(xmp)};
+}
+
+type GifPalette = Readonly<{gray: boolean; first: readonly [number, number, number]}>;
+
+function gifPalette(bytes: Uint8Array, offset: number, entries: number): GifPalette {
+  if (offset + entries * 3 > bytes.length) throw new TypeError('GIF palette is truncated.');
+  let gray = true;
+  for (let index = 0; index < entries; index++) {
+    const pixel = offset + index * 3;
+    if (bytes[pixel] !== index || bytes[pixel + 1] !== index || bytes[pixel + 2] !== index) gray = false;
+  }
+  return {gray, first: [bytes[offset]!, bytes[offset + 1]!, bytes[offset + 2]!]};
+}
+
+function skipGifBlocks(bytes: Uint8Array, start: number): number {
+  let offset = start;
+  while (offset < bytes.length) {
+    const size = bytes[offset++]!;
+    if (size === 0) return offset;
+    if (offset + size > bytes.length) throw new TypeError('GIF extension is truncated.');
+    offset += size;
+  }
+  throw new TypeError('GIF extension is truncated.');
+}
+
+function gifImageHeader(
+  bytes: Uint8Array,
+  offset: number,
+  globalPalette: GifPalette | undefined,
+  transparency: number | undefined
+): ImageHeader & {orientation: number} {
+  if (offset + 9 > bytes.length) throw new TypeError('GIF frame header is invalid.');
+  const x = readU16(bytes, offset, true);
+  const y = readU16(bytes, offset + 2, true);
+  const frameWidth = readU16(bytes, offset + 4, true);
+  const frameHeight = readU16(bytes, offset + 6, true);
+  const flags = bytes[offset + 8]!;
+  const localEntries = flags & 0x80 ? 2 ** ((flags & 7) + 1) : 0;
+  const palette = localEntries ? gifPalette(bytes, offset + 9, localEntries) : globalPalette;
+  const gray = !palette || palette.gray;
+  const shade = transparency ?? 0;
+  const fill: readonly [number, number, number] =
+    transparency === undefined ? (palette?.first ?? [0, 0, 0]) : gray ? [shade, shade, shade] : [255, 255, 255];
+  return {
+    format: 'gif',
+    width: Math.max(readU16(bytes, 6, true), x + frameWidth),
+    height: Math.max(readU16(bytes, 8, true), y + frameHeight),
+    orientation: 1,
+    gif: {x, y, width: frameWidth, height: frameHeight, fill, preserveTransparentRgb: gray}
+  };
+}
+
+function gifExtensionTransparency(bytes: Uint8Array, offset: number, label: number | undefined): number | undefined {
+  const blockSize = bytes[offset];
+  if (label !== 0xf9 || blockSize === undefined || blockSize < 4 || offset + 5 > bytes.length) return undefined;
+  return bytes[offset + 1]! & 1 ? bytes[offset + 4] : undefined;
+}
+
+function gifHeader(bytes: Uint8Array): ImageHeader & {orientation: number} {
+  if (bytes.length < 13) throw new TypeError('GIF header is truncated.');
+  const packed = bytes[10]!;
+  const globalEntries = packed & 0x80 ? 2 ** ((packed & 7) + 1) : 0;
+  const globalPalette = globalEntries ? gifPalette(bytes, 13, globalEntries) : undefined;
+  let offset = 13 + globalEntries * 3;
+  let transparency: number | undefined;
+  while (offset < bytes.length) {
+    const marker = bytes[offset++]!;
+    if (marker === 0x2c) return gifImageHeader(bytes, offset, globalPalette, transparency);
+    if (marker !== 0x21) throw new TypeError('GIF frame header is invalid.');
+    const label = bytes[offset++];
+    transparency = gifExtensionTransparency(bytes, offset, label) ?? transparency;
+    offset = skipGifBlocks(bytes, offset);
+  }
+  throw new TypeError('GIF has no image frame.');
 }
 
 function readHeader(bytes: Uint8Array): ImageHeader & {orientation?: number} {
@@ -265,13 +510,12 @@ function readHeader(bytes: Uint8Array): ImageHeader & {orientation?: number} {
     return {format: 'png', width: readU32(bytes, 16), height: readU32(bytes, 20)};
   }
   if (hasAscii(bytes, 0, '\xff\xd8')) return {format: 'jpeg', ...jpegHeader(bytes)};
-  if (hasAscii(bytes, 0, 'GIF87a') || hasAscii(bytes, 0, 'GIF89a'))
-    return {format: 'gif', width: readU16(bytes, 6, true), height: readU16(bytes, 8, true), orientation: 1};
+  if (hasAscii(bytes, 0, 'GIF87a') || hasAscii(bytes, 0, 'GIF89a')) return gifHeader(bytes);
   if (hasAscii(bytes, 0, 'RIFF') && hasAscii(bytes, 8, 'WEBP')) return {format: 'webp', ...webpHeader(bytes)};
   throw new TypeError('Qwen3.5 images must be PNG, JPEG, WEBP, or GIF.');
 }
 
-function decodeBase64(data: string): Uint8Array {
+function decodeBase64(data: string, maxImageBytes?: number): Uint8Array {
   let payload = data.replace(trimPythonWhitespaceStart, '').replace(trimPythonWhitespaceEnd, '');
   const prefix = /^data:image\/[\w.+-]+;base64,/u;
   payload = payload.replace(prefix, '');
@@ -288,6 +532,9 @@ function decodeBase64(data: string): Uint8Array {
     (remainder !== 0 && padding.length !== requiredPadding)
   )
     throw new TypeError('Qwen3.5 image input is not valid base64.');
+  const byteLength = Math.floor((encoded.length * 3) / 4);
+  if (maxImageBytes !== undefined && byteLength > maxImageBytes)
+    throw new RangeError(`Image exceeds the ${maxImageBytes} byte limit.`);
   // Python's pinned base64.b64decode(validate=True) accepts extra trailing '='
   // after a complete quartet; normalize that case before the stricter atob API.
   const decoded = globalThis.atob(encoded + '='.repeat(requiredPadding));
@@ -451,14 +698,21 @@ async function loadMagick(wasm?: MagickWasm): Promise<MagickModule> {
   return magickPromise;
 }
 
-async function decodeMagickRgb(bytes: Uint8Array, wasm?: MagickWasm): Promise<DecodedImage> {
+async function decodeMagickRgb(
+  bytes: Uint8Array,
+  wasm?: MagickWasm,
+  preserveTransparentRgb = false
+): Promise<DecodedImage> {
   const magick = await loadMagick(wasm);
   const result = magick.ImageMagick.read(bytes, (image: IMagickImage) => {
     const width = image.width;
     const height = image.height;
     if (image.hasAlpha) {
-      image.backgroundColor = magick.MagickColors.White;
-      image.alpha(magick.AlphaAction.Remove);
+      if (preserveTransparentRgb) image.alpha(magick.AlphaAction.Off);
+      else {
+        image.backgroundColor = magick.MagickColors.White;
+        image.alpha(magick.AlphaAction.Remove);
+      }
     }
     image.colorSpace = magick.ColorSpace.sRGB;
     const rgb = image.getPixels((pixels) => pixels.toByteArray(0, 0, width, height, 'RGB'));
@@ -467,6 +721,21 @@ async function decodeMagickRgb(bytes: Uint8Array, wasm?: MagickWasm): Promise<De
     return {width, height, rgb};
   });
   return result;
+}
+
+function gifCanvas(image: DecodedImage, header: ImageHeader): DecodedImage {
+  const frame = header.gif!;
+  if (image.width === header.width && image.height === header.height) return image;
+  if (image.width !== frame.width || image.height !== frame.height)
+    throw new TypeError('GIF decoder returned unexpected frame dimensions.');
+  const rgb = new Uint8Array(header.width * header.height * 3);
+  for (let i = 0; i < rgb.length; i += 3) rgb.set(frame.fill, i);
+  for (let y = 0; y < image.height; y++) {
+    const source = y * image.width * 3;
+    const target = ((y + frame.y) * header.width + frame.x) * 3;
+    rgb.set(image.rgb.subarray(source, source + image.width * 3), target);
+  }
+  return {width: header.width, height: header.height, rgb};
 }
 
 function orientImage(image: DecodedImage, orientation: number): DecodedImage {
@@ -595,6 +864,45 @@ function preprocessRgb(image: DecodedImage, imageLongSide: number): Qwen35ImageI
   };
 }
 
+/** Decode the image formats accepted by Strands, composite alpha and apply EXIF orientation. */
+export async function decodeStrandsImage(
+  data: string,
+  options: Readonly<{
+    magickWasm?: MagickWasm | undefined;
+    maxImagePixels: number;
+    maxImageBytes?: number;
+    prepareJpeg?: () => Promise<void>;
+    loadMagick?: () => Promise<Uint8Array>;
+  }>
+): Promise<DecodedImage & {headerWidth: number; headerHeight: number}> {
+  const bytes = decodeBase64(data, options.maxImageBytes);
+  const header = readHeader(bytes);
+  assertImageSize(header, options.maxImagePixels);
+  let decoded: DecodedImage;
+  if (header.format === 'png') {
+    validatePngImageData(bytes, header);
+    decoded = decodePngRgb(bytes);
+  } else if (header.format === 'jpeg' && header.components !== 4) {
+    await options.prepareJpeg?.();
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    decoded = decodeJpegRgb(await decodeJpeg(buffer, {preserveOrientation: false}));
+  } else {
+    const wasm = options.magickWasm ?? (await options.loadMagick?.());
+    decoded = await decodeMagickRgb(bytes, wasm, header.gif?.preserveTransparentRgb);
+  }
+  if (header.gif) decoded = gifCanvas(decoded, header);
+
+  if (decoded.width !== header.width || decoded.height !== header.height)
+    throw new TypeError(
+      `Image decoder returned ${decoded.width}x${decoded.height}; header reports ${header.width}x${header.height}.`
+    );
+  return {
+    ...orientImage(decoded, header.orientation ?? (await pngOrientation(bytes))),
+    headerWidth: header.width,
+    headerHeight: header.height
+  };
+}
+
 export async function preprocessQwen35Image(
   data: string,
   options: Qwen35ImageInputOptions = {}
@@ -605,21 +913,8 @@ export async function preprocessQwen35Image(
     QWEN35_IMAGE_DEFAULTS.maxImagePixels,
     'maxImagePixels'
   );
-  const bytes = decodeBase64(data);
-  const header = readHeader(bytes);
-  assertImageSize(header, maxImagePixels);
-  let decoded: DecodedImage;
-  if (header.format === 'png') decoded = decodePngRgb(bytes);
-  else if (header.format === 'jpeg' && header.components !== 4) {
-    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    decoded = decodeJpegRgb(await decodeJpeg(buffer, {preserveOrientation: false}));
-  } else decoded = await decodeMagickRgb(bytes, options.magickWasm);
-
-  if (decoded.width !== header.width || decoded.height !== header.height)
-    throw new TypeError(
-      `Image decoder returned ${decoded.width}x${decoded.height}; header reports ${header.width}x${header.height}.`
-    );
-  return preprocessRgb(orientImage(decoded, header.orientation ?? (await pngOrientation(bytes))), imageLongSide);
+  const decoded = await decodeStrandsImage(data, {magickWasm: options.magickWasm, maxImagePixels});
+  return preprocessRgb(decoded, imageLongSide);
 }
 
 export async function preprocessQwen35Images(

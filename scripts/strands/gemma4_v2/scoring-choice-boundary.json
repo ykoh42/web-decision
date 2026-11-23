@@ -1,0 +1,28 @@
+{
+  "description": "Synthetic finite BF16 logits; not observed model outputs. Reference values depend on the stated NumPy and hardware environment.",
+  "sourceRevision": "c3c845782095b31d438963ac2afcdfe41b49f757",
+  "numpyVersion": "2.4.6",
+  "javascriptRuntime": "Node.js v26.13.1",
+  "hardware": "Apple M4 Pro, macOS 27.2.1",
+  "configuration": {"softcap": 30, "temperature": 1.5456},
+  "options": ["A", "B"],
+  "cases": [
+    {
+      "name": "numpy-js-choice-difference",
+      "logits": [215, 216],
+      "numpyProbabilities": [0.4999995231628418, 0.5000004768371582],
+      "numpyChoice": "B",
+      "observedJsProbabilities": [0.5, 0.5],
+      "observedJsChoice": "A"
+    },
+    {
+      "name": "raw-argmax-violates-source-tie",
+      "logits": [256, 260],
+      "numpyProbabilities": [0.5, 0.5],
+      "numpyChoice": "A",
+      "observedJsProbabilities": [0.5, 0.5],
+      "observedJsChoice": "A",
+      "rawLogitChoice": "B"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "web-decision",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Curated browser-local decision models running on TVM",
   "type": "module",
   "exports": {
@@ -24,6 +24,8 @@
     "QWEN-APACHE-LICENSE.txt",
     "STRANDS-QWEN35-LICENSE.md",
     "STRANDS-QWEN35-NOTICE",
+    "STRANDS-GEMMA4-V2-LICENSE",
+    "STRANDS-GEMMA4-V2-NOTICE",
     "KEV06-NOTICE",
     "KEV-NOTICE",
     "EMSCRIPTEN-LICENSE",
@@ -57,7 +59,15 @@
     "assets/mapika2b/manifest.json",
     "assets/mapika2b/text.wasm",
     "assets/mapika2b/text-bindings.json",
-    "assets/mapika2b/source-inventory.json"
+    "assets/mapika2b/source-inventory.json",
+    "assets/strands-gemma4-v2/manifest.json",
+    "assets/strands-gemma4-v2/graph.wasm",
+    "assets/strands-gemma4-v2/local.bin",
+    "assets/strands-gemma4-v2/global.bin",
+    "assets/strands-gemma4-v2/scoring.bin",
+    "assets/strands-gemma4-v2/source-inventory.json",
+    "assets/strands-gemma4-v2/decoder-bindings.json",
+    "assets/strands-gemma4-v2/vision-bindings.json"
   ],
   "sideEffects": false,
   "scripts": {
@@ -83,6 +93,7 @@
     "@jsquash/jpeg": "1.6.0",
     "c8": "12.0.0",
     "fast-png": "8.0.0",
+    "fflate": "0.8.3",
     "typescript": "7.0.2",
     "vite": "8.3.6"
   },

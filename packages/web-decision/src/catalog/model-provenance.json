@@ -42,11 +42,11 @@
     },
     {
       "modelId": "strands-decider-e2b-gemma4-v2-2611",
-      "status": "pending",
+      "status": "verified",
       "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
       "evidence": {
         "path": "src/catalog/provenance/strands-decider-e2b-gemma4-v2-2611.json",
-        "sha256": "073ca9615460fd95dccb69453a0590e01bc0cbb82682082c5c137c980fc4fff3"
+        "sha256": "7a55cbb265d5a0cbf141c761d87e2bd485a8891984233ef071aaf1c699062b14"
       }
     }
   ]

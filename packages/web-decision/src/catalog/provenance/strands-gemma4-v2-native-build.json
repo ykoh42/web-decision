@@ -1,0 +1,139 @@
+{
+  "evidenceSchema": "web-decision-tvm-build-v1",
+  "modelId": "strands-decider-e2b-gemma4-v2-2611",
+  "artifact": "graph.wasm",
+  "status": "success",
+  "target": "webgpu / wasm32",
+  "wasm": "layer.wasm",
+  "wasmBytes": 5504091,
+  "wasmSha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86",
+  "tvmVersion": "0.27.0.post1",
+  "embeddedBuildRoot": false,
+  "repository": "StrandsAgents/strands-decider-E2B-gemma4-v2-2611",
+  "modelRevision": "a5f32ea1bffe2e91c25c0c641d444e8115e28212",
+  "checkpointSha256": "593a28a67754653c7ffffff80a5186f18966cc6262c2f4f097414c187e5fd48c",
+  "configSha256": "1b28f3d2c3100f6c594754b81107428bd7b822a7f48272ca681dae9d2ec38330",
+  "readoutSha256": "37b3f1c4670f1afb78007624e3ec2a2f55503d9b78602216e2f29a4cfb5111f6",
+  "buildBackend": "native-tvm",
+  "weightSource": "pinned-safetensors",
+  "onnxImportOrExportUsed": false,
+  "buildEnvironment": {
+    "repository": {
+      "before": {
+        "head": "814542fe9647d89550bd9d71efe89a82c5826b69",
+        "dirty": false
+      },
+      "after": {
+        "head": "814542fe9647d89550bd9d71efe89a82c5826b69",
+        "dirty": false
+      }
+    },
+    "host": {
+      "system": "Darwin",
+      "machine": "arm64"
+    },
+    "python": {
+      "version": "3.11.11"
+    },
+    "pythonBuild": {
+      "lockfile": "scripts/strands/qwen35/build-env/uv.lock",
+      "lockfileSha256": "10d53aa34953a07643046643d472685f712c9c6f51fa3a105b39717a7fbabfc8",
+      "packages": {
+        "accelerate": "1.15.0",
+        "annotated-doc": "0.0.6",
+        "annotated-types": "0.8.0",
+        "anyio": "4.16.0",
+        "apache-tvm": "0.27.0.post1",
+        "apache-tvm-ffi": "0.1.15.post1",
+        "certifi": "2026.10.23",
+        "click": "8.5.1",
+        "fastapi": "0.162.6",
+        "filelock": "4.2.10",
+        "fsspec": "2026.9.0",
+        "h11": "0.16.0",
+        "hf-xet": "1.8.0",
+        "httpcore": "1.0.9",
+        "httptools": "0.9.0",
+        "httpx": "0.28.1",
+        "huggingface-hub": "1.33.0",
+        "idna": "3.20",
+        "jinja2": "3.1.6",
+        "markdown-it-py": "4.3.0",
+        "markupsafe": "3.0.4",
+        "mdurl": "0.1.2",
+        "ml-dtypes": "0.6.0",
+        "mpmath": "1.3.0",
+        "networkx": "3.6.1",
+        "numpy": "2.4.6",
+        "opentelemetry-api": "1.45.2",
+        "packaging": "26.3",
+        "peft": "0.21.0",
+        "pillow": "13.0.0",
+        "psutil": "7.2.2",
+        "pydantic": "2.14.3",
+        "pydantic-core": "2.50.4",
+        "pygments": "2.21.0",
+        "python-dotenv": "1.2.4",
+        "pyyaml": "6.0.3",
+        "regex": "2026.11.9",
+        "rich": "15.0.0",
+        "safetensors": "0.8.0",
+        "shellingham": "1.5.4",
+        "starlette": "1.10.0",
+        "strands-decider": "0.2.1.dev7+g13c0514",
+        "sympy": "1.14.0",
+        "tokenizers": "0.23.3",
+        "torch": "2.8.0",
+        "tqdm": "4.70.1",
+        "transformers": "5.22.2",
+        "typer": "0.29.1",
+        "typing-extensions": "4.16.0",
+        "typing-inspection": "0.4.5",
+        "uvicorn": "0.54.0",
+        "uvloop": "0.23.0",
+        "watchfiles": "1.3.0",
+        "websockets": "17.4"
+      }
+    },
+    "nativeTvm": {
+      "pythonPackage": {
+        "name": "apache-tvm",
+        "version": "0.27.0.post1",
+        "moduleSha256": "00d82f5c7661c3e19dd94352114648b19f15352fd39ac5b057f2bfbfc170e139",
+        "compilerLibrarySha256": "8bc04690ffab1e73cdb69e9cfc1544981511a8172fb630e4e2f9efae4239dbbb",
+        "runtimeLibrarySha256": "e99d2e4d2ab1861794b3e1fd1e4423d1ee5c97b308274bce227a65114dd5221d",
+        "ffiPackageVersion": "0.1.15.post1",
+        "ffiLibrarySha256": "d53f88f6265ec644c3674476613a895e50074af8b054587214bc7ea7d0a55363"
+      },
+      "source": {
+        "revision": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+        "patches": [],
+        "wasmRuntimeAssets": [
+          {
+            "name": "wasm_runtime.bc",
+            "bytes": 11242132,
+            "sha256": "1974cd7846e3735735fe48828856b7113257a426c24a49e44f45c79c412b972f"
+          },
+          {
+            "name": "tvmjs_support.bc",
+            "bytes": 173768,
+            "sha256": "24088d9f55002852d513af36b64770dacb1825e5dffebb95d23b43f104b19fc9"
+          },
+          {
+            "name": "webgpu_runtime.bc",
+            "bytes": 286844,
+            "sha256": "c4baf79ed300de425db4d81743ab89d36cee323e40e18904c4ef7f196f2fe0aa"
+          }
+        ]
+      },
+      "emscripten": {
+        "revision": "d7b4130688bfa348392b921ab04015aa15c4f154",
+        "version": "4.0.23",
+        "emccVersion": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 4.0.23 (7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed)",
+        "emccSha256": "498eba9b6aacffca1c358ba340fc7b37015d7867cb211c7f2d45784ee9310f03",
+        "clangSha256": "538e37cd01bf3acf8239b62e57ac05823c95d6e15e6f3963c4de6df1a4f4ce5f",
+        "wasmLdSha256": "78c27077265dca11635d5e3b53ed43f0b7640b9f7465ae629d3eb34aac78219d"
+      }
+    }
+  }
+}

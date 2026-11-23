@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import modelProvenance from '../src/catalog/model-provenance.json' with {type: 'json'};
 import {APPROVED_MODEL_IDS} from '../src/catalog/public-catalog.generated.ts';
 import * as library from '../src/curated/index.ts';
-import type {ModelId} from '../src/catalog/types.generated.js';
+import type {PublicModelId as ModelId} from '../src/curated/public-model-id.generated.js';
 
 test('exposes only the curated public entry points', () => {
   assert.deepEqual(Object.keys(library).sort(), [

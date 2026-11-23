@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "recipeRevision": "814542fe9647d89550bd9d71efe89a82c5826b69",
+  "recipe": [
+    {
+      "path": "scripts/ci/git_environment.py",
+      "sha256": "2f5b6f9a31b25804c0f2929e735997e8b2ac6edf5923c1fd6ce8232a5f70094b"
+    },
+    {
+      "path": "scripts/kanana/build_evidence.py",
+      "sha256": "b14a11cdfe775ec2fb6811188b9d8231a9c04efcab432fe1b3e3b399e653a39a"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/build_decoder_binding_manifest.py",
+      "sha256": "d3fd433a284fa4c2decf65ed88cea699a5ebcaa36c90b7908ce7834307ee53aa"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/build_model_tvm.py",
+      "sha256": "36196e455f339e0a4b1a768b82226d72a08938ece152d5efd6d1d9a78a8bb469"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/build_source_inventory.py",
+      "sha256": "4e6e47f3e23872b602414815cf9800ad63ee58d9ffe832bcc071d6b488e89c89"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/build_vision_binding_manifest.py",
+      "sha256": "fb0ba892c13d425d34fc1de243dd928796de1bbb7ce2a63ab0f5b9ecfde8aad2"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/capture_text_attention.py",
+      "sha256": "4d1344ee6477d858c4f58adec1a8dec974b993e7ec934be125e10b24bc9d1e0c"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/compare_chain_readout.py",
+      "sha256": "63e4fb4321a6ad96dcd3b403d3f82dda1129d377333895d8f46c7d27cefea1f7"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/compare_wasm_builds.py",
+      "sha256": "5a968b00f946a15ae30cbe6437cf98ee088df3c15624d8990e5e5f0bf3ca536b"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/concat_ir.py",
+      "sha256": "30951c6079e8cb9a2563385647ae2a210e86da593fa7672035aa45f4c4e62bb0"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/decoder_family_ir.py",
+      "sha256": "c8188642a175501ceeaf59d3a4a87521565bee275869a55d27474ef19139d9a5"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/generate_image_test_goldens.py",
+      "sha256": "07757ce5370ad69d2a1f0a12fc14ddaef089558d2ed904bb1ea0f68ce4f05c50"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/generate_scoring_asset.py",
+      "sha256": "95b577a302525cdc5de9d540d1f7f4748873f12894342a82b3f0a720c46b99e9"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_compatibility_reference.py",
+      "sha256": "c579000e2fea0a6d400ff41c4df66092201dee940e804c8b68513c8615bafb29"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_embedding_ir.py",
+      "sha256": "494b6bb042639fd596ddf017c5eec530a6db704308257be5c4e4f722dfd492cf"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_encoded_reference.py",
+      "sha256": "c4ead58b35fa9740bebe7f1472f72456237ea4137ee50711dcc47cf08820cfeb"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_geometry_reference.py",
+      "sha256": "d5e19efc6300ef03a7e22f57680de28e7408fc85213577b34385d4cdbb1ba6d8"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_input_reference.py",
+      "sha256": "c89f2cad48fef3ce40e83d5a5d875c5a77ffe182fca2a97d20e565dfd1b64825"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/image_matrix_reference.py",
+      "sha256": "e2fb4f2f2d0994f03cf1dd6584806fa8e29cd09c8a1a487ec8472944adc22a1d"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/map_order_reference.py",
+      "sha256": "2b808d58cea117cbf02e7d401de29f8f34e7467237283220260cbb4e499143b7"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/model_partition.py",
+      "sha256": "0ed5d945edfb8131f8f4035664185d5244433d4c7ff307cf1b00504d3da73ba8"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/packed_parameters.py",
+      "sha256": "2fc01cb5a517d4166c660b7d3b9ed1e5e46dd7db6561c58bf93d5ea049495f4b"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/per_layer_ir.py",
+      "sha256": "5f02cc3f596ca1e3cdb87776c62585a70460c7c6425adb30273357040dd74a11"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prefix_attention_chunked.py",
+      "sha256": "db8052838b7fe9df1ff1f924ce04aad222445e4304122002c26975c29c9048b4"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prepare_compact_ple_rows.py",
+      "sha256": "d8173fe1344a8ba51eb7e1b5a991147eb47b78eb0d4f76261b6a5158d13f5d62"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prepare_prefix_chunk_boundary_cases.py",
+      "sha256": "c9b0abfcf3cffdc9368cb8c8b26882c96ae24ba67d3425dca4e008b7b6387c5c"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prepare_prefix_tiled_cases.py",
+      "sha256": "cb6ffcf02ba2c576f5577a2d8c2b4b2726ec7858f64aa3948544617da1926ac5"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prepare_sliced_ple_weights.py",
+      "sha256": "a1df1e5a5d898335f3e10febbc282f8544a575abf5b37302479c9c47df378f39"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prepare_vision_layer_weights.py",
+      "sha256": "21c22343806a936087e86029c925cffe0c1039aa1ea02f8bce9036168b1443e8"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/probe_dynamic_rope.py",
+      "sha256": "ebeb0d2925c6b0c255df21d74dbe235508d44ff4504b29a089b729cf0235de38"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/probe_dynamic_vision_pool.py",
+      "sha256": "cc9c3544a6e84b128674bdac891ce152a0c5d054d3b5d75681c43a505265f618"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/probe_dynamic_word.py",
+      "sha256": "610499e20787e6f460f0c80b4512a49a19112d669b9ba1720c7febeef80c20c6"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/probe_layer0.py",
+      "sha256": "6c83650dd3fdda2e970e407d903c7988bf5388721c8c9d17729b4f25e32f1126"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/prompt_reference.py",
+      "sha256": "f5650223e97a2c2104f75e25bd0546a2de92784c619569246f6652a041eb67e1"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/protocol_boundary_reference.py",
+      "sha256": "68f085862ae4c12277566eac7d526a896e4026323e020e0b6c4c3495f97e35a2"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/readout_ir.py",
+      "sha256": "9cef0e0451988c5a05114d3190db543beea091fbafb70a45ff081ecce8e515f5"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/reference.py",
+      "sha256": "2d3f543aa155b6cad3f232de70d28b467f71a1f05e1b65a1246e7bd8d3d565d3"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/reference_1024.py",
+      "sha256": "bd0ff541d8f74dce0dac9ad550e8b0a6245bd225c2336d54e3a8b93768b57d24"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/reference_context_boundary.py",
+      "sha256": "c4fd5f79e05077bfae261655c2923b99bf8ad46a0b06abf2c59f2874971ab8fa"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/resize_reference.py",
+      "sha256": "fb7da9f935ff1d5f9d21ebf58315bca8b753829e76942bf7f25ed7cbbdf1f87d"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/rotary_ir.py",
+      "sha256": "0709dfea873103ccad818e01660c51f90841d5e6d6cbec84075826edbe826c1b"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/scoring_reference.py",
+      "sha256": "5e19cdb4be0dd7fe380be26b9b04417e4270ebd713ad0c7e4af66758178b6df6"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/slice_ir.py",
+      "sha256": "baec89a243c9a602697dd2365bf806667b9adc4052c57b86ad17603902100140"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/source_reference.py",
+      "sha256": "1fe1b38a65433edbb6b59579a1a6002862b0bf857468959c5af96e4ecd54f28c"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/split_layers.py",
+      "sha256": "b781161688e609347d5255077d31540ffcf4ef07cc965bdafa33f37fa08ace7d"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/split_transposed_family_ir.py",
+      "sha256": "e43de1e7fc90189e78bdf83bb42e1d1610342743cf62bb0c82e53a3e97f29c18"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_build_model_tvm.py",
+      "sha256": "70cd89279da7801f4c603a231c35c6981dd4268e7c7182aaad08d263e851077d"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_compare_wasm_builds.py",
+      "sha256": "ae6b3257392764986b3b29fdd40ba65e79be9fcf1eb2711c0d4ab85876992981"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_dynamic_context_ir.py",
+      "sha256": "905f478134fc585ffd041e0ab8298146b2b5b6746f14280365735d62066578cb"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_extracted_ir.py",
+      "sha256": "20acd4840eb5d31229408870618fccfd9676f7a1df788425f9d72c12a79aa337"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_image_embedding_ir.py",
+      "sha256": "8f8146d4b73a7e405927dcd06d4a32d172f166d4fed7d350b92aa3b6f1664b31"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_model_partition.py",
+      "sha256": "615175b8f397719c0fde0b6a931ae3b4c44012b812172415d1e82085e3449540"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_readout_nan.py",
+      "sha256": "674a44378fba1c78b79840d6377fcdca78befb3100ea7a785e2e2cb47e8692b0"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/test_webgpu_grid.py",
+      "sha256": "cdf60a4d57d5304ec5d8d7c3f7a6d30ed737212ad5149f894015deb99aae543d"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/transpose_reuse_ir.py",
+      "sha256": "7430c6762f3970fc6a174f991e11a2f743bd1a0e664c909158bd8a49acdb19b4"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/two_image_reference.py",
+      "sha256": "3d999c5ab4775d500a6f491ee6e6fdfcb88ab667b281241ca954e507bfcd39a9"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/verify_layer_bindings.py",
+      "sha256": "d3649b0b0f9d501a0c4e9417eb8b5732f616b09bc157d051536b034f06a5b8d9"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/vision_attention_tir.py",
+      "sha256": "07aac66d144c44240ff628e7dead485413755cdcfffa3a7a01ce02d54c9d149b"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/vision_graphs.py",
+      "sha256": "f6b8d6f032356ba150c669a77cd30f0dcb903ec3c7fbd97899e817a2f3484ee9"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/vision_multi_reference.py",
+      "sha256": "54ebb0fa1883c8c6f36e4dd56a8316b3640bae87a3b721017fe32c7d09ae7c09"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/vision_pool_ir.py",
+      "sha256": "866b37cfe1cf4cb447243f471737eb4ff97cfca9434c1e6244fff24a9d2f82aa"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/vision_reference.py",
+      "sha256": "1a71f9fa7a6e14e0468b1ba1f2dbaf145c612f244b0d3d4cfafdb6f3af0484fd"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/webgpu_grid.py",
+      "sha256": "1515ca825198bb8826831884332ff535cbc90cef62686163539fbd6451eb805e"
+    },
+    {
+      "path": "scripts/strands/gemma4_v2/word_embedding_ir.py",
+      "sha256": "93a9d8a56a605123e9c1cb5871c792a8e6ac2b11d4ccee7e32dbf5dcac3c8d75"
+    },
+    {
+      "path": "scripts/strands/qwen35/qwen35_tvm_build.py",
+      "sha256": "53a8c7f3e6e48e1461be6c7b59814af8bee8c5b11c5a8b740e89c2c42f98073c"
+    }
+  ],
+  "config": [
+    {
+      "path": "packages/web-decision/assets/strands-gemma4-v2/manifest.json",
+      "sha256": "ec01a0e831d7329cc282a4a7e9015e2f9be8cc63800171caee958dc24b104a75"
+    },
+    {
+      "path": "packages/web-decision/assets/strands-gemma4-v2/source-inventory.json",
+      "sha256": "c4c1f9ca91d272d88f2559dd186fa0d37e878fa70d378c44a20de978179366aa"
+    },
+    {
+      "path": "packages/web-decision/assets/strands-gemma4-v2/decoder-bindings.json",
+      "sha256": "d559f57f95338b9b90429b61baf367f5e8a18b186013ec377c6e9aeb253d951c"
+    },
+    {
+      "path": "packages/web-decision/assets/strands-gemma4-v2/vision-bindings.json",
+      "sha256": "23255ad23212dc2d286ed58d2a09deed429b0aac2895536699a4ddb41be2616f"
+    },
+    {
+      "path": "scripts/strands/qwen35/build-env/uv.lock",
+      "sha256": "10d53aa34953a07643046643d472685f712c9c6f51fa3a105b39717a7fbabfc8"
+    }
+  ],
+  "sourceConfig": {
+    "path": "config.json",
+    "bytes": 4954,
+    "sha256": "1b28f3d2c3100f6c594754b81107428bd7b822a7f48272ca681dae9d2ec38330"
+  },
+  "nativeBuild": {
+    "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v2-native-build.json",
+    "sha256": "614d2f915428265f8fc28d0591bf2a9c72b5d6fd77e9d0466624c5a0fba1eb23"
+  },
+  "cleanBuildCount": 2,
+  "artifactLockSha256": "2e314ba154cf30ef08c2acea7b031f9b6c03e19ae806e8e84d84667b3e945550",
+  "artifact": {
+    "path": "assets/strands-gemma4-v2/graph.wasm",
+    "bytes": 5504091,
+    "sha256": "d59b83705315bdfedf64c2e1c210da609a98b8912d535f4b7f8b9935574d1e86"
+  },
+  "onnxImportOrExportUsed": false,
+  "scope": "Two separate native CPU builds from the committed recipe produced byte-identical TVM WebGPU modules. Browser inference and release approval are tracked by the separate exact-archive gate."
+}

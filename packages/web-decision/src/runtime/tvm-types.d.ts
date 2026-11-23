@@ -47,5 +47,6 @@ export interface Instance {
   cpu(): DLDevice;
   createVirtualMachine(device: DLDevice): VirtualMachine;
   empty(shape: number[] | number, dtype: string, device: DLDevice): Tensor;
-  getGlobalFunc(name: string): (...args: unknown[]) => unknown;
+  getGlobalFunc(name: string): PackedFunc;
+  systemLib(): {getFunction(name: string): PackedFunc};
 }

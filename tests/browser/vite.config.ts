@@ -75,7 +75,7 @@ export default defineConfig({
     alias: {
       '@huggingface/tokenizers': realpathSync(
         resolve(
-          mapikaCandidateConsumer ?? resolve(workspace, 'packages/web-decision'),
+          mapikaCandidateConsumer ?? packageConsumerRoot ?? resolve(workspace, 'packages/web-decision'),
           'node_modules/@huggingface/tokenizers/dist/tokenizers.mjs'
         )
       ),
@@ -89,7 +89,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port,
     strictPort: true,
-    ...(mapikaCandidateGpu ? {hmr: false} : {}),
+    ...(mapikaCandidateGpu || process.env.WEB_DECISION_STRANDS_V2_PROBE === '1' ? {hmr: false} : {}),
     fs: {
       allow: [
         workspace,

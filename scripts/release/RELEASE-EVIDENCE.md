@@ -30,6 +30,8 @@ The provenance gate checks committed evidence hashes and binds any declared upst
 
 ## Gemma 4 v2 exact-package evidence preparation
 
+Gemma source provenance records the pinned checkpoint lineage, redistribution terms, and independently rebuilt graph. The verified provenance status refers to those inputs. Browser verification uses the combined archive built from that committed candidate and records results outside the source tree. This permits the same package bytes to proceed from candidate verification to release.
+
 The public producer requires a clean source checkout and an installed combined archive with verified provenance. It records the archive, source, graph response, physical hardware, live checkpoint range, six CPU-reference cases, image recovery, and offline inference. The official subset includes rows 0–299 and 430–489 and excludes rows 300–429. The producer embeds both the record and the code probabilities in the Playwright JSON report.
 
 With the release archive installed in a clean consumer and the exact upstream `golden_vectors.jsonl` available, run the producer with the paths set below. Save the JSON report outside the checkout.

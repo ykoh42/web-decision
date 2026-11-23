@@ -301,6 +301,85 @@ const catalog = [
           'On M4 Pro Chromium WebGPU, seven text and image cases matched the pinned FP32 reference. A 32,904-token smoke test completed. Long-input latency and device requirements vary.'
       }
     }
+  },
+  {
+    modelId: 'strands-decider-e2b-gemma4-v2-2611',
+    description: {
+      adapter: 'strands-gemma4-v2',
+      precision: 'BF16 source checkpoint with FP32 TVM WebGPU computation and FP32 readout',
+      checkpoint: {
+        repository: 'StrandsAgents/strands-decider-E2B-gemma4-v2-2611',
+        revision: 'a5f32ea1bffe2e91c25c0c641d444e8115e28212',
+        weightSha256: '593a28a67754653c7ffffff80a5186f18966cc6262c2f4f097414c187e5fd48c'
+      },
+      assets: {
+        integrity: 'pinned-manifest',
+        location: 'package-and-pinned-upstream',
+        additionalFiles:
+          'Direct TVM WebGPU graphs, scoring data, and binding inventories are bundled. Verified ranges of the BF16 checkpoint, readout, tokenizer, and configuration load from the pinned upstream revision.',
+        requiredFiles: [
+          'manifest.json',
+          'graph.wasm',
+          'local.bin',
+          'global.bin',
+          'scoring.bin',
+          'source-inventory.json',
+          'decoder-bindings.json',
+          'vision-bindings.json'
+        ],
+        manifestSha256: '44abf31975515754143ae97556d3ce002f19b91fcce3c73fbd663e768e2ae249'
+      },
+      licenses: {
+        project: 'Apache-2.0',
+        modelTerms: 'Apache-2.0',
+        modelCard:
+          'https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v2-2611/tree/a5f32ea1bffe2e91c25c0c641d444e8115e28212'
+      },
+      backend: {
+        name: 'tvm-webgpu',
+        requiredFeatures: [],
+        requiredLimits: {
+          maxBufferSize: 536870912,
+          maxStorageBufferBindingSize: 536870912
+        },
+        requiresNonFallbackAdapter: true
+      },
+      features: {
+        textChoice: {
+          status: 'implemented',
+          abstention: 'explicit-noul',
+          limits: [
+            {
+              resource: 'tokens',
+              scope: 'question',
+              defaultMax: 32768,
+              description:
+                'State, image, and question tokens count together for each question. Subject to the compiled graph and device allocation limits.'
+            },
+            {
+              resource: 'questions',
+              scope: 'request',
+              min: 1
+            }
+          ],
+          handling: 'state-and-question-decoder-readout',
+          tokenCount: 'state-and-image-tokens-plus-sum-of-question-tokens',
+          score: {
+            basis: 'strands-readout',
+            calibration: 'not-guaranteed'
+          }
+        },
+        typedTextQuestionTypes: ['choice', 'noul', 'score'],
+        imageChoice: {
+          status: 'implemented'
+        }
+      },
+      verification: {
+        currentBundleGpu: 'see-release-evidence',
+        currentBundleCpuWasm: 'not-applicable',
+        currentBundleJavascript: 'not-applicable'
+      }
+    }
   }
 ] as unknown as readonly PublicCatalogEntry[];
 export const APPROVED_MODEL_IDS = Object.freeze(catalog.map(({modelId}) => modelId));

@@ -1,9 +1,9 @@
 import {CACHE_NAME} from '../assets.js';
 import {APPROVED_ADAPTER_LOADERS} from '../catalog/public-adapters.generated.ts';
 import {MODEL_CATALOG, MODEL_CATALOG_BY_ID} from '../catalog/public-catalog.generated.ts';
-import type {ModelId} from '../catalog/types.generated.js';
+import type {PublicModelId as ModelId} from './public-model-id.generated.js';
 import {WebDecisionError} from './errors.ts';
-import {readLoadOptions} from './load-options.ts';
+import {createDecisionModelLoader} from './load-decision-model.ts';
 
 export {WebDecisionError};
 export {KananaFloat, kananaFloat} from '../kanana/json-float.ts';
@@ -43,23 +43,12 @@ export function describeModel(modelId: ModelId) {
 }
 
 /** Load a curated model from the source and artifact pinned by this package. */
-export async function loadDecisionModel(input: unknown) {
-  const {modelId, options} = readLoadOptions(input, isModelId);
-  (options as {signal?: AbortSignal}).signal?.throwIfAborted();
-  const description = describeModel(modelId);
-  const loaderDescription = loaderDescriptionsById[modelId]!;
-  const loadAdapter = APPROVED_ADAPTER_LOADERS[MODEL_CATALOG_BY_ID[modelId].description.adapter];
-  if (!loadAdapter) throw new WebDecisionError('INVALID_ASSET', 'The model adapter is unavailable.', undefined);
-  const {loadModel} = await loadAdapter();
-  const model = await loadModel(options, loaderDescription);
-  try {
-    Object.defineProperty(model, 'description', {value: description});
-    return model;
-  } catch (error) {
-    await Promise.allSettled([Promise.resolve().then(() => model.dispose?.())]);
-    throw error;
-  }
-}
+export const loadDecisionModel = createDecisionModelLoader({
+  isModelId,
+  describe: describeModel,
+  loaderDescription: (modelId) => loaderDescriptionsById[modelId]!,
+  loadAdapter: (modelId) => APPROVED_ADAPTER_LOADERS[MODEL_CATALOG_BY_ID[modelId].description.adapter]
+});
 
 /** Delete this library's cached model assets for the current origin. */
 export async function clearModelCache() {

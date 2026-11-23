@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import {
   createQwen35Session,
@@ -380,4 +381,38 @@ test('requires all owned-runner lifecycle methods', () => {
     () => createQwen35Session({tokenizer: tokenizerFixture(), runner: {run() {}} as never, modelName: 'qwen'}),
     /owned graph runner/u
   );
+});
+
+test('Qwen image requests recover after malformed input and cancellation', async () => {
+  const gate = deferred<void>();
+  const started = deferred<void>();
+  const fixture = runnerFixture(async (chunk, input, call) => {
+    assert.equal(input.imageCount, 1);
+    if (call === 1) {
+      started.resolve();
+      await gate.promise;
+    }
+    return probabilities(chunk);
+  });
+  const session = createSession(fixture.runner);
+  const encoded = (await readFile(new URL('./fixtures/qwen35-image-input/single-pixel.png', import.meta.url))).toString(
+    'base64'
+  );
+  const request = {state: 'image', images: [encoded], questions: questions(1)};
+  try {
+    await assert.rejects(session.systemOne({...request, images: ['%%%']}), /base64/i);
+    assert.equal(fixture.callCount, 0);
+    const controller = new AbortController();
+    const first = session.systemOne(request, {signal: controller.signal});
+    await started.promise;
+    controller.abort();
+    await assert.rejects(first, {name: 'AbortError'});
+    gate.resolve();
+    const result = await session.systemOne(request);
+    assert.equal(result.usage.output_tokens, 1);
+    assert.equal(fixture.callCount, 2);
+  } finally {
+    gate.resolve();
+    await session.dispose();
+  }
 });

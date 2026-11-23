@@ -99,15 +99,26 @@ test('the provenance manifest covers every locked curated model', async () => {
   );
 });
 
-test('the pending Gemma lock passes main provenance and fails release provenance', async () => {
+test('pending Gemma provenance passes main validation and fails release validation', async () => {
   const {manifestBytes} = await readProductionInputs();
   const manifest = JSON.parse(manifestBytes.toString('utf8')) as {models: ModelProvenanceRecord[]};
-  assert.equal(manifest.models.find(({modelId}) => modelId === GEMMA_V2_MODEL_ID)?.status, 'pending');
-  assert.deepEqual((await validateTemporaryManifest(manifestBytes, {allowPending: true})).pendingModelIds, [
+  const model = manifest.models.find(({modelId}) => modelId === GEMMA_V2_MODEL_ID);
+  assert.ok(model);
+  const pending = Buffer.from(
+    JSON.stringify({status: 'pending', modelId: GEMMA_V2_MODEL_ID, unresolved: ['Synthetic pending provenance test.']})
+  );
+  model.status = 'pending';
+  model.evidence.sha256 = sha256(pending);
+  const bytes = Buffer.from(JSON.stringify(manifest));
+  const options = {
+    expectedSha256: sha256(bytes),
+    evidenceOverrides: {[GEMMA_V2_MODEL_ID + '.json']: pending}
+  };
+  assert.deepEqual((await validateTemporaryManifest(bytes, {...options, allowPending: true})).pendingModelIds, [
     GEMMA_V2_MODEL_ID
   ]);
   await assert.rejects(
-    validateTemporaryManifest(manifestBytes),
+    validateTemporaryManifest(bytes, options),
     /strands-decider-e2b-gemma4-v2-2611 provenance is pending/u
   );
 });

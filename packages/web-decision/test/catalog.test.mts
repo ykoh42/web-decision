@@ -39,7 +39,7 @@ function canonical(value: unknown): unknown {
   );
 }
 
-test('catalog retains pinned TVM descriptors including pending Gemma', () => {
+test('catalog retains pinned TVM descriptors including Gemma', () => {
   assert.deepEqual(MODEL_IDS, [
     'kanana-2-v-decide-3b-2611',
     'strands-decider-2b-qwen3.5-v1-2610',
@@ -109,7 +109,11 @@ test('catalog retains pinned TVM descriptors including pending Gemma', () => {
   assert.equal(gemma.description.backend.name, 'tvm-webgpu');
   assert.equal(gemma.description.features.imageChoice?.status, 'implemented');
   assert.equal(gemma.artifacts.manifest.experimental, false);
-  assert.equal((APPROVED_MODEL_IDS as readonly string[]).includes(gemma.modelId), false);
+  const gemmaProvenance = modelProvenance.models.find(({modelId}) => modelId === gemma.modelId);
+  assert.equal(
+    (APPROVED_MODEL_IDS as readonly string[]).includes(gemma.modelId),
+    gemmaProvenance?.status === 'verified'
+  );
 });
 
 test('public generated catalog and model ID type include verified models only', async () => {

@@ -1,4 +1,3 @@
-import type {ModelId} from '../catalog/types.generated.js';
 import {APPROVED_MODEL_LOAD_OPTIONS} from '../catalog/public-load-options.generated.ts';
 import {WebDecisionError} from './errors.ts';
 
@@ -10,9 +9,9 @@ function optionsForModel(modelId: string, approvedLoadOptions: ModelLoadOptions)
 }
 
 /** Validate the closed public load interface without evaluating caller getters. */
-export function readLoadOptions(
+export function readLoadOptions<Id extends string>(
   options: unknown,
-  isModelId: (value: unknown) => value is ModelId,
+  isModelId: (value: unknown) => value is Id,
   approvedLoadOptions: ModelLoadOptions = APPROVED_MODEL_LOAD_OPTIONS
 ) {
   if (!options || typeof options !== 'object' || Array.isArray(options))
