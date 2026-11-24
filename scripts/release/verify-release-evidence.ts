@@ -6,6 +6,12 @@ import {lstat, readFile, readdir, realpath} from 'node:fs/promises';
 import {basename, dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
+import {
+  assertKananaCurrentEvidenceRun,
+  KANANA_CONVERSION_CONFIG_PATH,
+  KANANA_MODEL_PROVENANCE_PATH,
+  readKananaCurrentEvidenceCommit
+} from './kanana-current-evidence-commit.mjs';
 import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {
   assertCommittedPackageProvenance,
@@ -1787,10 +1793,7 @@ async function assertKananaExactPackageProvenance(
   playwrightReportBytes: Buffer,
   maxContextReportBytes: Buffer
 ): Promise<void> {
-  const evidencePath = join(
-    workspaceRoot,
-    'packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json'
-  );
+  const evidencePath = join(workspaceRoot, KANANA_MODEL_PROVENANCE_PATH);
   const evidence = JSON.parse(await readFile(evidencePath, 'utf8')) as AnyRecord;
   const exactPackage = evidence.validation?.exactPackageWebgpu as AnyRecord;
   const candidate = exactPackage?.candidateArchive as AnyRecord;
@@ -1803,7 +1806,7 @@ async function assertKananaExactPackageProvenance(
   assert.equal(exactPackage?.maximumLength?.passed, true);
   assert.equal(exactPackage?.maximumLength?.playwrightReportSha256, sha256(maxContextReportBytes));
 
-  const configPath = join(workspaceRoot, 'packages/web-decision/src/catalog/provenance/kanana-conversion-config.json');
+  const configPath = join(workspaceRoot, KANANA_CONVERSION_CONFIG_PATH);
   const config = JSON.parse(await readFile(configPath, 'utf8')) as AnyRecord;
   const publicApi = config.validation?.curatedPublicApiReleaseTestsEvidence as AnyRecord;
   assert.equal(publicApi?.archiveSha256, inputs.archive.archiveSha256);
@@ -1865,12 +1868,49 @@ export async function verifyKananaCombinedReleaseEvidence(
   return {...result, playwrightReportSha256, maxContextReportSha256, approved};
 }
 
+async function verifyKananaCurrentCommittedEvidence(
+  options: KananaReleaseEvidenceOptions,
+  workspaceRoot: string,
+  evidenceCommit: string
+): Promise<AnyRecord> {
+  const evidence = readKananaCurrentEvidenceCommit(workspaceRoot, evidenceCommit);
+  const {archiveSha256, packageVersion, playwrightReportSha256, maxContextReportSha256, sourceCommit} = evidence;
+  const pin = validateKananaCombinedPin(
+    {schemaVersion: 1, archiveSha256, packageVersion, playwrightReportSha256, maxContextReportSha256},
+    'release'
+  );
+  const inputs = await collectKananaCombinedInputs(
+    options.archivePath,
+    options.installedPackagePath,
+    workspaceRoot,
+    pin,
+    'current'
+  );
+  const {result, playwrightReportBytes, maxContextReportBytes} = await verifyKananaRun(options, inputs, workspaceRoot);
+  assertKananaCurrentEvidenceRun(evidence, {
+    archive: inputs.archive,
+    playwrightReportBytes,
+    maxContextReportBytes,
+    maxContextTokens: inputs.policy.maximumContext.maxTokens
+  });
+  assert.deepEqual(
+    readKananaCurrentEvidenceCommit(workspaceRoot, evidenceCommit),
+    evidence,
+    'Current Kanana evidence commit changed during verification.'
+  );
+  return {...result, playwrightReportSha256, maxContextReportSha256, sourceCommit, evidenceCommit, approved: true};
+}
+
 /** Verify Kanana on the same committed, fully verified catalog as the current archive. */
 export async function verifyKananaCurrentReleaseEvidence(
-  options: KananaReleaseEvidenceOptions & {candidateConfigPath?: string}
+  options: KananaReleaseEvidenceOptions & {candidateConfigPath?: string; evidenceCommit?: string}
 ): Promise<AnyRecord> {
   const workspaceRoot = resolve(options.workspaceRoot ?? WORKSPACE_ROOT);
-  const {candidateConfigPath, archivePath, installedPackagePath} = options;
+  const {candidateConfigPath, archivePath, installedPackagePath, evidenceCommit} = options;
+  if (evidenceCommit !== undefined) {
+    assert.equal(candidateConfigPath, undefined, 'Kanana evidence commit cannot be combined with a candidate pin.');
+    return verifyKananaCurrentCommittedEvidence(options, workspaceRoot, evidenceCommit);
+  }
   const pin = await readKananaCombinedPin(workspaceRoot, candidateConfigPath, KANANA_CURRENT_RELEASE_PIN);
   const inputs = await collectKananaCombinedInputs(archivePath, installedPackagePath, workspaceRoot, pin, 'current');
   const {result, playwrightReportBytes, maxContextReportBytes} = await verifyKananaRun(options, inputs, workspaceRoot);
@@ -2172,6 +2212,11 @@ function verifyCommandLine(args: string[]) {
       return verifyKananaCombinedReleaseEvidence(parseKananaArguments(args.slice(1)));
     case '--kanana-current':
       return verifyKananaCurrentReleaseEvidence(parseKananaArguments(args.slice(1)));
+    case '--kanana-current-evidence-commit': {
+      const evidenceCommit = args[1];
+      fail(evidenceCommit && !evidenceCommit.startsWith('--'), 'Kanana current evidence commit ID is required.');
+      return verifyKananaCurrentReleaseEvidence({...parseKananaArguments(args.slice(2)), evidenceCommit});
+    }
     case '--kanana-current-candidate': {
       const candidateConfigPath = args[1];
       fail(

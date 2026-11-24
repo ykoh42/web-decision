@@ -15,6 +15,7 @@
     "./verify-release-evidence.ts",
     "./verify-release-evidence.test.ts",
     "./tvm-build-evidence.test.ts",
+    "./kanana-current-evidence-commit.test.mts",
     "./mapika-release-evidence.test.mts"
   ]
 }

@@ -54,6 +54,41 @@ node --import tsx scripts/release/strands-gemma4-v2-release-evidence.mts \
 
 Add `WEB_DECISION_GEMMA_V2_RAW_CAPTURE=1` to observe unrounded values in the installed scorer with Chromium’s debugger. This mode serves archive JavaScript and the pinned tokenizer without development-server transforms. It fails if Chromium parses different bytes, moves the exact scorer breakpoint, or records a different set of questions. The verifier recomputes the upstream thresholds and the six CPU-reference differences. Release approval remains pending review of the exact combined run.
 
+## Post-build Kanana evidence for the current archive
+
+Build and test the archive on the clean source commit. Use `--kanana-current-candidate` with the archive pin to check both Kanana reports and the independent TVM rebuilds. Keep the test checkout on that source commit so the Gemma and Mapika report checks continue to bind the same source. The candidate verifier prints the archive, installed package tree, bundle and report digests, as well as the verified context length.
+
+In a separate worktree at the tested commit, add `scripts/release/evidence/kanana-current/<archiveSha256>.json` and commit it as a direct child of that commit. The child commit may add exactly this one regular file. Record the candidate verification values and the SHA-256 of each original Kanana provenance file from the tested source. The two provenance files are `packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json` and `packages/web-decision/src/catalog/provenance/kanana-conversion-config.json`.
+
+```json
+{
+  "schemaVersion": 1,
+  "sourceCommit": "<tested git commit>",
+  "packageVersion": "<verified archive version>",
+  "archiveSha256": "<archive sha256>",
+  "packageTreeSha256": "<installed package tree sha256>",
+  "bundleSha256": "<installed entrypoint sha256>",
+  "playwrightReportSha256": "<browser report sha256>",
+  "maxContextReportSha256": "<context report sha256>",
+  "maxContextTokens": 20480,
+  "maxContextPassed": true,
+  "modelProvenanceSha256": "<tested model provenance file sha256>",
+  "conversionConfigSha256": "<tested conversion config sha256>"
+}
+```
+
+Run the final gate from the original clean source worktree. Provide the full ID of the post-build evidence commit and the same archive, installation, reports and build evidence.
+
+```sh
+node --import tsx scripts/release/verify-release-evidence.ts \
+  --kanana-current-evidence-commit "$evidence_commit" \
+  --archive "$archive" --installed-package "$installed_package" \
+  --playwright-report "$browser_report" --max-context-report "$context_report" \
+  --build-evidence "$build_evidence"
+```
+
+The verifier reads the added file directly from Git, applies the current-release archive, provenance, test fixture, hardware and TVM rebuild checks, and verifies the two exact report byte strings against the post-build commit. Keep the evidence commit ID with the release record. Historical exact-package provenance stays at its original paths and the existing historical commands use it. The Git commit pins the evidence bytes. Reviewer identity and release authorization follow the release procedure.
+
 ## Kanana exact-package GPU evidence
 
 The Kanana gate is separate from the Kev matrix and accepts only the npm-packed `web-decision@0.4.0` archive pinned in [release-evidence-policy.json](./release-evidence-policy.json). The policy binds the archive SHA-256, Kanana static manifest, checkpoint revision and digest, all five manifest file hashes, and the text and image reference fixtures. The text test checks its recorded TVM WebGPU output against the pinned Python/PyTorch fixture. The image test checks the selected option and probabilities against its pinned Python/PyTorch fixture. Every record carries the installed archive and entrypoint digests, exact text and vision Wasm hashes, the `navigator.gpu.requestAdapter().info` observation, adapter features and limits, and the model output. The policy pins the source hashes of all four GPU test files and their evidence helpers; release verification requires those files to match committed `HEAD` bytes.
