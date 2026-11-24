@@ -48,7 +48,7 @@ Mapika loads the text runner first. It fetches embedding ranges and image assets
 
 To prepare Mapika for offline use, call `await model.prepareOffline({signal, onProgress})` while online. Both options are optional. A complete model cache uses about 4.5 GB of browser storage. Check `model.cacheStatus` for `'complete'`, then pass `offline: true` when loading the model offline.
 
-Strands Gemma 4 v2 accepts keyed `choice`, `noul`, and `score` questions and base64 images. The default is 32,768 input tokens per question, counting state, image, and question tokens. Set `maxLength` at load time or for an individual `systemOne()` call. Actual capacity depends on the GPU and its buffer limits. Call `prepareOffline()` online and check `isOfflineReady()` before loading with `offline: true`. The pinned checkpoint contains about 10.25 GB of weights. See the packaged [license](./STRANDS-GEMMA4-V2-LICENSE) and [notice](./STRANDS-GEMMA4-V2-NOTICE) for attribution.
+Strands Gemma 4 v2 accepts keyed `choice`, `noul`, and `score` questions and base64 images. Use a `Map` to preserve the order of numeric-looking keys. Use `bigint` for exact large integers in structured content and `kananaFloat(2)` to render the float `2.0`. The default is 32,768 input tokens per question, counting state, image, and question tokens. Set `maxLength` at load time or for an individual `systemOne()` call. Actual capacity depends on the GPU and its buffer limits. Call `prepareOffline()` online and check `isOfflineReady()` before loading with `offline: true`. The pinned checkpoint contains about 10.25 GB of weights. See the packaged [license](./STRANDS-GEMMA4-V2-LICENSE) and [notice](./STRANDS-GEMMA4-V2-NOTICE) for attribution.
 
 ## Kanana model terms
 

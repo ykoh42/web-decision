@@ -20,3 +20,9 @@ void evaluate;
 
 // @ts-expect-error Gemma always uses its pinned assets.
 void loadDecisionModel({modelId: 'strands-decider-e2b-gemma4-v2-2611', assetsUrl: 'https://example.org/'});
+
+const compatibleRequest: StrandsGemma4V2SystemOneRequest = {
+  audio: null,
+  questions: {q: {instructions: 'Is it ready?'}}
+};
+void compatibleRequest;

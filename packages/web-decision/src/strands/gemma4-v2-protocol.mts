@@ -57,15 +57,7 @@ function pythonNumber(value: number): string {
   if (Number.isNaN(value)) return 'NaN';
   if (value === Infinity) return 'Infinity';
   if (value === -Infinity) return '-Infinity';
-  const wire = JSON.stringify(value);
-  if (!/[.e]/u.test(wire)) return wire;
-  const n = Math.abs(value);
-  if (n !== 0 && (n < 1e-4 || n >= 1e16)) {
-    const [mantissa, exponent] = value.toExponential().split('e');
-    const power = Number(exponent);
-    return `${mantissa}e${power < 0 ? '-' : '+'}${String(Math.abs(power)).padStart(2, '0')}`;
-  }
-  return wire;
+  return Number.isSafeInteger(value) && !Object.is(value, -0) ? String(value) : pythonFloat(value);
 }
 
 function pythonFloat(value: number): string {
@@ -154,7 +146,8 @@ function normalize(question: Gemma4V2Question) {
   const entries = criteria !== null && !Array.isArray(criteria) ? dictionaryEntries(criteria) : [];
   const isNoul =
     criteria === null || (!Array.isArray(criteria) && entries.every(([key]) => key === 'true' || key === 'false'));
-  const kind = question.type ?? (isNoul ? 'noul' : Array.isArray(criteria) ? 'score' : 'choice');
+  const kind =
+    question.type === undefined ? (isNoul ? 'noul' : Array.isArray(criteria) ? 'score' : 'choice') : question.type;
   if (!['noul', 'choice', 'score'].includes(kind)) throw invalid('Unknown question type.');
   if (kind === 'noul') return normalizeNoul(criteria, entries);
   if (kind === 'score') {

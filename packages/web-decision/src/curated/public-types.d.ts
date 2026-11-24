@@ -242,6 +242,7 @@ export interface StrandsGemma4V2SystemOneRequest {
   readonly state?: StrandsGemma4V2Content;
   readonly questions: StrandsGemma4V2Dictionary<StrandsGemma4V2Question>;
   readonly images?: readonly string[];
+  readonly audio?: null;
 }
 
 export interface StrandsGemma4V2SystemOneOptions {

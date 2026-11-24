@@ -81,3 +81,18 @@ test('preserves long input and rejects values the upstream request cannot repres
   cycle.self = cycle;
   assert.throws(() => renderStrandsV2({state: cycle, questions: {q: {instructions: 'x'}}}, tokenizer), /cycle/i);
 });
+
+test('requires a valid explicit kind and preserves upstream float formatting in structured content', () => {
+  const questions = {q: {instructions: 'Ready?'}};
+  assert.throws(
+    () => renderStrandsV2({questions: {q: {...questions.q, type: null}}} as never, tokenizer),
+    /Unknown question type/u
+  );
+  const result = renderStrandsV2(
+    {state: {signed: -0, unsafe: 1e20, ordinary: 4, exact: 100000000000000000000n}, questions},
+    tokenizer
+  );
+  const expected =
+    'user\n<state>\n{\n  "signed": -0.0,\n  "unsafe": 1e+20,\n  "ordinary": 4,\n  "exact": 100000000000000000000\n}\n</state>\n';
+  assert.deepEqual(result.stateIds, [2, 105, ...bytes(expected)]);
+});
