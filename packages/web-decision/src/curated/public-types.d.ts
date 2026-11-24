@@ -275,7 +275,9 @@ export interface StrandsGemma4V2DecisionModel {
     options?: StrandsGemma4V2SystemOneOptions | null
   ): Promise<StrandsGemma4V2SystemOneResult>;
   releaseCachedMemory(): Promise<void>;
+  /** Verify all cached weights, fetching missing or corrupt ranges only when online. This can read about 9.6 GB. */
   prepareOffline(options?: {signal?: AbortSignal; onProgress?: (progress: ModelProgress) => void}): Promise<void>;
+  /** Check pinned static assets and weight presence without rehashing the full weight cache. */
   isOfflineReady(signal?: AbortSignal | null): Promise<boolean>;
   dispose(): Promise<void>;
 }

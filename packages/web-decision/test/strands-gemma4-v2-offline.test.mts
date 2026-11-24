@@ -27,6 +27,10 @@ test('pinned checkpoint assets use the immutable revision directory with a trail
   }
 });
 
+function verifiable<T extends {hasCompleteOfflineWeights(): Promise<boolean>}>(source: T) {
+  return {...source, verifyOfflineWeights: source.hasCompleteOfflineWeights.bind(source)};
+}
+
 function sampleAssets() {
   const base = new URL('https://example.test/pinned/');
   const contents = new Map<string, Uint8Array>();
@@ -78,7 +82,7 @@ test('prepares every pinned static asset and weights before reporting offline re
       imagesComplete = true;
     }
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   assert.equal(await preparation.isOfflineReady(), false);
   const progress: number[] = [];
   await preparation.prepareOffline({onProgress: (event) => progress.push(event.loadedBytes)});
@@ -111,7 +115,7 @@ test('rejects omitted graph assets and fails when static asset integrity differs
   assert.throws(
     () =>
       createGemma4V2OfflinePreparation(
-        source,
+        verifiable(source),
         cache,
         {...assets, artifacts: []},
         {
@@ -137,7 +141,7 @@ test('rejects omitted graph assets and fails when static asset integrity differs
       imagesComplete = true;
     }
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   await assert.rejects(preparation.prepareOffline());
   assert.equal(preparedWeights, false);
   assert.equal(await preparation.isOfflineReady(), false);
@@ -182,7 +186,7 @@ test('cancelled preparation can be retried without marking the model ready', asy
       imagesComplete = true;
     }
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   const controller = new AbortController();
   const first = preparation.prepareOffline({signal: controller.signal});
   await waiting;
@@ -225,7 +229,7 @@ test('readiness and preparation reject when disposed during a pending weight che
     },
     async prepareOffline() {}
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   const preparing = preparation.prepareOffline();
   await pending;
   const readiness = preparation.isOfflineReady();
@@ -273,7 +277,7 @@ test('one caller can cancel shared preparation without cancelling another caller
     },
     async prepareOffline() {}
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   const controller = new AbortController();
   const first = preparation.prepareOffline({signal: controller.signal});
   const second = preparation.prepareOffline();
@@ -322,7 +326,7 @@ test('a failed static asset cache write keeps earlier files and permits retry', 
       assert.fail('images are already complete');
     }
   };
-  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const preparation = createGemma4V2OfflinePreparation(verifiable(source), cache, assets, images);
   await assert.rejects(preparation.prepareOffline(), /could not be cached/i);
   assert.equal(weightChecks, 0);
   assert.equal(await preparation.isOfflineReady(), false);
@@ -336,4 +340,131 @@ test('a failed static asset cache write keeps earlier files and permits retry', 
   assert.equal(requests.get(new URL(assets.tokenizerConfig.name, assets.tokenizerConfig.base).href), 1);
   assert.equal(requests.get(new URL(assets.readout.name, assets.readout.base).href), 2);
   preparation.dispose();
+});
+
+test('offline preparation never fetches missing static assets', async (t) => {
+  const {assets} = sampleAssets();
+  const cache = new MemoryCache();
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    throw new Error('offline preparation must not fetch');
+  });
+  const source = {
+    async hasCompleteOfflineWeights() {
+      return false;
+    },
+    async verifyOfflineWeights() {
+      return false;
+    },
+    async prepareWeightsOffline() {
+      throw new Error('offline preparation must not fetch weights');
+    }
+  };
+  const images = {
+    async isOfflineReady() {
+      return false;
+    },
+    async prepareOffline() {
+      throw new Error('offline preparation must not fetch codecs');
+    }
+  };
+  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images, true);
+  await assert.rejects(preparation.prepareOffline(), /offline/i);
+  assert.equal(requests, 0);
+  preparation.dispose();
+});
+
+test('cancelling explicit weight revalidation preserves the reason and allows retry', async (t) => {
+  const {assets, contents} = sampleAssets();
+  const cache = new MemoryCache();
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (input: string) => new Response(Uint8Array.from(contents.get(String(input))!))
+  );
+  let hold = true;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const source = {
+    async hasCompleteOfflineWeights() {
+      return true;
+    },
+    async verifyOfflineWeights(signal?: AbortSignal | null) {
+      if (!hold) return true;
+      entered();
+      await new Promise<void>((_resolve, reject) =>
+        signal!.addEventListener('abort', () => reject(signal!.reason), {once: true})
+      );
+      return false;
+    },
+    async prepareWeightsOffline() {
+      assert.fail('intact weights must not be fetched');
+    }
+  };
+  const images = {
+    async isOfflineReady() {
+      return true;
+    },
+    async prepareOffline() {
+      assert.fail('codecs already cached');
+    }
+  };
+  const preparation = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  const controller = new AbortController();
+  const reason = new Error('stop weight revalidation');
+  const pending = preparation.prepareOffline({signal: controller.signal});
+  await started;
+  controller.abort(reason);
+  await assert.rejects(pending, (error) => error === reason);
+  hold = false;
+  await preparation.prepareOffline();
+  assert.equal(await preparation.isOfflineReady(), true);
+  preparation.dispose();
+});
+
+test('offline preparation refuses missing codecs or invalid weights without contacting the network', async (t) => {
+  const {assets, contents} = sampleAssets();
+  const cache = new MemoryCache();
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    requests++;
+    return new Response(Uint8Array.from(contents.get(String(input))!));
+  });
+  let weightsReady = true;
+  let imagesReady = true;
+  const source = {
+    async hasCompleteOfflineWeights() {
+      return true;
+    },
+    async verifyOfflineWeights() {
+      return weightsReady;
+    },
+    async prepareWeightsOffline() {
+      assert.fail('offline cannot repair weights');
+    }
+  };
+  const images = {
+    async isOfflineReady() {
+      return imagesReady;
+    },
+    async prepareOffline() {
+      assert.fail('offline cannot fetch codecs');
+    }
+  };
+  const online = createGemma4V2OfflinePreparation(source, cache, assets, images);
+  await online.prepareOffline();
+  const before = requests;
+  const offline = createGemma4V2OfflinePreparation(source, cache, assets, images, true);
+  imagesReady = false;
+  await assert.rejects(offline.prepareOffline(), /image decoder.*offline/i);
+  assert.equal(requests, before);
+  imagesReady = true;
+  weightsReady = false;
+  await assert.rejects(offline.prepareOffline(), /weights.*offline/i);
+  assert.equal(requests, before);
+  offline.dispose();
+  online.dispose();
 });

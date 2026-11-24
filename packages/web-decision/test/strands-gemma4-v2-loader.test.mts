@@ -230,6 +230,9 @@ test('loader connects the offline coordinator to graph pins, image preparation, 
       }
       return weights;
     },
+    async verifyOfflineWeights() {
+      return weights;
+    },
     async prepareWeightsOffline(options?: {onProgress?: (bytes: number, total: number) => void}) {
       weights = true;
       options?.onProgress?.(3, 3);

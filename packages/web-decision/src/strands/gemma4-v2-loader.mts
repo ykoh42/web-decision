@@ -209,7 +209,8 @@ export async function loadGemma4V2Model(options: Gemma4V2LoaderOptions, dependen
         source,
         options.cache,
         pinnedGemma4V2OfflineAssets([...dependencies.graphAssets, ...(scoringAsset ? [scoringAsset] : [])]),
-        imagePreparer
+        imagePreparer,
+        options.offline ?? false
       );
     }
     runner = await waitForAbort(

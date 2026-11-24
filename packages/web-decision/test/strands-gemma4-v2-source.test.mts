@@ -315,7 +315,7 @@ test('explicit offline verification can be cancelled while a cached range read i
   source.dispose();
 });
 
-test('offline coordinator prepares the actual range source and detects missing ranges', async (t) => {
+test('offline coordinator detects damaged ranges and preserves healthy cache across a failed repair', async (t) => {
   const data = fixture();
   const cache = new MemoryCache();
   const contents = new Map<string, Uint8Array>();
@@ -334,6 +334,7 @@ test('offline coordinator prepares the actual range source and detects missing r
     artifacts: [asset('model.wasm')]
   };
   let requests = 0;
+  let failWeightFetch = false;
   t.mock.method(globalThis, 'fetch', async (input: string, init?: RequestInit) => {
     requests++;
     if (!String(input).endsWith('/model.safetensors')) {
@@ -341,6 +342,7 @@ test('offline coordinator prepares the actual range source and detects missing r
       assert.ok(bytes);
       return new Response(Uint8Array.from(bytes));
     }
+    if (failWeightFetch) throw new TypeError('network unavailable');
     const range = new Headers(init?.headers).get('range');
     const match = /^bytes=(\d+)-(\d+)$/u.exec(range ?? '');
     assert.ok(match);
@@ -371,6 +373,37 @@ test('offline coordinator prepares the actual range source and detects missing r
   assert.equal(requests, onlineRequests);
   const key = [...cache.entries.keys()].find((item) => item.includes(data.inventory.chunks[0]![2]));
   assert.ok(key);
+  const saved = new Uint8Array(await cache.entries.get(key)!.arrayBuffer());
+  const corrupted = saved.slice();
+  corrupted[0] = corrupted[0]! ^ 1;
+  cache.entries.set(key, new Response(corrupted));
+  // Readiness is a fast presence check; explicit preparation verifies all ranges.
+  assert.equal(await preparation.isOfflineReady(), true);
+  const damaged = await openGemma4V2SourceFromInventory(data.inventory, data.digest, base, {cache, offline: true});
+  await assert.rejects(damaged.readTensor('model.language_model.first'), /offline/i);
+  assert.equal(requests, onlineRequests);
+  const damagedPreparation = createGemma4V2OfflinePreparation(damaged, cache, assets, images, true);
+  await assert.rejects(damagedPreparation.prepareOffline(), /offline/i);
+  assert.equal(requests, onlineRequests);
+  damagedPreparation.dispose();
+  damaged.dispose();
+  const preserved = new Map<string, Uint8Array>();
+  for (const [name, response] of cache.entries)
+    if (name !== key) preserved.set(name, new Uint8Array(await response.clone().arrayBuffer()));
+  failWeightFetch = true;
+  await assert.rejects(preparation.prepareOffline(), /fetch|range/i);
+  for (const [name, bytes] of preserved) {
+    const response = cache.entries.get(name);
+    assert.ok(response, `Healthy cache entry was removed: ${name}`);
+    assert.deepEqual(new Uint8Array(await response.clone().arrayBuffer()), bytes);
+  }
+  assert.equal(await source.verifyOfflineWeights(), false);
+  failWeightFetch = false;
+  const afterFailure = requests;
+  await preparation.prepareOffline();
+  assert.equal(await preparation.isOfflineReady(), true);
+  assert.equal(await source.verifyOfflineWeights(), true);
+  assert.equal(requests, afterFailure + 1);
   cache.entries.delete(key);
   assert.equal(await preparation.isOfflineReady(), false);
   preparation.dispose();

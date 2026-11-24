@@ -17,6 +17,7 @@ export type Gemma4V2OfflineAssets = Readonly<{
 }>;
 type WeightSource = Readonly<{
   hasCompleteOfflineWeights(signal?: AbortSignal | null): Promise<boolean>;
+  verifyOfflineWeights(signal?: AbortSignal | null): Promise<boolean>;
   prepareWeightsOffline(options?: {
     signal?: AbortSignal | null;
     onProgress?: (bytes: number, total: number) => void;
@@ -70,7 +71,8 @@ export function createGemma4V2OfflinePreparation(
   source: WeightSource,
   cache: AssetCache,
   assets: Gemma4V2OfflineAssets,
-  images: ImagePreparation
+  images: ImagePreparation,
+  offline = false
 ) {
   if (
     !cache ||
@@ -149,15 +151,19 @@ export function createGemma4V2OfflinePreparation(
   }
 
   const preparation = createOfflinePreparation(false, async (signal, onProgress: (progress: ModelProgress) => void) => {
-    await readStaticAssets(false, signal);
+    await readStaticAssets(offline, signal);
     signal.throwIfAborted();
     const imagesReady = await images.isOfflineReady(signal);
     signal.throwIfAborted();
-    if (!imagesReady) await images.prepareOffline(signal);
+    if (!imagesReady) {
+      if (offline) throw new WebDecisionError('ASSET_LOAD_FAILED', 'Image decoder is not available offline.');
+      await images.prepareOffline(signal);
+    }
     signal.throwIfAborted();
-    const weightsReady = await source.hasCompleteOfflineWeights(signal);
+    const weightsReady = await source.verifyOfflineWeights(signal);
     signal.throwIfAborted();
     if (!weightsReady) {
+      if (offline) throw new WebDecisionError('ASSET_LOAD_FAILED', 'Verified weights are not available offline.');
       await source.prepareWeightsOffline({
         signal,
         onProgress(loadedBytes, totalBytes) {
