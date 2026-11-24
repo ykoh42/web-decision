@@ -79,7 +79,14 @@ async function collectCases(page: Page, references: Record<string, CpuCase>) {
   const cases = {};
   for (const [name, reference] of Object.entries(references)) {
     const input = JSON.parse(reference.requestJson) as unknown;
-    if (!results.has(reference.requestSha256)) results.set(reference.requestSha256, await callSystemOne(page, input));
+    if (!results.has(reference.requestSha256)) {
+      const started = performance.now();
+      results.set(reference.requestSha256, await callSystemOne(page, input));
+      console.log(
+        'GEMMA_PUBLIC_CASE',
+        JSON.stringify({case: name, elapsedMs: Math.round(performance.now() - started)})
+      );
+    }
     const observed = results.get(reference.requestSha256)!;
     expect(observed.model).toBe(modelId);
     expect(observed.usage).toEqual({input_tokens: reference.inputTokens, output_tokens: reference.outputTokens});
@@ -171,12 +178,22 @@ async function collectCorpus(page: Page, requests: CorpusRequests, raw?: RawCapt
   const vectors: string[] = [];
   try {
     for (const {line, golden} of requests) {
+      const started = performance.now();
       const invoke = () => callSystemOne(page, golden.request);
       const observed = raw
         ? await raw.capture(Object.keys(golden.questions), invoke)
         : {result: await invoke(), frames: undefined};
       expect(observed.result.model).toBe(modelId);
       vectors.push(JSON.stringify(gemmaV2PublicCodeRow(line, golden, observed.result, observed.frames)));
+      console.log(
+        'GEMMA_PUBLIC_ROW',
+        JSON.stringify({
+          line,
+          completed: vectors.length,
+          total: requests.length,
+          elapsedMs: Math.round(performance.now() - started)
+        })
+      );
     }
     return {bytes: Buffer.from(vectors.join('\n') + '\n'), rawEvidence: raw?.evidence()};
   } finally {
@@ -249,7 +266,13 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
     const single = references['image-single']!;
     const singleResult = results.get(single.requestSha256)!;
     await assertImageRecovery(page, single, singleResult);
+    const offlineStarted = performance.now();
+    console.log('GEMMA_PUBLIC_OFFLINE', 'start');
     const offline = await checkOffline(page, single, singleResult);
+    console.log(
+      'GEMMA_PUBLIC_OFFLINE',
+      JSON.stringify({phase: 'complete', elapsedMs: Math.round(performance.now() - offlineStarted)})
+    );
     const after = await verifyInstalled(archive, bundle);
     expect(archiveIdentity(after.archive)).toEqual(archiveIdentity(verified.archive));
     expect(cleanSourceCommit(root)).toBe(sourceCommit);

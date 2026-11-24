@@ -281,6 +281,63 @@ function validatePngChunk(type: string, data: Uint8Array, seen: Set<string>): vo
   );
 }
 
+function choosePngSingletons(chunks: PngTextChunk[]) {
+  const chosen = new Map<string, Uint8Array>();
+  let duplicates = false;
+  let imageStarted = false;
+  for (const {type, data} of chunks) {
+    if (type === 'IDAT') imageStarted = true;
+    if (!PNG_SINGLETON_CHUNKS.has(type)) continue;
+    if (imageStarted || chosen.has(type)) duplicates = true;
+    if (!imageStarted || type === 'tRNS' || type === 'iCCP') {
+      // Validate every encountered compressed profile, even those later replaced.
+      validatePngChunk(type, data, new Set());
+      if (!imageStarted || type === 'tRNS') chosen.set(type, data);
+    }
+  }
+  return {chosen, duplicates};
+}
+
+function pngPaletteChunks(chosen: Map<string, Uint8Array>, raw: (data: Uint8Array) => Uint8Array) {
+  return ['PLTE', 'tRNS'].flatMap((type) => {
+    const data = chosen.get(type);
+    return data ? [raw(data)] : [];
+  });
+}
+
+function normalizedPngSingletons(bytes: Uint8Array, chunks: PngTextChunk[], chosen: Map<string, Uint8Array>) {
+  const raw = (data: Uint8Array) => {
+    const start = data.byteOffset - bytes.byteOffset - 8;
+    return bytes.subarray(start, start + data.length + 12);
+  };
+  const header = chosen.get('IHDR');
+  if (!header || header.length !== 13) throw new TypeError('PNG has no readable IHDR dimensions.');
+  const parts: Uint8Array[] = [bytes.subarray(0, 8), raw(header)];
+  let insertedPalette = false;
+  for (const {type, data} of chunks) {
+    if (type === 'IDAT' && !insertedPalette) {
+      parts.push(...pngPaletteChunks(chosen, raw));
+      insertedPalette = true;
+    }
+    if (type === 'IHDR' || type === 'PLTE' || type === 'tRNS') continue;
+    if (type === 'iCCP' && chosen.get(type) !== data) continue;
+    parts.push(raw(data));
+  }
+  const normalized = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    normalized.set(part, offset);
+    offset += part.length;
+  }
+  return normalized;
+}
+
+function canonicalizePngSingletons(bytes: Uint8Array): Uint8Array {
+  const chunks = [...pngChunks(bytes)];
+  const {chosen, duplicates} = choosePngSingletons(chunks);
+  return duplicates ? normalizedPngSingletons(bytes, chunks, chosen) : bytes;
+}
+
 function pngImageData(bytes: Uint8Array): Uint8Array {
   let first: Uint8Array = new Uint8Array(0);
   let size = 0;
@@ -911,7 +968,8 @@ export async function decodeStrandsImage(
     loadMagick?: () => Promise<Uint8Array>;
   }>
 ): Promise<DecodedImage & {headerWidth: number; headerHeight: number}> {
-  const bytes = decodeBase64(data, options.maxImageBytes);
+  const input = decodeBase64(data, options.maxImageBytes);
+  const bytes = hasAscii(input, 0, '\x89PNG\r\n\x1a\n') ? canonicalizePngSingletons(input) : input;
   const header = readHeader(bytes);
   assertImageSize(header, options.maxImagePixels);
   let decoded: DecodedImage;
