@@ -1,5 +1,5 @@
 import {decode as decodePng} from 'fast-png';
-import {unzlibSync} from 'fflate';
+import {unzlibSync, zlibSync} from 'fflate';
 import decodeJpeg from '@jsquash/jpeg/decode.js';
 import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
 import {packKananaImagePatches, resizePillowBicubic} from '../kanana/image-processing.ts';
@@ -303,14 +303,50 @@ function pngImageData(bytes: Uint8Array): Uint8Array {
   return combined;
 }
 
-function validatePngImageData(bytes: Uint8Array, header: ImageHeader): void {
+function pngCrc(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const value of data) {
+    crc ^= value;
+    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngWithImageData(bytes: Uint8Array, imageData: Uint8Array): Uint8Array {
+  const compressed = zlibSync(imageData);
+  const chunk = new Uint8Array(compressed.length + 12);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, compressed.length);
+  chunk.set([73, 68, 65, 84], 4);
+  chunk.set(compressed, 8);
+  view.setUint32(chunk.length - 4, pngCrc(chunk.subarray(4, chunk.length - 4)));
+  const parts: Uint8Array[] = [bytes.subarray(0, 8)];
+  let added = false;
+  for (const {type, data} of pngChunks(bytes)) {
+    if (type === 'IDAT') {
+      if (!added) parts.push(chunk);
+      added = true;
+    } else {
+      const start = data.byteOffset - bytes.byteOffset - 8;
+      parts.push(bytes.subarray(start, start + data.length + 12));
+    }
+  }
+  const result = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
+  return result;
+}
+
+function validatePngImageData(bytes: Uint8Array, header: ImageHeader): Uint8Array {
   const expected = pngFilteredSize(bytes, header);
-  const actual = boundedPngInflatedSize(
-    pngImageData(bytes),
-    expected,
-    'PNG decompressed data exceeds the size of its declared scanlines.'
-  );
-  if (actual !== expected) throw new TypeError('PNG decoder returned incomplete scanline data.');
+  const inflated = unzlibSync(pngImageData(bytes), {out: new Uint8Array(expected + 1)});
+  if (inflated.length < expected) throw new TypeError('PNG decoder returned incomplete scanline data.');
+  // Pillow consumes the declared scanlines and ignores any following decompressed bytes.
+  // Recompress only those bytes so fast-png never expands an unbounded IDAT stream.
+  return inflated.length > expected ? pngWithImageData(bytes, inflated.subarray(0, expected)) : bytes;
 }
 
 function rawProfileExif(text: string): Uint8Array | undefined {
@@ -880,8 +916,7 @@ export async function decodeStrandsImage(
   assertImageSize(header, options.maxImagePixels);
   let decoded: DecodedImage;
   if (header.format === 'png') {
-    validatePngImageData(bytes, header);
-    decoded = decodePngRgb(bytes);
+    decoded = decodePngRgb(validatePngImageData(bytes, header));
   } else if (header.format === 'jpeg' && header.components !== 4) {
     await options.prepareJpeg?.();
     const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
