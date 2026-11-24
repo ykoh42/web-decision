@@ -608,7 +608,7 @@ function readHeader(bytes: Uint8Array): ImageHeader & {orientation?: number} {
   throw new TypeError('Qwen3.5 images must be PNG, JPEG, WEBP, or GIF.');
 }
 
-function decodeBase64(data: string, maxImageBytes?: number): Uint8Array {
+function decodeBase64(data: string, maxImageBytes?: number, invalidBase64?: () => Error): Uint8Array {
   let payload = data.replace(trimPythonWhitespaceStart, '').replace(trimPythonWhitespaceEnd, '');
   const prefix = /^data:image\/[\w.+-]+;base64,/u;
   payload = payload.replace(prefix, '');
@@ -624,7 +624,7 @@ function decodeBase64(data: string, maxImageBytes?: number): Uint8Array {
     remainder === 1 ||
     (remainder !== 0 && padding.length !== requiredPadding)
   )
-    throw new TypeError('Qwen3.5 image input is not valid base64.');
+    throw invalidBase64?.() ?? new TypeError('Qwen3.5 image input is not valid base64.');
   const byteLength = Math.floor((encoded.length * 3) / 4);
   if (maxImageBytes !== undefined && byteLength > maxImageBytes)
     throw new RangeError(`Image exceeds the ${maxImageBytes} byte limit.`);
@@ -964,11 +964,12 @@ export async function decodeStrandsImage(
     magickWasm?: MagickWasm | undefined;
     maxImagePixels: number;
     maxImageBytes?: number;
+    invalidBase64?: () => Error;
     prepareJpeg?: () => Promise<void>;
     loadMagick?: () => Promise<Uint8Array>;
   }>
 ): Promise<DecodedImage & {headerWidth: number; headerHeight: number}> {
-  const input = decodeBase64(data, options.maxImageBytes);
+  const input = decodeBase64(data, options.maxImageBytes, options.invalidBase64);
   const bytes = hasAscii(input, 0, '\x89PNG\r\n\x1a\n') ? canonicalizePngSingletons(input) : input;
   const header = readHeader(bytes);
   assertImageSize(header, options.maxImagePixels);

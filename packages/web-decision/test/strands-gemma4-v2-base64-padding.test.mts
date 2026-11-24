@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
+import {WebDecisionError} from '../src/curated/errors.ts';
 import {prepareGemma4V2EncodedImage} from '../src/strands/gemma4-v2-image.mts';
 import {decodeStrandsImage} from '../src/strands/qwen35-image-input.mts';
 
@@ -39,4 +40,28 @@ test('Gemma and Qwen honor pinned Python base64 validation at every padding boun
   }
   const dataUri = `data:image/png;base64,${valid}===`;
   assert.equal((await prepareGemma4V2EncodedImage(dataUri)).width, 64);
+});
+
+test('Gemma classifies invalid base64 without rewriting Qwen or codec asset errors', async () => {
+  await assert.rejects(prepareGemma4V2EncodedImage('!'), (error) => {
+    assert.ok(error instanceof WebDecisionError);
+    assert.equal(error.code, 'INVALID_INPUT');
+    assert.equal(error.message, 'Gemma 4 v2 image input is not valid base64.');
+    return true;
+  });
+  await assert.rejects(decodeStrandsImage('!', {maxImagePixels: 4096 * 4096}), {
+    name: 'TypeError',
+    message: 'Qwen3.5 image input is not valid base64.'
+  });
+  const jpeg = await readFile(new URL('./fixtures/strands-gemma4-v2-image-formats/progressive.jpg', import.meta.url));
+  const unavailable = new WebDecisionError('ASSET_LOAD_FAILED', 'Pinned JPEG codec unavailable.');
+  await assert.rejects(
+    prepareGemma4V2EncodedImage(jpeg.toString('base64'), {
+      codecs: {
+        prepareJpeg: () => Promise.reject(unavailable),
+        loadMagick: () => Promise.reject(new Error('Unexpected Magick codec request.'))
+      }
+    }),
+    (error) => error === unavailable
+  );
 });

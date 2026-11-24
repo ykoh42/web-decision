@@ -90,6 +90,7 @@ export async function prepareGemma4V2EncodedImage(
     magickWasm: options.magickWasm,
     maxImagePixels: 4096 * 4096,
     maxImageBytes: 16 * 1024 * 1024,
+    invalidBase64: () => new WebDecisionError('INVALID_INPUT', 'Gemma 4 v2 image input is not valid base64.'),
     prepareJpeg: () => waitForAbort(() => codecs.prepareJpeg(), options.signal),
     loadMagick: () => waitForAbort(() => codecs.loadMagick(), options.signal)
   });
