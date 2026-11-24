@@ -229,15 +229,12 @@ test('rejects an invalid image span before loading embedding rows', async () => 
   await runner.dispose();
 });
 
-test('refuses lengths beyond the compiled TVM graph before GPU allocation', async () => {
+test('passes 131073 tokens to the TVM functions', async () => {
   const fake = setup();
   const runner = await createGemma4V2Runner(fake.deps as never);
-  await assert.rejects(
-    runner.run({stateIds: Array(131073).fill(1), questionIds: [], imageSpans: [], images: []}),
-    /compiled.*131072/i
-  );
-  assert.equal(fake.embeddingIds.length, 0);
-  assert.equal(fake.calls.length, 0);
+  const output = await runner.run({stateIds: Array(131073).fill(1), questionIds: [], imageSpans: [], images: []});
+  assert.equal(output.length, 255);
+  assert.equal(fake.embeddingIds.length > 0, true);
   assert.equal(fake.scopes.length, 0);
   await runner.dispose();
 });

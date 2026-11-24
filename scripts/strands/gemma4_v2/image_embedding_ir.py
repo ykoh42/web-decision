@@ -81,7 +81,7 @@ def build_image_embedding_ir(*, cpu=False):
     """Return a Relax module: (hidden[1,n,1536], image[k,1536], start[1]) → [1,n,1536].
 
     Both tensors are float32 and start is int32. The caller must validate
-    1 <= k <= n <= 131072 and 0 <= start <= n-k. Call again on the result
+    1 <= k <= n and 0 <= start <= n-k. Call again on the result
     for each following image. `cpu=True` is only for reference comparisons.
     """
     n = tvm.tirx.Var("n", "int64")
@@ -92,7 +92,6 @@ def build_image_embedding_ir(*, cpu=False):
     start = relax.Var("start", relax.TensorType((1,), "int32"))
     attributes = {
         "tir_var_lower_bound": {"n": 1, "k": 1},
-        "tir_var_upper_bound": {"n": 131072, "k": 131072},
     }
     with builder.function("main", [hidden, image, start], attrs=attributes):
         with builder.dataflow():

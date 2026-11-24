@@ -110,7 +110,7 @@ def convert_attention(node, importer):
 
 def build_decoder_family(checkpoint, index, example):
     config, layer, scalar, shared = load_layer(checkpoint, index)
-    length = torch.export.Dim("length", min=2, max=config.max_position_embeddings)
+    length = torch.export.Dim("length", min=2)
     dynamic = (
         {1: length},
         {1: length},

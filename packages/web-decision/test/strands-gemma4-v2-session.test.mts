@@ -211,11 +211,11 @@ test('accepts exact context boundaries including configured long contexts', asyn
   const request = (length: number) => ({state: 'x'.repeat(length), questions: {q: choice}});
   const rendered = renderStrandsV2(request(1), tokenizer);
   const overhead = rendered.stateIds.length + rendered.questions[0]!.questionIds.length - 1;
-  for (const limit of [32768, 131072]) {
+  for (const limit of [32768, 131072, 131073]) {
     await session.systemOne(request(limit - overhead), {maxLength: limit});
     await assert.rejects(session.systemOne(request(limit - overhead + 1), {maxLength: limit}), /context length/i);
   }
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   await session.dispose();
 });
 
@@ -266,7 +266,7 @@ test('rejects a non-string model field as the upstream request does', async () =
   await session.dispose();
 });
 
-test('reports the compiled graph limit even when the caller requests a longer context', async () => {
+test('passes 131073 tokens to the runner when explicitly configured', async () => {
   let calls = 0;
   const session = create({
     async run() {
@@ -280,8 +280,9 @@ test('reports the compiled graph limit even when the caller requests a longer co
   const rendered = renderStrandsV2(request(1), tokenizer);
   const overhead = rendered.stateIds.length + rendered.questions[0]!.questionIds.length - 1;
   await session.systemOne(request(131072 - overhead), {maxLength: 131073});
-  await assert.rejects(session.systemOne(request(131073 - overhead), {maxLength: 131073}), /compiled.*131072/i);
-  assert.equal(calls, 1);
+  await session.systemOne(request(131073 - overhead), {maxLength: 131073});
+  await assert.rejects(session.systemOne(request(131074 - overhead), {maxLength: 131073}), /context length/i);
+  assert.equal(calls, 2);
   await session.dispose();
 });
 

@@ -112,7 +112,7 @@ def build(checkpoint, hidden, *, host_readout=False):
             return normalized if host_readout else self.linear(normalized)
 
     model = Readout().eval()
-    length = torch.export.Dim("length", min=2, max=config.max_position_embeddings)
+    length = torch.export.Dim("length", min=2)
     program = torch.export.export(
         model, (torch.from_numpy(hidden),), dynamic_shapes=({1: length},), strict=False
     )

@@ -23,7 +23,7 @@ def webgpu_source(module, target):
 
 
 class DynamicContextIrTest(unittest.TestCase):
-    def test_context_bound_does_not_specialize_embedding_shaders(self):
+    def test_dynamic_context_does_not_specialize_embedding_shaders(self):
         target = tvm.target.Target(
             "webgpu", host={"kind": "llvm", "mtriple": "wasm32-unknown-unknown-wasm"}
         )
@@ -44,8 +44,8 @@ class DynamicContextIrTest(unittest.TestCase):
                     sequence = func.ret_ty.shape.values[1]
                     self.assertIsInstance(sequence, tvm.tirx.Var)
                     self.assertEqual(sequence.name, dimension)
-                    bounds = dict(func.attrs["tir_var_upper_bound"])
-                    self.assertEqual(int(bounds[dimension]), 131072)
+                    bounds = dict(func.attrs.get("tir_var_upper_bound", {}))
+                    self.assertNotIn(dimension, bounds)
                     bounds[dimension] = 131073
                     module.update_func(
                         module.get_global_var(name),

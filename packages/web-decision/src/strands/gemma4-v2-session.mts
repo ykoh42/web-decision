@@ -2,7 +2,6 @@ import {waitForAbort} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {validateH2oSignal} from '../h2o/signal.mjs';
 import {readKananaFloat} from '../kanana/json-float.ts';
-import {assertGemma4V2CompiledContext} from './gemma4-v2-context.mjs';
 import {
   renderStrandsV2,
   type Gemma4V2Content,
@@ -185,7 +184,6 @@ export function createGemma4V2Session(options: Gemma4V2SessionOptions) {
           throw invalid(
             `Question ${JSON.stringify(question.name)} exceeds the configured context length of ${limit} tokens.`
           );
-        assertGemma4V2CompiledContext(length);
       }
       const answers: Array<[string, ReturnType<typeof finishGemma4V2Answer>]> = [];
       for (const question of rendered.questions) {

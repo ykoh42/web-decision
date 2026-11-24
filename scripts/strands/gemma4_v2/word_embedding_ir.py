@@ -52,7 +52,7 @@ def build():
         [rows, ids],
         attrs={
             "tir_var_lower_bound": {"length": 1, "unique": 1},
-            "tir_var_upper_bound": {"length": 131072, "unique": 262144},
+            "tir_var_upper_bound": {"unique": 262144},
         },
     ):
         with builder.dataflow():

@@ -144,7 +144,7 @@ def import_part(part, args, dynamic, names, converters=None):
 
 def build_query(block, width):
     rows = torch.export.Dim("query_rows", min=1, max=256)
-    keys = torch.export.Dim("key_rows", min=2, max=131072)
+    keys = torch.export.Dim("key_rows", min=2)
     return import_part(
         QueryPart(block),
         (
@@ -175,7 +175,7 @@ def build_query(block, width):
 
 
 def build_kv(block, width):
-    keys = torch.export.Dim("key_rows", min=2, max=131072)
+    keys = torch.export.Dim("key_rows", min=2)
     return import_part(
         KvPart(block),
         (

@@ -1,6 +1,5 @@
 import type {DLDevice, Instance, Tensor} from '../runtime/tvm-types.js';
 import {withGemma4V2Cleanup} from './gemma4-v2-cleanup.mjs';
-import {GEMMA4_V2_COMPILED_CONTEXT_LENGTH} from './gemma4-v2-context.mjs';
 
 const PATCHES = 2520;
 const WIDTH = 768;
@@ -186,7 +185,6 @@ export function insertGemma4V2VisionEmbedding(
     hidden.shape[2] !== OUTPUT_WIDTH ||
     !Number.isSafeInteger(length) ||
     length! < 1 ||
-    length! > GEMMA4_V2_COMPILED_CONTEXT_LENGTH ||
     image.dtype !== 'float32' ||
     image.shape.length !== 2 ||
     image.shape[1] !== OUTPUT_WIDTH ||

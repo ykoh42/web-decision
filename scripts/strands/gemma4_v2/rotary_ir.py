@@ -59,7 +59,6 @@ def build():
             [ids, freq],
             attrs={
                 "tir_var_lower_bound": {"length": 1},
-                "tir_var_upper_bound": {"length": 131072},
             },
         ):
             with bb.dataflow():

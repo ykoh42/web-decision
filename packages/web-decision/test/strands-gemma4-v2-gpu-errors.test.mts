@@ -66,7 +66,8 @@ test('the tiled decoder checks the largest unpacked matrix and full hidden buffe
   for (const [tokens, bytes] of [
     [3, 75_497_472],
     [32_768, 201_326_592],
-    [131_072, 805_306_368]
+    [131_072, 805_306_368],
+    [131_073, 805_314_560]
   ] as const) {
     const input = {stateIds: Array<number>(tokens - 1).fill(2), questionIds: [4], imageSpans: [], images: []};
     for (const [maxBufferSize, maxStorageBufferBindingSize] of [
@@ -80,9 +81,43 @@ test('the tiled decoder checks the largest unpacked matrix and full hidden buffe
       });
       assert.deepEqual(gpu.pushed, []);
     }
-    const gpu = device([], {maxBufferSize: bytes, maxStorageBufferBindingSize: bytes});
-    assert.deepEqual(await guardGemma4V2Runner(gpu.device, lifecycle, runner, true).run(input), [7]);
+    for (const [maxBufferSize, maxStorageBufferBindingSize] of [
+      [bytes, bytes],
+      [bytes + 4, bytes],
+      [bytes, bytes + 4]
+    ] as const) {
+      const gpu = device([], {maxBufferSize, maxStorageBufferBindingSize});
+      assert.deepEqual(await guardGemma4V2Runner(gpu.device, lifecycle, runner, true).run(input), [7]);
+      assert.equal(gpu.pops, 3);
+    }
   }
+  lifecycle.close();
+});
+
+test('rejects a tiled hidden buffer when allocator paging crosses the TVM signed limit', async () => {
+  const {guardGemma4V2Runner, watchGemma4V2Device} = await import('../src/strands/gemma4-v2-gpu-errors.mjs');
+  const lifecycle = watchGemma4V2Device({lost: new Promise(() => {})});
+  const gpu = device([], {maxBufferSize: 4294967292, maxStorageBufferBindingSize: 4294967292});
+  const guarded = guardGemma4V2Runner(
+    gpu.device,
+    lifecycle,
+    {
+      async run() {
+        return [7];
+      },
+      releaseCachedMemory() {},
+      dispose() {}
+    },
+    true
+  );
+  const stateIds = Array<number>(349_523).fill(2);
+  const input = {stateIds, questionIds: [4], imageSpans: [], images: []};
+  assert.deepEqual(await guarded.run(input), [7]);
+  await assert.rejects(guarded.run({...input, questionIds: [3, 4]}), {
+    code: 'DEVICE_RESOURCE_LIMIT',
+    message: /2147483648-byte.*signed 32-bit/
+  });
+  assert.equal(gpu.pops, 3);
   lifecycle.close();
 });
 

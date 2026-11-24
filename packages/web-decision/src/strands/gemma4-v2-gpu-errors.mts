@@ -1,9 +1,9 @@
 import {WebDecisionError} from '../kev.js';
-import {assertGemma4V2CompiledContext} from './gemma4-v2-context.mjs';
 import type {Gemma4V2OwnedRunner} from './gemma4-v2-session.mjs';
 
 // The pinned TVM JS FFI reads the WebGPU allocator's int64 argument as a signed int32.
 const TVM_WEBGPU_MAX_ALLOCATION_BYTES = 0x7fffffff;
+const TVM_VM_ALLOCATION_PAGE_BYTES = 4096;
 
 const TEXT_HIDDEN_WIDTH = 1536;
 const LARGEST_TILED_UNPACKED_MATRIX_ROWS = 12288;
@@ -15,7 +15,10 @@ function assertAttentionBufferLimit(limits: GPUSupportedLimits, tokens: number, 
   const elements = queryTiled
     ? Math.max(tokens, LARGEST_TILED_UNPACKED_MATRIX_ROWS) * TEXT_HIDDEN_WIDTH
     : tokens * 8 * 512;
-  const bytes = elements * Float32Array.BYTES_PER_ELEMENT;
+  // VM storage uses TVM's 4096-byte allocator pages. The JS bridge receives
+  // the rounded size and WebGPU binds the whole allocation.
+  const requestedBytes = elements * Float32Array.BYTES_PER_ELEMENT;
+  const bytes = Math.ceil(requestedBytes / TVM_VM_ALLOCATION_PAGE_BYTES) * TVM_VM_ALLOCATION_PAGE_BYTES;
   const path = queryTiled ? 'tiled decoder' : 'full attention';
   if (bytes > TVM_WEBGPU_MAX_ALLOCATION_BYTES)
     throw new WebDecisionError(
@@ -161,7 +164,6 @@ export function guardGemma4V2Runner(
       if (lifecycle.lost)
         throw new WebDecisionError('INFERENCE_ERROR', 'The GPU device was lost.', {cause: lifecycle.cause});
       const tokens = input.stateIds.length + input.questionIds.length;
-      assertGemma4V2CompiledContext(tokens);
       assertAttentionBufferLimit(device.limits, tokens, queryTiled);
       const combined = combineGemma4V2Signals(lifecycle.signal, caller);
       try {

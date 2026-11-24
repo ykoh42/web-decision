@@ -99,7 +99,7 @@ def build_per_layer_ir(checkpoint):
             "model.language_model.per_layer_projection_norm.weight"
         ).float()
     model = Projection(config.rms_norm_eps, weights, norm).eval()
-    length = torch.export.Dim("length", min=2, max=config.max_position_embeddings)
+    length = torch.export.Dim("length", min=2)
     count = torch.export.Dim("unique", min=2, max=262144)
     inputs = (
         torch.zeros((1, 80, 1536)),

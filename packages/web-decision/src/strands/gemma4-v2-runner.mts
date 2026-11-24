@@ -1,7 +1,6 @@
 import type {DLDevice, Instance, Tensor, VirtualMachine} from '../runtime/tvm-types.js';
 import {loadPinnedGemma4V2Bindings} from './gemma4-v2-bindings.mjs';
 import {withGemma4V2Cleanup} from './gemma4-v2-cleanup.mjs';
-import {assertGemma4V2CompiledContext} from './gemma4-v2-context.mjs';
 import type {Gemma4V2RunnerInput, Gemma4V2OwnedRunner} from './gemma4-v2-session.mjs';
 import type {openPinnedGemma4V2Source} from './gemma4-v2-source.mjs';
 import {runSplitAdapter, transposedSplitGraphs} from './gemma4-v2-split-adapter.mjs';
@@ -422,7 +421,6 @@ export async function createGemma4V2Runner(deps: Gemma4V2RunnerDependencies): Pr
       if (closed) throw new Error('Gemma 4 runner is disposed.');
       if (busy) throw new Error('Gemma 4 runner is already in use.');
       signal?.throwIfAborted();
-      assertGemma4V2CompiledContext(input.stateIds.length + input.questionIds.length);
       busy = true;
       try {
         return await runInference(deps, bindings, input, signal);
