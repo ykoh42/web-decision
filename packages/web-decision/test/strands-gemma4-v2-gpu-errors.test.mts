@@ -72,7 +72,7 @@ test('the tiled decoder checks the largest unpacked matrix and full hidden buffe
     for (const [maxBufferSize, maxStorageBufferBindingSize] of [
       [bytes - 4, bytes],
       [bytes, bytes - 4]
-    ]) {
+    ] as const) {
       const gpu = device([], {maxBufferSize, maxStorageBufferBindingSize});
       await assert.rejects(guardGemma4V2Runner(gpu.device, lifecycle, runner, true).run(input), {
         code: 'DEVICE_RESOURCE_LIMIT',
