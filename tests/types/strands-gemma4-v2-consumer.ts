@@ -9,6 +9,12 @@ async function evaluate(request: StrandsGemma4V2SystemOneRequest, signal: AbortS
     const result = await model.systemOne(request, {signal});
     const modelId: 'strands-decider-e2b-gemma4-v2-2611' = result.model;
     void modelId;
+    for (const answer of Object.values(result.answers)) {
+      if (answer.type === 'score') {
+        const labels = Object.values(answer.legend).map((label) => label.trim());
+        void labels;
+      }
+    }
     await model.releaseCachedMemory();
     await model.prepareOffline({signal});
     await model.isOfflineReady(signal);

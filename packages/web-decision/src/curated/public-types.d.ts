@@ -256,7 +256,7 @@ export type StrandsGemma4V2SystemOneAnswer =
   | Readonly<{
       type: 'score';
       score: number;
-      legend: Readonly<Record<string, StrandsGemma4V2Content | null>>;
+      legend: Readonly<Record<string, string>>;
       probabilities: Readonly<Record<string, number>>;
       confidence: number;
     }>;
