@@ -41,6 +41,22 @@ export async function verifyGemmaArchiveResources(
   }
 }
 
+export async function verifyGemmaV2ScorerResources(
+  installedRoot: string,
+  archiveFiles: readonly string[],
+  observed: Record<string, unknown>,
+  scorerPath: string
+) {
+  await verifyGemmaArchiveResources(installedRoot, archiveFiles, observed, [
+    'dist/index.js',
+    scorerPath,
+    'dist/gemma4-v2/graph.wasm',
+    'dist/gemma4-v2/local.bin',
+    'dist/gemma4-v2/global.bin',
+    'dist/gemma4-v2/scoring.bin'
+  ]);
+}
+
 export async function routeGemmaExactArchive(
   context: BrowserContext,
   origin: string,

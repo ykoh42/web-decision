@@ -17,7 +17,7 @@ import {
   GEMMA_V2_CPU_REFERENCE_SHA256,
   validateGemmaV2CpuReferences
 } from '../../scripts/release/strands-gemma4-v2-source-reference.mjs';
-import {routeGemmaExactArchive, verifyGemmaArchiveResources} from './gemma-v2-exact-archive-page.mjs';
+import {routeGemmaExactArchive, verifyGemmaV2ScorerResources} from './gemma-v2-exact-archive-page.mjs';
 import {findGemmaV2ScorerPin, gemmaV2RawProbabilityEncoding, openGemmaV2RawCapture} from './gemma-v2-raw-capture.mjs';
 import {collectHardwareEvidence} from './kev06-release-evidence.ts';
 import {readAdapter, readHardwareReport} from './mapika2b-hardware.mts';
@@ -259,10 +259,12 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
       : undefined;
     const raw = scorer && exactPage ? await openGemmaV2RawCapture(page, exactPage.url(scorer.path), scorer) : undefined;
     const {bytes: vectorBytes, rawEvidence} = await collectCorpus(page, requests, raw);
-    const metrics = inspectGemma4V2Conformance(golden, vectorBytes, {
-      bytes: selection,
-      sha256: GEMMA_V2_OFFICIAL_SUBSET_SHA256
-    });
+    const metrics = inspectGemma4V2Conformance(
+      golden,
+      vectorBytes,
+      {bytes: selection, sha256: GEMMA_V2_OFFICIAL_SUBSET_SHA256},
+      rawEvidence ? 'raw-fp32' : undefined
+    );
     const single = references['image-single']!;
     const singleResult = results.get(single.requestSha256)!;
     await assertImageRecovery(page, single, singleResult);
@@ -285,11 +287,12 @@ test(gemmaV2PublicTitle, async ({page, browser}, info) => {
     const transport = exactPage?.evidence();
     if (rawEvidence && transport) {
       expect(transport.tokenizerServed).toBe(true);
-      await verifyGemmaArchiveResources(after.archive.installedRoot, after.archive.archiveFiles, transport.served, [
-        'dist/index.js',
-        rawEvidence.path,
-        'dist/gemma4-v2/graph.wasm'
-      ]);
+      await verifyGemmaV2ScorerResources(
+        after.archive.installedRoot,
+        after.archive.archiveFiles,
+        transport.served,
+        rawEvidence.path
+      );
     }
     const report = {
       schemaVersion: 1,

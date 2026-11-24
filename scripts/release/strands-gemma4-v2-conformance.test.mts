@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  assertGemmaV2RawProbabilities,
   gemma4V2Agreement,
   inspectGemma4V2Conformance,
   readGemmaCandidate,
@@ -87,4 +88,17 @@ test('candidate parser rejects duplicate rows, split questions and nonfinite val
   ]);
   const incomplete = readGemmaCandidate(Buffer.from(line(0, a)));
   assert.throws(() => gemma4V2Agreement(source, incomplete), /same questions/u);
+});
+
+test('raw conformance preserves FP32 and rejects decimal display values and out-of-range inputs', () => {
+  const candidate = (probabilities: number[]) => new Map([['q', {codes: ['A', 'B'], probabilities}]]);
+  assert.doesNotThrow(() => assertGemmaV2RawProbabilities(candidate([Math.fround(0.9), Math.fround(0.1)])));
+  for (const probabilities of [
+    [0.9, 0.1],
+    [-0.125, 1.125],
+    [NaN, 0],
+    [Infinity, 0]
+  ]) {
+    assert.throws(() => assertGemmaV2RawProbabilities(candidate(probabilities)), /requires float32 probabilities/u);
+  }
 });

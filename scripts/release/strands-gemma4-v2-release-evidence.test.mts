@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {archiveIdentity} from './curated-gpu-evidence.mts';
-import {assertGemma4V2ReleaseRecord} from './strands-gemma4-v2-release-evidence.mts';
+import {assertGemma4V2ReleaseRecord, assertGemmaV2RawCapture} from './strands-gemma4-v2-release-evidence.mts';
 import type {ArchiveInfo} from './verify-release-evidence.ts';
 import {
   assertGemmaV2LongReferences,
@@ -12,10 +12,14 @@ import {
 
 import {
   gemmaV2PublicCodeRow,
+  gemmaV2PublicProbabilityEncoding,
   gemmaV2PublicRunAttachment,
   gemmaV2PublicTitle,
-  gemmaV2PublicVectorsAttachment
+  gemmaV2PublicVectorsAttachment,
+  roundGemmaV2RawProbability
 } from '../../tests/browser/gemma-v2-public-evidence.mjs';
+import {gemmaV2RawProbabilityEncoding} from '../../tests/browser/gemma-v2-raw-capture.mjs';
+import {verifyGemmaV2ScorerResources} from '../../tests/browser/gemma-v2-exact-archive-page.mjs';
 import {readGemmaV2PlaywrightRun} from './strands-gemma4-v2-release-browser.mjs';
 import {readPinnedGemma4V2Subset} from './strands-gemma4-v2-conformance.mjs';
 
@@ -224,4 +228,36 @@ test('Gemma browser evidence requires passing Chromium results and both embedded
   const wrongSpec = structuredClone(playwright);
   wrongSpec.suites[0]!.specs[0]!.file = 'private-candidate.spec.ts';
   assert.throws(() => readGemmaV2PlaywrightRun(wrongSpec, tmpRoot));
+});
+
+test('release raw capture must be present and must belong to the installed scorer', async () => {
+  await assert.rejects(
+    assertGemmaV2RawCapture({conformance: {probabilityEncoding: gemmaV2PublicProbabilityEncoding}}, archive, 1066),
+    /requires unrounded Chromium scorer probabilities/u
+  );
+  await assert.rejects(
+    assertGemmaV2RawCapture({conformance: {probabilityEncoding: gemmaV2RawProbabilityEncoding}}, archive, 1066),
+    /Missing exact Gemma scorer evidence/u
+  );
+  const partialResources = Object.fromEntries(
+    [
+      'dist/index.js',
+      'dist/chunk.js',
+      'dist/gemma4-v2/graph.wasm',
+      'dist/gemma4-v2/local.bin',
+      'dist/gemma4-v2/global.bin'
+    ].map((entry) => [entry, 'synthetic-digest'])
+  );
+  await assert.rejects(
+    verifyGemmaV2ScorerResources('/unused-fixture', Object.keys(partialResources), partialResources, 'dist/chunk.js'),
+    /Missing served Gemma archive resource: dist\/gemma4-v2\/scoring\.bin/u
+  );
+});
+
+test('the installed scorer comparison uses exact four-place round-half-even for raw FP32', () => {
+  assert.equal(roundGemmaV2RawProbability(0.03125), 0.0312);
+  assert.equal(roundGemmaV2RawProbability(0.09375), 0.0938);
+  assert.equal(roundGemmaV2RawProbability(Math.fround(0.99994999)), 0.9999);
+  assert.equal(roundGemmaV2RawProbability(Math.fround(0.99995005)), 1);
+  assert.throws(() => roundGemmaV2RawProbability(0.99995), /Expected a probability in FP32/u);
 });

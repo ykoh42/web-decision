@@ -7,6 +7,10 @@ import {fileURLToPath} from 'node:url';
 export const GEMMA_V2_OFFICIAL_GOLDEN_SHA256 = '658445826fa307b949d88722f5a312eb39b6354cbdfe62102d4d4982dfc92ded';
 export const GEMMA_V2_OFFICIAL_SUBSET_PATH = 'tests/fixtures/strands-gemma4-v2-official-subset.json';
 export const GEMMA_V2_OFFICIAL_SUBSET_SHA256 = '9dde7b0e7d4bbc3ccfb40fbe474d5b52eae7b365a321eebe8eff87675b1d8e27';
+// Strands tests/core_conformance.py at c3c845782095b31d438963ac2afcdfe41b49f757.
+const MIN_QUESTIONS = 1000;
+const MIN_TOP1_AGREEMENT = 0.98;
+const MAX_MEAN_ABS_DP = 0.02;
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 type Row = {codes: string[]; probabilities: number[]};
 type GoldenLine = {questions: Record<string, Row>};
@@ -114,15 +118,27 @@ export function gemma4V2Agreement(reference: Rows, candidate: Rows) {
     questions,
     top1Agreement,
     meanAbsDp,
-    meetsUpstreamMetricThresholds: questions >= 1000 && top1Agreement >= 0.98 && meanAbsDp <= 0.02
+    meetsUpstreamMetricThresholds:
+      questions >= MIN_QUESTIONS && top1Agreement >= MIN_TOP1_AGREEMENT && meanAbsDp <= MAX_MEAN_ABS_DP
   };
+}
+
+/** Check the numeric representation emitted by Chromium's raw scorer capture. */
+export function assertGemmaV2RawProbabilities(candidate: Rows): void {
+  for (const [question, {probabilities}] of candidate) {
+    assert.ok(
+      probabilities.every((p) => p >= 0 && p <= 1 && Math.fround(p) === p),
+      'Gemma v2 raw evidence requires float32 probabilities in [0, 1]: ' + question
+    );
+  }
 }
 
 /** Calculate metrics only; source provenance and exact installed archive must be verified separately. */
 export function inspectGemma4V2Conformance(
   goldenBytes: Uint8Array,
   candidateBytes: Uint8Array,
-  selection?: {bytes: Uint8Array; sha256: string}
+  selection?: {bytes: Uint8Array; sha256: string},
+  encoding?: 'raw-fp32'
 ) {
   assert.equal(sha256(goldenBytes), GEMMA_V2_OFFICIAL_GOLDEN_SHA256, 'Official checkpoint golden bytes differ.');
   const golden = readGolden(goldenBytes);
@@ -135,7 +151,9 @@ export function inspectGemma4V2Conformance(
     assert.deepEqual(Object.keys(definition), ['rows'], 'Selection must contain only row numbers.');
     selected = selectGemmaGoldenRows(golden, definition.rows);
   }
-  const metrics = gemma4V2Agreement(selected, readGemmaCandidate(candidateBytes));
+  const candidate = readGemmaCandidate(candidateBytes);
+  if (encoding === 'raw-fp32') assertGemmaV2RawProbabilities(candidate);
+  const metrics = gemma4V2Agreement(selected, candidate);
   const allRows = originalRows(golden);
   const selectedOriginalRows = originalRows(selected);
   const omittedRows = [...allRows].filter((row) => !selectedOriginalRows.has(row));

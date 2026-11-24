@@ -40,6 +40,7 @@ With the release archive installed in a clean consumer and the exact upstream `g
 WEB_DECISION_REAL_GPU=1 \
 WEB_DECISION_BROWSER_NAME=chromium \
 WEB_DECISION_GEMMA_V2_PUBLIC_EVIDENCE=1 \
+WEB_DECISION_GEMMA_V2_RAW_CAPTURE=1 \
 WEB_DECISION_RELEASE_ARCHIVE="$archive" \
 WEB_DECISION_RELEASE_ARCHIVE_SHA256="$archive_sha256" \
 WEB_DECISION_INSTALLED_BUNDLE="$installed_package/dist/index.js" \
@@ -52,7 +53,7 @@ node --import tsx scripts/release/strands-gemma4-v2-release-evidence.mts \
   "$archive" "$installed_package" "$playwright_json" "$tvm_build_evidence" "$golden"
 ```
 
-Add `WEB_DECISION_GEMMA_V2_RAW_CAPTURE=1` to observe unrounded values in the installed scorer with Chromium’s debugger. This mode serves archive JavaScript and the pinned tokenizer without development-server transforms. It fails if Chromium parses different bytes, moves the exact scorer breakpoint, or records a different set of questions. The verifier recomputes the upstream thresholds and the six CPU-reference differences. Release approval remains pending review of the exact combined run.
+Chromium’s debugger observes unrounded values in the installed scorer. The producer serves archive JavaScript and the pinned tokenizer without development-server transforms. It fails if Chromium parses different bytes, moves the exact scorer breakpoint, or records a different set of questions. The Gemma verifier requires raw evidence for the 1,066 pinned questions and recomputes the upstream criterion. It requires at least 1,000 questions, at least 98% top-1 agreement, and at most 0.02 mean per-question maximum absolute probability difference. Ties use the first code. It checks the exact requests, token counts, output types, choice labels, and structure for all six CPU cases, and records their numerical differences. The Gemma result covers this model on the exact combined archive. The remaining models have separate checks.
 
 ## Post-build Kanana evidence for the current archive
 

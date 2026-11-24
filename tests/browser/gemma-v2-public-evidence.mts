@@ -68,15 +68,23 @@ function codeProbabilities(question: Question, answer: PublicAnswer) {
   return [(10_000 - Math.round(answer.noul * 10_000)) / 10_000, answer.noul];
 }
 
+export function roundGemmaV2RawProbability(value: number): number {
+  assert.ok(value >= 0 && value <= 1 && Math.fround(value) === value, 'Expected a probability in FP32.');
+  // A 24-bit FP32 significand times 10,000 is exact in a 53-bit JavaScript number.
+  // The pinned scorer rounds the binary value to four decimal places, ties to even.
+  const scaled = value * 10_000;
+  const whole = Math.floor(scaled);
+  const tail = scaled - whole;
+  const roundUp = tail > 0.5 || (tail === 0.5 && whole % 2 === 1);
+  return Math.abs((whole + Number(roundUp)) / 10_000);
+}
+
 function compareRawToPublic(answer: PublicAnswer, reported: number[], frame: RawGemmaFrame): number[] {
   const raw = frame.probabilities;
   assert.equal(raw.length, frame.options.length);
-  // This only checks four-decimal public serialization against the same scorer frame.
-  // The upstream conformance thresholds apply to the raw array without adjustment.
-  const roundingBound = 0.00005 + 2 * Number.EPSILON;
-  if (answer.type === 'noul') assert.ok(Math.abs(raw[1]! - answer.noul) <= roundingBound);
+  if (answer.type === 'noul') assert.equal(roundGemmaV2RawProbability(raw[1]!), answer.noul);
   else {
-    assert.ok(raw.every((value, index) => Math.abs(value - reported[index]!) <= roundingBound));
+    assert.deepEqual(raw.map(roundGemmaV2RawProbability), reported);
     if (answer.type === 'choice') assert.equal(answer.choice, frame.options[raw.indexOf(Math.max(...raw))]);
   }
   return raw;

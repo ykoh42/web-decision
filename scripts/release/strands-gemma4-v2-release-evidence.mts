@@ -17,10 +17,9 @@ import {
 
 import {
   gemmaV2ArchiveTokenizerSha256,
-  verifyGemmaArchiveResources
+  verifyGemmaV2ScorerResources
 } from '../../tests/browser/gemma-v2-exact-archive-page.mjs';
 import {findGemmaV2ScorerPin, gemmaV2RawProbabilityEncoding} from '../../tests/browser/gemma-v2-raw-capture.mjs';
-import {gemmaV2PublicProbabilityEncoding} from '../../tests/browser/gemma-v2-public-evidence.mjs';
 import {
   GEMMA_V2_OFFICIAL_SUBSET_PATH,
   GEMMA_V2_OFFICIAL_SUBSET_SHA256,
@@ -137,16 +136,18 @@ function assertRuntimeEvidence(
   assert.equal(data.recovery, 'passed', 'Gemma image recovery evidence is required.');
 }
 
-async function verifyCaptureEncoding(data: Record<string, unknown>, archive: ArchiveInfo, questions: number) {
-  if (data.rawCapture === undefined) return gemmaV2PublicProbabilityEncoding;
+export async function assertGemmaV2RawCapture(data: Record<string, unknown>, archive: ArchiveInfo, questions: number) {
+  const conformance = record(data.conformance, 'Missing mandatory Gemma v2 raw conformance evidence.');
+  assert.equal(
+    conformance.probabilityEncoding,
+    gemmaV2RawProbabilityEncoding,
+    'Gemma v2 release evidence requires unrounded Chromium scorer probabilities.'
+  );
+  const capture = record(data.rawCapture, 'Missing exact Gemma scorer evidence.');
   const scorer = await findGemmaV2ScorerPin(archive.installedRoot, archive.archiveFiles);
-  const {breakpointColumn, served} = record(data.rawCapture, 'Missing exact Gemma scorer evidence.');
+  const {breakpointColumn, served} = capture;
   const resources = record(served, 'Missing served Gemma archive resource hashes.');
-  await verifyGemmaArchiveResources(archive.installedRoot, archive.archiveFiles, resources, [
-    'dist/index.js',
-    scorer.path,
-    'dist/gemma4-v2/graph.wasm'
-  ]);
+  await verifyGemmaV2ScorerResources(archive.installedRoot, archive.archiveFiles, resources, scorer.path);
   assert.ok(
     typeof breakpointColumn === 'number' &&
       Number.isSafeInteger(breakpointColumn) &&
@@ -166,7 +167,6 @@ async function verifyCaptureEncoding(data: Record<string, unknown>, archive: Arc
     },
     'The raw Gemma capture differs from the scorer in the exact installed archive.'
   );
-  return gemmaV2RawProbabilityEncoding;
 }
 
 async function readCommittedBytes(path: string): Promise<Buffer> {
@@ -179,7 +179,7 @@ async function readCommittedBytes(path: string): Promise<Buffer> {
   return bytes;
 }
 
-/** Recompute exact-package evidence while combined-archive release approval remains pending. */
+/** Verify Gemma's evidence for one exact combined archive. Other models have separate gates. */
 export async function verifyGemma4V2ReleaseEvidence(options: {
   archivePath: string;
   installedPackagePath: string;
@@ -210,12 +210,14 @@ export async function verifyGemma4V2ReleaseEvidence(options: {
   const data = record(JSON.parse(runBytes.toString('utf8')), 'Invalid Gemma v2 browser-run attachment.');
   assertRuntimeEvidence(data, sourceCommit, lock, catalogSha256);
   const numericDifferences = assertGemma4V2ReleaseRecord(data, archive, {status: 'pinned-upstream-cpu', cases});
-  const metrics = inspectGemma4V2Conformance(golden, vectors, {
-    bytes: subset,
-    sha256: GEMMA_V2_OFFICIAL_SUBSET_SHA256
-  });
-  const probabilityEncoding = await verifyCaptureEncoding(data, archive, metrics.questions);
-  assert.deepEqual(data.conformance, {probabilityEncoding, ...metrics});
+  const metrics = inspectGemma4V2Conformance(
+    golden,
+    vectors,
+    {bytes: subset, sha256: GEMMA_V2_OFFICIAL_SUBSET_SHA256},
+    'raw-fp32'
+  );
+  await assertGemmaV2RawCapture(data, archive, metrics.questions);
+  assert.deepEqual(data.conformance, {probabilityEncoding: gemmaV2RawProbabilityEncoding, ...metrics});
   assert.ok(
     metrics.meetsUpstreamMetricThresholds,
     `Gemma v2 code probabilities fail upstream thresholds: ${JSON.stringify(metrics)}`
@@ -246,16 +248,18 @@ export async function verifyGemma4V2ReleaseEvidence(options: {
     ],
     [packageRoot, archive.installedRoot]
   );
-  throw new Error(
-    `Gemma v2 release approval remains pending exact combined-archive review: ${JSON.stringify({
-      archiveSha256: archive.archiveSha256,
-      playwrightSha256: sha256(playwright),
-      probabilityEncoding,
-      metrics,
-      numericDifferences,
-      build
-    })}`
-  );
+  return {
+    status: 'verified-gemma-v2-evidence',
+    modelId,
+    sourceCommit,
+    archiveSha256: archive.archiveSha256,
+    catalogSha256,
+    playwrightSha256: sha256(playwright),
+    probabilityEncoding: gemmaV2RawProbabilityEncoding,
+    metrics,
+    numericDifferences,
+    build
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
