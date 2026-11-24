@@ -143,11 +143,10 @@ function normalize(question: Gemma4V2Question) {
   const criteria = question.criteria ?? null;
   if (criteria !== null && !Array.isArray(criteria) && !dictionary(criteria))
     throw invalid('Invalid question criteria.');
-  const entries = criteria !== null && !Array.isArray(criteria) ? dictionaryEntries(criteria) : [];
-  const isNoul =
-    criteria === null || (!Array.isArray(criteria) && entries.every(([key]) => key === 'true' || key === 'false'));
-  const kind =
-    question.type === undefined ? (isNoul ? 'noul' : Array.isArray(criteria) ? 'score' : 'choice') : question.type;
+  const entries = dictionary(criteria) ? dictionaryEntries(criteria) : [];
+  const noulOrChoice = entries.every(([key]) => key === 'true' || key === 'false') ? 'noul' : 'choice';
+  const inferredKind = Array.isArray(criteria) ? 'score' : noulOrChoice;
+  const kind = question.type === undefined ? inferredKind : question.type;
   if (!['noul', 'choice', 'score'].includes(kind)) throw invalid('Unknown question type.');
   if (kind === 'noul') return normalizeNoul(criteria, entries);
   if (kind === 'score') {
