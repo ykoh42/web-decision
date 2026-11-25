@@ -35,6 +35,7 @@ export interface Gemma4V1Graph {
 }
 
 export interface Gemma4V1Stages {
+  readonly signal?: AbortSignal | undefined;
   withWeights<T>(
     weights: Readonly<Record<string, readonly Gemma4V1Binding[]>>,
     signal: AbortSignal,
@@ -282,7 +283,9 @@ export function createGemma4V1Decoder(
   }
 
   return {
-    async run(state, questions, signal, usePrefixCache = true) {
+    async run(state, questions, caller, usePrefixCache = true) {
+      const signal = stages.signal ? AbortSignal.any([caller, stages.signal]) : caller;
+      signal.throwIfAborted();
       const largest = state.length + questions.reduce((longest, {ids}) => Math.max(longest, ids.length), 0);
       checkDevice(largest);
       const prefix =

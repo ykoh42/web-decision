@@ -1,3 +1,4 @@
+import {readAssetBatch} from '../asset-batch.js';
 import {openAssetCache, readVerifiedAsset, waitForAbort, type AssetFileManifest} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import type {ModelProgress} from '../curated/types.js';
@@ -39,9 +40,9 @@ export function createGemma4V1TvmStages(
   runtime: Instance,
   device: DLDevice,
   source: Pick<ReturnType<typeof createGemma4V1Source>, 'tensor'>,
-  gpu?: GPUDevice
+  gpu?: GPUDevice,
+  lifecycle = gpu ? watchGemma4V2Device(gpu) : undefined
 ): Gemma4V1Stages {
-  const lifecycle = gpu ? watchGemma4V2Device(gpu) : undefined;
   let vm: VirtualMachine | undefined;
   function getVm() {
     if (vm) return vm;
@@ -72,6 +73,7 @@ export function createGemma4V1TvmStages(
   }
 
   return {
+    signal: lifecycle?.signal,
     async withWeights(weights, caller, operation) {
       const signal = lifecycle ? AbortSignal.any([lifecycle.signal, caller]) : caller;
       signal.throwIfAborted();
@@ -258,8 +260,10 @@ export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManife
         options.onProgress!({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes, phase: 'bundled-assets'});
       }
     : undefined;
-  const [wasm, graphBytes, inventoryBytes, tokenBytes, tokenizerConfig] = await Promise.all(
-    runtimeFiles.map((name) => load(name, offline, signal, onBytes))
+  const [wasm, graphBytes, inventoryBytes, tokenBytes, tokenizerConfig] = await readAssetBatch(
+    runtimeFiles,
+    (name, batchSignal) => load(name, offline, batchSignal, onBytes),
+    signal
   );
   async function verifyCachedFiles(caller: AbortSignal) {
     for (const name of runtimeFiles) await load(name, true, caller);
@@ -287,19 +291,22 @@ export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManife
   signal?.throwIfAborted();
   const gpu = await requestGpu(maxLength, signal);
   let runtime: Instance | undefined;
+  let lifecycle: ReturnType<typeof watchGemma4V2Device> | undefined;
   try {
-    signal?.throwIfAborted();
+    lifecycle = watchGemma4V2Device(gpu);
+    const startup = signal ? AbortSignal.any([signal, lifecycle.signal]) : lifecycle.signal;
+    startup.throwIfAborted();
     runtime = await waitForAbort(
       () => instantiate(wasm!, createPolyfillWASI()),
-      signal,
+      startup,
       (late) => late.dispose()
     );
-    signal?.throwIfAborted();
+    startup.throwIfAborted();
     runtime.initWebGPU(gpu);
-    const stages = createGemma4V1TvmStages(runtime, runtime.webgpu(), source, gpu);
+    const stages = createGemma4V1TvmStages(runtime, runtime.webgpu(), source, gpu, lifecycle);
     const decoder = createGemma4V1Decoder(graph, stages, source, (tokens) => checkGemma4V1Buffer(gpu.limits, tokens));
     const session = createGemma4V1Session(tokenizer, decoder, policy);
-    signal?.throwIfAborted();
+    startup.throwIfAborted();
     const closed = new AbortController();
     const combined = (caller?: AbortSignal) => (caller ? AbortSignal.any([closed.signal, caller]) : closed.signal);
     return {
@@ -326,6 +333,7 @@ export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManife
       }
     };
   } catch (error) {
+    lifecycle?.close();
     return withGemma4V2Cleanup(
       async () => {
         throw error;

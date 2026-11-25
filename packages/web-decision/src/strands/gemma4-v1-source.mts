@@ -1,4 +1,4 @@
-import type {AssetCache} from '../assets.js';
+import {waitForAbort, type AssetCache} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import {RangeCacheTransaction, type RangeCacheSpec} from './range-cache.mjs';
 import {readVerifiedRange} from './range-reader.mjs';
@@ -144,6 +144,29 @@ export function createGemma4V1Source(
   }
   const read = (id: SourceId, range: RangeCacheSpec, signal?: AbortSignal) =>
     readRange(sources[id], range, {...options, signal}).then(({bytes}) => bytes);
+  let preparation = Promise.resolve();
+
+  async function prepare(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    if (!options.cache)
+      throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 requires a cache for offline preparation.');
+    for (const [index, id] of ids.entries()) {
+      const step = await transaction(id, signal);
+      try {
+        for (const range of plans[index]!) {
+          const result = options.offline
+            ? await readRange(sources[id], range, {...options, signal})
+            : await step.read(sources[id], range, {signal});
+          if (!result.cachedByHash)
+            throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 could not cache a verified weight range.');
+        }
+        if (options.offline ? !(await step.hasCommittedRanges({signal})) : !(await step.commit({signal})))
+          throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 offline weights are incomplete.');
+      } finally {
+        step.dispose();
+      }
+    }
+  }
 
   return {
     async tensor(binding: Gemma4V1Binding, signal?: AbortSignal) {
@@ -199,24 +222,10 @@ export function createGemma4V1Source(
       return true;
     },
     async prepareOffline(signal?: AbortSignal) {
-      if (!options.cache)
-        throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 requires a cache for offline preparation.');
-      for (const [index, id] of ids.entries()) {
-        const step = await transaction(id, signal);
-        try {
-          for (const range of plans[index]!) {
-            const result = options.offline
-              ? await readRange(sources[id], range, {...options, signal})
-              : await step.read(sources[id], range, {signal});
-            if (!result.cachedByHash)
-              throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 could not cache a verified weight range.');
-          }
-          if (options.offline ? !(await step.hasCommittedRanges({signal})) : !(await step.commit({signal})))
-            throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 offline weights are incomplete.');
-        } finally {
-          step.dispose();
-        }
-      }
+      signal?.throwIfAborted();
+      const task = preparation.then(() => prepare(signal));
+      preparation = task.catch(() => {});
+      return waitForAbort(() => task, signal);
     }
   };
 }
