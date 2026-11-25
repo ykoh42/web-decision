@@ -116,7 +116,7 @@ export async function verifyViteReplay(options: {
   const expectedModules = options.archive.archiveFiles.filter(
     (path) => path.startsWith('dist/') && /\.(?:mjs|js|cjs)$/u.test(path)
   );
-  assert.equal(expectedModules.length, 27);
+  assert.equal(expectedModules.length, options.archive.archiveSha256 === BFA_VITE_REPLAY_ARCHIVE_SHA256 ? 28 : 27);
   const tokenizer = '@huggingface/tokenizers/dist/tokenizers.mjs';
   const moduleEntries = (data.modules as unknown[]).map((value) => record(value, 'Invalid Vite replay module.'));
   assert.deepEqual(moduleEntries.map((entry) => entry.label).sort(), [...expectedModules, tokenizer].sort());
