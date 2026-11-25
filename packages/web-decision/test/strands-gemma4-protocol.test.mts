@@ -1,3 +1,4 @@
+import {Tokenizer} from '@huggingface/tokenizers';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {WebDecisionError} from '../src/kev.js';
@@ -174,6 +175,28 @@ test('keeps Unicode option offsets exact, including surrogate pairs', () => {
     return prefixLength + Array.from(row.questionText.slice(0, start + line.length)).length - 1;
   });
   assert.deepEqual(row.optionIndices, expectedLastTokens);
+});
+
+test('includes the last UTF-8 fallback token in each option span', () => {
+  const ascii = Array.from({length: 95}, (_, index) => String.fromCharCode(32 + index));
+  const bytes = Array.from({length: 256}, (_, value) => `<0x${value.toString(16).toUpperCase().padStart(2, '0')}>`);
+  const vocab = Object.fromEntries(['<unk>', '\n', ...ascii, ...bytes].map((piece, id) => [piece, id]));
+  const fallback = new Tokenizer(
+    {
+      added_tokens: [],
+      normalizer: null,
+      pre_tokenizer: null,
+      post_processor: null,
+      decoder: {type: 'ByteFallback'},
+      model: {type: 'BPE', vocab, merges: [], byte_fallback: true, unk_token: '<unk>'}
+    },
+    {}
+  );
+  const row = packStrandsGemma4Request(fallback, '', {
+    pick: {type: 'choice', instructions: 'Pick one.', criteria: {a: 'é', b: '∮', c: '𐐀', d: '🫩'}}
+  }).rows[0]!;
+  const lastTokens = row.optionIndices.map((index) => fallback.id_to_token(row.inputIds[index]!));
+  assert.deepEqual(lastTokens, ['<0xA9>', '<0xAE>', '<0x80>', '<0xA9>']);
 });
 
 test('preserves Map and array order for numeric-looking question and option names', () => {

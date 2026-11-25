@@ -22,6 +22,7 @@ export interface Gemma4PackedRow {
 }
 
 export interface Gemma4PackedRequest {
+  readonly stateIds: readonly number[];
   readonly rows: readonly Gemma4PackedRow[];
   readonly tokenCount: number;
 }
@@ -96,6 +97,7 @@ type Gemma4TokenSpan = [number, number];
 
 interface Gemma4TokenizerContract {
   encode(text: string, options: {readonly add_special_tokens: boolean}): unknown;
+  id_to_token?(id: number): string | undefined;
   decode(
     ids: number[],
     options: {readonly skip_special_tokens: false; readonly clean_up_tokenization_spaces: false}
@@ -361,27 +363,60 @@ function tokenIds(encoded: unknown): number[] {
   return copy;
 }
 
+function fallbackByte(token: string | undefined): number {
+  const hex = token?.match(/^<0x([0-9A-F]{2})>$/u)?.[1];
+  return Number.parseInt(hex ?? '', 16);
+}
+
+function utf8ByteLength(byte: number): number {
+  if (byte >= 0xf0 && byte <= 0xf4) return 4;
+  if (byte >= 0xe0 && byte <= 0xef) return 3;
+  if (byte >= 0xc2 && byte <= 0xdf) return 2;
+  return 1;
+}
+
+function tokenGroup(tokenizer: Gemma4TokenizerContract, ids: readonly number[], start: number): number[] {
+  const width = utf8ByteLength(fallbackByte(tokenizer.id_to_token?.(ids[start]!)));
+  const group = ids.slice(start, start + width);
+  if (
+    group.length !== width ||
+    group.slice(1).some((id) => {
+      const byte = fallbackByte(tokenizer.id_to_token?.(id));
+      return !(byte >= 0x80 && byte <= 0xbf);
+    })
+  )
+    throw invalidTokenizer('Strands Gemma 4 tokenizer returned invalid UTF-8 fallback tokens.');
+  return group;
+}
+
+function decodeTokenGroup(tokenizer: Gemma4TokenizerContract, ids: number[]): string {
+  let piece;
+  try {
+    piece = tokenizer.decode(ids, {skip_special_tokens: false, clean_up_tokenization_spaces: false});
+  } catch (cause) {
+    throw invalidTokenizer('Strands Gemma 4 tokenizer could not decode token offsets.', cause);
+  }
+  if (typeof piece !== 'string' || !piece.length)
+    throw invalidTokenizer('Strands Gemma 4 tokenizer returned an empty token piece.');
+  return piece;
+}
+
 function tokenOffsets(tokenizer: unknown, text: string, ids: readonly number[]): Gemma4TokenSpan[] {
-  if (typeof (tokenizer as Gemma4TokenizerContract | null | undefined)?.decode !== 'function')
+  const decoder = tokenizer as Gemma4TokenizerContract | null | undefined;
+  if (typeof decoder?.decode !== 'function')
     throw invalidTokenizer('Strands Gemma 4 tokenizer cannot recover token offsets.');
   const spans: Gemma4TokenSpan[] = [];
   const pieces: string[] = [];
   let cursor = 0;
-  for (const id of ids) {
-    let piece;
-    try {
-      piece = (tokenizer as Gemma4TokenizerContract).decode([id], {
-        skip_special_tokens: false,
-        clean_up_tokenization_spaces: false
-      });
-    } catch (cause) {
-      throw invalidTokenizer('Strands Gemma 4 tokenizer could not decode token offsets.', cause);
-    }
-    if (typeof piece !== 'string' || !piece.length)
-      throw invalidTokenizer('Strands Gemma 4 tokenizer returned an empty token piece.');
+  for (let index = 0; index < ids.length;) {
+    const group = tokenGroup(decoder, ids, index);
+    const piece = decodeTokenGroup(decoder, group);
+    const end = cursor + piece.length;
     pieces.push(piece);
-    spans.push([cursor, cursor + piece.length]);
-    cursor += piece.length;
+    // The HF fast tokenizer gives every byte of a character the same source span.
+    for (let byte = 0; byte < group.length; byte++) spans.push([cursor, end]);
+    index += group.length;
+    cursor = end;
   }
   if (pieces.join('') !== text)
     throw invalidTokenizer('Strands Gemma 4 tokenizer cannot align decoded tokens with the exact prompt text.');
@@ -423,7 +458,10 @@ export function packStrandsGemma4Request(
   maxLength: number = STRANDS_GEMMA4_MAX_LENGTH
 ): Gemma4PackedRequest {
   if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw invalid('Invalid Strands Gemma 4 context length.');
-  const request = snapshotRequest(state, questions);
+  return packSnapshot(tokenizer, snapshotRequest(state, questions), maxLength);
+}
+
+function packSnapshot(tokenizer: unknown, request: Gemma4RequestSnapshot, maxLength: number): Gemma4PackedRequest {
   const stateIds = encode(tokenizer, request.stateText, true);
   const rows = request.questions.map((source) => {
     const question = renderQuestion(source);
@@ -445,9 +483,41 @@ export function packStrandsGemma4Request(
     });
   });
   return Object.freeze({
+    stateIds: Object.freeze(stateIds),
     rows: Object.freeze(rows),
     tokenCount: rows.reduce((total, row) => total + row.inputIds.length, 0)
   });
+}
+
+function pinnedQuestionType(criteria: unknown): Gemma4QuestionType {
+  if (criteria == null) return 'noul';
+  if (Array.isArray(criteria)) return 'score';
+  return objectEntries(criteria, 'Question criteria', true).every(([key]) => key === 'false' || key === 'true')
+    ? 'noul'
+    : 'choice';
+}
+
+/** Pinned E2B v1 wire rules; the experimental graph retains its existing API. */
+export function packPinnedStrandsGemma4V1Request(
+  tokenizer: unknown,
+  value: unknown,
+  maxLength: number = STRANDS_GEMMA4_MAX_LENGTH
+): Gemma4PackedRequest {
+  if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw invalid('Invalid Strands Gemma 4 context length.');
+  const {state, model, images, questions} = Object.fromEntries(objectEntries(value, 'System One request'));
+  if (model !== undefined && typeof model !== 'string') throw invalid('Model must be a string.');
+  if (images !== undefined && (!Array.isArray(images) || images.length))
+    throw invalid('This model accepts text state only.');
+  const typed = objectEntries(questions, 'Questions', true).map(([name, question]) => {
+    const {type, instructions, criteria} = Object.fromEntries(objectEntries(question, `Question ${name}`));
+    const kind = type === undefined ? pinnedQuestionType(criteria) : type;
+    if (kind === 'choice') {
+      const count = objectEntries(criteria, `Question ${name} criteria`, true).length;
+      if (count > 255) throw invalid(`Question ${name} choice supports at most 255 options.`);
+    }
+    return [name, {type: kind, instructions, criteria}] as const;
+  });
+  return packSnapshot(tokenizer, snapshotRequest(state, new Map(typed)), maxLength);
 }
 
 function roundPython(value: number, places = 4): number {
