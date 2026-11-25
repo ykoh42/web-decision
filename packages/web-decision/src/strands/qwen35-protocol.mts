@@ -609,10 +609,6 @@ export function snapshotQwen35Request(request: unknown, options: Qwen35RequestOp
   });
 }
 
-export function renderQwen35State(state: Qwen35Content): string {
-  return `<state>\n${renderContent(state, 'State')}\n</state>\n`;
-}
-
 function snapshotTokenized(encoded: unknown): Qwen35Tokenized {
   const source = encoded as Qwen35Encoded | null | undefined;
   const idsSource = source?.ids;
