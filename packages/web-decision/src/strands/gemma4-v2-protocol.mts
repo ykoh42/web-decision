@@ -154,7 +154,7 @@ function normalize(question: Gemma4V2Question) {
       !Array.isArray(criteria) ||
       criteria.length < 2 ||
       criteria.length > 10 ||
-      criteria.some((x) => typeof x !== 'string')
+      Array.from(criteria).some((x) => typeof x !== 'string')
     )
       throw invalid('Invalid score criteria.');
     return {kind, options: criteria.map((_, index) => String(index)), descriptions: criteria};

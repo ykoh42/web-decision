@@ -96,3 +96,16 @@ test('requires a valid explicit kind and preserves upstream float formatting in 
     'user\n<state>\n{\n  "signed": -0.0,\n  "unsafe": 1e+20,\n  "ordinary": 4,\n  "exact": 100000000000000000000\n}\n</state>\n';
   assert.deepEqual(result.stateIds, [2, 105, ...bytes(expected)]);
 });
+
+test('rejects missing score criteria entries with the normal validation error', () => {
+  const sparse = ['low'];
+  sparse[2] = 'high';
+  for (const criteria of [sparse, ['low', null, 'high']]) {
+    const request = {questions: {q: {type: 'score', instructions: 'Rate this', criteria}}};
+    assert.throws(() => renderStrandsV2(request as never, tokenizer), {
+      name: 'WebDecisionError',
+      code: 'INVALID_INPUT',
+      message: 'Invalid score criteria.'
+    });
+  }
+});
