@@ -428,6 +428,8 @@ export async function verifySplit(rawReportPath: string, prefix32k: string, tvmB
     {status: 'pinned-upstream-cpu', cases: cpuCases}
   );
   const build = await verifySplitNativeBuild(tvmBuildEvidencePath, archive.installedRoot);
+  const warmRuntimeVerifierCommit =
+    persistentMode() === 'warm' ? cleanSourceCommit(await realpath(join(scratch, 'verifier'))) : undefined;
 
   return {
     status: 'verified-gemma-v2-split-evidence',
@@ -441,6 +443,7 @@ export async function verifySplit(rawReportPath: string, prefix32k: string, tvmB
       corpus: 'byte-preserving-installed-archive',
       longContext: 'installed-archive-vite-consumer',
       viteReplay,
+      ...(warmRuntimeVerifierCommit ? {warmRuntimeVerifierCommit} : {}),
       ...(cohort.persistent ? {persistentCohort: cohort.persistent} : {})
     },
     reports: {rawPlaywrightSha256: playwrightSha256, rawReceiptSha256: sha256(receiptBytes), independent32k: long},
