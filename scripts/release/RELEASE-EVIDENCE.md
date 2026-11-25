@@ -59,7 +59,7 @@ Chromium’s debugger observes unrounded values in the installed scorer. The pro
 
 The original single-producer procedure above remains supported. The split gate uses two Playwright reports for the same tested source and installed archive. The 1,066-question corpus and five CPU-reference cases use byte-preserving archive JavaScript and the pinned tokenizer, with raw scorer capture, image recovery, offline inference, and cleanup. The separate 32,768-token case exercises the installed archive through a Vite consumer. That run did not record browser HTTP response bytes.
 
-The reviewed CPU Vite replay checks the exact archive and source, 27 archive JavaScript modules plus the tokenizer, and 17 assets. It is a later reproduction of the Vite setup. The replay does not attest to the live response bytes or its complete inherited environment. Its report and script pins apply to the reviewed 0.7.0 candidate. A different candidate requires a newly reviewed replay and pins.
+The reviewed CPU Vite replay checks the exact archive and source, all reachable archive JavaScript modules plus the tokenizer, and 17 assets. The bfa candidate contains 28 modules and the earlier e729 candidate contains 27. It is a later reproduction of the Vite setup. The replay does not attest to the live response bytes or its complete inherited environment. Its report and script pins apply to their reviewed candidates. A different candidate requires a newly reviewed replay and pins.
 
 The persistent Chromium producer uses one of these explicit checkpoint evidence scopes.
 
@@ -73,7 +73,7 @@ The reused-profile evidence records `independent-online-range-probe` and `indepe
 
 Supply `WEB_DECISION_SPLIT_TESTED_COMMIT`, `WEB_DECISION_SPLIT_TESTED_ROOT`, `WEB_DECISION_SPLIT_PRODUCER_DIR`, `WEB_DECISION_SPLIT_VITE_AUDIT`, and `WEB_DECISION_SPLIT_VITE_AUDIT_SCRIPT`. For persistent evidence, also supply the settings recorded by the producer. Run the normal Gemma verifier command above with the completed raw corpus report as `"$playwright_json"` and append `--split "$independent_32k_prefix"`.
 
-The verifier checks the original reports and their start and completion receipts independently. It records the tested source commit separately from the verifier commit and rejects intervening changes outside release verification. Raw probability, CPU references, matching devices, offline replay, cleanup, and native TVM build checks remain required. The output is model evidence with `releaseApproved: false`.
+The verifier checks the original reports and their start and completion receipts independently. It records the tested source commit separately from the verifier commit and rejects intervening changes outside release verification, except for the exact paired setup-python SHA correction in the two Python workflows. Raw probability, CPU references, matching devices, offline replay, cleanup, and native TVM build checks remain required. The output is model evidence with `releaseApproved: false`.
 
 ## Gemma split evidence for e729bb94
 
