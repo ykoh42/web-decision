@@ -61,6 +61,44 @@ def verify(path, sha):
     return raw
 
 
+def render_case(tok, key, original_request, answers):
+    request = SystemOneRequest.model_validate(original_request)
+    questions = [render_question(q) for q in request.questions.values()]
+    state, ids, offsets = fit_window(
+        tok, render_state(request.state), [q.text for q in questions], 4096
+    )
+    rows = {}
+    token_pin = {"state": state, "questions": {}}
+    for name, question, tokens, spans in zip(
+        request.questions, questions, ids, offsets, strict=True
+    ):
+        index = option_token_index(spans, question.option_spans, 0)
+        source = answers[key, name]
+        probabilities = [source["probabilities"][slot] for slot in question.slot_labels]
+        answer = to_answer(question, probabilities, ordinal_smoothing=0.1).model_dump()
+        if answer != source["answer"]:
+            raise ValueError("Upstream scoring revision differs on the pinned fixture")
+        rows[name] = {
+            "type": question.kind,
+            "ids": tokens,
+            "positions": index,
+            "logits": source["logits"],
+            "answer": answer,
+        }
+        token_pin["questions"][name] = [tokens, index]
+    case = {
+        "name": key,
+        "request": original_request,
+        "stateIds": state,
+        "questions": rows,
+        "usage": {
+            "input_tokens": len(state) + sum(map(len, ids)),
+            "output_tokens": len(questions),
+        },
+    }
+    return case, token_pin
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tokenizer", type=Path)
@@ -75,48 +113,8 @@ def main():
     cases = []
     token_pin = {}
     for key, original_request in REQUESTS.items():
-        request = SystemOneRequest.model_validate(original_request)
-        questions = [render_question(q) for q in request.questions.values()]
-        state, ids, offsets = fit_window(
-            tok, render_state(request.state), [q.text for q in questions], 4096
-        )
-        rows = {}
-        token_pin[key] = {"state": state, "questions": {}}
-        for name, question, tokens, spans in zip(
-            request.questions, questions, ids, offsets, strict=True
-        ):
-            index = option_token_index(spans, question.option_spans, 0)
-            source = answers[key, name]
-            probabilities = [
-                source["probabilities"][slot] for slot in question.slot_labels
-            ]
-            answer = to_answer(
-                question, probabilities, ordinal_smoothing=0.1
-            ).model_dump()
-            if answer != source["answer"]:
-                raise ValueError(
-                    "Upstream scoring revision differs on the pinned fixture"
-                )
-            rows[name] = {
-                "type": question.kind,
-                "ids": tokens,
-                "positions": index,
-                "logits": source["logits"],
-                "answer": answer,
-            }
-            token_pin[key]["questions"][name] = [tokens, index]
-        cases.append(
-            {
-                "name": key,
-                "request": original_request,
-                "stateIds": state,
-                "questions": rows,
-                "usage": {
-                    "input_tokens": len(state) + sum(map(len, ids)),
-                    "output_tokens": len(questions),
-                },
-            }
-        )
+        case, token_pin[key] = render_case(tok, key, original_request, answers)
+        cases.append(case)
     packed = json.dumps(token_pin, separators=(",", ":")).encode()
     if hashlib.sha256(packed).hexdigest() != original[0]["tokens_sha256"]:
         raise ValueError(

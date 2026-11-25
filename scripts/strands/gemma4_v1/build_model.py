@@ -72,6 +72,14 @@ def export_name(name, stage):
     return "p_" + name.replace(".", "_").lower()
 
 
+def layer_target_names(source, short):
+    if source == "adapter":
+        return [short.removesuffix(".weight") + ".default.weight"]
+    if short.endswith(".weight"):
+        return [short, short.removesuffix(".weight") + ".base_layer.weight"]
+    return [short]
+
+
 def layer_names(inventory, index, stage):
     candidates = {}
     for source, prefix in (("base", LAYER_BASE), ("adapter", LAYER_ADAPTER)):
@@ -80,15 +88,7 @@ def layer_names(inventory, index, stage):
             if not full.startswith(layer):
                 continue
             short = full.removeprefix(layer)
-            if source == "adapter":
-                targets = [short.removesuffix(".weight") + ".default.weight"]
-            else:
-                targets = (
-                    [short, short.removesuffix(".weight") + ".base_layer.weight"]
-                    if short.endswith(".weight")
-                    else [short]
-                )
-            for target in targets:
+            for target in layer_target_names(source, short):
                 if key := export_name(target, stage):
                     candidates[key] = (source, full, meta)
     return candidates
