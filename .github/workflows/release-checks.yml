@@ -158,6 +158,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: pnpm run check:package "$GITHUB_WORKSPACE/web-decision-$RELEASE_VERSION.tgz"
+      - name: Verify the reviewed exact-archive GPU evidence
+        if: steps.release.outputs.version == '0.8.0'
+        run: node --import tsx scripts/release/verify-gemma4-v1-promotion.mts "$GITHUB_WORKSPACE/web-decision-0.8.0.tgz"
       - name: Audit the packed runtime dependency
         if: matrix.node == '24.0.0' && steps.release.outputs.version != '0.5.0' && steps.release.outputs.version != '0.6.0' && steps.release.outputs.version != '0.7.0' && steps.release.outputs.version != '0.8.0'
         env:
