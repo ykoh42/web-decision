@@ -1,5 +1,6 @@
 import {openAssetCache, readVerifiedAsset, type AssetFileManifest} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
+import type {ModelProgress} from '../curated/types.js';
 import {createPolyfillWASI, instantiate} from '../runtime/tvm.generated.mjs';
 import type {DLDevice, Instance, Tensor, VirtualMachine} from '../runtime/tvm-types.js';
 import {withGemma4V2Cleanup} from './gemma4-v2-cleanup.mjs';
@@ -23,6 +24,7 @@ export interface Options extends Gemma4V1ServingOptions {
   readonly cache?: boolean;
   readonly offline?: boolean;
   readonly signal?: AbortSignal;
+  readonly onProgress?: (progress: ModelProgress) => void;
 }
 
 function outputs(result: unknown) {
@@ -204,17 +206,57 @@ async function requestGpu(maxLength: number) {
   }
 }
 
-export async function loadGemma4V1Private(base: URL, pins: AssetFileManifest, options: Options = {}) {
+const runtimeFiles = [
+  'graph.wasm',
+  'graph.json',
+  'source-inventory.json',
+  'tokenizer.json',
+  'tokenizer_config.json'
+] as const;
+export type RuntimeAssetUrls = Readonly<Record<(typeof runtimeFiles)[number], URL>>;
+
+export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManifest, options: Options = {}) {
   const {signal, offline = false} = options;
   const policy = resolveGemma4V1ServingOptions(options);
   signal?.throwIfAborted();
   if (offline && options.cache === false)
     throw new WebDecisionError('ASSET_LOAD_FAILED', 'Offline Gemma 4 v1 requires a cache.');
   const cache = await openAssetCache(options.cache, signal);
-  const load = (name: string) => readVerifiedAsset(base, pins, name, {cache, offline, signal});
+  const totalBytes = runtimeFiles.reduce((total, name) => total + pins.files[name]!.bytes, 0);
+  let loadedBytes = 0;
+  const load = (
+    name: (typeof runtimeFiles)[number],
+    offline: boolean,
+    signal: AbortSignal | undefined,
+    onBytes?: (bytes: number) => void
+  ) => {
+    const url = urls[name];
+    const file = url.pathname.slice(url.pathname.lastIndexOf('/') + 1);
+    return readVerifiedAsset(new URL('.', url), {files: {[file]: pins.files[name]!}}, file, {
+      cache,
+      offline,
+      signal,
+      ...(onBytes ? {onBytes} : {})
+    });
+  };
+  const onBytes = options.onProgress
+    ? (bytes: number) => {
+        loadedBytes += bytes;
+        options.onProgress!({loadedBytes, totalBytes, fraction: loadedBytes / totalBytes, phase: 'bundled-assets'});
+      }
+    : undefined;
   const [wasm, graphBytes, inventoryBytes, tokenBytes, tokenizerConfig] = await Promise.all(
-    ['graph.wasm', 'graph.json', 'source-inventory.json', 'tokenizer.json', 'tokenizer_config.json'].map(load)
+    runtimeFiles.map((name) => load(name, offline, signal, onBytes))
   );
+  async function verifyCachedFiles(caller: AbortSignal) {
+    for (const name of runtimeFiles) await load(name, true, caller);
+  }
+
+  async function ensureCachedFiles(caller: AbortSignal) {
+    if (!cache) throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 requires a cache for offline preparation.');
+    if (!offline) for (const name of runtimeFiles) await load(name, false, caller);
+    await verifyCachedFiles(caller);
+  }
   const text = <T,>(bytes: ArrayBuffer) => JSON.parse(new TextDecoder().decode(bytes)) as T;
   const graph = text<Gemma4V1Graph>(graphBytes!);
   const {maxLength} = policy;
@@ -244,8 +286,22 @@ export async function loadGemma4V1Private(base: URL, pins: AssetFileManifest, op
     const combined = (caller?: AbortSignal) => (caller ? AbortSignal.any([closed.signal, caller]) : closed.signal);
     return {
       ...session,
-      isOfflineReady: (caller?: AbortSignal) => source.isOfflineReady(combined(caller)),
-      prepareOffline: (caller?: AbortSignal) => source.prepareOffline(combined(caller)),
+      async isOfflineReady(caller?: AbortSignal) {
+        const signal = combined(caller);
+        if (!(await source.isOfflineReady(signal))) return false;
+        try {
+          await verifyCachedFiles(signal);
+          return true;
+        } catch {
+          signal.throwIfAborted();
+          return false;
+        }
+      },
+      async prepareOffline(caller?: AbortSignal) {
+        const signal = combined(caller);
+        await ensureCachedFiles(signal);
+        await source.prepareOffline(signal);
+      },
       dispose() {
         closed.abort(new WebDecisionError('SESSION_CLOSED', 'The Strands Gemma 4 v1 model has been disposed.'));
         return session.dispose();
