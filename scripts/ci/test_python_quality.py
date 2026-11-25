@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import subprocess
@@ -184,21 +183,6 @@ def test_snapshot_rejects_duplicate_diagnostics():
                 lint=[item, item],
             )
         )
-
-
-@pytest.mark.parametrize("version", ["0.1.0", "0.2.0"])
-def test_historical_tvm_build_source_locks_remain_unchanged(version):
-    lock = json.loads(
-        (ROOT / f"releases/web-decision-{version}/source-lock.json").read_text()
-    )
-    entry = next(
-        item for item in lock["files"] if item["path"] == "scripts/build_tvm_q4.py"
-    )
-
-    assert entry["bytes"] == 6802
-    assert entry["sha256"] == (
-        "706ced9e6a620cd4c653cb130e809b91be7c94b6ead6041ae85626f13fcc6deb"
-    )
 
 
 def run(*arguments, cwd, env=None):

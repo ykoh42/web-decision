@@ -30,7 +30,6 @@
     "**/dist/**",
     ".toolchains/**",
     "models/**",
-    "releases/**",
     "tests/types/**",
     "tests/browser/kev-upstream-provider.ts",
     "tests/browser/kev06-default-source-real-webgpu.spec.ts"

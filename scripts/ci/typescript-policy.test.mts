@@ -6,7 +6,7 @@ import {dirname, join} from 'node:path';
 import {test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {
-  checkSharedReleaseInputs,
+  checkRetainedSharedReleaseInputs,
   discoverChangedJavaScriptPaths,
   discoverInlineJavaScriptPaths,
   discoverJavaScriptPaths,
@@ -290,28 +290,55 @@ test('rejects glob paths and changed reasons in the exact exception list', (cont
   assert.ok(result.problems.some((problem) => problem.includes('changed its recorded exception reason')));
 });
 
-test('shared historical inputs must match both their pinned bytes and all release locks', (context) => {
-  const root = mkdtempSync(join(tmpdir(), 'web-decision-shared-release-'));
+test('allows only the deleted archived release exceptions to retire', (context) => {
+  const fixture = createGitFixture();
+  context.after(() => rmSync(fixture.root, {recursive: true, force: true}));
+  const current = ['src/legacy.mjs'];
+  const policy = {...fixture.policy, exceptions: []};
+  const common = {
+    currentJavaScriptPaths: current,
+    seedJavaScriptPaths: fixture.seedJavaScriptPaths,
+    previousPolicy: fixture.policy,
+    changedJavaScriptPaths: new Set([historicalPath]),
+    requireComplete: false
+  };
+  assert.deepEqual(validateTypeScriptMigrationPolicy(policy, common).problems, []);
+  assert.ok(
+    validateTypeScriptMigrationPolicy(policy, {
+      ...common,
+      currentJavaScriptPaths: [...current, historicalPath]
+    }).problems.some((problem) => problem.includes('missing') || problem.includes('must have an exact exception'))
+  );
+  const vendorPath = 'src/vendor/immutable.js';
+  const previous = {
+    ...fixture.policy,
+    exceptions: [{path: vendorPath, reason: 'Upstream vendored from an immutable original source for compatibility.'}]
+  };
+  assert.ok(
+    validateTypeScriptMigrationPolicy(policy, {...common, previousPolicy: previous}).problems.some((problem) =>
+      problem.includes('historical exception entries are immutable')
+    )
+  );
+});
+
+test('retained shared release inputs must match their pinned bytes', (context) => {
+  const root = mkdtempSync(join(tmpdir(), 'web-decision-retained-release-'));
   context.after(() => rmSync(root, {recursive: true, force: true}));
   const sourceRoot = fileURLToPath(new URL('../../', import.meta.url));
-  const inputPaths = [
-    'scripts/fetch-model.test.mjs',
+  const paths = [
     'scripts/release/kev-current-source-preview-package-policy.mjs',
     'scripts/release/kev-current-source-preview-safety.mjs'
   ];
-  const locks = ['0.1.0', '0.2.0', '0.3.0'].map((version) => `releases/web-decision-${version}/source-lock.json`);
-  for (const path of [...inputPaths, ...locks]) {
+  for (const path of paths) {
     const destination = join(root, path);
     mkdirSync(dirname(destination), {recursive: true});
     copyFileSync(join(sourceRoot, path), destination);
   }
-  assert.deepEqual(checkSharedReleaseInputs(root), []);
-  appendFileSync(join(root, inputPaths[0]!), '\n');
-  assert.ok(
-    checkSharedReleaseInputs(root).some((problem) => problem.includes('differs from its historical release hash'))
-  );
-  write(root, locks[1]!, JSON.stringify({files: []}));
-  assert.ok(checkSharedReleaseInputs(root).some((problem) => problem.includes('does not pin the expected')));
+  assert.deepEqual(checkRetainedSharedReleaseInputs(root), []);
+  appendFileSync(join(root, paths[0]!), '\n');
+  assert.ok(checkRetainedSharedReleaseInputs(root).some((problem) => problem.includes('differs')));
+  rmSync(join(root, paths[1]!));
+  assert.ok(checkRetainedSharedReleaseInputs(root).some((problem) => problem.includes('missing')));
 });
 
 test('a shared release exception cannot be copied to another JavaScript file', () => {

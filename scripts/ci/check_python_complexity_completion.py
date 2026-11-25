@@ -18,13 +18,6 @@ else:
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE_NAME = "complexipy-snapshot.json"
 THRESHOLD = 15
-HISTORICAL_RELEASE_DIRECTORIES = frozenset(
-    {
-        "releases/web-decision-0.1.0",
-        "releases/web-decision-0.2.0",
-        "releases/web-decision-0.3.0",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -121,12 +114,6 @@ def load_snapshot(path: Path) -> list[Finding]:
     return validate_snapshot(value)
 
 
-def is_historical_release_path(name: str) -> bool:
-    return any(
-        name.startswith(f"{directory}/") for directory in HISTORICAL_RELEASE_DIRECTORIES
-    )
-
-
 def completion_violations(
     findings: list[Finding], source_paths: set[str]
 ) -> list[Finding]:
@@ -135,12 +122,7 @@ def completion_violations(
             raise ValueError(
                 f"Python complexity baseline references a missing or unscanned source: {finding.path}"
             )
-    return [
-        finding
-        for finding in findings
-        if not is_historical_release_path(finding.path)
-        and finding.complexity > THRESHOLD
-    ]
+    return [finding for finding in findings if finding.complexity > THRESHOLD]
 
 
 def require_complete(findings: list[Finding], source_paths: set[str]) -> None:

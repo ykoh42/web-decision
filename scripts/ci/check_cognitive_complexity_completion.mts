@@ -12,11 +12,6 @@ import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const THRESHOLD = 15;
 const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
-const HISTORICAL_RELEASE_DIRECTORIES = new Set([
-  'releases/web-decision-0.1.0',
-  'releases/web-decision-0.2.0',
-  'releases/web-decision-0.3.0'
-]);
 
 interface Finding {
   file: string;
@@ -64,13 +59,6 @@ function normalizedSourcePath(value: unknown, label: string): string {
     fail(`Invalid ${label} path: ${String(value)}`);
   }
   return value;
-}
-
-function isHistoricalReleasePath(file: string): boolean {
-  for (const directory of HISTORICAL_RELEASE_DIRECTORIES) {
-    if (file.startsWith(`${directory}/`)) return true;
-  }
-  return false;
 }
 
 export function parseSonarBaseline(text: string): SonarBaseline {
@@ -151,7 +139,7 @@ export function completionViolations(baseline: SonarBaseline, sourcePaths: Reado
   if (missingFiles.length > 0) {
     fail(`SonarJS baseline references a missing or unscanned source: ${missingFiles[0]?.file ?? ''}`);
   }
-  return baseline.findings.filter(({file, score}) => !isHistoricalReleasePath(file) && score > THRESHOLD);
+  return baseline.findings.filter(({score}) => score > THRESHOLD);
 }
 
 export function requireComplete(baseline: SonarBaseline, sourcePaths: ReadonlySet<string>): void {

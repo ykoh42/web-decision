@@ -19,4 +19,10 @@ Review the candidate and evidence before creating a tag or publishing. Publish t
 
 ## Historical releases
 
-To reproduce a previous release, check out its own Git tag and use the instructions and source lock in that checkout. The `0.2.0` tag is missing its TVM source overlay. Recover `releases/web-decision-0.2.0/source/overlay/.toolchains` from commit `baa3c144d23e1882ba29084c9f95897b8c56accb`, then verify it against the tag's source lock. Historical verification is not evidence for a new archive.
+For 0.1.0–0.3.0, check out the corresponding release tag and follow its build instructions and source lock. The 0.2.0 tag lacks its TVM overlay; restore it before checking the lock:
+
+```sh
+git restore --source=baa3c144d23e1882ba29084c9f95897b8c56accb -- releases/web-decision-0.2.0/source/overlay/.toolchains
+```
+
+The tags and overlay commit must be available locally; a shallow clone may need its history fetched. The tagged source locks have been checked against their inputs, including the restored 0.2.0 overlay. This does not by itself establish a reproducible archive build. The later [b0f66fb snapshot](https://github.com/ykoh42/web-decision/tree/b0f66fb34b96887a75f7708b3944ff1b62b7560a/releases) preserves additional historical sources and evidence, but its checkout alone does not satisfy those release source locks. Historical verification is not evidence for a new archive.

@@ -9,7 +9,7 @@ on:
         description: Release version to verify when running this workflow from its matching release tag
         required: true
         type: choice
-        options: ['0.1.0', '0.2.0', '0.3.0', '0.4.0', '0.5.0', '0.6.0', '0.7.0']
+        options: ['0.4.0', '0.5.0', '0.6.0', '0.7.0']
 
 permissions:
   contents: read
@@ -56,7 +56,6 @@ jobs:
             exit 1
           fi
           case "$version" in
-            0.1.0|0.2.0|0.3.0) workspace_package=false ;;
             0.4.0|0.5.0|0.6.0|0.7.0) workspace_package=true ;;
             *) echo "Unsupported release version: $version" >&2; exit 1 ;;
           esac
@@ -119,7 +118,8 @@ jobs:
           elif [[ "$RELEASE_VERSION" == "0.4.0" || "$RELEASE_VERSION" == "0.5.0" ]]; then
             script="test:types:$RELEASE_VERSION"
           else
-            script="test:types:0.3.0"
+            echo "Unsupported release version: $RELEASE_VERSION" >&2
+            exit 1
           fi
           pnpm run "$script"
       - name: Test release package
@@ -128,23 +128,16 @@ jobs:
         run: |
           if [[ "$RELEASE_VERSION" == "0.6.0" || "$RELEASE_VERSION" == "0.7.0" ]]; then
             script="test"
-          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
-            script="test:release"
           else
             script="test:release:$RELEASE_VERSION"
           fi
           pnpm run "$script"
-      - name: Verify release build requirements
-        if: matrix.node == '24.0.0' && steps.release.outputs.version == '0.1.0'
-        run: python scripts/verify_preview_build_requirements.py
       - name: Build release package
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           if [[ "$RELEASE_VERSION" == "0.6.0" || "$RELEASE_VERSION" == "0.7.0" ]]; then
             script="build:package"
-          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
-            script="build:release"
           else
             script="build:release:$RELEASE_VERSION"
           fi
@@ -156,8 +149,6 @@ jobs:
           if [[ "$RELEASE_VERSION" == "0.6.0" || "$RELEASE_VERSION" == "0.7.0" ]]; then
             npm pack --ignore-scripts ./packages/web-decision
             exit 0
-          elif [[ "$RELEASE_VERSION" == "0.1.0" ]]; then
-            script="pack:release"
           else
             script="pack:release:$RELEASE_VERSION"
           fi
@@ -173,11 +164,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           consumer="$RUNNER_TEMP/web-decision-consumer"
-          if [[ "$RELEASE_VERSION" == "0.4.0" ]]; then
-            archive="$GITHUB_WORKSPACE/web-decision-0.4.0.tgz"
-          else
-            archive="$GITHUB_WORKSPACE/releases/web-decision-$RELEASE_VERSION/build/release/web-decision-$RELEASE_VERSION.tgz"
-          fi
+          archive="$GITHUB_WORKSPACE/web-decision-$RELEASE_VERSION.tgz"
           mkdir -p "$consumer"
           (
             cd "$consumer"

@@ -40,21 +40,11 @@ test('source inventory excludes only git-confirmed deletions and retains untrack
   assert.deepEqual([...workingTreeSources(root)].sort(), ['src/new.ts', 'src/retained.mts']);
 });
 
-test('excludes only the fixed historical semver release directories', () => {
-  const findings = [
-    {file: 'releases/web-decision-0.1.0/legacy.js', identity: 'module/function:old', score: 80},
-    {file: 'releases/web-decision-0.2.0/legacy.ts', identity: 'module/function:old', score: 80},
-    {file: 'releases/web-decision-0.3.0/legacy.mjs', identity: 'module/function:old', score: 80}
-  ];
-  assert.deepEqual(
-    completionFindings(
-      baseline(findings),
-      findings.map(({file}) => file)
-    ),
-    []
-  );
-  assert.doesNotThrow(() =>
-    requireComplete(parseSonarBaseline(baseline(findings)), new Set(findings.map(({file}) => file)))
+test('archived release paths cannot bypass current quality checks', () => {
+  const findings = [{file: 'releases/web-decision-0.1.0/legacy.js', identity: 'module/function:old', score: 80}];
+  assert.throws(
+    () => requireComplete(parseSonarBaseline(baseline(findings)), new Set(findings.map(({file}) => file))),
+    /Managed JavaScript\/TypeScript source remains/u
   );
 });
 

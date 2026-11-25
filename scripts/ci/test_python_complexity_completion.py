@@ -23,29 +23,12 @@ def entry(
     }
 
 
-def test_excludes_only_fixed_historical_release_directories():
+def test_archived_release_paths_cannot_bypass_current_quality_checks():
     findings = validate_snapshot(
-        [
-            entry(
-                "releases/web-decision-0.1.0/legacy.py",
-                "historical",
-                87,
-            ),
-            entry(
-                "releases/web-decision-0.2.0/legacy.py",
-                "historical",
-                87,
-            ),
-            entry(
-                "releases/web-decision-0.3.0/legacy.py",
-                "historical",
-                87,
-            ),
-        ]
+        [entry("releases/web-decision-0.1.0/legacy.py", "historical", 87)]
     )
-    paths = {finding.path for finding in findings}
-    assert completion_violations(findings, paths) == []
-    require_complete(findings, paths)
+    with pytest.raises(ValueError, match="Managed Python source remains"):
+        require_complete(findings, {finding.path for finding in findings})
 
 
 def test_new_release_snapshot_and_vendor_paths_remain_managed():

@@ -235,9 +235,8 @@ const RULE_CODE = 'sonarjs(cognitive-complexity)';
 const RULE_ID = 'sonarjs/cognitive-complexity';
 const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 
-// These tracked files are generated artifacts, not maintainable source. Every
-// release source overlay and vendored TypeScript source file remains in scope.
-export const GENERATED_EXCLUSIONS: readonly GeneratedExclusion[] = Object.freeze([
+// Accept only the exact retired release exclusions from the previous baseline.
+export const RETIRED_RELEASE_EXCLUSIONS: readonly GeneratedExclusion[] = Object.freeze([
   {
     path: 'releases/web-decision-0.3.0/package/dist/index.js',
     reason:
@@ -249,6 +248,8 @@ export const GENERATED_EXCLUSIONS: readonly GeneratedExclusion[] = Object.freeze
       'Four-line Emscripten/TVM-generated glue; the pinned upstream TypeScript/C++ source remains in scope and CI regenerates this artifact.'
   }))
 ]);
+
+export const GENERATED_EXCLUSIONS: readonly GeneratedExclusion[] = Object.freeze([]);
 
 const require = createRequire(import.meta.url);
 const sonarPluginEntry = require.resolve('eslint-plugin-sonarjs');
@@ -734,7 +735,9 @@ function validateBaseline(inputValue: unknown, label: string): ValidatedBaseline
   const generatedExclusions = input.generatedExclusions as GeneratedExclusion[];
   const findings = input.findings as ComplexityFinding[];
   const expectedExclusions = JSON.stringify(GENERATED_EXCLUSIONS);
-  if (JSON.stringify(generatedExclusions) !== expectedExclusions) {
+  const isPreviousReleaseBaseline =
+    label === 'Trusted baseline' && JSON.stringify(generatedExclusions) === JSON.stringify(RETIRED_RELEASE_EXCLUSIONS);
+  if (JSON.stringify(generatedExclusions) !== expectedExclusions && !isPreviousReleaseBaseline) {
     fail(`${label} generated exclusions differ from the checked-in list.`);
   }
   const scores = validateFindings(findings, label);
@@ -1021,7 +1024,8 @@ function verifyAgainstTrustedBase(
   ensureNoToolDowngrades(reviewed.versions, previousVersions);
   if (
     trusted.baseline &&
-    JSON.stringify(reviewed.generatedExclusions) !== JSON.stringify(trusted.baseline.generatedExclusions)
+    JSON.stringify(reviewed.generatedExclusions) !== JSON.stringify(trusted.baseline.generatedExclusions) &&
+    JSON.stringify(trusted.baseline.generatedExclusions) !== JSON.stringify(RETIRED_RELEASE_EXCLUSIONS)
   ) {
     fail('Cognitive complexity generated exclusions changed from the trusted baseline.');
   }

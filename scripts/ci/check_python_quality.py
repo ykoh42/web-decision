@@ -19,6 +19,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT = ROOT / "ruff-snapshot.json"
 SNAPSHOT_ENV = "WEB_DECISION_RUFF_BASELINE"
 SAFE_OUTPUT_SHA256 = "d00ed5b9a7a863ff64d402350c4a2c958454838ea6411949d961f0d9a94cb307"
+FROZEN_SOURCE_SHA256 = {
+    "scripts/test_safe_output.py": "a4d1f45b4fcc97f77e831e2f8f3b0572a435e2bf10a753b173753e02ce391f54",
+    "scripts/tvm_dynamic_onnx.py": "ecd2efc6106c68b86c9039af8403fdc571d07e48f030dc1008ac8ba6e3c452d6",
+    "scripts/tvm_narrow_int64.py": "bd8988fcac885447b150484f3eac1fdbe85384adb13e10360213c6274052a787",
+    "scripts/tvm_q4_operators.py": "6df7d7e54f7fda107ddf2081cab7f953e8567a68353d5d240963a377dead3212",
+    "scripts/tvm_selective_params.py": "468f772e69d6d149bc1ddd18678830de38b80f8ecf0c2ddf17b67d8c05adbbfa",
+}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -68,21 +75,9 @@ def tracked_python_files():
 
 
 def source_lock_hashes():
-    locked = defaultdict(set)
-    for lock_path in sorted(
-        (ROOT / "releases").glob("web-decision-*/source-lock.json")
-    ):
-        document = json.loads(lock_path.read_text(encoding="utf-8"))
-        for entry in document.get("files", []):
-            name = entry.get("path")
-            digest = entry.get("sha256")
-            if (
-                isinstance(name, str)
-                and name.endswith(".py")
-                and SHA256.fullmatch(str(digest))
-            ):
-                locked[name].add(digest)
-    return locked
+    return defaultdict(
+        set, {name: {digest} for name, digest in FROZEN_SOURCE_SHA256.items()}
+    )
 
 
 def validate_frozen_entries(snapshot, locked_hashes):

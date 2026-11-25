@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   GENERATED_EXCLUSIONS,
+  RETIRED_RELEASE_EXCLUSIONS,
   ROOT,
   TYPESCRIPT_PARSER_VERSION,
   checkBaseline,
@@ -168,6 +169,20 @@ test('rejects new and worsened violations relative to the trusted baseline', () 
   assert.throws(
     () => checkBaseline(initial, {...initial, versions: {...initial.versions, sonarjs: '5.0.0'}}),
     /tool versions differ/u
+  );
+});
+
+test('retires only the exact historical generated exclusions', () => {
+  const candidate = baseline([]);
+  const trusted = {...candidate, generatedExclusions: RETIRED_RELEASE_EXCLUSIONS};
+  assert.equal(checkBaseline(candidate, trusted), true);
+  assert.throws(
+    () => checkBaseline({...candidate, generatedExclusions: RETIRED_RELEASE_EXCLUSIONS}, trusted),
+    /generated exclusions differ/u
+  );
+  assert.throws(
+    () => checkBaseline(candidate, {...trusted, generatedExclusions: RETIRED_RELEASE_EXCLUSIONS.slice(1)}),
+    /generated exclusions differ/u
   );
 });
 
