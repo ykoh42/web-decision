@@ -22,6 +22,7 @@ export const promotion = {
   catalogSha256: '825e4e24777cb3b12615e0379d9cd14c0da040ac70f0be27ee9a7c704632486f',
   nativeTvmRevision: '7b5acb32bd271342a24130f4ef439ff6c2e52c6c'
 } as const;
+const kananaPath = `scripts/release/evidence/kanana-current/${promotion.archive.sha256}.json`;
 
 export const requiredReports = {
   'kanana-2-v-decide-3b-2611': ['browserMatrix', 'maximumContext'],
@@ -124,18 +125,136 @@ export function assertPromotionSource(root: string, testedSource: string = promo
     });
   const verifierCommit = git('rev-parse', 'HEAD').trim();
   assert.equal(git('rev-parse', '--show-toplevel').trim(), root);
+  assert.equal(
+    git('status', '--porcelain', '--untracked-files=all'),
+    '',
+    'GPU release evidence requires a clean source checkout.'
+  );
   git('merge-base', '--is-ancestor', testedSource, verifierCommit);
   const files = git('diff', '--name-only', '--no-renames', '-z', testedSource, verifierCommit)
     .split('\0')
     .filter(Boolean);
   for (const file of files)
-    assert.ok(file === 'package.json' || releaseFiles.has(file), 'Change outside release verification: ' + file);
+    assert.ok(
+      file === 'package.json' || file === kananaPath || releaseFiles.has(file),
+      'Change outside release verification: ' + file
+    );
   if (files.includes('package.json'))
     assert.equal(
       git('show', verifierCommit + ':package.json'),
       testCommandChange(git('show', testedSource + ':package.json'))
     );
   return verifierCommit;
+}
+
+export function assertKananaPromotionEvidence(root: string, testedSource: string, value: unknown) {
+  const receipt = record(value, 'Missing promotion receipt.');
+  const evidenceCommit = receipt.kananaEvidenceCommit;
+  assert.ok(
+    typeof evidenceCommit === 'string' && /^[a-f0-9]{40}$/u.test(evidenceCommit),
+    'Missing Kanana evidence commit.'
+  );
+  const git = (...args: string[]) =>
+    execFileSync('git', ['--no-optional-locks', '--no-replace-objects', ...args], {
+      cwd: root,
+      env: gitEnvironmentFor(root)
+    });
+  assert.equal(
+    git('rev-list', '--parents', '-n', '1', evidenceCommit).toString().trim(),
+    `${evidenceCommit} ${testedSource}`,
+    'Kanana evidence must be a direct child of the tested source.'
+  );
+  git('merge-base', '--is-ancestor', evidenceCommit, 'HEAD');
+  assert.equal(
+    git(
+      'diff-tree',
+      '--no-commit-id',
+      '--no-renames',
+      '--name-status',
+      '-r',
+      '-z',
+      testedSource,
+      evidenceCommit
+    ).toString(),
+    `A\0${kananaPath}\0`,
+    'Kanana evidence child must add only the exact archive evidence.'
+  );
+  assert.match(
+    git('ls-tree', evidenceCommit, '--', kananaPath).toString(),
+    /^100644 blob [a-f0-9]{40}\t/u,
+    'Kanana evidence must be a regular file.'
+  );
+  assert.match(
+    git('ls-tree', 'HEAD', '--', kananaPath).toString(),
+    /^100644 blob [a-f0-9]{40}\t/u,
+    'Integrated Kanana evidence must be a regular file.'
+  );
+  const bytes = git('show', `${evidenceCommit}:${kananaPath}`);
+  assert.deepEqual(
+    git('show', `HEAD:${kananaPath}`),
+    bytes,
+    'Kanana evidence differs from the committed evidence child.'
+  );
+  const pin = record(JSON.parse(bytes.toString()), 'Invalid Kanana evidence.');
+  exactKeys(
+    pin,
+    [
+      'schemaVersion',
+      'sourceCommit',
+      'packageVersion',
+      'archiveSha256',
+      'packageTreeSha256',
+      'bundleSha256',
+      'playwrightReportSha256',
+      'maxContextReportSha256',
+      'modelProvenanceSha256',
+      'conversionConfigSha256',
+      'maxContextTokens',
+      'maxContextPassed'
+    ],
+    'Invalid Kanana evidence fields.'
+  );
+  const models = record(receipt.models, 'Missing model evidence.');
+  const kanana = record(models['kanana-2-v-decide-3b-2611'], 'Missing Kanana evidence.');
+  const reports = record(kanana.reports, 'Missing Kanana reports.');
+  assert.deepEqual(
+    [
+      pin.schemaVersion,
+      pin.sourceCommit,
+      pin.packageVersion,
+      pin.archiveSha256,
+      pin.packageTreeSha256,
+      pin.bundleSha256,
+      pin.playwrightReportSha256,
+      pin.maxContextReportSha256,
+      pin.maxContextPassed
+    ],
+    [
+      1,
+      testedSource,
+      promotion.archive.packageVersion,
+      promotion.archive.sha256,
+      promotion.archive.packageTreeSha256,
+      promotion.archive.bundleSha256,
+      reports.browserMatrix,
+      reports.maximumContext,
+      true
+    ],
+    'Kanana evidence differs from the promotion receipt.'
+  );
+  assert.ok(
+    Number.isSafeInteger(pin.maxContextTokens) && (pin.maxContextTokens as number) > 0,
+    'Invalid Kanana context evidence.'
+  );
+  for (const [key, path] of [
+    ['modelProvenanceSha256', 'packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json'],
+    ['conversionConfigSha256', 'packages/web-decision/src/catalog/provenance/kanana-conversion-config.json']
+  ] as const)
+    assert.equal(
+      pin[key],
+      sha256(git('show', `${testedSource}:${path}`)),
+      `Kanana ${key} differs from the tested source.`
+    );
 }
 
 export async function committedReceipt(root: string) {
@@ -164,7 +283,9 @@ export async function verifyPromotion(root: string, archive: string) {
   const source = await realpath(root);
   const releaseCommit = assertPromotionSource(source);
   const receipt = await committedReceipt(source);
-  assertPromotionReceipt(JSON.parse(receipt.toString('utf8')));
+  const parsed = JSON.parse(receipt.toString('utf8'));
+  assertPromotionReceipt(parsed);
+  assertKananaPromotionEvidence(source, promotion.sourceCommit, parsed);
   await verifyPromotionArchive(archive);
   return {
     status: 'verified-committed-promotion-receipt-and-archive',

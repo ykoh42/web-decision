@@ -34,6 +34,9 @@ each required report digest, each independently verified WASM and build report
 digest, the Kanana evidence commit and the complete local verification digest.
 The receipt belongs in a descendant commit containing only the reviewed release
 procedure changes. Its source field still names the GPU-tested package commit.
+The archive-specific Kanana evidence child must be integrated into that history.
+The hosted check verifies its direct parent, single added evidence path, source
+provenance, archive and report digests, and identical blob in the tagged tree.
 
 GitHub Release checks read the committed receipt and validate its required evidence
 fields and the exact SHA-256 of the packed archive. This hosted CPU check relies on

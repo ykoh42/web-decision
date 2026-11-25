@@ -9,6 +9,7 @@ import {sha256} from './curated-gpu-evidence.mjs';
 import {
   assertPromotionReceipt,
   assertPromotionSource,
+  assertKananaPromotionEvidence,
   committedReceipt,
   promotion,
   reportPath,
@@ -67,6 +68,80 @@ test('every public model and its named reports and native builds are required', 
   }
 });
 
+test('Kanana evidence is the reachable exact child of the tested source and matches the receipt', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-promotion-kanana-')));
+  t.after(() => rm(root, {recursive: true}));
+  const git = (...args: string[]) =>
+    execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8'}).trim();
+  const write = async (name: string, text: string) => {
+    await mkdir(dirname(join(root, name)), {recursive: true});
+    await writeFile(join(root, name), text);
+  };
+  git('init', '--quiet');
+  git('config', 'user.name', 'CPU gate test');
+  git('config', 'user.email', 'gate@example.invalid');
+  const provenance = 'packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json',
+    conversion = 'packages/web-decision/src/catalog/provenance/kanana-conversion-config.json';
+  await write(provenance, 'source provenance');
+  await write(conversion, 'source conversion');
+  git('add', '.');
+  git('commit', '-qm', 'tested product');
+  const source = git('rev-parse', 'HEAD');
+  const receipt = cpuReceipt();
+  const reports = receipt.models['kanana-2-v-decide-3b-2611']!.reports;
+  const path = `scripts/release/evidence/kanana-current/${promotion.archive.sha256}.json`;
+  const pin = {
+    schemaVersion: 1,
+    sourceCommit: source,
+    packageVersion: promotion.archive.packageVersion,
+    archiveSha256: promotion.archive.sha256,
+    packageTreeSha256: promotion.archive.packageTreeSha256,
+    bundleSha256: promotion.archive.bundleSha256,
+    playwrightReportSha256: reports.browserMatrix,
+    maxContextReportSha256: reports.maximumContext,
+    modelProvenanceSha256: sha256(Buffer.from('source provenance')),
+    conversionConfigSha256: sha256(Buffer.from('source conversion')),
+    maxContextTokens: 8192,
+    maxContextPassed: true
+  };
+  await write(path, JSON.stringify(pin));
+  git('add', path);
+  git('commit', '-qm', 'add exact Kanana evidence');
+  const child = git('rev-parse', 'HEAD');
+  receipt.kananaEvidenceCommit = child;
+  assert.equal(assertPromotionSource(root, source), child);
+  assert.doesNotThrow(() => assertKananaPromotionEvidence(root, source, receipt));
+  assert.throws(() => assertKananaPromotionEvidence(root, source, {...receipt, kananaEvidenceCommit: 'd'.repeat(40)}));
+  const wrong = structuredClone(receipt);
+  wrong.models['kanana-2-v-decide-3b-2611']!.reports.browserMatrix = 'a'.repeat(64);
+  assert.throws(() => assertKananaPromotionEvidence(root, source, wrong), /differs from the promotion receipt/u);
+  await write(path, JSON.stringify({...pin, archiveSha256: 'a'.repeat(64)}));
+  git('add', path);
+  git('commit', '-qm', 'tamper evidence');
+  assert.throws(
+    () => assertKananaPromotionEvidence(root, source, receipt),
+    /differs from the committed evidence child/u
+  );
+  git('checkout', '--quiet', '--detach', source);
+  assert.throws(() => assertKananaPromotionEvidence(root, source, receipt));
+  await write(path, JSON.stringify({...pin, archiveSha256: 'a'.repeat(64)}));
+  git('add', path);
+  git('commit', '-qm', 'wrong archive evidence');
+  assert.throws(
+    () => assertKananaPromotionEvidence(root, source, {...receipt, kananaEvidenceCommit: git('rev-parse', 'HEAD')}),
+    /differs from the promotion receipt/u
+  );
+  git('checkout', '--quiet', '--detach', source);
+  await write(path, JSON.stringify(pin));
+  await write('unexpected-product-file', 'unexpected');
+  git('add', '.');
+  git('commit', '-qm', 'evidence with extra file');
+  assert.throws(
+    () => assertKananaPromotionEvidence(root, source, {...receipt, kananaEvidenceCommit: git('rev-parse', 'HEAD')}),
+    /must add only the exact archive evidence/u
+  );
+});
+
 test('receipt verification rejects another source, another installation and preflight', () => {
   const evidence = cpuReceipt();
   assert.throws(() => assertPromotionReceipt({...evidence, sourceCommit: 'b'.repeat(40)}), /another tested source/u);
@@ -110,10 +185,12 @@ test('CI reads the reviewed Git blob and rejects absence, replacement and produc
 
   await writeFile(path, bytes.replace('"browserMatrix":"', '"browserMatrix":"a'));
   await assert.rejects(committedReceipt(root), /differs from the reviewed Git blob/u);
+  assert.throws(() => assertPromotionSource(root, source), /clean source checkout/u);
   await writeFile(path, bytes);
 
   const product = 'runtime.js';
   await writeFile(join(root, product), 'export {}');
+  assert.throws(() => assertPromotionSource(root, source), /clean source checkout/u);
   git('add', product);
   git('commit', '-qm', 'Change distributed entry');
   assert.throws(() => assertPromotionSource(root, source), /outside release verification/u);
