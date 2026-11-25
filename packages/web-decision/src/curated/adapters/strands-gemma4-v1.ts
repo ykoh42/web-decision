@@ -6,7 +6,8 @@ import tokenizerConfig from '../../../assets/strands-gemma4-v1/tokenizer_config.
 import manifest from '../../../assets/strands-gemma4-v1/manifest.json' with {type: 'json'};
 import {createGemma4V1CuratedAdapter} from './strands-gemma4-v1.mjs';
 
-const asset = (url: string) => new URL(url, import.meta.url);
+const moduleUrl = import.meta.url;
+const asset = (url: string) => new URL(url, moduleUrl);
 export const {loadModel} = createGemma4V1CuratedAdapter(
   {
     'graph.wasm': asset(graphWasm),
