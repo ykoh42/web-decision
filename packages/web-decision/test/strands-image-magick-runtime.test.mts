@@ -6,14 +6,19 @@ import {MAGICK} from '../src/mapika2b/image-codec-pins.mjs';
 import {prepareGemma4V2EncodedImage} from '../src/strands/gemma4-v2-image.mjs';
 import {preprocessQwen35Image} from '../src/strands/qwen35-image-input.mjs';
 
-test('shared ImageMagick initialization verifies the usual codec and permits retry after failure', async (t) => {
+test('ImageMagick source failures are isolated before shared verified initialization', async (t) => {
   const wasm = await readFile(new URL(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm')));
-  const url = new URL('https://example.test/codecs/magick.wasm');
+  const url = new URL('https://example.test/codecs/magick.wasm?fixture=codec');
+  const fetching = Promise.withResolvers<void>();
+  const finishFetch = Promise.withResolvers<void>();
+  let fetchedUrl: string | undefined;
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async (request: string) => {
-    assert.equal(request, url.href);
+    fetchedUrl = request;
     fetches++;
-    return new Response(new Uint8Array(wasm));
+    fetching.resolve();
+    await finishFetch.promise;
+    return new Response(null, {status: 503});
   });
 
   await assert.rejects(magickRuntime(new Uint8Array()), {code: 'INVALID_ASSET'});
@@ -25,9 +30,25 @@ test('shared ImageMagick initialization verifies the usual codec and permits ret
     if (bytes.byteLength === MAGICK.bytes) checks++;
     return digest(algorithm, bytes);
   });
-  const first = magickRuntime(url);
-  assert.equal(magickRuntime(wasm), first);
-  await first;
+  const unavailable = assert.rejects(magickRuntime(url), {code: 'ASSET_LOAD_FAILED'});
+  await fetching.promise;
+  const fromCache = magickRuntime(wasm);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const initialized = await Promise.race([
+      fromCache.then(() => true),
+      new Promise<boolean>((resolve) => {
+        timeout = setTimeout(() => resolve(false), 5000);
+      })
+    ]);
+    assert.equal(initialized, true, 'verified local bytes should not wait for the unrelated fetch');
+  } finally {
+    clearTimeout(timeout);
+    finishFetch.resolve();
+    await unavailable;
+  }
+  assert.equal(await magickRuntime(url), await fromCache);
+  assert.equal(fetchedUrl, url.href);
   assert.equal(fetches, 1);
   assert.equal(checks, 1);
 

@@ -24,6 +24,7 @@ export type MagickWasm = URL | ByteArray;
 type DecodedImage = {rgb: Uint8Array; width: number; height: number};
 
 let runtimePromise: Promise<MagickModule> | undefined;
+let defaultRuntimeRequest: Promise<MagickModule> | undefined;
 
 function bytesOf(value: unknown): Uint8Array {
   if (value instanceof Uint8Array) return value;
@@ -71,11 +72,15 @@ async function defaultWasmUrl(): Promise<URL> {
   return new URL(asset.default, import.meta.url);
 }
 
-async function verifiedMagickBytes(wasm?: MagickWasm): Promise<Uint8Array> {
-  const source = wasm ?? (await defaultWasmUrl());
+async function verifiedMagickBytes(source: MagickWasm): Promise<Uint8Array> {
   if (source instanceof URL) {
+    const href = source.href;
     const name = decodeURIComponent(source.pathname.split('/').at(-1)!);
-    return new Uint8Array(await readVerifiedAsset(new URL('.', source), {files: {[name]: MAGICK}}, name));
+    return new Uint8Array(
+      await readVerifiedAsset(new URL('.', source), {files: {[name]: MAGICK}}, name, {
+        fetchImpl: (_, options) => fetch(href, options)
+      })
+    );
   }
   if (!ArrayBuffer.isView(source) || source.byteLength !== MAGICK.bytes)
     throw new WebDecisionError('INVALID_ASSET', 'ImageMagick WASM size differs from the pinned codec.');
@@ -85,20 +90,27 @@ async function verifiedMagickBytes(wasm?: MagickWasm): Promise<Uint8Array> {
   return bytes;
 }
 
-/** Initialize the SDK shared by all image decoders with the same pinned bytes. */
+function initializeVerifiedMagick(bytes: Uint8Array): Promise<MagickModule> {
+  return (runtimePromise ??= (async () => {
+    const magick = await import('@imagemagick/magick-wasm');
+    await magick.initializeImageMagick(bytes);
+    return magick;
+  })().catch((error) => {
+    runtimePromise = undefined;
+    throw error;
+  }));
+}
+
+/** Share the SDK initialization once a caller has verified the pinned bytes. */
 export function magickRuntime(wasm?: MagickWasm): Promise<MagickModule> {
-  if (!runtimePromise) {
-    runtimePromise = (async () => {
-      const bytes = await verifiedMagickBytes(wasm);
-      const magick = await import('@imagemagick/magick-wasm');
-      await magick.initializeImageMagick(bytes);
-      return magick;
-    })().catch((error) => {
-      runtimePromise = undefined;
-      throw error;
-    });
-  }
-  return runtimePromise;
+  if (runtimePromise) return runtimePromise;
+  if (wasm !== undefined) return verifiedMagickBytes(wasm).then(initializeVerifiedMagick);
+  return (defaultRuntimeRequest ??= defaultWasmUrl()
+    .then(verifiedMagickBytes)
+    .then(initializeVerifiedMagick)
+    .finally(() => {
+      defaultRuntimeRequest = undefined;
+    }));
 }
 
 function checkPillowPixelLimit(width: number, height: number): void {
