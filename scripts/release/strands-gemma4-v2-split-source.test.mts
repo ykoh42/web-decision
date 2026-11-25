@@ -32,9 +32,15 @@ test('historical warm verifier requires its exact clean commit, ancestry and run
     git(work, 'add', '.');
     git(work, 'commit', '-m', 'successor');
     assertHistoricalWarmVerifier(work, runtime, original);
+    assert.throws(() => assertHistoricalWarmVerifier(work, join(runtime, 'scripts'), original), /checkout root/);
     await writeFile(join(runtime, paths[0]!), 'uncommitted tampering');
     assert.throws(() => assertHistoricalWarmVerifier(work, runtime, original));
     await writeFile(join(runtime, paths[0]!), paths[0]!);
+    git(runtime, 'update-index', '--assume-unchanged', paths[0]!);
+    await writeFile(join(runtime, paths[0]!), 'hidden tampering');
+    assert.throws(() => assertHistoricalWarmVerifier(work, runtime, original), /Historical warm runtime file differs/);
+    await writeFile(join(runtime, paths[0]!), paths[0]!);
+    git(runtime, 'update-index', '--no-assume-unchanged', paths[0]!);
     await writeFile(join(work, paths[0]!), 'different runtime');
     git(work, 'add', '.');
     git(work, 'commit', '-m', 'change runtime');

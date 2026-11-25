@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {readFileSync, realpathSync} from 'node:fs';
 import {readFile, realpath, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join, resolve} from 'node:path';
@@ -92,7 +93,17 @@ const warmRuntimeSources = [
 ];
 
 export function assertHistoricalWarmVerifier(root: string, runtime: string, expectedCommit: string) {
-  assert.equal(cleanSourceCommit(runtime), expectedCommit, 'Historical warm verifier commit differs.');
+  const runtimeOptions = {cwd: runtime, env: gitEnvironmentFor(runtime)};
+  const runtimeGit = (...args: string[]) =>
+    execFileSync('git', ['--no-optional-locks', '--no-replace-objects', ...args], runtimeOptions);
+  const top = runtimeGit('rev-parse', '--show-toplevel').toString().trim();
+  assert.equal(realpathSync(runtime), realpathSync(top), 'Historical warm verifier must be the checkout root.');
+  assert.equal(runtimeGit('status', '--porcelain').toString(), '', 'Historical warm verifier is not clean.');
+  assert.equal(
+    runtimeGit('rev-parse', 'HEAD').toString().trim(),
+    expectedCommit,
+    'Historical warm verifier commit differs.'
+  );
   const current = cleanSourceCommit(root);
   const options = {cwd: root, env: gitEnvironmentFor(root)};
   execFileSync(
@@ -104,6 +115,11 @@ export function assertHistoricalWarmVerifier(root: string, runtime: string, expe
     const read = (commit: string) =>
       execFileSync('git', ['--no-optional-locks', '--no-replace-objects', 'show', `${commit}:${path}`], options);
     assert.deepEqual(read(current), read(expectedCommit), `Historical warm runtime differs: ${path}`);
+    assert.deepEqual(
+      readFileSync(join(runtime, path)),
+      read(expectedCommit),
+      `Historical warm runtime file differs: ${path}`
+    );
   }
 }
 
