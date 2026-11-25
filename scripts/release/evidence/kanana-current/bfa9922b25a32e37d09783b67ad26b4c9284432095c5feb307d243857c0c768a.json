@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "b05bb22b4676b6e919a4c30665c910338b2c58f3",
+  "packageVersion": "0.7.0",
+  "archiveSha256": "bfa9922b25a32e37d09783b67ad26b4c9284432095c5feb307d243857c0c768a",
+  "packageTreeSha256": "c63c699fc4548251d895afef070abaa6f6bb43ff7c832dde4d8f117165a40269",
+  "bundleSha256": "186279ad1ec30544155cc46638f2627f3ecc6fdc345080bfa72bf92edc44b2c4",
+  "playwrightReportSha256": "ccd1a5853ec3bc1507f8a2035f9680fb594b2eb002cac095cbbb3e0123d1eb9f",
+  "maxContextReportSha256": "9db814b3769d3ab5b30f7d53542a232f459bb2d2aa27eb2efd49be87c38b5e37",
+  "maxContextTokens": 20480,
+  "maxContextPassed": true,
+  "modelProvenanceSha256": "08df520b47d2da09bbdc12f9e4566236ef69a04439c4126d58e5be1278753c13",
+  "conversionConfigSha256": "f45f1b717571969660590592b6ada995eec3ee08f1cc9a59dc599aa95c56649b"
+}
