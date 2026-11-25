@@ -5,6 +5,53 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import {assertSplitVerifierSource} from './strands-gemma4-v2-split-source.mts';
+import {assertHistoricalWarmVerifier} from './strands-gemma4-v2-split-producer.mts';
+
+test('historical warm verifier requires its exact clean commit, ancestry and runtime bytes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'historical-warm-source-'));
+  const work = join(root, 'work');
+  const runtime = join(root, 'runtime');
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', args, {cwd, stdio: ['ignore', 'pipe', 'pipe']})
+      .toString()
+      .trim();
+  const paths = ['warm-seed', 'persistent-trace', 'persistent-variant', 'local-checkpoint', 'split-evidence'].map(
+    (name) => `scripts/release/strands-gemma4-v2-${name}.mts`
+  );
+  try {
+    await mkdir(join(work, 'scripts/release'), {recursive: true});
+    git(work, 'init');
+    git(work, 'config', 'user.email', 'test@example.invalid');
+    git(work, 'config', 'user.name', 'test');
+    for (const path of paths) await writeFile(join(work, path), path);
+    git(work, 'add', '.');
+    git(work, 'commit', '-m', 'original');
+    const original = git(work, 'rev-parse', 'HEAD');
+    git(root, 'clone', work, runtime);
+    await writeFile(join(work, 'other.txt'), 'verification code');
+    git(work, 'add', '.');
+    git(work, 'commit', '-m', 'successor');
+    assertHistoricalWarmVerifier(work, runtime, original);
+    await writeFile(join(runtime, paths[0]!), 'uncommitted tampering');
+    assert.throws(() => assertHistoricalWarmVerifier(work, runtime, original));
+    await writeFile(join(runtime, paths[0]!), paths[0]!);
+    await writeFile(join(work, paths[0]!), 'different runtime');
+    git(work, 'add', '.');
+    git(work, 'commit', '-m', 'change runtime');
+    assert.throws(() => assertHistoricalWarmVerifier(work, runtime, original), /Historical warm runtime differs/);
+    const unrelated = join(root, 'unrelated');
+    await mkdir(unrelated);
+    git(unrelated, 'init');
+    git(unrelated, 'config', 'user.email', 'test@example.invalid');
+    git(unrelated, 'config', 'user.name', 'test');
+    await writeFile(join(unrelated, 'unrelated'), 'different');
+    git(unrelated, 'add', '.');
+    git(unrelated, 'commit', '-m', 'unrelated');
+    assert.throws(() => assertHistoricalWarmVerifier(unrelated, runtime, original));
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
 
 test('only the exact pinned Kanana evidence file may be added', async () => {
   const root = await mkdtemp(join(tmpdir(), 'kanana-evidence-source-'));

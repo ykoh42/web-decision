@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {readFile, realpath, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join, resolve} from 'node:path';
-import {sha256} from './curated-gpu-evidence.mjs';
+import {cleanSourceCommit, sha256} from './curated-gpu-evidence.mjs';
 import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 import {
   derivePersistentSpec,
@@ -82,6 +82,31 @@ export function assertDerivedSpec(source: Buffer, actual: Buffer, provided: unkn
   return derived;
 }
 
+const historicalWarmCommit = 'ff1c1d34904481c187b6873872f323ca9e220580';
+const warmRuntimeSources = [
+  'scripts/release/strands-gemma4-v2-warm-seed.mts',
+  'scripts/release/strands-gemma4-v2-persistent-trace.mts',
+  'scripts/release/strands-gemma4-v2-persistent-variant.mts',
+  'scripts/release/strands-gemma4-v2-local-checkpoint.mts',
+  'scripts/release/strands-gemma4-v2-split-evidence.mts'
+];
+
+export function assertHistoricalWarmVerifier(root: string, runtime: string, expectedCommit: string) {
+  assert.equal(cleanSourceCommit(runtime), expectedCommit, 'Historical warm verifier commit differs.');
+  const current = cleanSourceCommit(root);
+  const options = {cwd: root, env: gitEnvironmentFor(root)};
+  execFileSync(
+    'git',
+    ['--no-optional-locks', '--no-replace-objects', 'merge-base', '--is-ancestor', expectedCommit, current],
+    options
+  );
+  for (const path of warmRuntimeSources) {
+    const read = (commit: string) =>
+      execFileSync('git', ['--no-optional-locks', '--no-replace-objects', 'show', `${commit}:${path}`], options);
+    assert.deepEqual(read(current), read(expectedCommit), `Historical warm runtime differs: ${path}`);
+  }
+}
+
 export async function inspectSplitProducer() {
   assert.ok(
     scratch && /^[a-f0-9]{40}$/u.test(sourceCommit),
@@ -98,12 +123,17 @@ export async function inspectSplitProducer() {
   const mode = persistentMode();
   if (mode) {
     const warm = mode === 'warm';
-    if (warm)
-      assert.equal(
-        await realpath(join(scratch, 'verifier')),
-        await realpath(workspace),
-        'Warm runtime checkout differs.'
-      );
+    if (warm) {
+      const runtime = await realpath(join(scratch, 'verifier'));
+      if (runtime !== (await realpath(workspace))) {
+        assert.equal(
+          process.env.WEB_DECISION_SPLIT_HISTORICAL_WARM_VERIFIER,
+          historicalWarmCommit,
+          'Warm runtime checkout differs.'
+        );
+        assertHistoricalWarmVerifier(workspace, runtime, historicalWarmCommit);
+      }
+    }
     const persistentPath = warm ? 'persistent-warm-archive.spec.ts' : 'persistent-public-archive.spec.ts';
     const [file, metadata, config, runtime, derivation, pinnedRuntime, pinnedDerivation] = await Promise.all([
       readFile(join(scratch, persistentPath)),
