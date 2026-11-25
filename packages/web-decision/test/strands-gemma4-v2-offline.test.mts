@@ -6,12 +6,14 @@ import {createGemma4V2OfflinePreparation, pinnedGemma4V2OfflineAssets} from '../
 import {GEMMA4_V2_REPOSITORY, GEMMA4_V2_REVISION} from '../src/strands/gemma4-v2-source.mjs';
 
 class MemoryCache implements AssetCache {
-  readonly entries = new Map<string, Response>();
+  readonly entries = new Map<string, ArrayBuffer>();
   async match(key: string) {
-    return this.entries.get(key)?.clone();
+    const bytes = this.entries.get(key);
+    return bytes === undefined ? undefined : new Response(bytes);
   }
   async put(key: string, response: Response) {
-    this.entries.set(key, response.clone());
+    // Cache Storage stores the bytes and gives every read a fresh response body.
+    this.entries.set(key, await response.arrayBuffer());
   }
 }
 
