@@ -15,7 +15,7 @@ const FORMAT_NAMES = 'BMP, GIF, WebP, TIFF, and CMYK JPEG';
 type ImageFormat = 'bmp' | 'gif' | 'jpeg' | 'pfm' | 'png' | 'pnm' | 'tiff' | 'webp' | null;
 type DecodedImageFormat = 'bmp' | 'gif' | 'jpeg' | 'tiff' | 'webp';
 type MagickModule = typeof import('@imagemagick/magick-wasm');
-type MagickWasm = URL | ByteArray | WebAssembly.Module;
+export type MagickWasm = URL | ByteArray;
 type DecodedImage = {rgb: Uint8Array; width: number; height: number};
 
 let runtimePromise: Promise<MagickModule> | undefined;
@@ -66,11 +66,27 @@ async function defaultWasmUrl(): Promise<URL> {
   return new URL(asset.default, import.meta.url);
 }
 
-export async function magickRuntime(wasm: MagickWasm | undefined): Promise<MagickModule> {
+async function verifiedMagickBytes(wasm?: MagickWasm): Promise<Uint8Array> {
+  const source = wasm ?? (await defaultWasmUrl());
+  if (source instanceof URL) {
+    const name = decodeURIComponent(source.pathname.split('/').at(-1)!);
+    return new Uint8Array(await readVerifiedAsset(new URL('.', source), {files: {[name]: MAGICK}}, name));
+  }
+  if (!ArrayBuffer.isView(source) || source.byteLength !== MAGICK.bytes)
+    throw new WebDecisionError('INVALID_ASSET', 'ImageMagick WASM size differs from the pinned codec.');
+  const bytes = new Uint8Array(source.buffer, source.byteOffset, source.byteLength).slice();
+  if ((await sha256(bytes)) !== MAGICK.sha256)
+    throw new WebDecisionError('INVALID_ASSET', 'ImageMagick WASM digest differs from the pinned codec.');
+  return bytes;
+}
+
+/** Initialize the SDK shared by all image decoders with the same pinned bytes. */
+export function magickRuntime(wasm?: MagickWasm): Promise<MagickModule> {
   if (!runtimePromise) {
     runtimePromise = (async () => {
+      const bytes = await verifiedMagickBytes(wasm);
       const magick = await import('@imagemagick/magick-wasm');
-      await magick.initializeImageMagick(wasm ?? (await defaultWasmUrl()));
+      await magick.initializeImageMagick(bytes);
       return magick;
     })().catch((error) => {
       runtimePromise = undefined;
@@ -163,3 +179,6 @@ export async function decodeKananaMagickImage(
   return result;
 }
 import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
+import {readVerifiedAsset, sha256} from '../assets.js';
+import {WebDecisionError} from '../kev.js';
+import {MAGICK} from '../mapika2b/image-codec-pins.mjs';

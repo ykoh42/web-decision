@@ -1,4 +1,5 @@
 import {resizePillowBicubic} from '../kanana/image-processing.ts';
+import type {MagickWasm} from '../kanana/magick-image.js';
 import {waitForAbort} from '../abort.js';
 import {WebDecisionError} from '../kev.js';
 import type {AssetCache} from '../assets.js';
@@ -77,7 +78,7 @@ export function prepareGemma4V2Image(rgb: Uint8Array, width: number, height: num
 export async function prepareGemma4V2EncodedImage(
   data: string,
   options: {
-    magickWasm?: URL | Uint8Array | WebAssembly.Module | undefined;
+    magickWasm?: MagickWasm | undefined;
     signal?: AbortSignal | null;
     codecs?: ImageCodecs;
   } = {}

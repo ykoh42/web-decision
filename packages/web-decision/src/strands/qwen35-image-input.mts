@@ -1,8 +1,9 @@
 import {decode as decodePng} from 'fast-png';
 import {unzlibSync, zlibSync} from 'fflate';
 import decodeJpeg from '@jsquash/jpeg/decode.js';
-import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
+import type {IMagickImage} from '@imagemagick/magick-wasm';
 import {packKananaImagePatches, resizePillowBicubic} from '../kanana/image-processing.ts';
+import type {MagickWasm} from '../kanana/magick-image.js';
 
 export const QWEN35_IMAGE_DEFAULTS = Object.freeze({
   imageLongSide: 448,
@@ -30,8 +31,6 @@ type GifFrame = Readonly<{
 }>;
 type ImageHeader = Readonly<{format: ImageFormat; width: number; height: number; components?: number; gif?: GifFrame}>;
 type DecodedImage = Readonly<{width: number; height: number; rgb: Uint8Array}>;
-type MagickModule = typeof import('@imagemagick/magick-wasm');
-type MagickWasm = URL | ByteArray | WebAssembly.Module;
 type JpegFrame = Readonly<{width: number; height: number; components: number}>;
 type PngImage = ReturnType<typeof decodePng>;
 type PngPalette = Readonly<{colors: NonNullable<PngImage['palette']>; hasTransparency: boolean}>;
@@ -60,8 +59,6 @@ export type Qwen35ImagesInput = Readonly<{
   pixelShape: readonly [patchRows: number, patchWidth: number];
   pixelValues: Float32Array;
 }>;
-
-let magickPromise: Promise<MagickModule> | undefined;
 
 function readU16(bytes: Uint8Array, offset: number, littleEndian = false): number {
   if (offset < 0 || offset + 2 > bytes.length) throw new TypeError('Image header is truncated.');
@@ -785,31 +782,13 @@ function decodeJpegRgb(image: ImageData): DecodedImage {
   return {width, height, rgb};
 }
 
-async function defaultMagickWasm(): Promise<URL> {
-  const asset = await import('@imagemagick/magick-wasm/magick.wasm?url&no-inline');
-  return new URL(asset.default, import.meta.url);
-}
-
-async function loadMagick(wasm?: MagickWasm): Promise<MagickModule> {
-  if (!magickPromise) {
-    magickPromise = (async () => {
-      const magick = await import('@imagemagick/magick-wasm');
-      await magick.initializeImageMagick(wasm ?? (await defaultMagickWasm()));
-      return magick;
-    })().catch((error) => {
-      magickPromise = undefined;
-      throw error;
-    });
-  }
-  return magickPromise;
-}
-
 async function decodeMagickRgb(
   bytes: Uint8Array,
   wasm?: MagickWasm,
   preserveTransparentRgb = false
 ): Promise<DecodedImage> {
-  const magick = await loadMagick(wasm);
+  const {magickRuntime} = await import('../kanana/magick-image.ts');
+  const magick = await magickRuntime(wasm);
   const result = magick.ImageMagick.read(bytes, (image: IMagickImage) => {
     const width = image.width;
     const height = image.height;

@@ -2,11 +2,12 @@ import {decode as decodePng} from 'fast-png';
 import type {DecodedPng, PngDataArray} from 'fast-png';
 import decodeJpeg from '@jsquash/jpeg/decode.js';
 import {decodeKananaPnmImage} from './pnm-image.js';
+import type {MagickWasm} from './magick-image.js';
 
 export type KananaImageDecodeOptions = {
   signal?: AbortSignal | undefined;
   fetch?: typeof fetch | undefined;
-  magickWasm?: URL | Int8Array | Uint8Array | Uint8ClampedArray | WebAssembly.Module | undefined;
+  magickWasm?: MagickWasm | undefined;
 };
 
 type DecodedImage = {rgb: Uint8Array; width: number; height: number};

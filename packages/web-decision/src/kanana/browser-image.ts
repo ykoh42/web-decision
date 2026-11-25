@@ -1,9 +1,10 @@
 import {decodeKananaEncodedImageSource} from './encoded-image.js';
+import type {MagickWasm} from './magick-image.js';
 
 export type KananaImageDecodeOptions = {
   signal?: AbortSignal;
   fetch?: typeof fetch;
-  magickWasm?: URL | Int8Array | Uint8Array | Uint8ClampedArray | WebAssembly.Module;
+  magickWasm?: MagickWasm;
 };
 
 const DECODED_IMAGE_GLOBALS = ['ImageBitmap', 'HTMLCanvasElement', 'OffscreenCanvas'] as const;
