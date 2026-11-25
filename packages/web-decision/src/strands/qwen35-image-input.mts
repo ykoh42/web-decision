@@ -305,11 +305,23 @@ function pngPaletteChunks(chosen: Map<string, Uint8Array>, raw: (data: Uint8Arra
   });
 }
 
+function wholePngChunk(bytes: Uint8Array, data: Uint8Array): Uint8Array {
+  const start = data.byteOffset - bytes.byteOffset - 8;
+  return bytes.subarray(start, start + data.length + 12);
+}
+
+function joinPngChunks(parts: Uint8Array[]): Uint8Array {
+  const output = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
 function normalizedPngSingletons(bytes: Uint8Array, chunks: PngTextChunk[], chosen: Map<string, Uint8Array>) {
-  const raw = (data: Uint8Array) => {
-    const start = data.byteOffset - bytes.byteOffset - 8;
-    return bytes.subarray(start, start + data.length + 12);
-  };
+  const raw = (data: Uint8Array) => wholePngChunk(bytes, data);
   const header = chosen.get('IHDR');
   if (!header || header.length !== 13) throw new TypeError('PNG has no readable IHDR dimensions.');
   const parts: Uint8Array[] = [bytes.subarray(0, 8), raw(header)];
@@ -323,13 +335,7 @@ function normalizedPngSingletons(bytes: Uint8Array, chunks: PngTextChunk[], chos
     if (type === 'iCCP' && chosen.get(type) !== data) continue;
     parts.push(raw(data));
   }
-  const normalized = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    normalized.set(part, offset);
-    offset += part.length;
-  }
-  return normalized;
+  return joinPngChunks(parts);
 }
 
 function canonicalizePngSingletons(bytes: Uint8Array): Uint8Array {
@@ -383,18 +389,25 @@ function pngWithImageData(bytes: Uint8Array, imageData: Uint8Array): Uint8Array 
     if (type === 'IDAT') {
       if (!added) parts.push(chunk);
       added = true;
-    } else {
-      const start = data.byteOffset - bytes.byteOffset - 8;
-      parts.push(bytes.subarray(start, start + data.length + 12));
-    }
+    } else parts.push(wholePngChunk(bytes, data));
   }
-  const result = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    result.set(part, offset);
-    offset += part.length;
+  return joinPngChunks(parts);
+}
+
+const PNG_BITMAP_CHUNKS = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND']);
+
+function packedAdam7Bitmap(bytes: Uint8Array): Uint8Array {
+  const parts = [bytes.subarray(0, 8)];
+  const indexed = bytes[25] === 3;
+  for (const {type, data} of pngChunks(bytes)) {
+    const chunk = wholePngChunk(bytes, data);
+    if (pngCrc(chunk.subarray(4, -4)) !== readU32(chunk, chunk.length - 4))
+      throw new TypeError(`PNG ${type} chunk checksum is invalid.`);
+    // Pillow composites indexed transparency. Plain grayscale keeps its sample values.
+    if (PNG_BITMAP_CHUNKS.has(type) || (indexed && type === 'tRNS')) parts.push(chunk);
   }
-  return result;
+  // Keep orientation and other metadata in the original PNG, outside the pixel decoder.
+  return joinPngChunks(parts);
 }
 
 function validatePngImageData(bytes: Uint8Array, header: ImageHeader): Uint8Array {
@@ -975,7 +988,13 @@ export async function decodeStrandsImage(
   assertImageSize(header, options.maxImagePixels);
   let decoded: DecodedImage;
   if (header.format === 'png') {
-    decoded = decodePngRgb(validatePngImageData(bytes, header));
+    // fast-png's Adam7 decoder requires byte-aligned samples.
+    const packedAdam7 = bytes[24]! < 8 && bytes[28] === 1;
+    const bitmap = validatePngImageData(packedAdam7 ? packedAdam7Bitmap(bytes) : bytes, header);
+    if (packedAdam7) {
+      const wasm = options.magickWasm ?? (await options.loadMagick?.());
+      decoded = await decodeMagickRgb(bitmap, wasm);
+    } else decoded = decodePngRgb(bitmap);
   } else if (header.format === 'jpeg' && header.components !== 4) {
     await options.prepareJpeg?.();
     const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
