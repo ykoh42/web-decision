@@ -52,6 +52,15 @@ export function createGemma4V1TvmStages(
     }
     return vm;
   }
+  async function closeScopes(release: () => void) {
+    if (lifecycle?.lost) return;
+    try {
+      await device.sync();
+    } finally {
+      if (!lifecycle?.lost) release();
+    }
+  }
+
   async function releaseCachedMemory() {
     if (vm && !lifecycle?.lost) {
       await device.sync();
@@ -66,6 +75,15 @@ export function createGemma4V1TvmStages(
       signal.throwIfAborted();
       const machine = getVm();
       const execute = async () => {
+        const resident = new Map<Gemma4V1HostTensor, Tensor>();
+        let residentScope = false;
+        const releaseResident = () => {
+          if (!residentScope) return;
+          residentScope = false;
+          resident.clear();
+          runtime.endScope();
+        };
+
         runtime.beginScope();
         return withGemma4V2Cleanup(
           async () => {
@@ -79,12 +97,24 @@ export function createGemma4V1TvmStages(
               }
               params.set(name, data);
             }
-            return operation(async (name, inputs) => {
+            const upload = ({shape, data}: Gemma4V1HostTensor) =>
+              runtime.empty(shape, 'float32', device).copyFrom(data);
+            return operation(async (name, inputs, releaseReusedInputs) => {
               signal.throwIfAborted();
+              // Open one K/V scope inside the weight scope. Each tile's own
+              // allocations live in its nested call scope.
+              for (const input of inputs) {
+                if (!input.reuseWithinLayer || resident.has(input)) continue;
+                if (!residentScope) {
+                  runtime.beginScope();
+                  residentScope = true;
+                }
+                resident.set(input, upload(input));
+              }
               runtime.beginScope();
-              return withGemma4V2Cleanup(
+              const output = await withGemma4V2Cleanup(
                 async () => {
-                  const active = inputs.map(({shape, data}) => runtime.empty(shape, 'float32', device).copyFrom(data));
+                  const active = inputs.map((input) => resident.get(input) ?? upload(input));
                   const values = outputs(machine.getFunction(name)(...active, ...(params.get(name) ?? [])));
                   const host: Gemma4V1HostTensor[] = [];
                   for (const tensor of values) {
@@ -96,19 +126,20 @@ export function createGemma4V1TvmStages(
                   }
                   return host;
                 },
-                async () => {
-                  if (lifecycle?.lost) return;
-                  await device.sync();
-                  runtime.endScope();
-                }
+                () => closeScopes(() => runtime.endScope())
               );
+              if (releaseReusedInputs && !lifecycle?.lost) releaseResident();
+              return output;
             });
           },
-          async () => {
-            if (lifecycle?.lost) return;
-            await device.sync();
-            runtime.endScope();
-          }
+          () =>
+            closeScopes(() => {
+              try {
+                releaseResident();
+              } finally {
+                runtime.endScope();
+              }
+            })
         );
       };
       return gpu ? withGemma4V2GpuErrors(gpu, execute) : execute();

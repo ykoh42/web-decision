@@ -17,6 +17,7 @@ type Source = Pick<ReturnType<typeof createGemma4V1Source>, 'rows'>;
 export interface Gemma4V1HostTensor {
   readonly shape: number[];
   readonly data: Float32Array;
+  readonly reuseWithinLayer?: boolean;
 }
 interface Layer {
   readonly family: 'local_owner' | 'global_owner' | 'local_shared' | 'global_shared';
@@ -44,7 +45,8 @@ export interface Gemma4V1Stages {
 }
 type Gemma4V1StageCall = (
   name: string,
-  inputs: readonly Gemma4V1HostTensor[]
+  inputs: readonly Gemma4V1HostTensor[],
+  releaseReusedInputs?: boolean
 ) => Promise<readonly Gemma4V1HostTensor[]>;
 
 type LayerKv = {key: Float32Array; value: Float32Array; start: number};
@@ -169,13 +171,16 @@ async function layerForward(args: {
   const keys = active.key.length / width;
   if (active.start + keys !== start + rows)
     throw new Error('Gemma 4 v1 K/V positions differ from the visible sequence.');
-  const kv = [tensor(active.key, 1, 1, keys, width), tensor(active.value, 1, 1, keys, width)];
+  const kv = [active.key, active.value].map((data) => ({
+    ...tensor(data, 1, 1, keys, width),
+    reuseWithinLayer: rows > tileSize
+  }));
   const output = new Float32Array(hidden.length);
   for (let from = 0; from < rows; from += tileSize) {
     const tile = Math.min(tileSize, rows - from);
     const query = queryTile(projected[0]!.data, rows, from, tile, width);
     const mask = gemma4V1CausalMask(start + from, tile, active.start, keys, layer.window);
-    const [attention] = await call(locality + '_attention_main', [query, ...kv, mask]);
+    const [attention] = await call(locality + '_attention_main', [query, ...kv, mask], from + tile === rows);
     const hiddenTile = tensor(hidden.subarray(from * hiddenSize, (from + tile) * hiddenSize), 1, tile, hiddenSize);
     const [result] = await call(layer.family + '_tail_main', [
       hiddenTile,
