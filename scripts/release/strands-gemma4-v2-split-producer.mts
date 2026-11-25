@@ -107,6 +107,17 @@ export function assertHistoricalWarmVerifier(root: string, runtime: string, expe
   }
 }
 
+async function verifyWarmRuntime() {
+  const runtime = await realpath(join(scratch, 'verifier'));
+  if (runtime === (await realpath(workspace))) return;
+  assert.equal(
+    process.env.WEB_DECISION_SPLIT_HISTORICAL_WARM_VERIFIER,
+    historicalWarmCommit,
+    'Warm runtime checkout differs.'
+  );
+  assertHistoricalWarmVerifier(workspace, runtime, historicalWarmCommit);
+}
+
 export async function inspectSplitProducer() {
   assert.ok(
     scratch && /^[a-f0-9]{40}$/u.test(sourceCommit),
@@ -123,17 +134,7 @@ export async function inspectSplitProducer() {
   const mode = persistentMode();
   if (mode) {
     const warm = mode === 'warm';
-    if (warm) {
-      const runtime = await realpath(join(scratch, 'verifier'));
-      if (runtime !== (await realpath(workspace))) {
-        assert.equal(
-          process.env.WEB_DECISION_SPLIT_HISTORICAL_WARM_VERIFIER,
-          historicalWarmCommit,
-          'Warm runtime checkout differs.'
-        );
-        assertHistoricalWarmVerifier(workspace, runtime, historicalWarmCommit);
-      }
-    }
+    if (warm) await verifyWarmRuntime();
     const persistentPath = warm ? 'persistent-warm-archive.spec.ts' : 'persistent-public-archive.spec.ts';
     const [file, metadata, config, runtime, derivation, pinnedRuntime, pinnedDerivation] = await Promise.all([
       readFile(join(scratch, persistentPath)),
