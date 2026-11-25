@@ -13,6 +13,7 @@ import {
 import {assertEvidenceArchive, cleanSourceCommit, record, sha256} from './curated-gpu-evidence.mts';
 import {verifyTvmBuildEvidence} from './tvm-build-evidence.ts';
 import {collectReleaseEvidenceInputs, type ArchiveInfo} from './verify-release-evidence.ts';
+import {mapikaCurrentPin, verifyMapikaCurrentSource} from './mapika-current-evidence.mts';
 
 const workspaceRoot = fileURLToPath(new URL('../../', import.meta.url));
 const packageRoot = join(workspaceRoot, 'packages/web-decision');
@@ -134,14 +135,19 @@ async function readReference(path: string, digest: string): Promise<Buffer> {
   return bytes;
 }
 
-async function assertConversionInputs(): Promise<void> {
+async function assertConversionInputs(inputRoot = workspaceRoot, current = false): Promise<void> {
   for (const input of [...conversion.recipe, ...conversion.config]) {
-    const bytes = await readFile(join(workspaceRoot, input.path));
+    const bytes = await readFile(join(inputRoot, input.path));
     assert.equal(sha256(bytes), input.sha256, `Mapika conversion input changed: ${input.path}`);
   }
   for (const input of conversion.releaseEvidenceInputs) {
-    const bytes = await readFile(join(workspaceRoot, input.path));
-    assert.equal(sha256(bytes), input.sha256, `Mapika release evidence input changed: ${input.path}`);
+    const bytes = await readFile(join(inputRoot, input.path));
+    let expected = input.sha256;
+    if (current && input.path === 'tests/browser/vite.config.ts') {
+      assert.equal(expected, mapikaCurrentPin.historicalViteSha256, 'Mapika historical Vite pin changed');
+      expected = mapikaCurrentPin.testedViteSha256;
+    }
+    assert.equal(sha256(bytes), expected, `Mapika release evidence input changed: ${input.path}`);
   }
 }
 
@@ -150,15 +156,24 @@ export async function verifyMapikaReleaseEvidence(options: {
   installedPackagePath: string;
   reportPath: string;
   buildEvidencePath: string;
+  currentTestedSource?: string;
 }) {
-  const {archive, models} = await collectReleaseEvidenceInputs(options);
+  const testedRoot = options.currentTestedSource ? resolve(options.currentTestedSource) : workspaceRoot;
+  const current = options.currentTestedSource ? await verifyMapikaCurrentSource(testedRoot, workspaceRoot) : undefined;
+  const {archive, models} = await collectReleaseEvidenceInputs({
+    ...options,
+    workspaceRoot: testedRoot,
+    sourcePackageRoot: join(testedRoot, 'packages/web-decision')
+  });
+  if (current)
+    assert.equal(archive.archiveSha256, mapikaCurrentPin.archiveSha256, 'Unexpected current candidate archive');
   const installedMetadata = JSON.parse(await readFile(join(archive.installedRoot, 'package.json'), 'utf8')) as {
     private?: boolean;
   };
   assert.notEqual(installedMetadata.private, true, 'A private package cannot be used as Mapika release evidence.');
   const model = models.find((item) => item.modelId === modelId);
   assert.ok(model, 'The public package must expose the curated Mapika model.');
-  await assertConversionInputs();
+  await assertConversionInputs(testedRoot, !!current);
   await readReference('scripts/mapika/reference-fp32-prepared.json', referencePins.preparedSha256);
   const answers = await readReference('scripts/mapika/reference-fp32-answers.json', referencePins.answersSha256);
   const report = await readFile(options.reportPath);
@@ -166,16 +181,22 @@ export async function verifyMapikaReleaseEvidence(options: {
   const data = record(JSON.parse(report.toString('utf8')), 'Invalid Mapika GPU evidence.');
   assert.equal(
     data.sourceCommit,
-    cleanSourceCommit(workspaceRoot),
+    current?.testedCommit ?? cleanSourceCommit(workspaceRoot),
     'Mapika GPU evidence refers to a different source commit.'
   );
   assertMapikaReleaseRecord(data, archive, source, model.backend.requiredLimits);
   const build = await verifyTvmBuildEvidence(
     options.buildEvidencePath,
     [mapikaBuildModel()],
-    [packageRoot, archive.installedRoot]
+    [packageRoot, join(testedRoot, 'packages/web-decision'), archive.installedRoot]
   );
-  return {modelId, archiveSha256: archive.archiveSha256, reportSha256: sha256(report), build};
+  return {
+    modelId,
+    archiveSha256: archive.archiveSha256,
+    reportSha256: sha256(report),
+    build,
+    ...(current ? {current} : {})
+  };
 }
 
 function mapikaBuildModel() {
@@ -204,16 +225,30 @@ function mapikaBuildModel() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [archivePath, installedPackagePath, reportPath, buildEvidencePath] = process.argv.slice(2);
+  const [
+    archivePath,
+    installedPackagePath,
+    reportPath,
+    buildEvidencePath,
+    currentOption,
+    currentTestedSource,
+    ...extra
+  ] = process.argv.slice(2);
   assert.ok(
     archivePath && installedPackagePath && reportPath && buildEvidencePath,
     'Expected archive, installed package, GPU report and TVM build evidence.'
+  );
+  assert.ok(
+    extra.length === 0 &&
+      (currentOption === undefined || (currentOption === '--current-tested-source' && currentTestedSource)),
+    'Invalid optional current source.'
   );
   const evidence = await verifyMapikaReleaseEvidence({
     archivePath,
     installedPackagePath,
     reportPath,
-    buildEvidencePath
+    buildEvidencePath,
+    ...(currentTestedSource ? {currentTestedSource} : {})
   });
   console.log(JSON.stringify(evidence, null, 2));
 }
