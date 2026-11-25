@@ -8,6 +8,9 @@ const existingTest = ' scripts/release/strands-gemma4-v2-release-evidence.test.m
 const splitTests =
   'scripts/release/strands-gemma4-v2-split-evidence.test.mts ' +
   'scripts/release/strands-gemma4-v2-split-source.test.mts ';
+const pythonWorkflows = ['.github/workflows/python-quality.yml', '.github/workflows/release-checks.yml'];
+const invalidPythonPin = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97b';
+const correctedPythonPin = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97';
 
 // Only release verification code and its tests may differ from the tested package source.
 const allowed = new Set([
@@ -72,9 +75,29 @@ export function assertSplitVerifierSource(root: string, testedCommit: string, ve
     .filter(Boolean);
   for (const path of changes)
     assert.ok(
-      path === 'package.json' || allowed.has(path),
+      path === 'package.json' || allowed.has(path) || pythonWorkflows.includes(path),
       `Tested source differs outside release verification: ${path}`
     );
+  const changedWorkflows = pythonWorkflows.filter((path) => changes.includes(path));
+  if (changedWorkflows.length) {
+    assert.deepEqual(changedWorkflows, pythonWorkflows, 'Both Python workflow pins must be corrected together.');
+    for (const path of changedWorkflows) {
+      const show = (commit: string) =>
+        execFileSync(
+          'git',
+          ['--no-optional-locks', '--no-replace-objects', 'show', `${commit}:${path}`],
+          options
+        ).toString('utf8');
+      const before = show(testedCommit);
+      const after = show(verifierCommit);
+      assert.equal(before.split(invalidPythonPin).length, 2, `Unexpected original Python pin: ${path}`);
+      assert.equal(
+        after,
+        before.replace(invalidPythonPin, correctedPythonPin),
+        `Unexpected Python workflow change: ${path}`
+      );
+    }
+  }
   if (changes.includes('package.json')) {
     const read = (commit: string) =>
       execFileSync(

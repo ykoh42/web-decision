@@ -123,3 +123,48 @@ test('combined Mapika and Gemma verifier changes leave the tested source intact'
     await rm(root, {recursive: true, force: true});
   }
 });
+
+test('both Python workflow changes must be the exact pinned SHA correction', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'python-pin-source-'));
+  const git = (...args: string[]) =>
+    execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe']})
+      .toString()
+      .trim();
+  const old = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97b';
+  const correct = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97';
+  const paths = ['.github/workflows/python-quality.yml', '.github/workflows/release-checks.yml'];
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'test');
+    await mkdir(join(root, '.github/workflows'), {recursive: true});
+    for (const path of paths) await writeFile(join(root, path), `- uses: ${old}\n`);
+    git('add', '.');
+    git('commit', '-m', 'tested');
+    const tested = git('rev-parse', 'HEAD');
+    await writeFile(join(root, paths[0]!), `- uses: ${correct}\n`);
+    git('add', '.');
+    git('commit', '-m', 'one correction');
+    assert.throws(() => assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')), /Both Python workflow pins/);
+    await writeFile(join(root, paths[1]!), `- uses: ${correct}\n`);
+    git('add', '.');
+    git('commit', '-m', 'both corrections');
+    assert.deepEqual(assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')).verificationFiles, paths);
+    await writeFile(join(root, paths[0]!), `- uses: ${correct}\nextra: changed\n`);
+    git('add', '.');
+    git('commit', '-m', 'unrelated change');
+    assert.throws(
+      () => assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')),
+      /Unexpected Python workflow change/
+    );
+    await writeFile(join(root, paths[0]!), '- uses: actions/setup-python@0000000000000000000000000000000000000000\n');
+    git('add', '.');
+    git('commit', '-m', 'wrong pin');
+    assert.throws(
+      () => assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')),
+      /Unexpected Python workflow change/
+    );
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
