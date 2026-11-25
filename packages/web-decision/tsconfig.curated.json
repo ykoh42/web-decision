@@ -93,6 +93,7 @@
     "test/tinydecide.test.mts",
     "test/strands-gemma4-runner.test.mts",
     "test/strands-gemma4-session.test.mts",
+    "test/strands-gemma4-v1-resident.test.mts",
     "test/strands-loader-entry.test.mts",
     "test/strands-manifest.test.mts",
     "test/strands-options.test.mts",

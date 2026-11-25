@@ -1,10 +1,10 @@
-import {openAssetCache, readVerifiedAsset, type AssetFileManifest} from '../assets.js';
+import {openAssetCache, readVerifiedAsset, waitForAbort, type AssetFileManifest} from '../assets.js';
 import {WebDecisionError} from '../kev.js';
 import type {ModelProgress} from '../curated/types.js';
 import {createPolyfillWASI, instantiate} from '../runtime/tvm.generated.mjs';
 import type {DLDevice, Instance, Tensor, VirtualMachine} from '../runtime/tvm-types.js';
 import {withGemma4V2Cleanup} from './gemma4-v2-cleanup.mjs';
-import {withGemma4V2GpuErrors, watchGemma4V2Device} from './gemma4-v2-gpu-errors.mjs';
+import {disposeGemma4V2Runtime, withGemma4V2GpuErrors, watchGemma4V2Device} from './gemma4-v2-gpu-errors.mjs';
 import {
   createGemma4V1Decoder,
   type Gemma4V1Graph,
@@ -64,19 +64,19 @@ export function createGemma4V1TvmStages(
   }
 
   async function releaseCachedMemory() {
-    if (vm && !lifecycle?.lost) {
-      await device.sync();
-      runtime.endScope();
-    }
+    if (!vm) return;
+    if (!lifecycle?.lost) await device.sync();
+    // The pinned TVM implementation pops the scope before disposing its VM.
     vm = undefined;
+    if (!lifecycle?.lost) runtime.endScope();
   }
 
   return {
     async withWeights(weights, caller, operation) {
       const signal = lifecycle ? AbortSignal.any([lifecycle.signal, caller]) : caller;
       signal.throwIfAborted();
-      const machine = getVm();
       const execute = async () => {
+        const machine = getVm();
         const resident = new Map<Gemma4V1HostTensor, Tensor>();
         let residentScope = false;
         const releaseResident = () => {
@@ -147,19 +147,16 @@ export function createGemma4V1TvmStages(
       return gpu ? withGemma4V2GpuErrors(gpu, execute) : execute();
     },
     releaseCachedMemory,
-    async dispose() {
-      try {
-        if (!lifecycle?.lost) {
-          try {
-            await releaseCachedMemory();
-          } finally {
-            runtime.dispose();
-          }
+    dispose() {
+      return withGemma4V2Cleanup(releaseCachedMemory, () => {
+        try {
+          // Its own device-loss callback disposes TVM when the fence loses the device.
+          if (!lifecycle?.lost) runtime.dispose();
+        } finally {
+          lifecycle?.close();
+          gpu?.destroy();
         }
-      } finally {
-        lifecycle?.close();
-        gpu?.destroy();
-      }
+      });
     }
   };
 }
@@ -189,19 +186,35 @@ export function checkGemma4V1Buffer(
     );
 }
 
-async function requestGpu(maxLength: number) {
-  const adapter = await globalThis.navigator?.gpu?.requestAdapter({powerPreference: 'high-performance'});
+async function requestGpu(maxLength: number, signal?: AbortSignal) {
+  let adapter;
+  try {
+    adapter = await waitForAbort(
+      () => globalThis.navigator?.gpu?.requestAdapter({powerPreference: 'high-performance'}),
+      signal
+    );
+  } catch (cause) {
+    signal?.throwIfAborted();
+    throw new WebDecisionError('DEVICE_RESOURCE_LIMIT', 'Could not acquire a WebGPU adapter.', {cause});
+  }
+  signal?.throwIfAborted();
   if (!adapter) throw new WebDecisionError('DEVICE_RESOURCE_LIMIT', 'A WebGPU adapter is unavailable.');
   checkGemma4V1Buffer(adapter.limits, STRANDS_GEMMA4_MAX_LENGTH);
   const bytes = gemma4V1AllocationBytes(maxLength);
   try {
-    return await adapter.requestDevice({
-      requiredLimits: {
-        maxBufferSize: Math.min(bytes, adapter.limits.maxBufferSize),
-        maxStorageBufferBindingSize: Math.min(bytes, adapter.limits.maxStorageBufferBindingSize)
-      }
-    });
+    return await waitForAbort(
+      () =>
+        adapter.requestDevice({
+          requiredLimits: {
+            maxBufferSize: Math.min(bytes, adapter.limits.maxBufferSize),
+            maxStorageBufferBindingSize: Math.min(bytes, adapter.limits.maxStorageBufferBindingSize)
+          }
+        }),
+      signal,
+      (late) => late.destroy()
+    );
   } catch (cause) {
+    signal?.throwIfAborted();
     throw new WebDecisionError('DEVICE_RESOURCE_LIMIT', 'Could not acquire the required WebGPU device.', {cause});
   }
 }
@@ -272,11 +285,16 @@ export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManife
     throw new WebDecisionError('ASSET_LOAD_FAILED', 'Gemma 4 v1 offline weights are incomplete.');
   const tokenizer = new Tokenizer(text(tokenBytes!), text(tokenizerConfig!));
   signal?.throwIfAborted();
-  const gpu = await requestGpu(maxLength);
+  const gpu = await requestGpu(maxLength, signal);
   let runtime: Instance | undefined;
   try {
     signal?.throwIfAborted();
-    runtime = await instantiate(wasm!, createPolyfillWASI());
+    runtime = await waitForAbort(
+      () => instantiate(wasm!, createPolyfillWASI()),
+      signal,
+      (late) => late.dispose()
+    );
+    signal?.throwIfAborted();
     runtime.initWebGPU(gpu);
     const stages = createGemma4V1TvmStages(runtime, runtime.webgpu(), source, gpu);
     const decoder = createGemma4V1Decoder(graph, stages, source, (tokens) => checkGemma4V1Buffer(gpu.limits, tokens));
@@ -308,11 +326,11 @@ export async function loadGemma4V1(urls: RuntimeAssetUrls, pins: AssetFileManife
       }
     };
   } catch (error) {
-    try {
-      runtime?.dispose();
-    } finally {
-      gpu.destroy();
-    }
-    throw error;
+    return withGemma4V2Cleanup(
+      async () => {
+        throw error;
+      },
+      () => disposeGemma4V2Runtime(runtime, gpu, false)
+    );
   }
 }

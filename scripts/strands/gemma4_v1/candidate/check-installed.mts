@@ -7,6 +7,7 @@ import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {APPROVED_MODEL_IDS} from '../../../../packages/web-decision/src/catalog/public-catalog.generated.ts';
 import {build} from 'vite';
+import {checkGemma4V1StartupCancellation} from './check-startup.mjs';
 import {verifyArchiveInstall} from '../../../release/verify-release-evidence.ts';
 
 const reportPath = resolve(process.argv[2]!);
@@ -124,6 +125,8 @@ try {
   assert.deepEqual(requests, []);
   bad = true;
   await assert.rejects(loadDecisionModel({modelId, cache: false}), /integrity/i);
+  bad = false;
+  await checkGemma4V1StartupCancellation(loadDecisionModel, modelId);
 } finally {
   globalThis.fetch = priorFetch;
   if (cacheDescriptor) Object.defineProperty(globalThis, 'caches', cacheDescriptor);
@@ -196,6 +199,7 @@ console.log(
     tamperedGraphRejected: true,
     installedTypes: true,
     browserConsumerBuild: true,
+    startupCancellationAndLateDeviceCleanup: true,
     noGpuReported: true,
     gpuExecuted: false
   })

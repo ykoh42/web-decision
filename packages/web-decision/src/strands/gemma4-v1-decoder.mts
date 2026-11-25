@@ -283,7 +283,7 @@ export function createGemma4V1Decoder(
 
   return {
     async run(state, questions, signal, usePrefixCache = true) {
-      const largest = state.length + Math.max(...questions.map(({ids}) => ids.length));
+      const largest = state.length + questions.reduce((longest, {ids}) => Math.max(longest, ids.length), 0);
       checkDevice(largest);
       const prefix =
         usePrefixCache && questions.length > 1 ? (await decodeChunks(state, [], signal)).prefix : undefined;

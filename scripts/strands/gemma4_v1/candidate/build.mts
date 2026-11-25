@@ -42,7 +42,21 @@ const assets = Object.fromEntries(
   Object.entries(assetBytes).map(([name, bytes]) => [name, {bytes: bytes.length, sha256: digest(bytes)}])
 );
 for (const [name, pin] of Object.entries(expected)) assert.equal(assets[name]?.sha256, pin, name);
-const graph = JSON.parse(await readFile(files['graph.json'], 'utf8'));
+const graphJson = assetBytes['graph.json']!.toString('utf8');
+const graph = JSON.parse(graphJson);
+assert.deepEqual(graph.source, source);
+// Bind the exact converter output. Only the separately checked clean source receipt
+// changes when the same graph is rebuilt from a different checkout revision.
+const normalizedGraph = graphJson.replace(
+  `"source":{"clean":true,"commit":"${source.commit}"}`,
+  `"source":{"clean":true,"commit":"${'0'.repeat(40)}"}`
+);
+const graphBindingsSha256 = digest(Buffer.from(normalizedGraph));
+assert.equal(
+  graphBindingsSha256,
+  'cd4fcac071875f1ea9b6d46d2f71d99635aad2ede1f249863b73d35b030114b2',
+  'Gemma 4 v1 graph bindings differ from the exact independently pinned converter output.'
+);
 assert.equal(graph.format, 'web-decision-gemma4-e2b-v1-graph-v1');
 assert.equal(graph.archiveApproved, false);
 assert.equal(graph.target, 'webgpu-wasm');
@@ -51,7 +65,6 @@ assert.equal(graph.graphSha256, assets['graph.wasm']?.sha256);
 assert.equal(graph.inventorySha256, assets['source-inventory.json']?.sha256);
 assert.equal(graph.layers.length, 35);
 assert.equal(graph.maxLength, 131_072);
-assert.deepEqual(graph.source, source);
 const license = await readFile(join(official, 'LICENSE.md'));
 assert.equal(digest(license), '0a526e4695eb2b9e8cd57655446ed77c3d4a35e55165f434ee5479071ce44ca0');
 await mkdir(output);
@@ -136,6 +149,7 @@ const report = {
   source,
   modelId,
   manifestSha256,
+  graphBindingsSha256,
   assets,
   archive
 };

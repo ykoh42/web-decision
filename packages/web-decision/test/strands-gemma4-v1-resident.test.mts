@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {DLDevice, Instance} from '../src/runtime/tvm-types.js';
+import {createGemma4V1Decoder, type Gemma4V1Graph} from '../src/strands/gemma4-v1-decoder.mjs';
 import {createGemma4V1TvmStages} from '../src/strands/gemma4-v1-runtime.mjs';
 
 function observeStages(failSyncAt?: number) {
   const copies: number[] = [];
   const calls: DemoTensor[][] = [];
   const scopes: DemoTensor[][] = [];
+  let failVmRelease = false;
   class DemoTensor {
     readonly dtype = 'float32';
     value = 0;
@@ -45,10 +47,13 @@ function observeStages(failSyncAt?: number) {
     },
     endScope() {
       for (const tensor of scopes.pop()!) tensor.disposed = true;
+      if (!scopes.length && failVmRelease) throw Error('VM cleanup failed after scope popped');
     },
     createVirtualMachine() {
+      const vmScope = scopes.at(-1)!;
       return {
         getFunction(name: string) {
+          assert.ok(scopes.includes(vmScope), 'Retried a VM from a released scope.');
           return (...inputs: DemoTensor[]) => {
             assert.equal(
               inputs.some((tensor) => tensor.disposed),
@@ -68,7 +73,15 @@ function observeStages(failSyncAt?: number) {
     dispose: () => assert.deepEqual(scopes, [])
   } as unknown as Instance;
   const source = {tensor: async () => assert.fail('No model weights should be read')};
-  return {copies, calls, scopes, stages: createGemma4V1TvmStages(runtime, device, source)};
+  return {
+    copies,
+    calls,
+    scopes,
+    stages: createGemma4V1TvmStages(runtime, device, source),
+    failNextVmRelease(value: boolean) {
+      failVmRelease = value;
+    }
+  };
 }
 
 const input = (value: number, reuseWithinLayer = false) => ({
@@ -160,4 +173,101 @@ test('a failed call synchronization unwinds all three scopes in order', async ()
   assert.equal(calls[0]![0]!.disposed, true);
   await stages.withWeights({}, new AbortController().signal, async (call) => call('attention', [key], true));
   await stages.dispose();
+});
+
+test('recreates the VM after scope release throws after popping the scope', async () => {
+  const {stages, failNextVmRelease} = observeStages();
+  const signal = new AbortController().signal;
+  const invoke = () => stages.withWeights({}, signal, (call) => call('attention', [input(1)]));
+  await invoke();
+  failNextVmRelease(true);
+  await assert.rejects(async () => stages.releaseCachedMemory(), /VM cleanup failed after scope popped/);
+  failNextVmRelease(false);
+  await invoke();
+  await stages.dispose();
+});
+
+test('leaves TVM auto-disposal in charge when the device is lost during the final fence', async () => {
+  let lose!: () => void;
+  const lost = new Promise<void>((resolve) => {
+    lose = resolve;
+  });
+  let disposalCount = 0;
+  let destructionCount = 0;
+  let depth = 0;
+  let loseOnSync = false;
+  const runtime = {
+    beginScope: () => {
+      depth++;
+    },
+    endScope() {
+      assert.ok(depth > 0, 'Runtime scope already cleared on device loss.');
+      depth--;
+    },
+    createVirtualMachine: () => ({}),
+    dispose: () => {
+      disposalCount++;
+      depth = 0;
+    }
+  } as unknown as Instance;
+  // initWebGPU attaches TVM's own disposal callback before the model attaches its observer.
+  void lost.then(() => runtime.dispose());
+  const gpu = {
+    lost,
+    pushErrorScope() {},
+    popErrorScope: async () => null,
+    destroy() {
+      destructionCount++;
+    }
+  } as unknown as GPUDevice;
+  const device = {
+    async sync() {
+      if (loseOnSync) {
+        lose();
+        await lost;
+      }
+    }
+  } as unknown as DLDevice;
+  const stages = createGemma4V1TvmStages(runtime, device, {tensor: async () => assert.fail('Unexpected weights')}, gpu);
+  await stages.withWeights({}, new AbortController().signal, async () => {});
+  assert.equal(depth, 1);
+  loseOnSync = true;
+  await stages.dispose();
+  assert.equal(disposalCount, 1);
+  assert.equal(destructionCount, 1);
+});
+
+test('checks a large question batch without spreading user input into a function call', async () => {
+  const graph: Gemma4V1Graph = {
+    maxLength: 131_072,
+    layers: Array.from({length: 35}, () => ({
+      family: 'local_owner',
+      producer: null,
+      window: 512,
+      project: [],
+      tail: []
+    })),
+    final: [],
+    ple: [],
+    rope: {sliding_attention: [], full_attention: []}
+  };
+  const rejected = Error('Device check reached');
+  const decoder = createGemma4V1Decoder(
+    graph,
+    {withWeights: async () => assert.fail('No GPU dispatch expected'), releaseCachedMemory() {}, dispose() {}},
+    {rows: async () => assert.fail('No weight fetch expected')},
+    (length) => {
+      assert.equal(length, 4);
+      throw rejected;
+    }
+  );
+  const question = {ids: [1, 2, 3], optionIndices: [1], answerIndex: 2};
+  await assert.rejects(
+    decoder.run(
+      [0],
+      Array.from({length: 200_000}, () => question),
+      new AbortController().signal
+    ),
+    rejected
+  );
 });
