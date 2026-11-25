@@ -372,14 +372,18 @@ function pngCrc(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function pngWithImageData(bytes: Uint8Array, imageData: Uint8Array): Uint8Array {
-  const compressed = zlibSync(imageData);
-  const chunk = new Uint8Array(compressed.length + 12);
+function encodePngChunk(type: 'IDAT' | 'PLTE' | 'tRNS', data: Uint8Array): Uint8Array {
+  const chunk = new Uint8Array(data.length + 12);
   const view = new DataView(chunk.buffer);
-  view.setUint32(0, compressed.length);
-  chunk.set([73, 68, 65, 84], 4);
-  chunk.set(compressed, 8);
+  view.setUint32(0, data.length);
+  for (let index = 0; index < 4; index++) chunk[4 + index] = type.charCodeAt(index);
+  chunk.set(data, 8);
   view.setUint32(chunk.length - 4, pngCrc(chunk.subarray(4, chunk.length - 4)));
+  return chunk;
+}
+
+function pngWithImageData(bytes: Uint8Array, imageData: Uint8Array): Uint8Array {
+  const chunk = encodePngChunk('IDAT', zlibSync(imageData));
   const parts: Uint8Array[] = [bytes.subarray(0, 8)];
   let added = false;
   for (const {type, data} of pngChunks(bytes)) {
@@ -393,16 +397,27 @@ function pngWithImageData(bytes: Uint8Array, imageData: Uint8Array): Uint8Array 
 
 const PNG_BITMAP_CHUNKS = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND']);
 
+function defaultPngPalette(entries: number, alpha?: Uint8Array): Uint8Array[] {
+  // Pillow uses opaque black for every entry before applying tRNS when PLTE is missing.
+  const palette = [encodePngChunk('PLTE', new Uint8Array(entries * 3))];
+  if (alpha?.length) palette.push(encodePngChunk('tRNS', alpha.subarray(0, entries)));
+  return palette;
+}
+
 function packedAdam7Bitmap(bytes: Uint8Array): Uint8Array {
   const parts = [bytes.subarray(0, 8)];
   const indexed = bytes[25] === 3;
-  for (const {type, data} of pngChunks(bytes)) {
+  const chunks = [...pngChunks(bytes)];
+  const defaultPalette = indexed && !chunks.some(({type}) => type === 'PLTE');
+  for (const {type, data} of chunks) {
     const chunk = wholePngChunk(bytes, data);
     if (pngCrc(chunk.subarray(4, -4)) !== readU32(chunk, chunk.length - 4))
       throw new TypeError(`PNG ${type} chunk checksum is invalid.`);
     // Pillow composites indexed transparency. Plain grayscale keeps its sample values.
-    if (PNG_BITMAP_CHUNKS.has(type) || (indexed && type === 'tRNS')) parts.push(chunk);
+    if (PNG_BITMAP_CHUNKS.has(type) || (indexed && !defaultPalette && type === 'tRNS')) parts.push(chunk);
   }
+  if (defaultPalette)
+    parts.splice(2, 0, ...defaultPngPalette(1 << bytes[24]!, chunks.find(({type}) => type === 'tRNS')?.data));
   // Keep orientation and other metadata in the original PNG, outside the pixel decoder.
   return joinPngChunks(parts);
 }

@@ -89,5 +89,61 @@
     "height": 19,
     "base64": "iVBORw0KGgoAAAANSUhEUgAAABMAAAALBAMAAAEY/JufAAAAGmVYSWZNTQAqAAAACAABARIAAwAAAAEABgAAAAAAANZnS2kAAAAwUExURSA/Xn2cu9r5GDdWdZSz0vEQL05tjKvK6QgnRmWEo8LhAB8+XXybutn4FzZVdJOy0WIcY+QAAAAQdFJOUwDIAMgAyADIAMgAyADIAMgm2YyiAAAAcElEQVR4nGPgYGBoaGA4wuDD4HDCgeFV0gOGZXoLGJJeJTAseaGTsIThgUrGmgcMQNYLHYa/O0sNPzD8tC3c+oHh68Zayw8MH00r935AEb8uHT8ZjAUYymGggEH88vxoML7AsN0eCg0YwmffFwbjCQBZBjvYk2wk2wAAAABJRU5ErkJggg==",
     "pillowRgbSha256": "69bfe10c45d94d48bc450dc2a13e76940045fc00cd14df56d323b0313f86909b"
+  },
+  {
+    "name": "adam7-missing-plte-1-2x1-opaque",
+    "width": 2,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABAQMAAAG5691fAAAADElEQVR4nGNgYGgAAACEAIHJde6SAAAAAElFTkSuQmCC",
+    "pillowRgbSha256": "b0f66adc83641586656866813fd9dd0b8ebb63796075661ba45d1aa8089e1d44"
+  },
+  {
+    "name": "adam7-missing-plte-1-2x1-single",
+    "width": 2,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABAQMAAAG5691fAAAAAnRSTlP/AOW3MEoAAAAMSURBVHicY2BgaAAAAIQAgcl17pIAAAAASUVORK5CYII=",
+    "pillowRgbSha256": "69e4feee9a9dde3fea79f57bf1ac68614581c26bc7562a37ffafce61095e7f61"
+  },
+  {
+    "name": "adam7-missing-plte-2-4x1-opaque",
+    "width": 4,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABAgMAAAHzVdfIAAAADklEQVR4nGNgYGhgKAAAAfYA8Q575kUAAAAASUVORK5CYII=",
+    "pillowRgbSha256": "15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b"
+  },
+  {
+    "name": "adam7-missing-plte-2-4x1-short",
+    "width": 4,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABAgMAAAHzVdfIAAAAAXRSTlMqm10RsAAAAA5JREFUeJxjYGBoYCgAAAH2APEOe+ZFAAAAAElFTkSuQmCC",
+    "pillowRgbSha256": "efb1337cbf0e24cb9000ba93351f51e2062f5811a8edd4d92d5245759ddf1932"
+  },
+  {
+    "name": "adam7-missing-plte-2-4x1-empty",
+    "width": 4,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABAgMAAAHzVdfIAAAAAHRSTlM2uXDMAAAADklEQVR4nGNgYGhgKAAAAfYA8Q575kUAAAAASUVORK5CYII=",
+    "pillowRgbSha256": "15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b"
+  },
+  {
+    "name": "adam7-missing-plte-4-16x1-opaque",
+    "width": 16,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAABAAAAABBAMAAAFSUAP6AAAAFElEQVR4nGPgYPBhUFvHIBw++z4AC5QDDUVHQHUAAAAASUVORK5CYII=",
+    "pillowRgbSha256": "17b0761f87b081d5cf10757ccc89f12be355c70e2e29df288b65b30710dcbcd1"
+  },
+  {
+    "name": "adam7-missing-plte-4-16x1-partial",
+    "width": 16,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAABAAAAABBAMAAAFSUAP6AAAABHRSTlMAf/4f6wmIMQAAABRJREFUeJxj4GDwYVBbxyAcPvs+AAuUAw1FR0B1AAAAAElFTkSuQmCC",
+    "pillowRgbSha256": "77e7e028a060262f608a4d004efadaf0e6ec23290820548cbb658b4f3c0827bd"
+  },
+  {
+    "name": "adam7-missing-plte-4-16x1-long",
+    "width": 16,
+    "height": 1,
+    "base64": "iVBORw0KGgoAAAANSUhEUgAAABAAAAABBAMAAAFSUAP6AAAAIHRSTlMAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHx8UIeEAAAAUSURBVHicY+Bg8GFQW8cgHD77PgALlAMNRUdAdQAAAABJRU5ErkJggg==",
+    "pillowRgbSha256": "0796b4f446e28de5523f17c33ec0777ee181cf5a39801440142ce7e9c467285e"
   }
 ]
