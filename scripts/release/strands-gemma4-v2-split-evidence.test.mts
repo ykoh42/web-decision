@@ -321,6 +321,17 @@ test('Vite replay remains separately pinned and fails closed on wrong provenance
     {assets: report.assets.slice(1)}
   ])
     assert.throws(() => assertViteReplayRecord({...report, ...mutation}, expected));
+  const bfaExpected = {...expected, archiveSha256: gemmaSplitCandidate.archive.sha256};
+  const bfa = {
+    ...report,
+    archiveSha256: bfaExpected.archiveSha256,
+    archiveModules: 28,
+    matchedModules: 29,
+    modules: Array.from({length: 29}, () => ({}))
+  };
+  assert.doesNotThrow(() => assertViteReplayRecord(bfa, bfaExpected));
+  assert.throws(() => assertViteReplayRecord({...bfa, matchedModules: 28}, bfaExpected));
+  assert.throws(() => assertViteReplayRecord({...bfa, modules: bfa.modules.slice(1)}, bfaExpected));
 });
 
 test('the reviewed Vite replay and script have independent required digests', async () => {
@@ -339,7 +350,22 @@ test('the reviewed Vite replay and script have independent required digests', as
   assert.throws(() => assertViteReplayPins(pinned, '0'.repeat(64)), /No reviewed Vite replay is pinned for archive/);
   assert.throws(
     () => assertViteReplayPins(pinned, gemmaSplitCandidate.archive.sha256),
-    /No reviewed Vite replay is pinned for archive/
+    /Unreviewed Vite replay report/
+  );
+  const current = await import('./strands-gemma4-v2-vite-replay.mjs');
+  assert.doesNotThrow(() =>
+    assertViteReplayPins(
+      {reportSha256: current.BFA_VITE_REPLAY_SHA256, scriptSha256: current.BFA_VITE_REPLAY_SCRIPT_SHA256},
+      current.BFA_VITE_REPLAY_ARCHIVE_SHA256
+    )
+  );
+  assert.throws(
+    () =>
+      assertViteReplayPins(
+        {reportSha256: current.BFA_VITE_REPLAY_SHA256, scriptSha256: VITE_REPLAY_SCRIPT_SHA256},
+        current.BFA_VITE_REPLAY_ARCHIVE_SHA256
+      ),
+    /Unreviewed Vite replay script/
   );
 });
 

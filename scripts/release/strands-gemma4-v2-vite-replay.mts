@@ -11,6 +11,9 @@ import type {ArchiveInfo} from './verify-release-evidence.ts';
 export const VITE_REPLAY_ARCHIVE_SHA256 = '7c3bb65bdd8a4f3195a613435f6d2a23c8699ff0c435db4614e6d2a88af78edd';
 export const VITE_REPLAY_SHA256 = '75733072d30f51ea8175be8430a2b4204249db6c77d725ae80be00fc73ae1adb';
 export const VITE_REPLAY_SCRIPT_SHA256 = 'fd751409831f39dbf935ee76d9d26fe84cf71a853c152bbce61dfe097b9d03b0';
+export const BFA_VITE_REPLAY_ARCHIVE_SHA256 = 'bfa9922b25a32e37d09783b67ad26b4c9284432095c5feb307d243857c0c768a';
+export const BFA_VITE_REPLAY_SHA256 = 'c490c9475b0207a3efc1cb8035988c935c69f4d24dca9c10fc61966541b2b7d4';
+export const BFA_VITE_REPLAY_SCRIPT_SHA256 = '14670c5bbe1320b8a0f08a7abe926141951e04d917a9fbd05a36e0f6240fd024';
 const sourceFiles = [
   'tests/browser/vite.config.ts',
   'tests/browser/index.html',
@@ -46,17 +49,19 @@ export function assertViteReplayRecord(
   assert.equal(data.parserVersion, '8.19.0');
   assert.equal(data.tokenizerSha256, gemmaV2ArchiveTokenizerSha256);
   assert.deepEqual(data.issues, []);
-  assert.equal(data.archiveModules, 27);
-  assert.equal(data.matchedModules, 28);
+  const bfa = expected.archiveSha256 === BFA_VITE_REPLAY_ARCHIVE_SHA256;
+  assert.equal(data.archiveModules, bfa ? 28 : 27);
+  assert.equal(data.matchedModules, bfa ? 29 : 28);
   const shell = record(data.devShell, 'Missing Vite replay shell.');
   assert.equal(shell.entryImportsExactInstalledBundle, true);
   assert.deepEqual(shell.pageModuleScripts, ['/@vite/client', '/harness.ts']);
-  assert.ok(Array.isArray(data.modules) && data.modules.length === 28);
+  assert.ok(Array.isArray(data.modules) && data.modules.length === (bfa ? 29 : 28));
   assert.ok(Array.isArray(data.assets) && data.assets.length === 17);
 }
 
 const reviewedReplays = new Map([
   [VITE_REPLAY_ARCHIVE_SHA256, {reportSha256: VITE_REPLAY_SHA256, scriptSha256: VITE_REPLAY_SCRIPT_SHA256}],
+  [BFA_VITE_REPLAY_ARCHIVE_SHA256, {reportSha256: BFA_VITE_REPLAY_SHA256, scriptSha256: BFA_VITE_REPLAY_SCRIPT_SHA256}],
   [
     'e729bb940f5361e56ebc367f26b515f0c36a904fd5d1544064751f9dce4c698f',
     {
