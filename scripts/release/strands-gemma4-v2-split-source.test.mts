@@ -1,10 +1,57 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtemp, mkdir, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import {assertSplitVerifierSource} from './strands-gemma4-v2-split-source.mts';
+
+test('only the exact pinned Kanana evidence file may be added', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kanana-evidence-source-'));
+  const git = (...args: string[]) =>
+    execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe']})
+      .toString()
+      .trim();
+  const path =
+    'scripts/release/evidence/kanana-current/bfa9922b25a32e37d09783b67ad26b4c9284432095c5feb307d243857c0c768a.json';
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'test');
+    await writeFile(join(root, 'source.txt'), 'tested');
+    git('add', '.');
+    git('commit', '-m', 'tested');
+    const tested = git('rev-parse', 'HEAD');
+    await mkdir(join(root, 'scripts/release/evidence/kanana-current'), {recursive: true});
+    const evidence = await readFile(
+      new URL(
+        './evidence/kanana-current/bfa9922b25a32e37d09783b67ad26b4c9284432095c5feb307d243857c0c768a.json',
+        import.meta.url
+      )
+    );
+    await writeFile(join(root, path), evidence);
+    git('add', '.');
+    git('commit', '-m', 'pinned evidence');
+    assert.deepEqual(assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')).verificationFiles, [path]);
+    await writeFile(join(root, path), Buffer.concat([evidence, Buffer.from(' ')]));
+    git('add', '.');
+    git('commit', '-m', 'alter evidence');
+    assert.throws(
+      () => assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')),
+      /Unexpected Kanana evidence bytes/
+    );
+    await writeFile(join(root, path), evidence);
+    await writeFile(join(root, 'scripts/release/evidence/kanana-current/other.json'), evidence);
+    git('add', '.');
+    git('commit', '-m', 'add other evidence');
+    assert.throws(
+      () => assertSplitVerifierSource(root, tested, git('rev-parse', 'HEAD')),
+      /outside release verification/
+    );
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
 
 test('only permitted release verifier changes may follow the tested source', async () => {
   const root = await mkdtemp(join(tmpdir(), 'release-source-test-'));

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {gitEnvironmentFor} from '../git-worktree-environment.mjs';
 
 const releaseTest = 'test:quality:release';
@@ -11,6 +12,9 @@ const splitTests =
 const pythonWorkflows = ['.github/workflows/python-quality.yml', '.github/workflows/release-checks.yml'];
 const invalidPythonPin = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97b';
 const correctedPythonPin = 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97';
+const kananaEvidence =
+  'scripts/release/evidence/kanana-current/bfa9922b25a32e37d09783b67ad26b4c9284432095c5feb307d243857c0c768a.json';
+const kananaEvidenceSha256 = 'c5716ae8ab34c7d06401f26ebe3df5241e9af6cd5f158dd2302d92a9adf345d0';
 
 // Only release verification code and its tests may differ from the tested package source.
 const allowed = new Set([
@@ -75,9 +79,21 @@ export function assertSplitVerifierSource(root: string, testedCommit: string, ve
     .filter(Boolean);
   for (const path of changes)
     assert.ok(
-      path === 'package.json' || allowed.has(path) || pythonWorkflows.includes(path),
+      path === 'package.json' || path === kananaEvidence || allowed.has(path) || pythonWorkflows.includes(path),
       `Tested source differs outside release verification: ${path}`
     );
+  if (changes.includes(kananaEvidence)) {
+    const bytes = execFileSync(
+      'git',
+      ['--no-optional-locks', '--no-replace-objects', 'show', `${verifierCommit}:${kananaEvidence}`],
+      options
+    );
+    assert.equal(
+      createHash('sha256').update(bytes).digest('hex'),
+      kananaEvidenceSha256,
+      'Unexpected Kanana evidence bytes.'
+    );
+  }
   const changedWorkflows = pythonWorkflows.filter((path) => changes.includes(path));
   if (changedWorkflows.length) {
     assert.deepEqual(changedWorkflows, pythonWorkflows, 'Both Python workflow pins must be corrected together.');
