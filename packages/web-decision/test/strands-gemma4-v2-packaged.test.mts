@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp, readFile, rm, symlink} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, symlink, writeFile} from 'node:fs/promises';
 import * as nodeModule from 'node:module';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -30,6 +30,8 @@ test('the dormant packaged runtime binds the four emitted assets to their pinned
         lib: {entry: join(root, 'src/strands/gemma4-v2-packaged.mts'), formats: ['es'], fileName: () => 'index.mjs'}
       }
     });
+    // Vite emits .js chunks, which need the same ESM scope as the published package.
+    await writeFile(join(outDir, 'package.json'), '{"type":"module"}\n');
     await symlink(join(root, 'node_modules'), join(outDir, 'node_modules'), 'dir');
     const {gemma4V2PackagedAssets} = (await import(pathToFileURL(join(outDir, 'index.mjs')).href)) as {
       gemma4V2PackagedAssets(): Record<string, {base: URL; name: string; metadata: {bytes: number; sha256: string}}>;
