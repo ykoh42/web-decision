@@ -37,6 +37,11 @@ procedure changes. Its source field still names the GPU-tested package commit.
 The archive-specific Kanana evidence child must be integrated into that history.
 The hosted check verifies its direct parent, single added evidence path, source
 provenance, archive and report digests, and identical blob in the tagged tree.
+Three Python build helpers were simplified after the tested source commit. The
+hosted check accepts only their exact original and revised Git blobs, together.
+The revised helpers independently rebuilt the 35-layer native graph byte-for-byte
+and the package archive still matched `68e75c7495ff00df3c45c540801780ed03f2be087eac7af91d9d988ee2bc7101`.
+Retain and review that rebuild's original logs locally; CI does not run it.
 
 GitHub Release checks read the committed receipt and validate its required evidence
 fields and the exact SHA-256 of the packed archive. This hosted CPU check relies on

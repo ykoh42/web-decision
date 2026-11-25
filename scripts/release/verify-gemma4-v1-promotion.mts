@@ -41,6 +41,21 @@ const releaseFiles = new Set([
   test
 ]);
 
+const pythonBuildPins = {
+  'scripts/strands/gemma4_v1/build_model.py': {
+    before: 'a3fd287b7ce524aad28b2a8b726acb128348f7c6',
+    after: 'cbfd2cac17e910ca6d628b8e7a9e835c9921e5e3'
+  },
+  'scripts/strands/gemma4_v1/generate_protocol_fixture.py': {
+    before: '4400df99a22313a5f886e6a60f37af73b0c44ca1',
+    after: '7bec86f9cece9c61919614eac5fcd98444be6863'
+  },
+  'scripts/strands/gemma4_v1/webgpu_model_grid.py': {
+    before: 'e94f490422affd93f85d3c91599ddf26b21f4084',
+    after: '30a1d4209713167be767274f2abdad0cc73447c5'
+  }
+} as const;
+
 function exactKeys(value: Record<string, unknown>, keys: readonly string[], label: string) {
   assert.deepEqual(Object.keys(value).sort(), [...keys].sort(), label);
 }
@@ -115,7 +130,11 @@ function testCommandChange(original: string) {
   return original.replace(oldField, newField);
 }
 
-export function assertPromotionSource(root: string, testedSource: string = promotion.sourceCommit) {
+export function assertPromotionSource(
+  root: string,
+  testedSource: string = promotion.sourceCommit,
+  conversionPins: Readonly<Record<string, Readonly<{before: string; after: string}>>> = pythonBuildPins
+) {
   assert.match(testedSource, /^[a-f0-9]{40}$/u);
   const git = (...args: string[]) =>
     execFileSync('git', ['--no-optional-locks', '--no-replace-objects', ...args], {
@@ -134,9 +153,29 @@ export function assertPromotionSource(root: string, testedSource: string = promo
   const files = git('diff', '--name-only', '--no-renames', '-z', testedSource, verifierCommit)
     .split('\0')
     .filter(Boolean);
+  const changedConversion = files.filter((file) => Object.hasOwn(conversionPins, file));
+  if (changedConversion.length) {
+    assert.deepEqual(
+      changedConversion.sort(),
+      Object.keys(conversionPins).sort(),
+      'Incomplete verified Python build changes.'
+    );
+    for (const file of changedConversion) {
+      assert.equal(
+        git('rev-parse', `${testedSource}:${file}`).trim(),
+        conversionPins[file]!.before,
+        'Tested Python build input differs: ' + file
+      );
+      assert.equal(
+        git('rev-parse', `${verifierCommit}:${file}`).trim(),
+        conversionPins[file]!.after,
+        'Verified Python build change differs: ' + file
+      );
+    }
+  }
   for (const file of files)
     assert.ok(
-      file === 'package.json' || file === kananaPath || releaseFiles.has(file),
+      file === 'package.json' || file === kananaPath || releaseFiles.has(file) || Object.hasOwn(conversionPins, file),
       'Change outside release verification: ' + file
     );
   if (files.includes('package.json'))

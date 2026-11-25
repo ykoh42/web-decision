@@ -160,6 +160,44 @@ test('receipt verification rejects another source, another installation and pref
   assert.throws(() => assertPromotionReceipt({...evidence, status: 'inputs-verified-no-inference'}));
 });
 
+test('only the complete pinned Python build changes can accompany the tested source', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'web-decision-promotion-python-')));
+  t.after(() => rm(root, {recursive: true}));
+  const git = (...args: string[]) =>
+    execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8'}).trim();
+  git('init', '--quiet');
+  git('config', 'user.name', 'CPU gate test');
+  git('config', 'user.email', 'gate@example.invalid');
+  const names = ['scripts/build-a.py', 'scripts/build-b.py', 'scripts/build-c.py'];
+  await mkdir(join(root, 'scripts'));
+  for (const name of names) await writeFile(join(root, name), `before ${name}\n`);
+  git('add', '.');
+  git('commit', '-qm', 'tested product');
+  const source = git('rev-parse', 'HEAD');
+  const pins: Record<string, {before: string; after: string}> = {};
+  for (const name of names) {
+    pins[name] = {before: git('rev-parse', `${source}:${name}`), after: ''};
+    await writeFile(join(root, name), `after ${name}\n`);
+    pins[name]!.after = git('hash-object', name);
+  }
+  git('restore', '--worktree', names[1]!, names[2]!);
+  git('add', names[0]!);
+  git('commit', '-qm', 'partial unverified build change');
+  assert.throws(() => assertPromotionSource(root, source, pins), /Incomplete verified Python build changes/u);
+  await writeFile(join(root, names[1]!), `after ${names[1]}\n`);
+  await writeFile(join(root, names[2]!), `after ${names[2]}\n`);
+  git('add', names[1]!, names[2]!);
+  git('commit', '-qm', 'complete verified build changes');
+  assert.equal(assertPromotionSource(root, source, pins), git('rev-parse', 'HEAD'));
+  await writeFile(join(root, names[1]!), 'different change\n');
+  git('add', names[1]!);
+  git('commit', '-qm', 'tamper verified build change');
+  assert.throws(() => assertPromotionSource(root, source, pins), /Verified Python build change differs/u);
+  pins[names[1]!]!.after = git('rev-parse', `HEAD:${names[1]}`);
+  pins[names[0]!]!.before = 'f'.repeat(40);
+  assert.throws(() => assertPromotionSource(root, source, pins), /Tested Python build input differs/u);
+});
+
 test('the exact package guard refuses other archive bytes', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'web-decision-promotion-archive-'));
   t.after(() => rm(root, {recursive: true}));
