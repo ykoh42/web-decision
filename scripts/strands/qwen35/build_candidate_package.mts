@@ -143,6 +143,7 @@ async function stageCandidateDeclarations(dist: string): Promise<void> {
       join(curated, 'strands-qwen35-candidate-types.d.ts')
     ),
     copyFile(join(source, 'curated/public-types.d.ts'), join(curated, 'public-types.d.ts')),
+    copyFile(join(source, 'curated/mapika2b-types.d.ts'), join(curated, 'mapika2b-types.d.ts')),
     writeFile(
       join(curated, 'public-model-id.generated.d.ts'),
       `export type PublicModelId = ${JSON.stringify(modelId)};\n`

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {copyFile, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {copyFile, cp, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
+import {assertQwen35ProductionArchive} from '../../release/pin-qwen35-provenance.ts';
+import {verifyQwen35ExactPackage} from '../../release/strands-qwen35-release-evidence.ts';
 import {
   buildCandidateAdapterModule,
   buildCandidateCatalogModule,
@@ -45,12 +48,76 @@ test('candidate package metadata is explicitly unpublishable', () => {
   assert.equal(Object.hasOwn(metadata, 'scripts'), false);
 });
 
+test('the pending-only builder rejects the verified public source without creating outputs', async (t) => {
+  const output = await mkdtemp(join(tmpdir(), 'web-decision-qwen35-verified-source-'));
+  t.after(() => rm(output, {recursive: true, force: true}));
+  await assert.rejects(buildQwen35CandidatePackage(output), /only for pending provenance/u);
+  assert.deepEqual(await readdir(output), []);
+});
+
+async function stagePendingSource(workspace: string): Promise<void> {
+  const checkout = new URL('../../../', import.meta.url);
+  const packageRoot = 'packages/web-decision';
+  const sourceFiles = [
+    `${packageRoot}/src`,
+    `${packageRoot}/assets/qwen35`,
+    `${packageRoot}/package.json`,
+    `${packageRoot}/vite.config.ts`,
+    '.toolchains/apache-tvm-src/web/src',
+    'scripts/strands/qwen35/build_candidate_package.mts'
+  ];
+  await Promise.all(sourceFiles.map((path) => cp(new URL(path, checkout), join(workspace, path), {recursive: true})));
+  for (const path of ['node_modules', `${packageRoot}/node_modules`, 'scripts/release']) {
+    await symlink(fileURLToPath(new URL(path, checkout)), join(workspace, path), 'junction');
+  }
+
+  // Only the isolated fixture's provenance changes. The builder uses the real locked assets.
+  const stagedPackage = join(workspace, packageRoot);
+  const evidencePath = 'src/catalog/provenance/test-pending-qwen35.json';
+  const evidence = JSON.stringify({status: 'pending', fixture: 'private package consumer test'});
+  await Promise.all([
+    writeFile(join(stagedPackage, evidencePath), evidence),
+    writeFile(
+      join(stagedPackage, 'src/catalog/model-provenance.json'),
+      JSON.stringify({
+        models: [
+          {
+            modelId: 'strands-decider-2b-qwen3.5-v1-2610',
+            status: 'pending',
+            evidence: {path: evidencePath, sha256: createHash('sha256').update(evidence).digest('hex')}
+          }
+        ]
+      })
+    )
+  ]);
+}
+
 test('a strict TypeScript consumer imports the installed private candidate archive', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'web-decision-qwen35-packed-types-'));
   t.after(() => rm(root, {recursive: true, force: true}));
-  const {installedPackagePath} = await buildQwen35CandidatePackage(root);
-  const consumer = join(root, 'consumer');
-  assert.equal(await realpath(join(consumer, 'node_modules/web-decision')), installedPackagePath);
+  const workspace = join(root, 'source');
+  const output = join(root, 'output');
+  await Promise.all([stagePendingSource(workspace), mkdir(output)]);
+  execFileSync(
+    process.execPath,
+    ['--import', 'tsx', 'scripts/strands/qwen35/build_candidate_package.mts', '--output-dir', output],
+    {cwd: workspace, stdio: 'inherit'}
+  );
+  const consumer = join(output, 'consumer');
+  const installedPackagePath = await realpath(join(consumer, 'node_modules/web-decision'));
+  const report = JSON.parse(await readFile(join(output, 'candidate-package.json'), 'utf8')) as {
+    readonly status: string;
+    readonly provenanceStatus: string;
+    readonly package: {readonly exactInstallMatch: boolean; readonly private: boolean; readonly bundlePath: string};
+  };
+  assert.equal(report.status, 'unpublishable-pending-qwen-candidate');
+  assert.equal(report.provenanceStatus, 'pending');
+  assert.equal(report.package.private, true);
+  assert.equal(report.package.exactInstallMatch, true);
+  assert.equal(await realpath(join(output, report.package.bundlePath)), join(installedPackagePath, 'dist/index.js'));
+  const archivePath = join(output, 'pack/web-decision-0.0.0-qwen35-candidate.tgz');
+  const {archive} = await verifyQwen35ExactPackage(archivePath, installedPackagePath);
+  assert.throws(() => assertQwen35ProductionArchive(archive), /stable npm version/u);
   const fixture = new URL('../../../tests/types/', import.meta.url);
   await Promise.all([
     copyFile(new URL('qwen35-candidate-consumer.mts', fixture), join(consumer, 'consumer.mts')),
