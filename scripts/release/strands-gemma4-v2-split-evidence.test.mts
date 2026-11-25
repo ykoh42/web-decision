@@ -656,7 +656,8 @@ test('independent public probe accepts only a pinned complete 206 body', async (
   const inventory = {file: 'model.safetensors', sha256: 'unused', bytes: 100, chunks: [[0, 4, sha256(body)]]} as const;
   const fake = (status: number, content: Buffer) => async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     assert.equal(input, checkpointUrl);
-    assert.equal((init?.headers as Record<string, string>).Range, 'bytes=0-3');
+    assert.ok(init);
+    assert.equal((init.headers as Record<string, string>).Range, 'bytes=0-3');
     assert.equal(init?.credentials, 'omit');
     assert.equal(init?.cache, 'no-store');
     const response = new Response(new Uint8Array(content), {

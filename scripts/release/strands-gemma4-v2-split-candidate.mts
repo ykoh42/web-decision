@@ -20,9 +20,5 @@ export function assertSplitCandidate(sourceCommit: string, archive: unknown) {
     gemmaSplitCandidate.sourceCommit,
     'The recorded tested source differs from the bfa candidate.'
   );
-  assert.deepEqual(
-    archive,
-    gemmaSplitCandidate.archive,
-    'The exact installed archive differs from the bfa candidate.'
-  );
+  assert.deepEqual(archive, gemmaSplitCandidate.archive, 'The exact installed archive differs from the bfa candidate.');
 }
