@@ -6,11 +6,19 @@ import {MAGICK} from '../src/mapika2b/image-codec-pins.mjs';
 import {prepareGemma4V2EncodedImage} from '../src/strands/gemma4-v2-image.mjs';
 import {preprocessQwen35Image} from '../src/strands/qwen35-image-input.mjs';
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return {promise, resolve};
+}
+
 test('ImageMagick source failures are isolated before shared verified initialization', async (t) => {
   const wasm = await readFile(new URL(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm')));
   const url = new URL('https://example.test/codecs/magick.wasm?fixture=codec');
-  const fetching = Promise.withResolvers<void>();
-  const finishFetch = Promise.withResolvers<void>();
+  const fetching = deferred();
+  const finishFetch = deferred();
   let fetchedUrl: string | undefined;
   let fetches = 0;
   t.mock.method(globalThis, 'fetch', async (request: string) => {

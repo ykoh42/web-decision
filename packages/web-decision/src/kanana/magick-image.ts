@@ -78,7 +78,7 @@ async function verifiedMagickBytes(source: MagickWasm): Promise<Uint8Array> {
     const name = decodeURIComponent(source.pathname.split('/').at(-1)!);
     return new Uint8Array(
       await readVerifiedAsset(new URL('.', source), {files: {[name]: MAGICK}}, name, {
-        fetchImpl: (_, options) => fetch(href, options)
+        fetchImpl: (_: Parameters<typeof fetch>[0], options?: RequestInit) => fetch(href, options)
       })
     );
   }
