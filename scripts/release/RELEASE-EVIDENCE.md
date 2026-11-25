@@ -55,6 +55,36 @@ node --import tsx scripts/release/strands-gemma4-v2-release-evidence.mts \
 
 Chromium’s debugger observes unrounded values in the installed scorer. The producer serves archive JavaScript and the pinned tokenizer without development-server transforms. It fails if Chromium parses different bytes, moves the exact scorer breakpoint, or records a different set of questions. The Gemma verifier requires raw evidence for the 1,066 pinned questions and recomputes the upstream criterion. It requires at least 1,000 questions, at least 98% top-1 agreement, and at most 0.02 mean per-question maximum absolute probability difference. Ties use the first code. It checks the exact requests, token counts, output types, choice labels, and structure for all six CPU cases, and records their numerical differences. The Gemma result covers this model on the exact combined archive. The remaining models have separate checks.
 
+## Gemma split evidence for the reviewed 0.7.0 archive
+
+The original single-producer procedure above remains supported. The split gate uses two Playwright reports for the same tested source and installed archive. The 1,066-question corpus and five CPU-reference cases use byte-preserving archive JavaScript and the pinned tokenizer, with raw scorer capture, image recovery, offline inference, and cleanup. The separate 32,768-token case exercises the installed archive through a Vite consumer. That run did not record browser HTTP response bytes.
+
+The reviewed CPU Vite replay checks the exact archive and source, 27 archive JavaScript modules plus the tokenizer, and 17 assets. It is a later reproduction of the Vite setup. The replay does not attest to the live response bytes or its complete inherited environment. Its report and script pins apply to the reviewed 0.7.0 candidate. A different candidate requires a newly reviewed replay and pins.
+
+The persistent Chromium producer uses one of these explicit checkpoint evidence scopes.
+
+| Producer setting                                                     | Observation                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEB_DECISION_SPLIT_PERSISTENT_CHECKPOINT_MODE=online`               | With a fresh profile, the verifier checks the original public checkpoint range observed during model loading.                                                                                                                |
+| `WEB_DECISION_SPLIT_PERSISTENT_CHECKPOINT_MODE=local`                | The producer verifies the local checkpoint and each range it serves. This mode records the local route and range digests.                                                                                                    |
+| `online` with `WEB_DECISION_SPLIT_PERSISTENT_REUSE_FAILED_PROFILE=1` | The reviewed rerun uses a clone of the pinned failed-run profile at the original loopback origin. Before model load it separately checks the first pinned public Hugging Face 206 response and the installed graph response. |
+
+The reused-profile evidence records `independent-online-range-probe` and `independent-archive-response`. It verifies the exact requested range, bytes and digest and binds the old start receipt digest. Model loading can use verified cached assets. A probe records one observed public range. None of the persistent modes verifies a whole-checkpoint online download.
+
+Supply `WEB_DECISION_SPLIT_TESTED_COMMIT`, `WEB_DECISION_SPLIT_TESTED_ROOT`, `WEB_DECISION_SPLIT_PRODUCER_DIR`, `WEB_DECISION_SPLIT_VITE_AUDIT`, and `WEB_DECISION_SPLIT_VITE_AUDIT_SCRIPT`. For persistent evidence, also supply the settings recorded by the producer. Run the normal Gemma verifier command above with the completed raw corpus report as `"$playwright_json"` and append `--split "$independent_32k_prefix"`.
+
+The verifier checks the original reports and their start and completion receipts independently. It records the tested source commit separately from the verifier commit and rejects intervening changes outside release verification. Raw probability, CPU references, matching devices, offline replay, cleanup, and native TVM build checks remain required. The output is model evidence with `releaseApproved: false`.
+
+## Gemma split evidence for e729bb94
+
+The e729 verifier binds the recorded tested source, exact npm archive, installed package tree, and bundle to the new candidate. It reads the original reports and receipts for that candidate. The 32K receipts preserve their installed-package Vite consumer scope and the completion receipt binds the start and Playwright report digests.
+
+The Vite replay must use the new installation and actual e729 start receipt. Its script and report require an archive-specific reviewed pin. The previous 7c3 replay continues to identify the older archive. The later Vite replay remains CPU evidence and the live browser HTTP response bytes remain outside its scope.
+
+The fresh persistent Chromium producer captures the byte-preserving raw 1,066-question corpus and five CPU-reference cases, then checks offline replay. Its model-load range is checked immediately against the pinned inventory. The previous candidate's warm profile receipt does not establish e729 provenance. Admission of a future candidate-specific profile clone requires verified seed receipts, the same storage origin, e729's complete offline asset rehash, and a separately reported public range probe. The source profile remains read-only.
+
+The split procedure uses the model-specific Gemma verifier. The historical generic command still expects the single Kev Playwright policy and cannot accept the four model-specific current reports. The current native TVM checks pin the toolchain separately from the browser transport or scorer outcome.
+
 ## Post-build Kanana evidence for the current archive
 
 Build and test the archive on the clean source commit. Use `--kanana-current-candidate` with the archive pin to check both Kanana reports and the independent TVM rebuilds. Keep the test checkout on that source commit so the Gemma and Mapika report checks continue to bind the same source. The candidate verifier prints the archive, installed package tree, bundle and report digests, as well as the verified context length.
@@ -203,13 +233,15 @@ Supply a JSON build-evidence file with one entry for every `.wasm` in every cura
 ```json
 {
   "schemaVersion": 1,
-  "builds": [{
-    "modelId": "kev-0.6b-q4f16",
-    "artifact": "model.wasm",
-    "buildRoot": "path/to/independent-build",
-    "wasm": "public/tvm-kev-q4-dynamic.wasm",
-    "report": "reports/tvm-q4-build-dynamic.json"
-  }]
+  "builds": [
+    {
+      "modelId": "kev-0.6b-q4f16",
+      "artifact": "model.wasm",
+      "buildRoot": "path/to/independent-build",
+      "wasm": "public/tvm-kev-q4-dynamic.wasm",
+      "report": "reports/tvm-q4-build-dynamic.json"
+    }
+  ]
 }
 ```
 
@@ -316,14 +348,21 @@ const record = {
   },
   browser: {name, version, userAgent},
   device: {
-    manufacturer: hostManufacturer, model: hostModel, os, osVersion, architecture, isVirtual: false,
+    manufacturer: hostManufacturer,
+    model: hostModel,
+    os,
+    osVersion,
+    architecture,
+    isVirtual: false,
     evidence: {
       host: {source: 'windows-wmi/Win32_ComputerSystem', raw: {Manufacturer: hostManufacturer, Model: hostModel}},
       os: {source: 'node:os', raw: {version: os, release: osVersion, architecture}}
     }
   },
   gpu: {
-    api: 'webgpu', isFallbackAdapter, adapterInfo,
+    api: 'webgpu',
+    isFallbackAdapter,
+    adapterInfo,
     hardware: {manufacturer: gpuManufacturer, model: gpuModel, driverVersion, pnpDeviceId},
     hardwareEvidence: {
       source: 'windows-wmi/Win32_VideoController',
@@ -334,11 +373,16 @@ const record = {
         PNPDeviceID: pnpDeviceId
       }
     },
-    features, limits
+    features,
+    limits
   },
   inference: {
     online: {...observedInference(online), referenceMatched: baselineReferenceMatched},
-    offline: {...observedInference(offline), matchesOnline: offlineMatchesOnline, networkAttempts: offlineNetworkAttempts},
+    offline: {
+      ...observedInference(offline),
+      matchesOnline: offlineMatchesOnline,
+      networkAttempts: offlineNetworkAttempts
+    },
     reference: {
       packageSha256: '5aef3331e41a67e20fac9fbc00e47074d02e1feeef4e0c7e6f4b13fdc87bca6f',
       fixtureSha256: '91297c6ebf012170b95c61bb5a053b6ed86e4e47a129fe5eaaa681d4ec8c74cd',

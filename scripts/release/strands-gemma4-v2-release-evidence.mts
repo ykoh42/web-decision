@@ -268,17 +268,40 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     archivePath && installedPackagePath && reportPath && buildEvidencePath && goldenPath,
     'Expected archive, installed package, Playwright JSON report, TVM build evidence, and official golden JSONL.'
   );
-  console.log(
-    JSON.stringify(
-      await verifyGemma4V2ReleaseEvidence({
-        archivePath,
-        installedPackagePath,
-        reportPath,
-        buildEvidencePath,
-        goldenPath
-      }),
-      null,
-      2
-    )
+  const [mode, prefix, ...extra] = process.argv.slice(7);
+  assert.ok(
+    extra.length === 0 && (mode === undefined || (mode === '--split' && prefix)),
+    'Expected optional --split followed by the 32K report prefix.'
   );
+  let evidence: unknown;
+  if (mode === '--split') {
+    const env = {
+      ...process.env,
+      WEB_DECISION_RELEASE_ARCHIVE: archivePath,
+      WEB_DECISION_INSTALLED_PACKAGE: installedPackagePath,
+      WEB_DECISION_GEMMA_V2_OFFICIAL_GOLDEN: goldenPath
+    };
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        fileURLToPath(new URL('./strands-gemma4-v2-split-evidence.mts', import.meta.url)),
+        reportPath,
+        prefix!,
+        buildEvidencePath
+      ],
+      {env, encoding: 'utf8'}
+    );
+    evidence = JSON.parse(output);
+  } else {
+    evidence = await verifyGemma4V2ReleaseEvidence({
+      archivePath,
+      installedPackagePath,
+      reportPath,
+      buildEvidencePath,
+      goldenPath
+    });
+  }
+  console.log(JSON.stringify(evidence, null, 2));
 }

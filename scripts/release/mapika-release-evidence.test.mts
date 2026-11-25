@@ -8,7 +8,19 @@ import {
 } from '../../tests/browser/mapika2b-evidence.mts';
 import {archiveIdentity, sha256} from './curated-gpu-evidence.mts';
 import {assertMapikaReleaseRecord} from './mapika-release-evidence.mts';
+import {assertMapikaCurrentFacts, mapikaCurrentPin} from './mapika-current-evidence.mts';
 import type {ArchiveInfo} from './verify-release-evidence.ts';
+
+const currentFacts = () => ({
+  testedCommit: mapikaCurrentPin.testedCommit,
+  historicalViteSha256: mapikaCurrentPin.historicalViteSha256,
+  testedViteSha256: mapikaCurrentPin.testedViteSha256
+});
+test('current evidence preserves the historical Vite pin and binds the tested source', () => {
+  assert.doesNotThrow(() => assertMapikaCurrentFacts(currentFacts()));
+  for (const key of ['testedCommit', 'historicalViteSha256', 'testedViteSha256'] as const)
+    assert.throws(() => assertMapikaCurrentFacts({...currentFacts(), [key]: '0'.repeat(currentFacts()[key].length)}));
+});
 
 const fixtures = new URL('../mapika/', import.meta.url);
 const prepared = readFileSync(new URL('reference-fp32-prepared.json', fixtures));
