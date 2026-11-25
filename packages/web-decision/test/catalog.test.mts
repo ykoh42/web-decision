@@ -44,9 +44,10 @@ test('catalog retains pinned TVM descriptors including Gemma', () => {
     'kanana-2-v-decide-3b-2611',
     'strands-decider-2b-qwen3.5-v1-2610',
     'mapika-decider-2b-v12',
-    'strands-decider-e2b-gemma4-v2-2611'
+    'strands-decider-e2b-gemma4-v2-2611',
+    'strands-decider-e2b-gemma4-v1-2610'
   ]);
-  assert.equal(MODEL_CATALOG.length, 4);
+  assert.equal(MODEL_CATALOG.length, 5);
 
   const kanana = MODEL_CATALOG_BY_ID['kanana-2-v-decide-3b-2611'];
   assert.equal(kanana, MODEL_CATALOG[0]);
@@ -109,6 +110,20 @@ test('catalog retains pinned TVM descriptors including Gemma', () => {
   assert.equal(gemma.description.backend.name, 'tvm-webgpu');
   assert.equal(gemma.description.features.imageChoice?.status, 'implemented');
   assert.equal(gemma.artifacts.manifest.experimental, false);
+  const gemmaV1 = MODEL_CATALOG_BY_ID['strands-decider-e2b-gemma4-v1-2610'];
+  assert.equal(gemmaV1, MODEL_CATALOG[4]);
+  assert.equal(gemmaV1.description.adapter, 'strands-gemma4-v1');
+  assert.equal(gemmaV1.description.backend.name, 'tvm-webgpu');
+  assert.equal(gemmaV1.description.features.imageChoice?.status, 'not-implemented');
+  const tokenLimit = gemmaV1.description.features.textChoice.limits.find(({resource}) => resource === 'tokens');
+  assert.equal(tokenLimit?.defaultMax, 4096);
+  assert.equal(tokenLimit?.max, 131072);
+  assert.equal(gemmaV1.artifacts.manifest.experimental, false);
+  assert.equal(
+    gemmaV1.artifacts.manifest.files['graph.wasm']?.sha256,
+    '7a1a2f32f080011334f628714de8dbc69c6fc46b660c16c78737998b008cff3c'
+  );
+
   const gemmaProvenance = modelProvenance.models.find(({modelId}) => modelId === gemma.modelId);
   assert.equal(
     (APPROVED_MODEL_IDS as readonly string[]).includes(gemma.modelId),

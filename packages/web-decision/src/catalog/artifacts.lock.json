@@ -397,6 +397,96 @@
           "sourceSha256": "37b3f1c4670f1afb78007624e3ec2a2f55503d9b78602216e2f29a4cfb5111f6"
         }
       ]
+    },
+    "strands-decider-e2b-gemma4-v1-2610": {
+      "schemaVersion": 1,
+      "manifest": {
+        "sourcePath": "assets/strands-gemma4-v1/manifest.json",
+        "rawSha256": "dd0c1f78442cd4ec4d3fc2766def0a53b7dcf350772df2d249ac06cbdd490faa",
+        "canonicalSha256": "49f4a24431d8a9a0f317308c4e97268bc0703387a7e7a291e948dbfe7950feb9",
+        "canonicalBytes": 1409,
+        "experimental": false,
+        "files": {
+          "graph.wasm": {
+            "bytes": 15442839,
+            "sha256": "7a1a2f32f080011334f628714de8dbc69c6fc46b660c16c78737998b008cff3c"
+          },
+          "graph.json": {
+            "bytes": 169248,
+            "sha256": "c04762e0f3b70968ce1f80270137557caad5315870236c7808fbbee3a978d0e5"
+          },
+          "source-inventory.json": {
+            "bytes": 1125949,
+            "sha256": "eb953da8adbbddce431abf40bbc3f2fe6f217a83255ee4c41001d760b9a98c87"
+          },
+          "tokenizer.json": {
+            "bytes": 32170223,
+            "sha256": "30383f3ce90a169cbabe9eb3da7bb77988bf906aad2e59184b378f5470ec4dbd"
+          },
+          "tokenizer_config.json": {
+            "bytes": 3729,
+            "sha256": "3ab5c7b94dc97d65ca7064496fa69b88ff875378e1cb7ee3e43070c3a8170999"
+          }
+        }
+      },
+      "bundledRuntimeFiles": [
+        {
+          "manifestName": "graph.wasm",
+          "sourcePath": "assets/strands-gemma4-v1/graph.wasm",
+          "bytes": 15442839,
+          "sha256": "7a1a2f32f080011334f628714de8dbc69c6fc46b660c16c78737998b008cff3c"
+        },
+        {
+          "manifestName": "graph.json",
+          "sourcePath": "assets/strands-gemma4-v1/graph.json",
+          "bytes": 169248,
+          "sha256": "c04762e0f3b70968ce1f80270137557caad5315870236c7808fbbee3a978d0e5"
+        },
+        {
+          "manifestName": "source-inventory.json",
+          "sourcePath": "assets/strands-gemma4-v1/source-inventory.json",
+          "bytes": 1125949,
+          "sha256": "eb953da8adbbddce431abf40bbc3f2fe6f217a83255ee4c41001d760b9a98c87"
+        },
+        {
+          "manifestName": "tokenizer.json",
+          "sourcePath": "assets/strands-gemma4-v1/tokenizer.json",
+          "bytes": 32170223,
+          "sha256": "30383f3ce90a169cbabe9eb3da7bb77988bf906aad2e59184b378f5470ec4dbd"
+        },
+        {
+          "manifestName": "tokenizer_config.json",
+          "sourcePath": "assets/strands-gemma4-v1/tokenizer_config.json",
+          "bytes": 3729,
+          "sha256": "3ab5c7b94dc97d65ca7064496fa69b88ff875378e1cb7ee3e43070c3a8170999"
+        }
+      ],
+      "upstreams": [
+        {
+          "role": "checkpoint",
+          "repository": "google/gemma-4-E2B-it",
+          "revision": "3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+          "sourcePath": "model.safetensors",
+          "sourceBytes": 10246621918,
+          "sourceSha256": "2db5482b20d746879bb3ef79b5203e9075a2e2b98f54ec7c2f281c1477ddc550"
+        },
+        {
+          "role": "adapter",
+          "repository": "StrandsAgents/strands-decider-E2B-gemma4-v1-2610",
+          "revision": "d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+          "sourcePath": "lora/adapter_model.safetensors",
+          "sourceBytes": 289950976,
+          "sourceSha256": "c7786a59354aa190082b1c3aedb7ff3311fe260f070f360c4d3518762691c551"
+        },
+        {
+          "role": "readout",
+          "repository": "StrandsAgents/strands-decider-E2B-gemma4-v1-2610",
+          "revision": "d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+          "sourcePath": "head.safetensors",
+          "sourceBytes": 9456104,
+          "sourceSha256": "31220ff165a8bb6e48b87a85de11cbfc8660b7047049ea2f91872e1b6ddb45a9"
+        }
+      ]
     }
   }
 }

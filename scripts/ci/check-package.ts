@@ -16,6 +16,7 @@ const stableKevManifestSha256 = '57c554e757a96093669c1555e9e2564780c7eaba5e102b4
 const kananaModelId = 'kanana-2-v-decide-3b-2611';
 const kananaManifestSha256 = 'd4e6d1c735b1e61c8e8c941730886e0914f6820d5cc9025fd4ef3de087689eb5';
 const qwen35ModelId = 'strands-decider-2b-qwen3.5-v1-2610';
+const gemma4V1ModelId = 'strands-decider-e2b-gemma4-v1-2610';
 const gemma4V2ModelId = 'strands-decider-e2b-gemma4-v2-2611';
 const mapikaModelId = 'mapika-decider-2b-v12';
 const kananaLicenseSha256 = '3c13f0cf41c4d49f6d3885bffb27c39431826f9886cacac75349b4ffb58361c4';
@@ -66,7 +67,8 @@ const packagedSourceFiles = [
   'README.md',
   'src/curated/public-index.d.ts',
   'src/curated/public-types.d.ts',
-  'src/curated/public-model-id.generated.d.ts'
+  'src/curated/public-model-id.generated.d.ts',
+  'src/curated/strands-gemma4-v1-types.d.ts'
 ];
 const qwen35LicensePins = {
   'QWEN-APACHE-LICENSE.txt': '50cbab8a892c5f2993b8c7351a99182507472def3b1374558308605d99b86b32',
@@ -421,23 +423,24 @@ function verifyQwen35Artifacts(
   return wasm;
 }
 
-function verifyGemma4V2Artifacts(
+function verifyGemma4Artifacts(
   distDirectory: string,
   distFiles: readonly string[],
-  {bundledRuntimeFiles}: BundledArtifactLock
+  directory: 'gemma4-v1' | 'gemma4-v2',
+  lock?: BundledArtifactLock
 ): string[] {
-  const emitted = bundledRuntimeFiles.filter(({manifestName}) => !manifestName.endsWith('.json'));
-  const expected = emitted.map(({manifestName}) => 'gemma4-v2/' + manifestName).sort();
+  const prefix = directory + '/';
+  const emitted = (lock?.bundledRuntimeFiles ?? []).filter(
+    ({manifestName}) => directory === 'gemma4-v1' || !manifestName.endsWith('.json')
+  );
+  const expected = emitted.map(({manifestName}) => prefix + manifestName).sort();
   assert.deepEqual(
-    distFiles.filter((name) => name.startsWith('gemma4-v2/')),
+    distFiles.filter((name) => name.startsWith(prefix)),
     expected
   );
   for (const pin of emitted) {
-    const name = 'gemma4-v2/' + pin.manifestName;
-    assert.ok(
-      matchesAsset(join(distDirectory, name), pin),
-      'Bundled Gemma v2 asset differs from its lock: ' + name + '.'
-    );
+    const name = prefix + pin.manifestName;
+    assert.ok(matchesAsset(join(distDirectory, name), pin), 'Bundled asset differs from its lock: ' + name);
   }
   return expected.filter((name) => name.endsWith('.wasm')).map((name) => 'dist/' + name);
 }
@@ -506,6 +509,21 @@ function verifyQwen35LicenseNotice(): void {
   }
 }
 
+function verifyGemma4V1LicenseNotice(): string[] {
+  const license = 'STRANDS-GEMMA4-V1-LICENSE.md';
+  const notice = 'STRANDS-GEMMA4-V1-NOTICE';
+  assert.equal(
+    createHash('sha256')
+      .update(readFileSync(join(pkg, license)))
+      .digest('hex'),
+    '0a526e4695eb2b9e8cd57655446ed77c3d4a35e55165f434ee5479071ce44ca0'
+  );
+  const noticeBytes = readFileSync(join(pkg, notice), 'utf8');
+  assert.match(noticeBytes, /d383ecf8534b13d49b3b567a1b66f88fca6d50ba/u);
+  assert.match(noticeBytes, /3e22461f65e89153144f8adb70e3b8c2cc9845a7/u);
+  return [license, notice];
+}
+
 function verifyGemma4V2LicenseNotice(): void {
   const license = readFileSync(join(pkg, 'STRANDS-GEMMA4-V2-LICENSE'));
   assert.equal(license.byteLength, 11_358, 'The pinned Gemma v2 license size changed.');
@@ -534,13 +552,10 @@ function verifyPackageInventory(
   modelIds: ReadonlySet<string>
 ): void {
   const qwen35 = modelIds.has(qwen35ModelId) ? readBundledArtifactLock(qwen35ModelId) : undefined;
+  const gemma4V1 = modelIds.has(gemma4V1ModelId) ? readBundledArtifactLock(gemma4V1ModelId) : undefined;
   const gemma4V2 = modelIds.has(gemma4V2ModelId) ? readBundledArtifactLock(gemma4V2ModelId) : undefined;
   const mapika = modelIds.has(mapikaModelId) ? readBundledArtifactLock(mapikaModelId) : undefined;
-  if (!gemma4V2)
-    assert.ok(
-      !distFiles.some((name) => name.startsWith('gemma4-v2/')),
-      'Unapproved Gemma v2 must not emit runtime files.'
-    );
+  const gemma4V1Notices = gemma4V1 ? verifyGemma4V1LicenseNotice() : [];
   const assetFiles = [
     ...new Set(
       [...modelIds]
@@ -552,6 +567,7 @@ function verifyPackageInventory(
     ...packagedSourceFiles,
     ...(qwen35 ? qwen35PackageFiles : []),
     ...(mapika ? mapikaPackageFiles : []),
+    ...gemma4V1Notices,
     ...assetFiles,
     ...distFiles.map((name) => 'dist/' + name),
     'package.json'
@@ -561,7 +577,8 @@ function verifyPackageInventory(
     ...(modelIds.has(kananaModelId) ? kananaWasmFiles.map((name) => 'dist/' + name) : []),
     ...(qwen35 ? verifyQwen35Artifacts(distDirectory, distFiles, qwen35) : []),
     ...(mapika ? verifyMapikaArtifacts(distDirectory, mapika) : []),
-    ...(gemma4V2 ? verifyGemma4V2Artifacts(distDirectory, distFiles, gemma4V2) : []),
+    ...verifyGemma4Artifacts(distDirectory, distFiles, 'gemma4-v1', gemma4V1),
+    ...verifyGemma4Artifacts(distDirectory, distFiles, 'gemma4-v2', gemma4V2),
     ...assetFiles.filter((name) => name.endsWith('.wasm'))
   ];
   assert.deepEqual(

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "modelId": "strands-decider-e2b-gemma4-v1-2610",
+  "source": {
+    "clean": true,
+    "commit": "a7480215fda45a253da02642fe8493ac69248a2e"
+  },
+  "tvmVersion": "0.27.0.post1",
+  "tvmCommit": "7b5acb32bd271342a24130f4ef439ff6c2e52c6c",
+  "emsdkCommit": "d7b4130688bfa348392b921ab04015aa15c4f154",
+  "emscriptenVersion": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 4.0.23 (7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed)",
+  "buildBackend": "native-tvm",
+  "weightSource": "pinned-safetensors",
+  "onnxImportOrExportUsed": false,
+  "recipeFiles": [
+    {
+      "path": "scripts/strands/gemma4_v1/bf16_lowering.py",
+      "sha256": "1a9d453f3a87d2aa914ab3b734c743246a3fc0f039055c502a8333d2b1325072"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/build_model.py",
+      "sha256": "6ea5825dee416d0e0446ac1257246b765c62f5220f4910f0cce9d2ff809dbf6c"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/canonical_shape_stores.py",
+      "sha256": "d089ca1dc7dec622a5a32f26188bfb131dc533554b808164a641276ca55b076a"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/causal_attention_ir.py",
+      "sha256": "c3e90d6440188a118f02c63a239c39bfd637d0770e86cfe56216fc6a0dea9a57"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/causal_layer_ir.py",
+      "sha256": "0675a78467e476de04aa23b954fa413f54c2f35eb74f4416cc5b6fcc18900e26"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/pointer_head_ir.py",
+      "sha256": "ada42b1c6efcf428acea38c30ca88a139c3837f328a30ecd86b5c4129d81e72c"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/source_inventory.py",
+      "sha256": "5e6fbdc5815992cf56763f03c5ee7157456c4cbc9af4766e836b7aa26d5aaac7"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/tiled_causal_decoder.py",
+      "sha256": "71fc1e3f4a4a80ba976443a83147875e1a404c9687e56ae363b8333c59ef92f4"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/tiled_causal_layer.py",
+      "sha256": "ba693d12b5375d56a2796fe59de6e9379d7b8641ade85db9ce96b3a0394e627e"
+    },
+    {
+      "path": "scripts/strands/gemma4_v1/webgpu_model_grid.py",
+      "sha256": "5feebfb7e3aed5815d611312e39eaadab69b39cf1cff7f7128b884b712fda255"
+    }
+  ],
+  "wasm": {
+    "path": "packages/web-decision/assets/strands-gemma4-v1/graph.wasm",
+    "sha256": "7a1a2f32f080011334f628714de8dbc69c6fc46b660c16c78737998b008cff3c"
+  },
+  "boundGraph": {
+    "path": "packages/web-decision/assets/strands-gemma4-v1/graph.json",
+    "sha256": "c04762e0f3b70968ce1f80270137557caad5315870236c7808fbbee3a978d0e5"
+  },
+  "sourceIndependentGraphSha256": "cd4fcac071875f1ea9b6d46d2f71d99635aad2ede1f249863b73d35b030114b2",
+  "sourceInventory": {
+    "path": "packages/web-decision/assets/strands-gemma4-v1/source-inventory.json",
+    "sha256": "eb953da8adbbddce431abf40bbc3f2fe6f217a83255ee4c41001d760b9a98c87"
+  },
+  "servingConfig": {
+    "url": "https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v1-2610/resolve/d383ecf8534b13d49b3b567a1b66f88fca6d50ba/strands_decider_config.json",
+    "bytes": 739,
+    "sha256": "d323b2b07fdbcb911df601cdf50457ba62fc51c7d58538a4c457b34a290efbde"
+  },
+  "manifest": {
+    "path": "packages/web-decision/assets/strands-gemma4-v1/manifest.json",
+    "sha256": "dd0c1f78442cd4ec4d3fc2766def0a53b7dcf350772df2d249ac06cbdd490faa"
+  },
+  "defaultContextTokens": 4096,
+  "textModelPositionCapacity": 131072
+}

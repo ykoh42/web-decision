@@ -493,7 +493,7 @@ export function validateSpec(spec: unknown): CuratedModel[] {
 }
 
 function buildBundledFileRecords(
-  manifest: KevManifest,
+  manifest: Pick<KevManifest, 'files'>,
   inputs: readonly Readonly<{manifestName: string; sourcePath: string; bytes: Buffer}>[]
 ): ModelArtifactLock['bundledRuntimeFiles'] {
   return inputs.map(({manifestName, sourcePath, bytes}) => {
@@ -967,6 +967,68 @@ async function createGemma4V2ArtifactLock(model: CuratedModel): Promise<CatalogA
   };
 }
 
+async function createGemma4V1ArtifactLock(model: CuratedModel): Promise<CatalogArtifactLock> {
+  const directory = 'assets/strands-gemma4-v1';
+  const sourcePath = directory + '/manifest.json';
+  const {bytes, value} = await readJson(path.join(packageRoot, sourcePath));
+  const rawSha256 = sha256(bytes);
+  failUnless(
+    model.modelId === 'strands-decider-e2b-gemma4-v1-2610' &&
+      rawSha256 === 'dd0c1f78442cd4ec4d3fc2766def0a53b7dcf350772df2d249ac06cbdd490faa',
+    'Gemma v1 manifest differs from its immutable pin.'
+  );
+  type Source = Readonly<{repository: string; revision: string; file: string; bytes: number; sha256: string}>;
+  const manifest = value as {
+    modelId: string;
+    base: Source;
+    adapter: Source;
+    pointer: Source;
+    files: KevManifest['files'];
+  };
+  failUnless(
+    manifest.modelId === model.modelId &&
+      model.description.checkpoint.repository === manifest.adapter.repository &&
+      model.description.checkpoint.revision === manifest.adapter.revision &&
+      model.description.checkpoint.weightSha256 === manifest.adapter.sha256,
+    'Gemma v1 catalog checkpoint differs from its immutable pin.'
+  );
+  const bundledRuntimeFiles = buildBundledFileRecords(
+    manifest,
+    await Promise.all(
+      Object.keys(manifest.files).map(async (manifestName) => {
+        const sourcePath = directory + '/' + manifestName;
+        return {manifestName, sourcePath, bytes: await readFile(path.join(packageRoot, sourcePath))};
+      })
+    )
+  );
+  const canonicalBytes = canonicalManifestBytes(manifest);
+  const upstreams = Object.entries({
+    checkpoint: manifest.base,
+    adapter: manifest.adapter,
+    readout: manifest.pointer
+  }).map(([role, item]) => ({
+    role,
+    repository: item.repository,
+    revision: item.revision,
+    sourcePath: item.file,
+    sourceBytes: item.bytes,
+    sourceSha256: item.sha256
+  }));
+  return {
+    schemaVersion: 1,
+    manifest: {
+      sourcePath,
+      rawSha256,
+      canonicalSha256: sha256(canonicalBytes),
+      canonicalBytes: canonicalBytes.byteLength,
+      experimental: false,
+      files: manifest.files
+    },
+    bundledRuntimeFiles,
+    upstreams
+  };
+}
+
 export async function createModelArtifactLock(
   model: CuratedModel,
   options: Readonly<{directKevArtifactDirectory?: string}> = {}
@@ -977,6 +1039,7 @@ export async function createModelArtifactLock(
   if (model.description.adapter === 'strands-qwen35') return createQwen35ArtifactLock(model);
   if (model.description.adapter === 'mapika2b') return createMapika2bArtifactLock(model);
   if (model.description.adapter === 'strands-gemma4-v2') return createGemma4V2ArtifactLock(model);
+  if (model.description.adapter === 'strands-gemma4-v1') return createGemma4V1ArtifactLock(model);
   throw new Error('No artifact recipe is registered for adapter ' + model.description.adapter + '.');
 }
 
@@ -1125,6 +1188,8 @@ export function publicLoadOptionsForAdapter(adapter: string): readonly string[] 
   if (adapter === 'kanana' || adapter === 'strands-qwen35') return commonOptions;
   if (adapter === 'mapika2b') return [...commonOptions, 'temperature', 'temperatureByType', 'limits'];
   if (adapter === 'strands-gemma4-v2') return [...commonOptions, 'maxLength'];
+  if (adapter === 'strands-gemma4-v1')
+    return [...commonOptions, 'maxLength', 'maxBatch', 'maxBatchTokens', 'usePrefixCache'];
   throw new Error('No public load options are defined for adapter ' + adapter + '.');
 }
 

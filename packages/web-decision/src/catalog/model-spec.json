@@ -332,6 +332,83 @@
           "currentBundleJavascript": "not-applicable"
         }
       }
+    },
+    {
+      "modelId": "strands-decider-e2b-gemma4-v1-2610",
+      "description": {
+        "adapter": "strands-gemma4-v1",
+        "precision": "BF16 Gemma 4 E2B base with FP32 Strands adapter, pointer head, and TVM WebGPU computation",
+        "checkpoint": {
+          "repository": "StrandsAgents/strands-decider-E2B-gemma4-v1-2610",
+          "revision": "d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+          "weightSha256": "c7786a59354aa190082b1c3aedb7ff3311fe260f070f360c4d3518762691c551"
+        },
+        "assets": {
+          "integrity": "pinned-manifest",
+          "location": "package-and-pinned-upstream",
+          "additionalFiles": "The compiled graph, range inventory and tokenizer are bundled. The base checkpoint and adapter load from their pinned upstream revisions."
+        },
+        "licenses": {
+          "project": "Apache-2.0",
+          "modelTerms": "Apache-2.0",
+          "modelCard": "https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v1-2610/tree/d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+          "baseModelCard": "https://huggingface.co/google/gemma-4-E2B-it/tree/3e22461f65e89153144f8adb70e3b8c2cc9845a7"
+        },
+        "backend": {
+          "name": "tvm-webgpu",
+          "requiredFeatures": [],
+          "requiredLimits": {
+            "maxBufferSize": 75497472,
+            "maxStorageBufferBindingSize": 75497472
+          },
+          "requiresNonFallbackAdapter": false
+        },
+        "features": {
+          "textChoice": {
+            "status": "implemented",
+            "abstention": "explicit-noul",
+            "limits": [
+              {
+                "resource": "tokens",
+                "scope": "question",
+                "defaultMax": 4096,
+                "max": 131072,
+                "description": "Includes state and question tokens. Longer configured windows are subject to device limits."
+              },
+              {
+                "resource": "options",
+                "scope": "question",
+                "max": 255,
+                "description": "Maximum choices on a choice question."
+              },
+              {
+                "resource": "questions",
+                "scope": "request",
+                "min": 1
+              }
+            ],
+            "handling": "causal-state-and-question-pointer",
+            "tokenCount": "state-tokens-per-prefix-evaluation-plus-sum-of-question-tokens",
+            "score": {
+              "basis": "strands-pointer",
+              "calibration": "not-guaranteed"
+            }
+          },
+          "typedTextQuestionTypes": [
+            "choice",
+            "noul",
+            "score"
+          ],
+          "imageChoice": {
+            "status": "not-implemented"
+          }
+        },
+        "verification": {
+          "currentBundleGpu": "see-release-evidence",
+          "currentBundleCpuWasm": "not-applicable",
+          "currentBundleJavascript": "not-applicable"
+        }
+      }
     }
   ]
 }

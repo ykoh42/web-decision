@@ -1,0 +1,10 @@
+Gemma 4 E2B v1 decision model
+
+The bundled native TVM graph includes the Strands pointer head and model-specific
+lowering derived from StrandsAgents/strands-decider-E2B-gemma4-v1-2610 at
+d383ecf8534b13d49b3b567a1b66f88fca6d50ba. Its tokenizer and license are included.
+
+The Gemma 4 E2B instruction-tuned base weights are by Google DeepMind and are
+loaded from google/gemma-4-E2B-it at 3e22461f65e89153144f8adb70e3b8c2cc9845a7.
+The base weights and Strands adapter weights are supplied by the pinned upstream
+repositories and are verified before use. Both models use Apache License 2.0.

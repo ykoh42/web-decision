@@ -63,6 +63,14 @@ export default defineConfig({
   plugins: [
     resolveTvmTypeBoundary(),
     {
+      name: 'preserve-gemma4-v1-runtime-asset-urls',
+      enforce: 'pre',
+      resolveFileUrl({fileName, relativePath}) {
+        if (!fileName.startsWith('gemma4-v1/')) return null;
+        return `new URL(${JSON.stringify('./' + relativePath + '?no-inline')}, import.meta.url).href`;
+      }
+    },
+    {
       name: 'verify-pinned-webgpu-source',
       buildStart() {
         const path = fileURLToPath(new URL('../../.toolchains/apache-tvm-src/web/src/webgpu.ts', import.meta.url));
@@ -85,6 +93,7 @@ export default defineConfig({
       output: {
         assetFileNames(assetInfo) {
           const sourcePath = assetInfo.originalFileName?.replaceAll('\\', '/') ?? '';
+          if (sourcePath.includes('assets/strands-gemma4-v1/')) return 'gemma4-v1/[name].[ext]';
           if (sourcePath.includes('assets/strands-gemma4-v2/')) return 'gemma4-v2/[name].[ext]';
           return sourcePath.includes('assets/qwen35/') ? 'qwen35/[hash]/[name].[ext]' : '[name].[ext]';
         }

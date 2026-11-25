@@ -21,6 +21,7 @@
     "strands-qwen35-consumer.ts",
     "mapika2b-consumer.ts",
     "strands-gemma4-v2-consumer.ts",
+    "strands-gemma4-v1-consumer.ts",
     "pending-model-ids.ts"
   ]
 }

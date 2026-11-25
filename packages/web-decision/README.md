@@ -7,6 +7,7 @@
 | Kanana 2 V Decide 3B | `kanana-2-v-decide-3b-2611` |
 | Strands Decider 2B Qwen3.5 | `strands-decider-2b-qwen3.5-v1-2610` |
 | Mapika Decider 2B v12 | `mapika-decider-2b-v12` |
+| Strands Decider E2B Gemma 4 v1 | `strands-decider-e2b-gemma4-v1-2610` |
 | Strands Decider E2B Gemma 4 v2 | `strands-decider-e2b-gemma4-v2-2611` |
 
 `listModels()` returns the models in the installed package. `describeModel(modelId)` shows the pinned checkpoint, input limits, and verification metadata.
@@ -47,6 +48,8 @@ The models require WebGPU. The catalog describes model-specific limits and the r
 Mapika loads the text runner first. It fetches embedding ranges and image assets as requests need them, and caches verified downloads by default. Its `systemOne()` accepts the pinned Decider request format, including `choice`, `score`, `noul`, and PNG or JPEG images.
 
 To prepare Mapika for offline use, call `await model.prepareOffline({signal, onProgress})` while online. Both options are optional. A complete model cache uses about 4.5 GB of browser storage. Check `model.cacheStatus` for `'complete'`, then pass `offline: true` when loading the model offline.
+
+Strands Gemma 4 v1 accepts text state and keyed `choice`, `noul`, and `score` questions. Its pinned serving default is 4,096 tokens per question, including state tokens. Set `maxLength` to request a different context length up to the base model's 131,072-position capacity. The actual accepted length depends on the device. `maxBatch`, `maxBatchTokens`, and `usePrefixCache` control prefix reuse and input usage. The package includes the native TVM graph and tokenizer and verifies the pinned base and adapter ranges before use. See the packaged [license](./STRANDS-GEMMA4-V1-LICENSE.md) and [notice](./STRANDS-GEMMA4-V1-NOTICE).
 
 Strands Gemma 4 v2 accepts keyed `choice`, `noul`, and `score` questions and base64 images. Use a `Map` to preserve the order of numeric-looking keys. Use `bigint` for exact large integers in structured content and `kananaFloat(2)` to render the float `2.0`. The default is 32,768 input tokens per question, counting state, image, and question tokens. Set `maxLength` at load time or for an individual `systemOne()` call. Actual capacity depends on the GPU and its buffer limits. The pinned checkpoint contains about 10.25 GB of weights. See the packaged [license](./STRANDS-GEMMA4-V2-LICENSE) and [notice](./STRANDS-GEMMA4-V2-NOTICE) for attribution.
 

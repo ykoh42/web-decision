@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "modelId": "strands-decider-e2b-gemma4-v1-2610",
+  "status": "verified",
+  "sourceLineage": [
+    {
+      "role": "checkpoint",
+      "repository": "google/gemma-4-E2B-it",
+      "revision": "3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+      "path": "model.safetensors",
+      "bytes": 10246621918,
+      "sha256": "2db5482b20d746879bb3ef79b5203e9075a2e2b98f54ec7c2f281c1477ddc550"
+    },
+    {
+      "role": "adapter",
+      "repository": "StrandsAgents/strands-decider-E2B-gemma4-v1-2610",
+      "revision": "d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+      "path": "lora/adapter_model.safetensors",
+      "bytes": 289950976,
+      "sha256": "c7786a59354aa190082b1c3aedb7ff3311fe260f070f360c4d3518762691c551"
+    },
+    {
+      "role": "readout",
+      "repository": "StrandsAgents/strands-decider-E2B-gemma4-v1-2610",
+      "revision": "d383ecf8534b13d49b3b567a1b66f88fca6d50ba",
+      "path": "head.safetensors",
+      "bytes": 9456104,
+      "sha256": "31220ff165a8bb6e48b87a85de11cbfc8660b7047049ea2f91872e1b6ddb45a9"
+    }
+  ],
+  "referenceFiles": {
+    "modelCard": {
+      "url": "https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v1-2610/resolve/d383ecf8534b13d49b3b567a1b66f88fca6d50ba/README.md",
+      "bytes": 15592,
+      "sha256": "84fd725059fb1cbdbf82a312e8ec7aa6cdf4e9dc75e4c92aa28161055a2a6f29"
+    },
+    "license": {
+      "path": "packages/web-decision/STRANDS-GEMMA4-V1-LICENSE.md",
+      "sha256": "0a526e4695eb2b9e8cd57655446ed77c3d4a35e55165f434ee5479071ce44ca0",
+      "upstreamUrl": "https://huggingface.co/StrandsAgents/strands-decider-E2B-gemma4-v1-2610/resolve/d383ecf8534b13d49b3b567a1b66f88fca6d50ba/LICENSE.md"
+    },
+    "notice": {
+      "path": "packages/web-decision/STRANDS-GEMMA4-V1-NOTICE",
+      "sha256": "b67d5f10635c91ebc89a24b1de97c44b9fc0ca27d83747c8c47a82e4f371e2eb"
+    },
+    "baseModelCard": {
+      "url": "https://huggingface.co/google/gemma-4-E2B-it/resolve/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md",
+      "bytes": 27955,
+      "sha256": "3e0608a6be80e3eb040a5aa6c76707809503deb85be6360184a118fb6156526c"
+    }
+  },
+  "rights": [
+    {
+      "subject": "Pinned Strands E2B Gemma 4 v1 pointer, tokenizer and browser lowering",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Include the exact original packaged license.",
+        "Preserve the source attribution and mark the generated browser artifact as a modification."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/STRANDS-GEMMA4-V1-LICENSE.md",
+        "sha256": "0a526e4695eb2b9e8cd57655446ed77c3d4a35e55165f434ee5479071ce44ca0"
+      }
+    },
+    {
+      "subject": "Attribution for pinned Gemma 4 E2B base and Strands adapter",
+      "license": "Apache-2.0",
+      "redistribution": "conditional",
+      "conditions": [
+        "Retain attribution and license information."
+      ],
+      "evidence": {
+        "path": "packages/web-decision/STRANDS-GEMMA4-V1-NOTICE",
+        "sha256": "b67d5f10635c91ebc89a24b1de97c44b9fc0ca27d83747c8c47a82e4f371e2eb"
+      }
+    }
+  ],
+  "distributionScope": "Package includes the compiled pointer and decoder graph with tokenizer, graph metadata and range digests. The original base and adapter weights are retrieved from pinned upstream public ranges. Benchmark data stays outside the archive. Runtime parity is determined separately by exact-release evidence.",
+  "conversion": {
+    "repository": "https://github.com/ykoh42/web-decision",
+    "revision": "a7480215fda45a253da02642fe8493ac69248a2e",
+    "recipe": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v1-conversion.json",
+      "sha256": "85b7d197e43b1e23ea23c049bb9a52e48085ca1f4761e04ad64f592c4a7f9bd7"
+    },
+    "config": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v1-conversion.json",
+      "sha256": "85b7d197e43b1e23ea23c049bb9a52e48085ca1f4761e04ad64f592c4a7f9bd7"
+    },
+    "toolchain": {
+      "path": "packages/web-decision/src/catalog/provenance/strands-gemma4-v1-conversion.json",
+      "sha256": "85b7d197e43b1e23ea23c049bb9a52e48085ca1f4761e04ad64f592c4a7f9bd7"
+    },
+    "artifactLockSha256": "e3f13f658e552486a598ab0466a0c6153cc8b5b04ccd2d02c80aba4f65cffd81"
+  }
+}

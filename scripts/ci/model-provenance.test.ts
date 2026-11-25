@@ -87,6 +87,7 @@ test('the provenance manifest covers every locked curated model', async () => {
     'kanana-2-v-decide-3b-2611',
     'mapika-decider-2b-v12',
     QWEN_MODEL_ID,
+    'strands-decider-e2b-gemma4-v1-2610',
     GEMMA_V2_MODEL_ID
   ]);
   assert.deepEqual(manifestIds, catalogIds);

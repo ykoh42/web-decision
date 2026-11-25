@@ -6,7 +6,7 @@ import {lstat, readFile, realpath} from 'node:fs/promises';
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 
 export const MODEL_PROVENANCE_MANIFEST_PATH = 'src/catalog/model-provenance.json';
-export const MODEL_PROVENANCE_MANIFEST_SHA256 = '598aa8886c52332e73062fe36fdddffa521022a6aa5900fb0b47a5d7831fc5b4';
+export const MODEL_PROVENANCE_MANIFEST_SHA256 = '99b8ba2cb8cd07aa0e89abc2340147a77c4ea0c4f571c86df2d13e18a61c75f4';
 export const MODEL_PROVENANCE_EVIDENCE_ROOT = 'src/catalog/provenance';
 export const RELEASE_TEST_PROVENANCE_MANIFEST_SHA256 =
   '2f709fc940e00bcfe15f4e9f49c49c067d9654affa0d17d5997c42677e277870';
@@ -313,6 +313,8 @@ export async function validateCommittedEvidenceReference(
         'packages/web-decision/MAPIKA-APACHE-LICENSE.txt',
         'packages/web-decision/STRANDS-GEMMA4-V2-LICENSE',
         'packages/web-decision/STRANDS-GEMMA4-V2-NOTICE',
+        'packages/web-decision/STRANDS-GEMMA4-V1-LICENSE.md',
+        'packages/web-decision/STRANDS-GEMMA4-V1-NOTICE',
         'packages/web-decision/QWEN-APACHE-LICENSE.txt',
         'packages/web-decision/STRANDS-QWEN35-LICENSE.md'
       ].includes(path),

@@ -1,3 +1,8 @@
+import type {
+  StrandsGemma4V1DecisionModel,
+  StrandsGemma4V1LoadOptions,
+  StrandsGemma4V1ModelId
+} from './strands-gemma4-v1-types.js';
 import type {Mapika2bDecisionModel, Mapika2bLoadOptions} from './mapika2b-types.js';
 import type {PublicModelId} from './public-model-id.generated.js';
 import type {
@@ -83,8 +88,10 @@ export type LoadOptions =
   | KananaLoadOptions
   | StrandsQwen35LoadOptions
   | Mapika2bCuratedLoadOptions
-  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2LoadOptions);
+  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2LoadOptions)
+  | (StrandsGemma4V1ModelId extends never ? never : StrandsGemma4V1LoadOptions);
 export type * from './mapika2b-types.js';
+export type * from './strands-gemma4-v1-types.js';
 
 export interface ModelDescription {
   readonly modelId: ModelId;
@@ -286,7 +293,8 @@ export type LoadedDecisionModel =
   | KananaDecisionModel
   | (StrandsQwen35ModelId extends never ? never : StrandsQwen35DecisionModel)
   | (Mapika2bModelId extends never ? never : Mapika2bDecisionModel<Mapika2bModelId>)
-  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2DecisionModel);
+  | (StrandsGemma4V2ModelId extends never ? never : StrandsGemma4V2DecisionModel)
+  | (StrandsGemma4V1ModelId extends never ? never : StrandsGemma4V1DecisionModel);
 
 export function listModels(): readonly ModelDescription[];
 export function describeModel(modelId: ModelId): ModelDescription;
@@ -294,6 +302,7 @@ export function loadDecisionModel(options: KananaLoadOptions): Promise<KananaDec
 export function loadDecisionModel(options: StrandsQwen35LoadOptions): Promise<StrandsQwen35DecisionModel>;
 export function loadDecisionModel(options: Mapika2bCuratedLoadOptions): Promise<Mapika2bDecisionModel<Mapika2bModelId>>;
 export function loadDecisionModel(options: StrandsGemma4V2LoadOptions): Promise<StrandsGemma4V2DecisionModel>;
+export function loadDecisionModel(options: StrandsGemma4V1LoadOptions): Promise<StrandsGemma4V1DecisionModel>;
 export function loadDecisionModel(options: LoadOptions): Promise<LoadedDecisionModel>;
 export function loadDecisionModel(options: CommonLoadOptions): Promise<LoadedDecisionModel>;
 export function clearModelCache(): Promise<boolean>;

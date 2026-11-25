@@ -1,6 +1,6 @@
 {
   "name": "web-decision",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Curated browser-local decision models running on TVM",
   "type": "module",
   "exports": {
@@ -67,7 +67,16 @@
     "assets/strands-gemma4-v2/scoring.bin",
     "assets/strands-gemma4-v2/source-inventory.json",
     "assets/strands-gemma4-v2/decoder-bindings.json",
-    "assets/strands-gemma4-v2/vision-bindings.json"
+    "assets/strands-gemma4-v2/vision-bindings.json",
+    "src/curated/strands-gemma4-v1-types.d.ts",
+    "STRANDS-GEMMA4-V1-LICENSE.md",
+    "STRANDS-GEMMA4-V1-NOTICE",
+    "assets/strands-gemma4-v1/manifest.json",
+    "assets/strands-gemma4-v1/graph.wasm",
+    "assets/strands-gemma4-v1/graph.json",
+    "assets/strands-gemma4-v1/source-inventory.json",
+    "assets/strands-gemma4-v1/tokenizer.json",
+    "assets/strands-gemma4-v1/tokenizer_config.json"
   ],
   "sideEffects": false,
   "scripts": {
