@@ -101,7 +101,7 @@ test('Kanana evidence is the reachable exact child of the tested source and matc
     maxContextReportSha256: reports.maximumContext,
     modelProvenanceSha256: sha256(Buffer.from('source provenance')),
     conversionConfigSha256: sha256(Buffer.from('source conversion')),
-    maxContextTokens: 8192,
+    maxContextTokens: 20480,
     maxContextPassed: true
   };
   await write(path, JSON.stringify(pin));
@@ -124,6 +124,14 @@ test('Kanana evidence is the reachable exact child of the tested source and matc
   );
   git('checkout', '--quiet', '--detach', source);
   assert.throws(() => assertKananaPromotionEvidence(root, source, receipt));
+  await write(path, JSON.stringify({...pin, maxContextTokens: 8192}));
+  git('add', path);
+  git('commit', '-qm', 'incomplete context evidence');
+  assert.throws(
+    () => assertKananaPromotionEvidence(root, source, {...receipt, kananaEvidenceCommit: git('rev-parse', 'HEAD')}),
+    /Kanana context evidence/u
+  );
+  git('checkout', '--quiet', '--detach', source);
   await write(path, JSON.stringify({...pin, archiveSha256: 'a'.repeat(64)}));
   git('add', path);
   git('commit', '-qm', 'wrong archive evidence');

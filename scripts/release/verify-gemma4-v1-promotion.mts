@@ -242,10 +242,7 @@ export function assertKananaPromotionEvidence(root: string, testedSource: string
     ],
     'Kanana evidence differs from the promotion receipt.'
   );
-  assert.ok(
-    Number.isSafeInteger(pin.maxContextTokens) && (pin.maxContextTokens as number) > 0,
-    'Invalid Kanana context evidence.'
-  );
+  assert.equal(pin.maxContextTokens, 20_480, 'Invalid Kanana context evidence.');
   for (const [key, path] of [
     ['modelProvenanceSha256', 'packages/web-decision/src/catalog/provenance/kanana-2-v-decide-3b-2611.json'],
     ['conversionConfigSha256', 'packages/web-decision/src/catalog/provenance/kanana-conversion-config.json']
