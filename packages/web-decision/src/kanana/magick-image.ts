@@ -1,3 +1,8 @@
+import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
+import {readVerifiedAsset, sha256} from '../assets.js';
+import {WebDecisionError} from '../kev.js';
+import {MAGICK} from '../mapika2b/image-codec-pins.mjs';
+
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 const JPEG_SIGNATURE = [255, 216];
 const BMP_SIGNATURE = [66, 77];
@@ -178,7 +183,3 @@ export async function decodeKananaMagickImage(
   signal?.throwIfAborted();
   return result;
 }
-import type {ByteArray, IMagickImage} from '@imagemagick/magick-wasm';
-import {readVerifiedAsset, sha256} from '../assets.js';
-import {WebDecisionError} from '../kev.js';
-import {MAGICK} from '../mapika2b/image-codec-pins.mjs';

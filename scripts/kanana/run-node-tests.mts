@@ -42,6 +42,7 @@ const compiledSourceMapTests = new Set(coreTests);
 const coverageDirectory = join(packageRoot, 'coverage');
 await mkdir(coverageDirectory, {recursive: true});
 const outputDirectory = await mkdtemp(join(coverageDirectory, 'kanana-tests-'));
+const emittedKanana = join(outputDirectory, 'kanana');
 
 try {
   await writeFile(join(outputDirectory, 'package.json'), '{"type":"module"}\n');
@@ -86,8 +87,8 @@ try {
       cwd: packageRoot,
       env: {
         ...process.env,
-        KANANA_CORE_DIST: outputDirectory,
-        KANANA_TVM_SESSION_DIST: outputDirectory
+        KANANA_CORE_DIST: emittedKanana,
+        KANANA_TVM_SESSION_DIST: emittedKanana
       },
       stdio: 'inherit'
     });

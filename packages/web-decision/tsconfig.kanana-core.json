@@ -4,7 +4,7 @@
     "allowJs": true,
     "allowImportingTsExtensions": true,
     "checkJs": false,
-    "rootDir": "src/kanana",
+    "rootDir": "src",
     "sourceMap": true,
     "rewriteRelativeImportExtensions": true,
     "skipLibCheck": true
