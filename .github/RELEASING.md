@@ -17,6 +17,17 @@ Release only curated models whose TVM artifacts and behavior have been verified.
 
 Review the candidate and evidence before creating a tag or publishing. Publish the exact archive that passed verification.
 
+## 0.8.0 archive identity
+
+The GPU-tested package was built from `4bf2d93e9234bebb8007e6256e0bfa1d822bc0d5`. Before publishing, verify the original archive itself:
+
+```sh
+archive=/path/to/web-decision-0.8.0.tgz
+printf '%s  %s\n' '69574de135185770ba825f58b4ce294b0d2e0189a72a22e4dd8ba7e030b6a923' "$archive" | shasum -a 256 -c
+```
+
+CI builds and tests the source and its own packed archive; it does not receive or verify the original archive. Review the original archive's model evidence and its source identity separately.
+
 ## Historical releases
 
 For 0.1.0–0.3.0, check out the corresponding release tag and follow its build instructions and source lock. The 0.2.0 tag lacks its TVM overlay; restore it before checking the lock:
